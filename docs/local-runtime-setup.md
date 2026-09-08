@@ -291,3 +291,42 @@ malformed handoff errors, sign-in return preservation, and disabled raw token an
 account-info routes. The browser rechecked Home → the original conversation and
 mobile layout. Independent review approved the native service and Home wiring,
 including the narrowly handled `400 invalid_token` revocation retry.
+
+## Account controls and native reminders
+
+Home and the sidebar lead to `/account`. The page lists only the current
+account's channels and uses the same verified challenge flow to link another
+messenger. Disconnect requires confirmation, protects the last sign-in channel,
+revokes the identity and invalidates browser sessions. Logout failures remain
+visible and retryable instead of navigating as though logout succeeded.
+The focused HTTP/database entry point and isolated synthetic channel
+configuration are documented in [account controls](../server/accounts/README.md).
+
+New account provisioning creates the canonical workspace and owner membership
+atomically. Existing accounts cannot restore a deleted membership by logging in,
+linking a channel or resolving their workspace. Native output rechecks active
+identity and membership before enqueue and dispatch; this does not make external
+provider I/O atomic with revocation.
+
+Native Telegram/Kapso schedule tools resolve the authenticated channel owner.
+The existing Eve schedule loop invokes the agent and stores report chunks in the
+durable outbox with a transactionally recorded report/output association.
+The reminders page distinguishes queued, sent, failed, cancelled and uncertain
+delivery. Eve/Linq operations retain their existing dispatch path and do not
+initialize native authority services. No second scheduler was added.
+
+The combined runtime suite passed 53 tests against actual PostgreSQL. The
+subsequent native boundary correction passed 36 regression and 13 PostgreSQL
+tests. A browser journey used fresh Better Auth accounts and signed synthetic
+Telegram/Kapso inputs to verify first sign-in, linking, challenge reset,
+disconnect cancellation, session invalidation, remaining-channel sign-in and
+mobile layout. No provider response was fabricated and no external message was
+sent. Live messenger delivery and exhaustive restart, chaos and load checks
+remain release qualification work.
+
+The final combined check passed all six tasks, including 885 tests in 95 files,
+and the production build passed. The rebuilt browser reproduced the logout
+network failure and verified the correction: offline logout keeps the account
+page and session, displays an error and enables retry; an online retry signs out
+and invalidates the session. Independent review approved the account controls,
+native schedule boundary, membership changes and their composition.

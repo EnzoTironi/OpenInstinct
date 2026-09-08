@@ -8,6 +8,36 @@ import {
 import Link from "next/link";
 import { Button } from "@web/components/ui/button";
 
+const destinations = [
+  {
+    href: "/reminders",
+    title: "Reminders",
+    description:
+      "See what’s scheduled and return to a conversation to make changes.",
+    icon: ClockIcon,
+  },
+  {
+    href: "/personal-info",
+    title: "Personal info",
+    description: "Review the details Companion can use when filling in forms.",
+    icon: UserRoundIcon,
+  },
+  {
+    href: "/chat/history",
+    title: "Conversation history",
+    description:
+      "Return to an earlier conversation and pick up where you left off.",
+    icon: HistoryIcon,
+  },
+  {
+    href: "/account",
+    title: "Account and channels",
+    description:
+      "Connect Telegram or WhatsApp and manage your linked accounts.",
+    icon: UserRoundIcon,
+  },
+];
+
 export function HomeOverview() {
   return (
     <>
@@ -35,50 +65,23 @@ export function HomeOverview() {
           Keep track
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Button
-            nativeButton={false}
-            render={<Link href="/reminders" />}
-            variant="surface"
-          >
-            <ClockIcon aria-hidden="true" />
-            <span className="min-w-0 flex-1 space-y-1">
-              <span className="block type-label">Reminders</span>
-              <span className="block type-caption text-muted-foreground">
-                See what’s scheduled and return to a conversation to make
-                changes.
+          {destinations.map(({ href, title, description, icon: Icon }) => (
+            <Button
+              key={href}
+              nativeButton={false}
+              render={<Link href={href} />}
+              variant="surface"
+            >
+              <Icon aria-hidden="true" />
+              <span className="min-w-0 flex-1 space-y-1">
+                <span className="block type-label">{title}</span>
+                <span className="block type-caption text-muted-foreground">
+                  {description}
+                </span>
               </span>
-            </span>
-            <ArrowUpRightIcon aria-hidden="true" />
-          </Button>
-          <Button
-            nativeButton={false}
-            render={<Link href="/personal-info" />}
-            variant="surface"
-          >
-            <UserRoundIcon aria-hidden="true" />
-            <span className="min-w-0 flex-1 space-y-1">
-              <span className="block type-label">Personal info</span>
-              <span className="block type-caption text-muted-foreground">
-                Review the details Companion can use when filling in forms.
-              </span>
-            </span>
-            <ArrowUpRightIcon aria-hidden="true" />
-          </Button>
-          <Button
-            nativeButton={false}
-            render={<Link href="/chat/history" />}
-            variant="surface"
-          >
-            <HistoryIcon aria-hidden="true" />
-            <span className="min-w-0 flex-1 space-y-1">
-              <span className="block type-label">Conversation history</span>
-              <span className="block type-caption text-muted-foreground">
-                Return to an earlier conversation and pick up where you left
-                off.
-              </span>
-            </span>
-            <ArrowUpRightIcon aria-hidden="true" />
-          </Button>
+              <ArrowUpRightIcon aria-hidden="true" />
+            </Button>
+          ))}
         </div>
         <p className="type-supporting-body text-muted-foreground">
           Want Companion to remember a preference or forget something you

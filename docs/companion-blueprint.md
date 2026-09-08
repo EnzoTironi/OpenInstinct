@@ -599,6 +599,19 @@ cover the initiation path; live Google consent, refresh, revocation and native
 resumption remain unqualified. Better Auth's plaintext ID-token retention is an
 explicit pre-admission limitation recorded with the runtime evidence.
 
+Account controls now list the signed-in user's verified channels, link another
+channel through a fresh browser-bound confirmation, and disconnect an identity
+while invalidating browser sessions. The final sign-in channel is protected.
+New accounts receive their canonical workspace membership in the provisioning
+transaction; returning identities cannot recreate revoked membership.
+
+Telegram and Kapso reminders now use the existing Eve schedule execution and
+the native durable outbox. Execution, queued output and confirmed delivery remain
+distinct states in the reminders view. Fresh identity and membership checks
+apply before native operations and delivery. PostgreSQL and signed synthetic
+browser journeys cover these paths; actual messenger delivery, restart/chaos and
+load qualification remain deferred release work.
+
 ## Source and decision references
 
 - [Baseline and observed checks](companion-assessment.md).

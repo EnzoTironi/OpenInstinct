@@ -32,7 +32,7 @@ membership removal, last-access preservation, revocation and session invalidatio
 initialized `companion_runtime_test` database and makes no provider calls:
 
 ```sh
-TELEGRAM_BOT_ID="account-controls-$(uuidgen)" TELEGRAM_BOT_USERNAME=account_controls_test_bot node --env-file=.env.local --env-file=.env.runtime.local node_modules/tsx/dist/cli.mjs server/accounts/controls.integration.ts
+TELEGRAM_BOT_ID="account-controls-$(uuidgen)" TELEGRAM_BOT_USERNAME=account_controls_test_bot pnpm test:account-channels
 ```
 
 Frontend tests render both purposes and exercise pure error presentation. They do

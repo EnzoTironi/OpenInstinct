@@ -125,7 +125,8 @@
     "build:eve": "eve build",
     "dev:eve": "eve dev",
     "start:eve": "eve start",
-    "test:google-membership": "node --env-file=.env.local --env-file=.env.runtime.local node_modules/tsx/dist/cli.mjs server/google-workspace/membership.integration.ts"
+    "test:google-membership": "node --env-file=.env.local --env-file=.env.runtime.local node_modules/tsx/dist/cli.mjs server/google-workspace/membership.integration.ts",
+    "test:account-channels": "node --env-file=.env.local --env-file=.env.runtime.local node_modules/tsx/dist/cli.mjs server/accounts/controls.integration.ts"
   },
   "version": "0.0.0",
   "type": "module"

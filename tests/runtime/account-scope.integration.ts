@@ -51,7 +51,8 @@ test("verified account creation provisions scope once and never restores revoked
           sql`DELETE FROM public."user" WHERE id = ${identity.userId}`.pipe(
             Effect.andThen(
               sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`
-            )
+            ),
+            Effect.orDie
           )
         )
       );

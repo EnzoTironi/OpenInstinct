@@ -272,9 +272,10 @@ test("real BetterAuth router, signed browser challenge and database session", as
         const sql = yield* PgClient.PgClient;
         yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
         yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
-        for (const id of userIds)
+        for (const id of userIds) {
           yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
-        yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
+          yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
+        }
       })
     );
     await runtime.dispose();

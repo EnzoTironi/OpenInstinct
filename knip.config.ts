@@ -28,6 +28,8 @@ export default {
         "taze.config.ts",
         // Standalone real PostgreSQL check invoked by test:google-membership.
         "server/google-workspace/membership.integration.ts",
+        // Standalone real account/channel controls check invoked by test:account-channels.
+        "server/accounts/controls.integration.ts",
       ],
       ignoreDependencies: [
         // Type owners referenced by the Eve declaration patch, which Knip does not parse.

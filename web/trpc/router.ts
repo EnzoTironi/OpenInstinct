@@ -1,6 +1,7 @@
 import { gateway } from "ai";
 import { z } from "zod";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { TRPCError } from "@trpc/server";
 import { listBrowserTraces } from "@db/services/browser-traces";
 import { saveChat } from "@db/services/chats";
 import { replaceUserProfile } from "@db/services/user-profile";
@@ -10,6 +11,8 @@ import { saveChatSchema } from "@shared/chat/schema";
 import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 import { serverRuntime } from "../../server/runtime";
 import { disconnectGoogleWorkspace } from "../../server/google-workspace";
+import { IdentitySchema } from "../../server/accounts";
+import { revokeLinkedChannelIdentity } from "../../server/accounts/controls";
 import { userProfileSchema } from "@shared/user-profile/schema";
 import {
   vaultCreateItemSchema,
@@ -18,6 +21,32 @@ import {
 import { createTRPCRouter, protectedProcedure } from "./init";
 
 export const appRouter = createTRPCRouter({
+  accountChannels: {
+    revoke: protectedProcedure
+      .input(
+        Schema.toStandardSchemaV1(
+          Schema.Struct({ identityId: IdentitySchema.fields.id })
+        )
+      )
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          revokeLinkedChannelIdentity(
+            ctx.requestHeaders,
+            input.identityId
+          ).pipe(
+            Effect.mapError(
+              () =>
+                new TRPCError({
+                  code: "INTERNAL_SERVER_ERROR",
+                  message:
+                    "Your linked channel could not be updated. Please try again.",
+                })
+            )
+          ),
+          { signal }
+        )
+      ),
+  },
   chats: {
     save: protectedProcedure
       .input(saveChatSchema)
