@@ -3,15 +3,20 @@ import {
   getScheduledReportChannel,
 } from "../../db/services/scheduled-agent-jobs";
 import { randomUUID } from "node:crypto";
+import type { HookContext } from "eve/hooks";
+import completionHook from "../../agent/hooks/scheduled-run-completion";
 import { PgClient } from "@effect/sql-pg";
-import { ConfigProvider, Effect, Layer } from "effect";
+import { ConfigProvider, Effect, Layer, Result } from "effect";
 import { expect, test } from "vitest";
 import { ChannelAccounts } from "../../server/accounts";
 import { ChannelTransport } from "../../server/channels/transport";
 import { Telegram } from "../../server/channels/telegram";
 import { Kapso } from "../../server/channels/kapso";
 import { Messaging } from "../../server/messaging";
-import { dispatchNativeScheduledReport } from "../../server/schedules/native-report";
+import {
+  dispatchNativeScheduledReport,
+  deliverNativeScheduledReport,
+} from "../../server/schedules/native-report";
 import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
@@ -367,3 +372,110 @@ test.each(["telegram", "kapso"] as const)(
       channel
     )
 );
+
+test.each(["telegram", "kapso"] as const)(
+  "%s report delivery attempts the durable outbox immediately and reconciles rejection",
+  (channel) =>
+    run(
+      ({ runId, identityId }) =>
+        Effect.gen(function* () {
+          const sql = yield* PgClient.PgClient;
+          yield* sql`UPDATE scheduled_agent_runs SET outcome = ${sql.json({ kind: "result", summary: "Lembrete: revisar a demonstração do Companion.", urgency: "normal" })} WHERE id = ${runId}`;
+          // Actual provider adapter configuration is absent: it must reject before HTTP,
+          // after the outbox transaction commits. No response or service is fabricated.
+          const delivery = yield* deliverNativeScheduledReport(runId).pipe(
+            Effect.provideService(
+              ConfigProvider.ConfigProvider,
+              ConfigProvider.fromUnknown({})
+            ),
+            Effect.result
+          );
+          expect(Result.isFailure(delivery)).toBe(true);
+          expect(
+            yield* sql`SELECT status, attempts, payload->>'text' AS text, provider_message_id
+      FROM channel_outbox WHERE identity_id = ${identityId}`
+          ).toEqual([
+            {
+              status: "failed",
+              attempts: 1,
+              text: "Lembrete: revisar a demonstração do Companion.",
+              provider_message_id: null,
+            },
+          ]);
+          expect(
+            yield* sql`SELECT report_status FROM scheduled_agent_runs WHERE id = ${runId}`
+          ).toEqual([{ report_status: "failed" }]);
+          expect(
+            yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
+          ).toHaveLength(1);
+          yield* deliverNativeScheduledReport(runId);
+          expect(
+            yield* sql`SELECT status, attempts FROM channel_outbox WHERE identity_id = ${identityId}`
+          ).toEqual([{ status: "failed", attempts: 1 }]);
+        }),
+      channel
+    )
+);
+
+test("native completion hook persists and attempts the report before returning", () =>
+  run(({ runId, identityId, userId, workspaceId }) =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient;
+      const leaseToken = randomUUID();
+      const sessionId = randomUUID();
+      yield* sql`UPDATE scheduled_agent_runs SET status = 'running', report_status = 'not_ready', outcome = NULL,
+      lease_token = ${leaseToken}, lease_expires_at = clock_timestamp() + interval '1 minute', worker_session_id = ${sessionId}
+      WHERE id = ${runId}`;
+      // SAFETY: the hook reads only this synthetic event's session identity, turn and auth; all services are real.
+      const context = (
+        initiator: HookContext["session"]["auth"]["initiator"]
+      ) =>
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Synthetic callback data supplies only the hook's consumed fields; database and transport are real.
+        ({
+          session: {
+            id: sessionId,
+            turn: { id: "turn-0", sequence: 0 },
+            auth: { current: null, initiator },
+          },
+        }) as HookContext;
+      const handler = completionHook.events?.["message.completed"];
+      expect(handler).toBeDefined();
+      if (!handler) throw new Error("The completion hook is required.");
+      yield* Effect.tryPromise(async () => {
+        await handler(
+          {
+            type: "message.completed",
+            data: {
+              turnId: "turn-0",
+              stepIndex: 0,
+              sequence: 1,
+              finishReason: "stop",
+              message: "Lembrete: revisar a demonstração do Companion.",
+            },
+            meta: { id: randomUUID(), at: new Date().toISOString() },
+          },
+          context({
+            authenticator: "scheduled-worker",
+            principalId: userId,
+            principalType: "user",
+            attributes: {
+              scheduledRunId: runId,
+              scheduledRunLeaseToken: leaseToken,
+              conversationChannel: "telegram",
+              conversationId: identityId,
+              channelIdentityId: identityId,
+              workspaceId,
+            },
+          })
+        );
+      });
+      // The synthetic installation cannot match the configured real bot. The real
+      // transport rejects before HTTP, proving this hook attempted the queued item.
+      expect(
+        yield* sql`SELECT status, report_status FROM scheduled_agent_runs WHERE id = ${runId}`
+      ).toEqual([{ status: "completed", report_status: "failed" }]);
+      expect(
+        yield* sql`SELECT status, attempts, provider_message_id FROM channel_outbox WHERE identity_id = ${identityId}`
+      ).toEqual([{ status: "failed", attempts: 1, provider_message_id: null }]);
+    })
+  ));

@@ -1,6 +1,6 @@
 import type { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
 import { serverRuntime } from "../../../server/runtime";
-import { dispatchNativeScheduledReport } from "../../../server/schedules/native-report";
+import { deliverNativeScheduledReport } from "../../../server/schedules/native-report";
 import type { AttachSessionFn } from "eve/channels";
 import type { ScheduleToFn } from "eve/schedules";
 import {
@@ -23,7 +23,7 @@ export async function dispatchScheduledReport(
   conversationChannel: typeof scheduledConversationChannelSchema.Type
 ) {
   if (conversationChannel === "telegram" || conversationChannel === "kapso") {
-    await serverRuntime.runPromise(dispatchNativeScheduledReport(runId));
+    await serverRuntime.runPromise(deliverNativeScheduledReport(runId));
     return;
   }
   const claimed = await claimScheduledReport(runId);

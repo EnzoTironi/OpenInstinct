@@ -1,4 +1,7 @@
 import { defineHook } from "eve/hooks";
+import { serverRuntime } from "../../server/runtime";
+import { dispatchItem } from "../../server/channels/dispatch";
+import { deliverNativeScheduledReport } from "../../server/schedules/native-report";
 import { scheduledRunIdentity } from "@agent/lib/schedules/identity";
 import { scheduledRunOutcomeSchema } from "@shared/schedules/outcome";
 import {
@@ -144,10 +147,20 @@ export default defineHook({
         sessionId: ctx.session.id,
       });
       if (completed.run.reportStatus === "pending") {
-        console.info("[scheduled-run] completion report queued", {
+        console.info("[scheduled-run] completion report pending", {
           runId: completed.run.id,
           sessionId: ctx.session.id,
         });
+        const channel =
+          ctx.session.auth.initiator?.attributes.conversationChannel;
+        if (channel === "telegram" || channel === "kapso") {
+          await serverRuntime.runPromise(
+            dispatchItem(
+              completed.run.id,
+              deliverNativeScheduledReport(completed.run.id)
+            )
+          );
+        }
       }
     },
     async "turn.failed"(event, ctx) {

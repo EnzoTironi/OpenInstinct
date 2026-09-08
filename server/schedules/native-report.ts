@@ -141,3 +141,23 @@ export const dispatchNativeScheduledReport = Effect.fn(
     })
   );
 });
+
+/** Enqueue durably, attempt delivery after commit, then reconcile actual receipts. */
+export const deliverNativeScheduledReport = Effect.fn(
+  "deliverNativeScheduledReport"
+)(function* (runId: string) {
+  yield* dispatchNativeScheduledReport(runId);
+  const sql = yield* PgClient.PgClient;
+  const rows = yield* sql<{ identityId: string }>`
+      SELECT j.conversation_id AS "identityId"
+      FROM scheduled_agent_runs r JOIN scheduled_agent_jobs j ON j.id = r.job_id
+      WHERE r.id = ${runId} AND r.report_status = 'queued'
+        AND j.conversation_channel IN ('telegram', 'kapso')`;
+  if (!rows[0]) return;
+  const transport = yield* ChannelTransport;
+  const delivery = yield* transport
+    .drainOutbox(rows[0].identityId)
+    .pipe(Effect.result);
+  yield* dispatchNativeScheduledReport(runId);
+  yield* Effect.fromResult(delivery);
+});
