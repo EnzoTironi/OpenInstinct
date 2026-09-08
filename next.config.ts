@@ -55,6 +55,10 @@ export default function companionConfig(
                     source: `/api/channels/${channel}`,
                     destination: `${destination}/channels/${channel}`,
                   })),
+                  ...["report", "respond"].map((operation) => ({
+                    source: `/internal/scheduled-run/${operation}`,
+                    destination: `${destination}/internal/scheduled-run/${operation}`,
+                  })),
                 ],
               };
             })
