@@ -166,6 +166,13 @@ destroying useful implementation indiscriminately.
 
 The engineering package table in the blueprint remains a dependency map. It is
 not a requirement to finish every subsystem before touching the user experience.
+The current development priority is to connect and polish existing product flows.
+Record unresolved recovery and provider limits in the runtime evidence rather
+than blocking all product implementation on exhaustive qualification. Keep focused
+checks and independent review for changes; schedule comprehensive crash, chaos,
+load and provider qualification for release readiness. This changes development
+order, not the real-user admission gates below.
+
 Implement the smallest complete cross-package slice and test it immediately:
 
 1. Real text request → verified identity → Eve response → durable delivery → restart.

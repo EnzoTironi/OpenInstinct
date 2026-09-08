@@ -187,6 +187,27 @@ restoration for active continuations and pending approvals. Three installed-pack
 regression tests cover those cases. This proves the local scheduled report path; external channel
 delivery and general interrupted model-step replay still require separate proof.
 
+A crash during an active turn exposed a separate callback boundary: ordinary
+turn-scoped dynamic tools are not rebound by Eve after restart. An explicit public
+`rebindMissingCallbacks` opt-in now enables Eve's existing rebinding mechanism for
+the messaging resolver. The resolver only selects tools; it performs no delivery
+while resolving. The default remains disabled, and step-scoped callbacks are not
+covered. Installed-package tests check the omitted, false and true settings.
+
+The native Spark crash probe killed Eve after the memory step completed and the
+next step started. After restart, the memory document kept the exact same version,
+there was one successful memory write, and the resumed turn completed with one
+successful response. This required manually releasing the one queue lock owned
+by the targeted worker through Graphile Worker's public recovery API. The
+installed worker normally retains such locks for four hours; this is evidence of
+completed-step replay after manual queue recovery, not automatic crash recovery.
+The earlier run without the opt-in failed to restore the response callback.
+
+A different probe killed Eve after a successful memory action but before its step
+completed. Manual queue recovery repeated that write and changed the document
+version. Its strict duplicate-effect oracle failed and remains recorded. The
+completed-step success does not close interrupted-step effect idempotency.
+
 Native approvals, stop/correction UX, voice/files and real channel delivery
 remain unqualified. Existing
 Telegram/Kapso webhook configuration has not been redirected to this local server.

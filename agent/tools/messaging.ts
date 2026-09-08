@@ -51,6 +51,8 @@ function defineSendMessage() {
 }
 
 export default defineDynamic({
+  // This resolver only selects tool definitions; cold recovery can safely rebuild them.
+  rebindMissingCallbacks: true,
   events: {
     "turn.started": (_event, context) => {
       const principal =

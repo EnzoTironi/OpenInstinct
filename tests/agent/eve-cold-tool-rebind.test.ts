@@ -1,6 +1,7 @@
 // Exercise the installed, pinned Eve runtime; its callback registry and context must share one package instance.
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
+import { defineDynamic } from "eve/tools";
 
 import type { SessionAuthContext } from "../../node_modules/eve/dist/src/channel/types.js";
 import {
@@ -32,6 +33,26 @@ import {
   stampDurableDynamicToolCallbacks,
 } from "../../node_modules/eve/dist/src/tools/durable-callbacks.js";
 import { restoreTurnDynamicToolCallbacks } from "../../node_modules/eve/dist/src/execution/restore-turn-dynamic-tools.js";
+import { normalizeToolDefinition } from "../../node_modules/eve/dist/src/internal/authored-definition/schema-backed.js";
+
+it.each([
+  { enabled: undefined, expected: false },
+  { enabled: false, expected: false },
+  { enabled: true, expected: true },
+])(
+  "compiles the public cold callback opt-in: $enabled",
+  ({ enabled, expected }) => {
+    const tool = defineDynamic({
+      events: { "turn.started": () => null },
+      rebindMissingCallbacks: enabled,
+    });
+    expect(normalizeToolDefinition(tool, "Expected a dynamic tool.")).toEqual({
+      eventNames: ["turn.started"],
+      kind: "dynamic-tool",
+      rebindMissingCallbacks: expected,
+    });
+  }
+);
 
 const responder: SessionAuthContext = {
   attributes: {},
