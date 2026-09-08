@@ -1,0 +1,47 @@
+{
+  "message": {
+    "id": "wamid.redacted",
+    "from": "15550002222",
+    "text": {
+      "body": "/start aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "type": "text",
+    "kapso": {
+      "origin": "cloud_api",
+      "status": "delivered",
+      "content": "redacted",
+      "direction": "inbound",
+      "has_media": false,
+      "processing_status": "pending"
+    },
+    "context": null,
+    "username": null,
+    "timestamp": "1788895784",
+    "from_user_id": "redacted",
+    "from_parent_user_id": null
+  },
+  "conversation": {
+    "id": "redacted",
+    "kapso": {
+      "messages_count": 2,
+      "last_inbound_at": "redacted",
+      "last_message_id": "wamid.redacted",
+      "last_message_text": "redacted",
+      "last_message_type": "text",
+      "last_message_timestamp": "redacted"
+    },
+    "status": "active",
+    "metadata": {},
+    "username": null,
+    "created_at": "redacted",
+    "updated_at": "redacted",
+    "contact_name": "redacted",
+    "phone_number": "15550002222",
+    "last_active_at": "redacted",
+    "phone_number_id": "123456789",
+    "business_scoped_user_id": "redacted",
+    "parent_business_scoped_user_id": null
+  },
+  "phone_number_id": "123456789",
+  "is_new_conversation": false
+}

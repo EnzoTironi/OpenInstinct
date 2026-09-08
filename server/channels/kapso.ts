@@ -50,7 +50,7 @@ const message = Schema.Struct({
   from: Schema.optionalKey(Schema.String),
   to: Schema.optionalKey(Schema.String),
   text: Schema.optionalKey(Schema.Struct({ body: Schema.String })),
-  context: Schema.optionalKey(Schema.Struct({ id: messageId })),
+  context: Schema.optionalKey(Schema.NullOr(Schema.Struct({ id: messageId }))),
   image: Schema.optionalKey(media),
   document: Schema.optionalKey(media),
   audio: Schema.optionalKey(media),
@@ -107,7 +107,8 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
   const incoming = item.message;
   if (
     incoming?.kapso.direction !== "inbound" ||
-    incoming.kapso.status !== "received"
+    (incoming.kapso.status !== "received" &&
+      incoming.kapso.status !== "delivered")
   )
     return null;
   // Documented live origins; direction/status still exclude Business App sends.

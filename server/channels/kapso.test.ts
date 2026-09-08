@@ -2,6 +2,7 @@ import { Effect, type Schema } from "effect";
 import { expect, test } from "vitest";
 import { parseKapsoWebhook } from "./kapso";
 import { ProviderInputError } from "./provider-errors";
+import receivedDelivery from "./fixtures/kapso-received.redacted.json";
 
 const now = 1_800_000_000_000;
 const installation = {
@@ -108,7 +109,7 @@ test("ignores status/outbound/group/system events and rejects unsupported ID-onl
       ...base,
       message: {
         ...baseMessage,
-        kapso: { direction: "inbound", status: "delivered" },
+        kapso: { direction: "outbound", status: "delivered" },
       },
     })
   ).toEqual([]);
@@ -240,3 +241,23 @@ test.each(["history_sync", "unknown_future_origin", undefined])(
     );
   }
 );
+
+// Actual delivery 08279d9d-1918-4560-bc64-a4e3d635458e, retrieved from
+// Kapso log_search; identifiers and user text redacted, shape/status preserved.
+test("accepts the live inbound delivery with null context and delivered status", async () => {
+  const events = await Effect.runPromise(
+    parseKapsoWebhook(
+      receivedDelivery,
+      installation,
+      Number(receivedDelivery.message.timestamp) * 1000
+    )
+  );
+  expect(events).toHaveLength(1);
+  expect(events[0]).toMatchObject({
+    kind: "command",
+    command: "start",
+    token: "a".repeat(43),
+    senderId: "15550002222",
+    installationId: "123456789",
+  });
+});
