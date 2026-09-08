@@ -245,7 +245,7 @@ the response. Desktop and mobile layouts were inspected.
 Google setup now carries a validated local conversation destination through the
 existing connection flow. The browser exercised chat → Home → the same chat and
 rejected an external return destination. Live Google authorization remains
-unqualified because the local connector is unavailable.
+unqualified because Google OAuth credentials are not configured.
 
 The read-only reminders page consumes existing scheduled jobs and their latest
 execution and report states. Three real PostgreSQL cases cover account isolation,
@@ -253,3 +253,32 @@ conversation ownership, empty results and the 50/51 row boundary. Schedule
 completion is not presented as delivery. The page shows UTC, caps the list at 50,
 and keeps changes in the originating conversation; it adds no scheduler or write
 endpoint. Full failure recovery and provider delivery remain release gates.
+
+
+## Self-hosted Google Workspace
+
+Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for a Google OAuth web
+application. Register the exact installation URL followed by
+`/api/auth/callback/google` as its authorized redirect URI. Enable the Gmail,
+Calendar and People APIs and configure the consent audience for the accounts
+that will connect. Follow Google's [web-server OAuth setup](https://developers.google.com/identity/protocols/oauth2/web-server)
+for consent, offline access and any verification required by the requested scopes.
+
+Google linking starts from Home or the conversation's native authorization
+challenge. Better Auth handles the provider callback, account persistence and
+refresh. A conversation challenge also binds the signed-in Companion account to
+its native return destination. `@vercel/connect` remains only for the existing
+Linq integration; Google no longer uses a Vercel connector ID.
+
+The Home connection state reports a stored grant with the required scopes; it is
+not a live Google health check. Missing credentials leave Google visibly
+unavailable. Browser handoffs preserve Better Auth's state cookies, and a revoked
+workspace membership cannot initiate another link. Run the focused database
+check with `pnpm test:google-membership` against `companion_runtime_test`.
+
+Better Auth 1.7.2 encrypts access and refresh tokens at rest, but its Google
+callback persists the identity ID token without that encryption. The ID token
+stays in the linked account row and is removed on unlink; raw account-info and
+token HTTP routes are disabled. This SDK limitation remains an explicit
+pre-admission gap. Live consent, refresh, provider revocation and native
+suspend/resume with Google are still unqualified without Google credentials.

@@ -1,6 +1,6 @@
 # Self-hosted Google Workspace
 
-Better Auth owns provider account storage, encrypted OAuth tokens, OAuth state,
+Better Auth owns provider account storage, encrypted access and refresh tokens, OAuth state,
 the `/api/auth/callback/google` callback, and token refresh. The root authentication
 configuration must enable Google only when both client credentials are configured,
 encrypt OAuth tokens, and disable the raw HTTP token/link/unlink/account-info routes.
@@ -50,7 +50,7 @@ Run the focused real PostgreSQL membership check with the initialized runtime-te
 schema (the check refuses any database except `companion_runtime_test`):
 
 ```sh
-node --env-file=.env.local --env-file=.env.runtime.local node_modules/tsx/dist/cli.mjs server/google-workspace/membership.integration.ts
+pnpm test:google-membership
 ```
 
 It inserts an isolated synthetic membership, issues a real encrypted handoff,

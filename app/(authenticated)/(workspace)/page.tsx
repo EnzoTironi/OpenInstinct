@@ -1,20 +1,13 @@
 import { BotIcon, MailIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  getTokenResponse,
-  NoValidTokenError,
-  UserAuthorizationRequiredError,
-} from "@vercel/connect";
-import { z } from "zod";
+import { Effect, Result } from "effect";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import { getGatewayModel } from "@db/services/settings";
-import { env } from "@shared/environment";
-import {
-  googleWorkspaceReturnTo,
-  googleWorkspaceTokenParams,
-} from "@shared/google-workspace/connection";
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
+import { serverRuntime } from "../../../server/runtime";
+import { readGoogleWorkspaceConnection } from "../../../server/google-workspace";
 import { requireRequestScope } from "@web/auth/request-scope";
 import { GoogleWorkspaceAction } from "./_components/google-workspace-action";
 import { HomeOverview } from "./_components/home-overview";
@@ -26,7 +19,9 @@ export default async function Page({ searchParams }: PageProps<"/">) {
   const returnTo = googleWorkspaceReturnTo(params.returnTo);
   const scope = await requireRequestScope();
   const [googleWorkspace, gatewayModel] = await Promise.all([
-    readGoogleWorkspaceConnection(scope.userId),
+    serverRuntime.runPromise(
+      readGoogleWorkspaceConnection(scope).pipe(Effect.result)
+    ),
     getGatewayModel(scope),
   ]);
 
@@ -49,16 +44,24 @@ export default async function Page({ searchParams }: PageProps<"/">) {
           <MailIcon />
           <AlertTitle>Google connection unavailable</AlertTitle>
           <AlertDescription>
-            Google couldn’t connect. You can return to your conversation and
-            keep chatting.
+            Your Google connection couldn’t be updated. You can return to your
+            conversation and keep chatting.
           </AlertDescription>
         </Alert>
       ) : null}
 
-      <GoogleWorkspaceSection
-        connection={googleWorkspace}
-        returnTo={returnTo}
-      />
+      {Result.isFailure(googleWorkspace) ? (
+        <Alert>
+          <MailIcon />
+          <AlertTitle>Couldn’t load your Google connection</AlertTitle>
+          <AlertDescription>Reload this page to try again.</AlertDescription>
+        </Alert>
+      ) : (
+        <GoogleWorkspaceSection
+          connection={googleWorkspace.success}
+          returnTo={returnTo}
+        />
+      )}
 
       <details className="rounded-lg border border-border/50 p-4">
         <summary className="cursor-pointer type-label">
@@ -81,13 +84,15 @@ function GoogleWorkspaceSection({
   connection,
   returnTo,
 }: {
-  readonly connection?: GoogleWorkspaceConnection;
+  readonly connection: Effect.Success<
+    ReturnType<typeof readGoogleWorkspaceConnection>
+  >;
   readonly returnTo: string;
 }) {
-  const state = connection?.state;
+  const state = connection.state;
   const description =
     state === "connected"
-      ? (connection?.accountLabel ?? "Gmail, Calendar, and Contacts connected.")
+      ? "Gmail, Calendar, and Contacts connected."
       : state === "unavailable"
         ? "Google connections aren’t enabled on this installation yet."
         : "Gmail, Calendar, and Contacts through your Google account.";
@@ -104,39 +109,6 @@ function GoogleWorkspaceSection({
       </div>
     </WorkspaceSection>
   );
-}
-
-interface GoogleWorkspaceConnection {
-  readonly accountLabel: string | null;
-  readonly state: "connected" | "disconnected" | "unavailable";
-}
-
-async function readGoogleWorkspaceConnection(
-  userId: string
-): Promise<GoogleWorkspaceConnection> {
-  try {
-    const response = await getTokenResponse(
-      env.GOOGLE_CONNECTOR_UID,
-      googleWorkspaceTokenParams(userId),
-      { forceRefresh: true }
-    );
-    const claims = z
-      .object({ email: z.string().optional() })
-      .safeParse(response.claims);
-    return {
-      accountLabel:
-        response.name ?? (claims.success ? (claims.data.email ?? null) : null),
-      state: "connected",
-    };
-  } catch (error) {
-    if (
-      error instanceof UserAuthorizationRequiredError ||
-      error instanceof NoValidTokenError
-    ) {
-      return { accountLabel: null, state: "disconnected" };
-    }
-    return { accountLabel: null, state: "unavailable" };
-  }
 }
 
 function WorkspaceSection({

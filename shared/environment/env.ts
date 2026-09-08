@@ -84,7 +84,6 @@ export const env = createEnv({
     // Optional
     BLOB_READ_WRITE_TOKEN: requiredValue.optional(),
     BLOB_STORE_ID: requiredValue.optional(),
-    GOOGLE_CONNECTOR_UID: requiredValue.default("google/open-instinct"),
     GOOGLE_CLIENT_ID: Schema.toStandardSchemaV1(
       Schema.optional(Schema.NonEmptyString.check(Schema.isTrimmed()))
     ),

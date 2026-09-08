@@ -1,5 +1,4 @@
 import { gateway } from "ai";
-import { revokeToken, startAuthorization } from "@vercel/connect";
 import { z } from "zod";
 import { Schema } from "effect";
 import { listBrowserTraces } from "@db/services/browser-traces";
@@ -7,14 +6,10 @@ import { saveChat } from "@db/services/chats";
 import { replaceUserProfile } from "@db/services/user-profile";
 import { selectGatewayModel } from "@db/services/settings";
 import { deleteVaultItem, saveVaultItem } from "@db/services/vault";
-import type { AccessScope } from "@shared/identity/access-scope";
 import { saveChatSchema } from "@shared/chat/schema";
-import { env } from "@shared/environment";
-import {
-  googleWorkspaceSubject,
-  googleWorkspaceTokenParams,
-  googleWorkspaceReturnTo,
-} from "@shared/google-workspace/connection";
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
+import { serverRuntime } from "../../server/runtime";
+import { disconnectGoogleWorkspace } from "../../server/google-workspace";
 import { userProfileSchema } from "@shared/user-profile/schema";
 import {
   vaultCreateItemSchema,
@@ -41,9 +36,9 @@ export const appRouter = createTRPCRouter({
       .mutation(async ({ ctx, input }) => {
         const returnTo = googleWorkspaceReturnTo(input.returnTo);
         if (input.action === "disconnect") {
-          await revokeToken(env.GOOGLE_CONNECTOR_UID, {
-            subject: googleWorkspaceSubject(ctx.scope.userId),
-          });
+          await serverRuntime.runPromise(
+            disconnectGoogleWorkspace(ctx.requestHeaders)
+          );
           const query = new URLSearchParams({
             google: "disconnected",
             returnTo,
@@ -51,13 +46,9 @@ export const appRouter = createTRPCRouter({
           return { redirectTo: `/?${query}` };
         }
 
-        const callbackUrl = new URL(returnTo, ctx.origin);
-        callbackUrl.searchParams.set("google", "connected");
+        const query = new URLSearchParams({ returnTo });
         return {
-          redirectTo: await startGoogleWorkspaceAuthorization(
-            ctx.scope,
-            callbackUrl.toString()
-          ),
+          redirectTo: `/api/google-workspace/connect?${query}`,
         };
       }),
   },
@@ -102,18 +93,6 @@ export const appRouter = createTRPCRouter({
 });
 
 export type AppRouter = typeof appRouter;
-
-async function startGoogleWorkspaceAuthorization(
-  scope: AccessScope,
-  callbackUrl: string
-) {
-  const authorization = await startAuthorization(
-    env.GOOGLE_CONNECTOR_UID,
-    googleWorkspaceTokenParams(scope.userId),
-    { callbackUrl, expiresInMs: 10 * 60_000 }
-  );
-  return authorization.url;
-}
 
 async function readModelCatalog() {
   const { models } = await gateway.getAvailableModels();
