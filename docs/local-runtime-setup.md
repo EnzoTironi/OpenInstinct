@@ -204,3 +204,10 @@ reply values. Full TS7 and lint checks also passed. Earlier full-suite failures
 (two PGlite timeouts during concurrent heavy checks and the obsolete Zod-instance
 assertion) remain recorded; the successful suite ran without concurrent heavy
 checks.
+
+Running the complete uncached check subsequently reproduced three PGlite timeouts
+when Vitest initialized many workers alongside TS7 and lint. Bounding Vitest to
+two workers fixed that resource contention without changing assertions or timeout
+limits. The same `pnpm check --force` command then passed all six tasks and all
+794 tests; the uncached production build also passed. The failed concurrent run
+remains recorded.
