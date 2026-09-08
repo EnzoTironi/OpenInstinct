@@ -1,6 +1,7 @@
 import { gateway } from "ai";
 import { revokeToken, startAuthorization } from "@vercel/connect";
 import { z } from "zod";
+import { Schema } from "effect";
 import { listBrowserTraces } from "@db/services/browser-traces";
 import { saveChat } from "@db/services/chats";
 import { replaceUserProfile } from "@db/services/user-profile";
@@ -12,6 +13,7 @@ import { env } from "@shared/environment";
 import {
   googleWorkspaceSubject,
   googleWorkspaceTokenParams,
+  googleWorkspaceReturnTo,
 } from "@shared/google-workspace/connection";
 import { userProfileSchema } from "@shared/user-profile/schema";
 import {
@@ -28,16 +30,28 @@ export const appRouter = createTRPCRouter({
   },
   googleWorkspace: {
     update: protectedProcedure
-      .input(z.enum(["connect", "disconnect"]))
+      .input(
+        Schema.toStandardSchemaV1(
+          Schema.Struct({
+            action: Schema.Literals(["connect", "disconnect"]),
+            returnTo: Schema.optional(Schema.String),
+          })
+        )
+      )
       .mutation(async ({ ctx, input }) => {
-        if (input === "disconnect") {
+        const returnTo = googleWorkspaceReturnTo(input.returnTo);
+        if (input.action === "disconnect") {
           await revokeToken(env.GOOGLE_CONNECTOR_UID, {
             subject: googleWorkspaceSubject(ctx.scope.userId),
           });
-          return { redirectTo: "/?google=disconnected" };
+          const query = new URLSearchParams({
+            google: "disconnected",
+            returnTo,
+          });
+          return { redirectTo: `/?${query}` };
         }
 
-        const callbackUrl = new URL("/", ctx.origin);
+        const callbackUrl = new URL(returnTo, ctx.origin);
         callbackUrl.searchParams.set("google", "connected");
         return {
           redirectTo: await startGoogleWorkspaceAuthorization(
