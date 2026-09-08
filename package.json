@@ -4,6 +4,7 @@
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@effect/platform-node": "4.0.0-rc.112",
+    "@effect/sql-pg": "4.0.0-rc.112",
     "@googleapis/calendar": "^16.0.0",
     "@googleapis/gmail": "^18.0.0",
     "@googleapis/people": "^8.0.0",
@@ -116,7 +117,7 @@
     "start:app": "node --env-file-if-exists=.env.local scripts/start.ts",
     "test": "turbo run test:app",
     "test:app": "vitest run",
-    "test:runtime": "node --env-file-if-exists=.env.local node_modules/vitest/vitest.mjs run --config vitest.runtime.config.ts",
+    "test:runtime": "node --env-file-if-exists=.env.runtime.local node_modules/vitest/vitest.mjs run --config vitest.runtime.config.ts",
     "types:check": "turbo run types:check:app",
     "types:generate": "next typegen",
     "types:check:app": "tsc --noEmit -p tsconfig.json",

@@ -5,6 +5,7 @@ import {
   reactToMessageOutputSchema,
 } from "@shared/chat/reaction";
 import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
+import { privateMessageTool } from "@agent/lib/private-message-tool";
 
 function defineSendMessage() {
   return defineTool({
@@ -25,6 +26,16 @@ function defineSendMessage() {
 export default defineDynamic({
   events: {
     "turn.started": (_event, context) => {
+      const principal =
+        context.session.auth.current ?? context.session.auth.initiator;
+      const channel = principal?.attributes.conversationChannel;
+      if (channel === "telegram" || channel === "kapso") {
+        const tools = { send_message: privateMessageTool(channel) };
+        return resolveModeValue(context, {
+          interactive: tools,
+          "scheduled-report": tools,
+        });
+      }
       const isLinq = context.channel.kind === "channel:linq";
       const send_message = defineSendMessage();
 

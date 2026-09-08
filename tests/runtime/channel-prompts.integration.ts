@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
-import { Config, ConfigProvider, Effect, Layer, Redacted } from "effect";
+import { ConfigProvider, Effect, Layer } from "effect";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import { test } from "vitest";
 import {
@@ -12,6 +12,8 @@ import {
   ChannelAuthPromptError,
   ChannelAuthPrompts,
 } from "../../server/channel-auth/prompts.ts";
+
+import { runtimeDatabase } from "./database";
 
 const rejected = <A>(
   operation: Effect.Effect<
@@ -31,11 +33,8 @@ const rejected = <A>(
   );
 
 test("encrypted confirmation outbox is idempotent, fenced and never retries uncertain delivery", async () => {
-  const url = await Effect.runPromise(Config.string("DATABASE_URL"));
-  assert.equal(new URL(url).pathname, "/companion_accounts_test");
-  const database = PgClient.layer({ url: Redacted.make(url) });
   const accountsLayer = ChannelAccounts.layer.pipe(
-    Layer.provideMerge(database)
+    Layer.provideMerge(runtimeDatabase)
   );
   const live = ChannelAuthPrompts.layer.pipe(Layer.provideMerge(accountsLayer));
   const testKey = randomBytes(32).toString("base64url");
@@ -309,21 +308,20 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
       }
     }).pipe(
-      Effect.provide(live),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromUnknown({ BETTER_AUTH_SECRET: testKey })
-      )
+      ),
+      Effect.provide(live)
     )
   );
 });
 
 test("prompt preparation delegates revoked link rejection to account preview", async () => {
-  const url = await Effect.runPromise(Config.string("DATABASE_URL"));
-  assert.equal(new URL(url).pathname, "/companion_accounts_test");
-  const database = PgClient.layer({ url: Redacted.make(url) });
   const live = ChannelAuthPrompts.layer.pipe(
-    Layer.provideMerge(ChannelAccounts.layer.pipe(Layer.provideMerge(database)))
+    Layer.provideMerge(
+      ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase))
+    )
   );
   await Effect.runPromise(
     Effect.gen(function* () {
@@ -375,13 +373,13 @@ test("prompt preparation delegates revoked link rejection to account preview", a
         yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
       }
     }).pipe(
-      Effect.provide(live),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromUnknown({
           BETTER_AUTH_SECRET: randomBytes(32).toString("base64url"),
         })
-      )
+      ),
+      Effect.provide(live)
     )
   );
 });

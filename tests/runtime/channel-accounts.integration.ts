@@ -16,6 +16,7 @@ import {
   ChannelAccounts,
   ChannelAccountError,
 } from "../../server/accounts/index.ts";
+import { runtimeDatabase } from "./database";
 
 const secret = () => randomBytes(32).toString("base64url");
 
@@ -33,15 +34,7 @@ const rejected = <A>(
     })
   );
 test("channel identities, browser binding, races and revocation against migrated PostgreSQL", async () => {
-  const url = await Effect.runPromise(Config.string("DATABASE_URL"));
-  assert.ok(url, "DATABASE_URL must name a dedicated migrated test database");
-  assert.equal(
-    new URL(url).pathname,
-    "/companion_accounts_test",
-    "Integration requires the dedicated companion_accounts_test database"
-  );
-  const database = PgClient.layer({ url: Redacted.make(url) });
-  const live = ChannelAccounts.layer.pipe(Layer.provideMerge(database));
+  const live = ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase));
   await Effect.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
@@ -581,11 +574,11 @@ test("channel identities, browser binding, races and revocation against migrated
 }, 30_000);
 
 test("session issuance serializes with revocation across real PostgreSQL connections", async () => {
-  const url = await Effect.runPromise(Config.string("DATABASE_URL"));
-  assert.equal(new URL(url).pathname, "/companion_accounts_test");
-  const database = PgClient.layer({ url: Redacted.make(url) });
+  const url = await Effect.runPromise(
+    Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
+  );
   const storage = PgClient.layer({ url: Redacted.make(url) });
-  const live = ChannelAccounts.layer.pipe(Layer.provideMerge(database));
+  const live = ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase));
   await Effect.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;

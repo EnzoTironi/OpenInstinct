@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
-import { Config, Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { expect, test } from "vitest";
 import {
   IdentityInactive,
@@ -11,11 +11,9 @@ import {
   type Lease,
 } from "../../server/messaging";
 
-const database = PgClient.layerConfig({
-  url: Config.redacted("DATABASE_URL"),
-  maxConnections: Config.succeed(8),
-});
-const services = Messaging.layer.pipe(Layer.provideMerge(database));
+import { runtimeDatabase } from "./database";
+
+const services = Messaging.layer.pipe(Layer.provideMerge(runtimeDatabase));
 
 const fixture = Effect.fn("messaging.fixture")(function* (
   body: (
@@ -25,12 +23,6 @@ const fixture = Effect.fn("messaging.fixture")(function* (
   ) => Effect.Effect<void, unknown>
 ) {
   const sql = yield* PgClient.PgClient;
-  const current = yield* sql<{
-    name: string;
-  }>`SELECT current_database() AS name`;
-  if (current[0]?.name !== "companion_messaging_test") {
-    throw new Error("Messaging integration requires its dedicated database.");
-  }
   const userId = randomUUID();
   const identityId = randomUUID();
   yield* Effect.acquireRelease(

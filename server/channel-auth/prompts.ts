@@ -20,12 +20,12 @@ const Status = Schema.Literals([
   "failed",
   "cancelled",
 ]);
-export const PreparePrompt = Schema.Struct({
+const PreparePrompt = Schema.Struct({
   ...PreviewChallenge.fields,
   eventId: Identifier,
 });
-export const PromptLease = Schema.Struct({ challengeId: Id, leaseToken: Id });
-export const PromptReceipt = Schema.Struct({ challengeId: Id, status: Status });
+const PromptLease = Schema.Struct({ challengeId: Id, leaseToken: Id });
+const PromptReceipt = Schema.Struct({ challengeId: Id, status: Status });
 const Envelope = Schema.Struct({ challengeId: Id, ...PreparePrompt.fields });
 const EnvelopeJson = Schema.fromJsonString(Envelope);
 const PromptRow = Schema.Struct({

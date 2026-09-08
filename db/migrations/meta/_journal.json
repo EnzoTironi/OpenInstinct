@@ -92,6 +92,55 @@
       "when": 1788537134684,
       "tag": "0012_harsh_domino",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788865763803,
+      "tag": "0013_channel-accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788866184845,
+      "tag": "0014_durable-messaging",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788867780044,
+      "tag": "0015_pending-channel-proof",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788870247936,
+      "tag": "0016_channel-auth-prompts",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788870571525,
+      "tag": "0017_inbox-source-message",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788871933818,
+      "tag": "0018_outbox-sequence",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788873699414,
+      "tag": "0019_memory-documents",
+      "breakpoints": true
     }
   ]
 }

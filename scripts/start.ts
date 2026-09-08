@@ -53,11 +53,18 @@ const start = Command.make(
         )
       )
     );
-    const destination = `http://127.0.0.1:${String(evePort)}/eve/v1/:path+`;
+    const origin = `http://127.0.0.1:${String(evePort)}`;
+    const requiredRoutes = [
+      ["/eve/v1/:path+", "/eve/v1/:path+"],
+      ["/api/channels/telegram", "/channels/telegram"],
+      ["/api/channels/kapso", "/channels/kapso"],
+    ] as const;
     if (
-      !routes.rewrites.beforeFiles.some(
-        (route) =>
-          route.source === "/eve/v1/:path+" && route.destination === destination
+      !requiredRoutes.every(([source, path]) =>
+        routes.rewrites.beforeFiles.some(
+          (route) =>
+            route.source === source && route.destination === `${origin}${path}`
+        )
       )
     ) {
       return yield* new ServerStopped({

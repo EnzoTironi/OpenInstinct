@@ -3,13 +3,12 @@ import { createWorld } from "@workflow/world-postgres";
 import { Config, Effect, Redacted } from "effect";
 import { Pool } from "pg";
 import { expect, test } from "vitest";
+import { runtimeDatabase } from "./database";
 
 test("Postgres retains workflow stream bytes and closure across client restart", async () => {
   const connectionString = Redacted.value(
-    Effect.runSync(
-      Config.redacted("WORKFLOW_POSTGRES_URL").pipe(
-        Config.orElse(() => Config.redacted("DATABASE_URL"))
-      )
+    await Effect.runPromise(
+      Config.redacted("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
     )
   );
   const runId = `companion-storage-proof-${randomUUID()}`;

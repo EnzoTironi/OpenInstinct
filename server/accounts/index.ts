@@ -17,7 +17,7 @@ export const VerifiedSender = Schema.Struct({
   installationId: Identifier,
   senderId: Identifier,
 });
-export const IssueChallenge = Schema.Struct({
+const IssueChallenge = Schema.Struct({
   channel: channelProviderSchema,
   installationId: Identifier,
   browserSecret: Secret,
@@ -25,20 +25,20 @@ export const IssueChallenge = Schema.Struct({
     Schema.Struct({ userId: Identifier, sessionId: Identifier })
   ),
 });
-export const ConfirmChallenge = Schema.Struct({
+const ConfirmChallenge = Schema.Struct({
   token: Secret,
   sender: VerifiedSender,
 });
-export const ChallengeStatus = Schema.Struct({
+const ChallengeStatus = Schema.Struct({
   challengeId: Uuid,
   browserSecret: Secret,
 });
-export const ConsumeChallenge = Schema.Struct({
+const ConsumeChallenge = Schema.Struct({
   challengeId: Uuid,
   browserSecret: Secret,
   currentSessionId: Schema.optionalKey(Identifier),
 });
-export const RevokeIdentity = Schema.Struct({
+const RevokeIdentity = Schema.Struct({
   identityId: Uuid,
   userId: Identifier,
 });
@@ -78,16 +78,16 @@ const ChallengeRow = Schema.Struct({
   confirmedSenderId: Schema.NullOr(Identifier),
 });
 export const PreviewChallenge = ConfirmChallenge;
-export const ChallengePreview = Schema.Struct({
+const ChallengePreview = Schema.Struct({
   id: Uuid,
   purpose: ChallengeRow.fields.purpose,
   expiresAt: Schema.String,
 });
-export const SessionOwner = Schema.Struct({
+const SessionOwner = Schema.Struct({
   identityId: IdentitySchema.fields.id,
   userId: IdentitySchema.fields.userId,
 });
-export const ConsumedChallenge = Schema.Struct({
+const ConsumedChallenge = Schema.Struct({
   ...SessionOwner.fields,
   purpose: ChallengeRow.fields.purpose,
   principalId: Identifier,

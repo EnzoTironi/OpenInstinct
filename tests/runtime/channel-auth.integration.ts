@@ -9,7 +9,6 @@ import {
   Effect,
   Layer,
   ManagedRuntime,
-  Redacted,
 } from "effect";
 import { Pool } from "pg";
 import { test } from "vitest";
@@ -18,8 +17,10 @@ import {
   type channelChallengeIdSchema,
   type channelChallengeRequestSchema,
 } from "../../shared/identity/channel-auth.ts";
-import { ChannelAccounts } from "../accounts/index.ts";
-import { channelAuthPlugin } from "./index.ts";
+import { ChannelAccounts } from "../../server/accounts/index.ts";
+import { channelAuthPlugin } from "../../server/channel-auth/index.ts";
+
+import { runtimeDatabase } from "./database";
 
 const cookieHeader = (response: Response) =>
   response.headers
@@ -28,11 +29,11 @@ const cookieHeader = (response: Response) =>
     .join("; ");
 
 test("real BetterAuth router, signed browser challenge and database session", async () => {
-  const url = await Effect.runPromise(Config.string("DATABASE_URL"));
-  assert.equal(new URL(url).pathname, "/companion_accounts_test");
-  const database = PgClient.layer({ url: Redacted.make(url) });
+  const url = await Effect.runPromise(
+    Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
+  );
   const runtime = ManagedRuntime.make(
-    ChannelAccounts.layer.pipe(Layer.provideMerge(database))
+    ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase))
   );
   const pool = new Pool({ connectionString: url });
   const installationId = `plugin-test-${randomUUID()}`;

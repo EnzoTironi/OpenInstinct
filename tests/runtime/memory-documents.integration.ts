@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { Config, Effect, Layer, Result } from "effect";
 import { expect, test } from "vitest";
+import { runtimeDatabase } from "./database";
 import {
   MemoryDocuments,
   MemoryDocumentConflict,
@@ -14,7 +15,7 @@ const databaseConfig = {
   maxConnections: Config.succeed(8),
 };
 const services = MemoryDocuments.layer.pipe(
-  Layer.provideMerge(PgClient.layerConfig(databaseConfig))
+  Layer.provideMerge(runtimeDatabase)
 );
 const fixture = Effect.fn("memory.fixture")(function* (
   body: (
@@ -24,11 +25,6 @@ const fixture = Effect.fn("memory.fixture")(function* (
   ) => Effect.Effect<void, unknown>
 ) {
   const sql = yield* PgClient.PgClient;
-  const current = yield* sql<{
-    name: string;
-  }>`SELECT current_database() AS name`;
-  if (current[0]?.name !== "companion_messaging_test")
-    throw new Error("Memory integration requires its dedicated database.");
   const prefix = `memory-proof/${randomUUID()}/`;
   yield* Effect.acquireRelease(Effect.succeed(prefix), () =>
     sql`DELETE FROM memory_document WHERE left(key, char_length(${prefix})) = ${prefix}`.pipe(
@@ -187,7 +183,7 @@ test("forgetting persists empty content with a new version across a second servi
           pid: number;
           name: string;
         }>`SELECT pg_backend_pid() AS pid, current_database() AS name`;
-        expect(connection[0]?.name).toBe("companion_messaging_test");
+        expect(connection[0]?.name).toBe("companion_runtime_test");
         expect(connection[0]?.pid).not.toBe(originalConnection[0]?.pid);
         return yield* fresh.read(key);
       }).pipe(

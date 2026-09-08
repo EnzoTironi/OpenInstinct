@@ -24,17 +24,25 @@ To change Eve's internal port, set `EVE_NEXT_PRODUCTION_PORT` during the build a
 
 Eve uses `@workflow/world-postgres@5.0.0-beta.39`, matching its installed Workflow world/protocol dependency line. `WORKFLOW_POSTGRES_URL` can select a separate workflow database; otherwise the adapter uses `DATABASE_URL`. Run `pnpm workflow:migrate` against that database before starting any workers. The launcher defaults to a pool of 10 and concurrency of 4, configurable through the variables in `.env.example`.
 
-`pnpm test:runtime` runs the separate real-Postgres profile and fails if its database is unavailable. It does not use the unit suite's environment defaults or service mocks. The CI storage job migrates the application, runs workflow setup twice to check repeatability, exercises storage, and builds both servers. Its database and random installation keys are ephemeral.
+`pnpm test:runtime` loads the ignored `.env.runtime.local` and requires a dedicated database named `companion_runtime_test`. Set `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, and `WORKFLOW_POSTGRES_URL` in that file to this database, using your PostgreSQL credentials. The profile checks the connected database name before writing fixtures; it does not load the application's `.env.local` or the unit suite's defaults and mocks. Create the database with your PostgreSQL administrator, then initialize it:
+
+```bash
+node --env-file=.env.runtime.local node_modules/drizzle-kit/bin.cjs migrate --config db/drizzle.config.ts
+node --env-file=.env.runtime.local node_modules/@workflow/world-postgres/bin/setup.js
+pnpm test:runtime
+```
+
+The CI storage job supplies the same dedicated database through environment variables, migrates the application, runs workflow setup twice to check repeatability, exercises storage, and builds both servers. Its database and random installation keys are ephemeral. Storage tests use synthetic inputs through real PostgreSQL; they do not establish provider delivery or authenticated Eve replay.
 
 ## Credential readiness
 
-| Variable             | Current use                                       | Verification                                                                                                                                         |
-| -------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `KERNEL_API_KEY`     | Existing browser worker, loaded only when invoked | Authenticated browser-list request returned HTTP 200. No browser session was created.                                                                |
-| `TELEGRAM_BOT_TOKEN` | Reserved for the planned Telegram channel         | `getMe` confirmed ZoenOSBot; `getWebhookInfo` reported an existing webhook and zero pending updates. Channel is not yet wired into this checkout.    |
-| `KAPSO_API_KEY`      | Reserved for the planned WhatsApp channel         | Dedicated companion-development key; read-only phone-number and webhook requests returned HTTP 200. Number reported CONNECTED; one webhook exists.   |
-| `OPENCODE_API_KEY`   | Local OpenCode CLI experiments                    | Free Muse Spark 1.3 and Nemotron 3.5 Lightning each returned READY through OpenCode 1.17.20, with reported cost zero. Not an Eve runtime credential. |
-| `AI_GATEWAY_API_KEY` | Current upstream Eve model routing outside Vercel | Not configured in this checkout.                                                                                                                     |
+| Variable             | Current use                                       | Verification                                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KERNEL_API_KEY`     | Existing browser worker, loaded only when invoked | Authenticated browser-list request returned HTTP 200. No browser session was created.                                                                                                                     |
+| `TELEGRAM_BOT_TOKEN` | Verified Telegram ingress and durable delivery    | `getMe` confirmed ZoenOSBot; `getWebhookInfo` reported an existing webhook and zero pending updates. Native channel composition is now wired locally; the existing webhook destination remains unchanged. |
+| `KAPSO_API_KEY`      | Verified Kapso ingress and durable delivery       | Dedicated companion-development key; read-only phone-number and webhook requests returned HTTP 200. Number reported CONNECTED; one webhook exists.                                                        |
+| `OPENCODE_API_KEY`   | Local OpenCode CLI experiments                    | Free Muse Spark 1.3 and Nemotron 3.5 Lightning each returned READY through OpenCode 1.17.20, with reported cost zero. Not an Eve runtime credential.                                                      |
+| `AI_GATEWAY_API_KEY` | Current upstream Eve model routing outside Vercel | Not configured in this checkout.                                                                                                                                                                          |
 
 The existing Telegram and Kapso webhook destinations were not modified. Wire the durable ingress path and ownership binding before redirecting either channel. Credential validity alone is not evidence of end-to-end messaging, media handling, approval safety, or recovery.
 
@@ -61,3 +69,52 @@ The self-host runtime increment reproduced a second failure: `next start` alone 
 The updated regression suite passed all 708 tests and all six check tasks without cache. The first run of the new profile exposed missing Knip config discovery; the next exposed the old runtime environment assertion. Both failures are retained in the local evidence logs, and their fixes preserve explicit configuration and environment coverage. Independent review found no remaining material issue in this bounded runtime increment. CI execution is not established by local checks.
 
 Ripwire's runtime delta reports one major verbosity increase in the CI `jobs` mapping and one minor increase in Turbo's `tasks` mapping. The quality gate is not green; the added real-database CI job accounts for the major increase. No baseline suppression or threshold change was applied.
+
+## Native channel and memory increment
+
+Telegram and Kapso now enter the same verified-account, durable inbox/outbox and
+Eve session path. Provider event IDs remain distinct from reply message IDs.
+Account linking uses short-lived, browser-bound challenges, and delivery of its
+confirmation prompt is encrypted at rest. Dispatch revalidates active identity;
+per-item expected failures do not cancel unrelated work. FIFO uses database
+sequences, including text chunks created at the same timestamp.
+
+Profile documents now use PostgreSQL through Eve's public memory backend. Reads
+return versioned content; creates are conditional, and updates compare the last
+read version atomically. Stale writes produce Eve's native conflict error. Empty
+content is persisted with a new version. This storage adapter does not establish
+the source, export, deletion and retained-summary semantics of P06.
+
+The dedicated runtime profile passed 37 tests across nine files. These exercise
+real PostgreSQL and Better Auth, including linking races/replay, delivery leases,
+identity revocation, workflow stream persistence, memory CAS, reconnects, and
+cancellation of a write blocked by an actual database lock. The inherited unit
+suite separately passed 759 tests before the subsequent focused schema regression
+was added; inherited mocks remain regression evidence only.
+
+The composed production HTTP path accepted verified synthetic Telegram messages
+and assigned a burst to the same native session in order. It rejected unsigned
+webhooks and unauthenticated Eve access. The account flow created an actual Better
+Auth cookie after a signed confirmation and rejected premature completion and
+replay. Synthetic sender IDs and local test secrets were used; these checks sent
+no messages through external providers.
+
+Native execution exposed and corrected two additional startup failures: implicit
+file memory had no backend outside Vercel, and Effect's callable schema was not
+recognized by Eve's object-only Standard Schema detector. The public backend and
+a plain Standard Schema wrapper correct these boundaries. The latter has six
+regression cases through the actual installed schema codec, with failure before
+the correction and success after it.
+
+The rebuilt native run reaches model execution and stops with
+`MODEL_CALL_FAILED`: no AI Gateway credentials are configured. This is not an
+end-to-end model or provider qualification. In particular, interrupted model-step
+replay, native approvals, stop/correction UX, voice/files, scheduled execution and
+real channel delivery remain unqualified. Existing Telegram/Kapso webhook
+configuration has not been redirected to this local server.
+
+The latest full lint check passed after converting independent parser cases to
+parameterized tests. TS7 and the uncached production build passed. Ripwire still
+reports generated migration metadata size, recent code churn and a small
+initialization-retry duplication; its quality gate is not green. Those findings
+were not suppressed, and local validation does not establish CI execution.

@@ -104,17 +104,6 @@ export const env = createEnv({
   emptyStringAsUndefined: true,
 });
 
-const authHostname = env.BETTER_AUTH_URL
-  ? new URL(env.BETTER_AUTH_URL).hostname
-  : undefined;
-
-export const localPhoneAuthBypassEnabled =
-  localDevelopment &&
-  (authHostname === "localhost" ||
-    authHostname?.endsWith(".localhost") === true ||
-    authHostname === "127.0.0.1" ||
-    authHostname === "[::1]");
-
 function hasValue(value: string | undefined) {
   return value !== undefined && value.trim().length > 0;
 }

@@ -48,15 +48,13 @@ describe("environment", () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("VERCEL_ENV", undefined);
 
-    const { env, localPhoneAuthBypassEnabled } =
-      await import("@shared/environment");
+    const { env } = await import("@shared/environment");
 
     expect(env).toMatchObject({
       BETTER_AUTH_SECRET: "openinstinct-local-auth-development-secret",
       BETTER_AUTH_URL: "http://localhost:3000",
       SECRET_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     });
-    expect(localPhoneAuthBypassEnabled).toBe(true);
   });
 
   it.each([
@@ -179,26 +177,6 @@ describe("environment", () => {
       "Invalid environment variables"
     );
   });
-
-  it.each([
-    ["http://localhost:3000", "development", undefined, true],
-    ["https://openinstinct.localhost", "development", undefined, true],
-    ["http://localhost:3000", "production", undefined, false],
-    ["http://localhost:3000", "development", "development", false],
-    ["https://preview.example.com", "development", undefined, false],
-  ] as const)(
-    "resolves local phone auth bypass for %s in %s",
-    async (url, nodeEnv, vercelEnv, expected) => {
-      vi.stubEnv("BETTER_AUTH_URL", url);
-      vi.stubEnv("NODE_ENV", nodeEnv);
-      vi.stubEnv("VERCEL_ENV", vercelEnv);
-
-      const { localPhoneAuthBypassEnabled } =
-        await import("@shared/environment");
-
-      expect(localPhoneAuthBypassEnabled).toBe(expected);
-    }
-  );
 
   it("allows non-browser application configuration without a Kernel key", async () => {
     vi.stubEnv("KERNEL_API_KEY", undefined);

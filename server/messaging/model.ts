@@ -71,7 +71,7 @@ export const DeliveryFailureSchema = Schema.Literals([
 ]);
 export type DeliveryFailure = typeof DeliveryFailureSchema.Type;
 
-export const MessageStatus = Schema.Literals([
+const MessageStatus = Schema.Literals([
   "queued",
   "dispatching",
   "accepted",
@@ -80,7 +80,7 @@ export const MessageStatus = Schema.Literals([
   "failed",
   "cancelled",
 ]);
-export const MessageReceiptSchema = Schema.Struct({
+const MessageReceiptSchema = Schema.Struct({
   id: IdentityId,
   identityId: IdentityId,
   key: reference,
@@ -93,7 +93,6 @@ export const MessageReceiptSchema = Schema.Struct({
   resultId: Schema.NullOr(Schema.String),
   lastError: Schema.NullOr(Schema.String),
 });
-export type MessageReceipt = typeof MessageReceiptSchema.Type;
 export const MessageClaimSchema = Schema.Struct({
   ...MessageReceiptSchema.fields,
   status: Schema.Literal("dispatching"),

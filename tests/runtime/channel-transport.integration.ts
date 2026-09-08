@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
-import { Config, ConfigProvider, Effect, Layer } from "effect";
+import { ConfigProvider, Effect, Layer } from "effect";
 import { expect, test } from "vitest";
 import { ChannelAccounts } from "../../server/accounts";
 import { Kapso } from "../../server/channels/kapso";
@@ -12,16 +12,14 @@ import {
 } from "../../server/channels/transport";
 import { Messaging, PayloadConflict } from "../../server/messaging";
 
-const database = PgClient.layerConfig({
-  url: Config.redacted("DATABASE_URL"),
-  maxConnections: Config.succeed(8),
-});
+import { runtimeDatabase } from "./database";
+
 const dependencies = Layer.mergeAll(
   Messaging.layer,
   ChannelAccounts.layer,
   Telegram.layer,
   Kapso.layer
-).pipe(Layer.provideMerge(database));
+).pipe(Layer.provideMerge(runtimeDatabase));
 const services = ChannelTransport.layer.pipe(Layer.provideMerge(dependencies));
 const fixture = Effect.fn("transport.fixture")(function* (
   body: (
@@ -33,11 +31,6 @@ const fixture = Effect.fn("transport.fixture")(function* (
   ) => Effect.Effect<void, unknown>
 ) {
   const sql = yield* PgClient.PgClient;
-  const current = yield* sql<{
-    name: string;
-  }>`SELECT current_database() AS name`;
-  if (current[0]?.name !== "companion_messaging_test")
-    throw new Error("Channel transport requires its dedicated test database.");
   const userId = randomUUID();
   yield* Effect.acquireRelease(
     sql`INSERT INTO "user" (id, name, email) VALUES (${userId}, 'Transport proof', ${`${userId}@example.invalid`})`,

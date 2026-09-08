@@ -9,7 +9,7 @@ const keySchema = Schema.String.check(
 );
 const contentSchema = Schema.String.check(Schema.isMaxLength(4000));
 const versionSchema = Schema.String.check(Schema.isUUID());
-export const MemoryDocumentSchema = Schema.Struct({
+const MemoryDocumentSchema = Schema.Struct({
   content: contentSchema,
   version: versionSchema,
 });

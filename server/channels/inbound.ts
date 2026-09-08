@@ -18,7 +18,7 @@ const base = {
   messageId: ProviderReferenceSchema,
   occurredAt: Schema.String,
 };
-export const InboundEventSchema = Schema.Union([
+const InboundEventSchema = Schema.Union([
   Schema.Struct({
     ...base,
     kind: Schema.Literal("message"),
@@ -72,9 +72,10 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
   const text = payload.text?.trim() ?? "";
   const command =
     /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text);
-  if (command) {
-    if (command[2] && command[2].toLowerCase() !== botUsername?.toLowerCase())
-      return null;
+  if (command?.[2] && command[2].toLowerCase() !== botUsername?.toLowerCase())
+    return null;
+  const greeting = command?.[1]?.toLowerCase() === "start" && !command[3];
+  if (command && !greeting) {
     const token = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
       command[3]
     ).pipe(
@@ -89,7 +90,7 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
     const action = command[1]?.toLowerCase() === "start" ? "start" : "confirm";
     return { ...coordinates, kind: "command", command: action, token };
   }
-  if (/^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) {
+  if (!greeting && /^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) {
     return yield* new ProviderInputError({
       provider: coordinates.channel,
       reason: "invalid_command",

@@ -14,7 +14,7 @@ async function withDocument(body: (key: string) => Promise<void>) {
       const current = yield* sql<{
         name: string;
       }>`SELECT current_database() AS name`;
-      if (current[0]?.name !== "companion_messaging_test")
+      if (current[0]?.name !== "companion_runtime_test")
         throw new Error(
           "Memory backend proof requires its dedicated database."
         );

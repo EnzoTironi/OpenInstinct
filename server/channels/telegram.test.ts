@@ -15,6 +15,21 @@ const baseMessage = {
 const parse = (value: Schema.Json) =>
   Effect.runPromise(parseTelegramUpdate(value, installation, now));
 
+test.each(["/start", "/start@CompanionBot"])(
+  "%s opens an ordinary conversation",
+  async (text) => {
+    expect(
+      (await parse({ update_id: 98, message: { ...baseMessage, text } }))[0]
+    ).toMatchObject({ kind: "message", payload: { text } });
+  }
+);
+
+test("confirm still requires proof", async () => {
+  await expect(
+    parse({ update_id: 98, message: { ...baseMessage, text: "/confirm" } })
+  ).rejects.toMatchObject({ reason: "invalid_command" });
+});
+
 test("preserves update and sender IDs and separates login tokens from messages", async () => {
   const events = await parse({
     update_id: 99,
