@@ -26,6 +26,8 @@ import {
   ProviderUncertain,
   requestProviderJson,
 } from "./provider-errors";
+import { downloadMediaBytes } from "./media/download";
+import { ChannelMediaError } from "./media/policy";
 
 const positiveId = Schema.Int.check(
   Schema.isBetween({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
@@ -189,10 +191,24 @@ const response = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(false), error_code: Schema.Int }),
 ]);
 
+const downloadableFile = Schema.Struct({
+  ok: Schema.Literal(true),
+  result: Schema.Struct({
+    file_id: ProviderReferenceSchema,
+    file_size: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
+    file_path: Schema.String.check(
+      Schema.isPattern(/^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/u),
+      Schema.makeFilter((path) =>
+        path.split("/").every((part) => part !== "." && part !== "..")
+      )
+    ),
+  }),
+});
+
 const makeTelegram = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
   const request = Effect.fn("Telegram.request")(function* (
-    method: "sendMessage" | "answerCallbackQuery",
+    method: "sendMessage" | "answerCallbackQuery" | "getFile",
     body: Schema.Json
   ) {
     const installation = yield* readInstallation;
@@ -302,6 +318,53 @@ const makeTelegram = Effect.gen(function* () {
     return { providerMessageId: String(result.result.message_id) };
   });
   return {
+    downloadMedia: Effect.fn("Telegram.downloadMedia")(function* (
+      installationId: string,
+      fileId: string,
+      maxBytes: number
+    ) {
+      const installation = yield* readInstallation;
+      if (installation.botId !== installationId)
+        return yield* new ChannelMediaError({ reason: "wrong_installation" });
+      const id = yield* Schema.decodeUnknownEffect(ProviderReferenceSchema)(
+        fileId
+      ).pipe(
+        Effect.mapError(
+          () => new ChannelMediaError({ reason: "invalid_media" })
+        )
+      );
+      const metadata = yield* request("getFile", { file_id: id }).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(downloadableFile)),
+        Effect.mapError(
+          () => new ChannelMediaError({ reason: "download_failed" })
+        )
+      );
+      if (metadata.result.file_id !== id)
+        return yield* new ChannelMediaError({ reason: "invalid_media" });
+      if (
+        metadata.result.file_size !== undefined &&
+        metadata.result.file_size > maxBytes
+      )
+        return yield* new ChannelMediaError({ reason: "too_large" });
+      const secret = yield* Config.redacted("TELEGRAM_BOT_TOKEN").pipe(
+        Effect.mapError(
+          () => new ChannelMediaError({ reason: "download_failed" })
+        )
+      );
+      const bytes = yield* downloadMediaBytes(
+        http,
+        HttpClientRequest.get(
+          `https://api.telegram.org/file/bot${Redacted.value(secret)}/${metadata.result.file_path}`
+        ),
+        maxBytes
+      );
+      if (
+        metadata.result.file_size !== undefined &&
+        bytes.length !== metadata.result.file_size
+      )
+        return yield* new ChannelMediaError({ reason: "invalid_media" });
+      return bytes;
+    }),
     parse: Effect.fn("Telegram.parse")(function* (value: Schema.Json) {
       return yield* parseTelegramUpdate(
         value,

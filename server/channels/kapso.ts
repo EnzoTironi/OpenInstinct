@@ -24,6 +24,8 @@ import {
   ProviderUncertain,
   requestProviderJson,
 } from "./provider-errors";
+import { downloadMediaBytes } from "./media/download";
+import { ChannelMediaError } from "./media/policy";
 
 const phone = Schema.String.check(Schema.isPattern(/^\+?[1-9][0-9]{5,14}$/));
 const phoneId = Schema.String.check(Schema.isPattern(/^[1-9][0-9]{0,31}$/));
@@ -253,6 +255,28 @@ const receipt = Schema.Struct({
   ),
 });
 
+const downloadableMedia = Schema.Struct({
+  id: ProviderReferenceSchema,
+  file_size: Schema.String.check(Schema.isPattern(/^[0-9]+$/u)),
+  download_url: Schema.String.check(
+    Schema.makeFilter((value) => {
+      try {
+        const url = new URL(value);
+        return (
+          url.origin === "https://api.kapso.ai" &&
+          url.pathname === "/meta/whatsapp/media_download" &&
+          !url.username &&
+          !url.password &&
+          !url.hash &&
+          Boolean(url.searchParams.get("token"))
+        );
+      } catch {
+        return false;
+      }
+    })
+  ),
+});
+
 const makeKapso = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
   const sendText = Effect.fn("Kapso.sendText")(function* (
@@ -324,6 +348,53 @@ const makeKapso = Effect.gen(function* () {
     return { providerMessageId: sentMessage.id };
   });
   return {
+    downloadMedia: Effect.fn("Kapso.downloadMedia")(function* (
+      installationId: string,
+      mediaId: string,
+      maxBytes: number
+    ) {
+      const installation = yield* readInstallation;
+      if (installation.phoneNumberId !== installationId)
+        return yield* new ChannelMediaError({ reason: "wrong_installation" });
+      const id = yield* Schema.decodeUnknownEffect(phoneId)(mediaId).pipe(
+        Effect.mapError(
+          () => new ChannelMediaError({ reason: "invalid_media" })
+        )
+      );
+      const key = yield* Config.redacted("KAPSO_API_KEY").pipe(
+        Effect.mapError(
+          () => new ChannelMediaError({ reason: "download_failed" })
+        )
+      );
+      const metadata = yield* requestProviderJson(
+        http,
+        "kapso",
+        HttpClientRequest.get(
+          `https://api.kapso.ai/meta/whatsapp/v24.0/${id}`
+        ).pipe(
+          HttpClientRequest.setUrlParam("phone_number_id", installationId),
+          HttpClientRequest.setHeader("X-API-Key", Redacted.value(key))
+        )
+      ).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(downloadableMedia)),
+        Effect.mapError(
+          () => new ChannelMediaError({ reason: "download_failed" })
+        )
+      );
+      if (metadata.id !== id)
+        return yield* new ChannelMediaError({ reason: "invalid_media" });
+      if (Number(metadata.file_size) > maxBytes)
+        return yield* new ChannelMediaError({ reason: "too_large" });
+      // The provider-issued URL embeds its authorization. Never forward the API key.
+      const bytes = yield* downloadMediaBytes(
+        http,
+        HttpClientRequest.get(metadata.download_url),
+        maxBytes
+      );
+      if (bytes.length !== Number(metadata.file_size))
+        return yield* new ChannelMediaError({ reason: "invalid_media" });
+      return bytes;
+    }),
     parse: Effect.fn("Kapso.parse")(function* (value: Schema.Json) {
       return yield* parseKapsoWebhook(
         value,

@@ -4,6 +4,8 @@ import type { Identity } from "../../server/accounts";
 import { Messaging, type Lease } from "../../server/messaging";
 import { ChannelTransport } from "../../server/channels/transport";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
+import { loadChannelContent } from "../../server/channels/media/content";
+import { mediaFailureMessage } from "../../server/channels/media/policy";
 
 class ChannelDispatchError extends Schema.TaggedError<ChannelDispatchError>()(
   "ChannelDispatchError",
@@ -75,15 +77,37 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
       return yield* new ChannelDispatchError({ reason: "unauthorized" });
     const messaging = yield* Messaging;
     const receipt = yield* messaging.checkInboxLease(lease);
-    if (receipt.payload.attachments?.length) {
+    const loaded = yield* loadChannelContent(identity, receipt.payload).pipe(
+      Effect.catchTag("ChannelMediaError", (error) =>
+        Effect.gen(function* () {
+          yield* requireChannelPrincipal(channel, auth);
+          yield* messaging.checkInboxLease(lease);
+          const transport = yield* ChannelTransport;
+          yield* transport.enqueueText({
+            identityId: identity.id,
+            deliveryKey: `unsupported:${receipt.id}`,
+            text: mediaFailureMessage(error),
+          });
+          yield* messaging.markInboxFailed({
+            lease,
+            reason: "adapter_rejected",
+          });
+          return yield* new ChannelDispatchError({
+            reason: "unsupported_media",
+          });
+        })
+      )
+    );
+    // Media I/O may outlive a revocation. Recheck authority and the lease before use.
+    yield* requireChannelPrincipal(channel, auth);
+    yield* messaging.checkInboxLease(lease);
+    for (const [index, transcript] of loaded.transcripts.entries()) {
       const transport = yield* ChannelTransport;
       yield* transport.enqueueText({
         identityId: identity.id,
-        deliveryKey: `unsupported:${receipt.id}`,
-        text: "I can’t read attachments on this installation yet. Please send the information as text.",
+        deliveryKey: `transcript:${receipt.id}:${String(index)}`,
+        text: `I heard: ${transcript}\nIf this is incorrect, send a correction.`,
       });
-      yield* messaging.markInboxFailed({ lease, reason: "adapter_rejected" });
-      return yield* new ChannelDispatchError({ reason: "unsupported_media" });
     }
     const principal = channelPrincipal(
       identity,
@@ -93,7 +117,7 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
     yield* messaging.checkInboxLease(lease);
     const session = yield* Effect.tryPromise({
       try: () =>
-        context.from(identity.id).send(receipt.payload.text ?? "", {
+        context.from(identity.id).send(loaded.content, {
           auth: principal,
           turnPolicy: "queue",
         }),
@@ -148,7 +172,7 @@ export const drainChannelInbox = Effect.fn("drainChannelInbox")(function* (
   for (let index = 0; index < 8; index++) {
     const claim = yield* messaging.claimInbox({
       identityId: identity.id,
-      leaseSeconds: 30,
+      leaseSeconds: 150,
     });
     if (!claim) return;
     yield* handoffChannelMessage(
