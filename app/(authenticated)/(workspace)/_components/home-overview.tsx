@@ -69,9 +69,9 @@ export function HomeOverview() {
           shared?{" "}
           <Link
             className="text-foreground underline underline-offset-4"
-            href="/chat"
+            href="/chat?starter=memory"
           >
-            Talk about it in chat.
+            Review or change memories in chat.
           </Link>
         </p>
       </section>

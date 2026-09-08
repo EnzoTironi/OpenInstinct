@@ -15,8 +15,13 @@ import {
 } from "@web/components/ai-elements/prompt-input";
 import { chatTitle, messageContent } from "../../_lib/message-input";
 import { api } from "@web/trpc/client";
+import { chatStarters } from "../../_lib/starters";
 
-export function NewChat() {
+export function NewChat({
+  initialDraft = "",
+}: {
+  readonly initialDraft?: string;
+}) {
   const router = useRouter();
   const { mutateAsync: saveChat } = api.chats.save.useMutation();
   const pendingTitle = useRef<string | undefined>(undefined);
@@ -24,7 +29,7 @@ export function NewChat() {
   const navigationStarted = useRef(false);
   const sendFailed = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(initialDraft);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(false);
   const agent = useEveAgent({
@@ -113,20 +118,7 @@ export function NewChat() {
         aria-label="Ideas to get started"
         className="flex flex-wrap justify-center gap-2"
       >
-        {[
-          {
-            label: "Think it through",
-            text: "Help me think through a decision. Ask me what I’m weighing up.",
-          },
-          {
-            label: "Remember a preference",
-            text: "I’d like you to remember a preference. Ask me what matters.",
-          },
-          {
-            label: "Plan a reminder",
-            text: "Help me set a reminder. Ask me what it’s for and when I need it.",
-          },
-        ].map(({ label, text }) => (
+        {chatStarters.map(({ label, text }) => (
           <Button
             key={label}
             disabled={sending}

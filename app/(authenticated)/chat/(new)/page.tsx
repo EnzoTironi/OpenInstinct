@@ -1,6 +1,11 @@
 import { NewChat } from "./_components/new-chat";
+import { chatStarters } from "../_lib/starters";
 
-export default function NewChatPage() {
+export default async function NewChatPage({
+  searchParams,
+}: PageProps<"/chat">) {
+  const params = await searchParams;
+  const starter = chatStarters.find((item) => item.id === params.starter);
   return (
     <div className="flex h-full min-h-0 items-center justify-center bg-background px-4 pb-[10vh] text-foreground sm:px-6">
       <div className="flex w-full max-w-xl flex-col items-center gap-6">
@@ -10,7 +15,7 @@ export default function NewChatPage() {
             Think something through, remember what matters, or plan a reminder.
           </p>
         </div>
-        <NewChat />
+        <NewChat initialDraft={starter?.text} key={starter?.id ?? "new"} />
       </div>
     </div>
   );
