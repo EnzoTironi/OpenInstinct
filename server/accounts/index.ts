@@ -83,6 +83,16 @@ export const ChallengePreview = Schema.Struct({
   purpose: ChallengeRow.fields.purpose,
   expiresAt: Schema.String,
 });
+export const SessionOwner = Schema.Struct({
+  identityId: IdentitySchema.fields.id,
+  userId: IdentitySchema.fields.userId,
+});
+export const ConsumedChallenge = Schema.Struct({
+  ...SessionOwner.fields,
+  purpose: ChallengeRow.fields.purpose,
+  principalId: Identifier,
+  workspaceId: Identifier,
+});
 type Failure = ChannelAccountError | SqlError;
 interface Accounts {
   readonly resolveVerifiedSender: (
@@ -108,15 +118,11 @@ interface Accounts {
   ) => Effect.Effect<typeof channelChallengeStatusSchema.Type, Failure>;
   readonly consumeChallenge: (
     input: typeof ConsumeChallenge.Type
-  ) => Effect.Effect<
-    {
-      userId: string;
-      identityId: string;
-      principalId: string;
-      workspaceId: string;
-    },
-    Failure
-  >;
+  ) => Effect.Effect<typeof ConsumedChallenge.Type, Failure>;
+  readonly withLoginSession: <A, E, R>(
+    owner: typeof SessionOwner.Type,
+    createSession: Effect.Effect<A, E, R>
+  ) => Effect.Effect<A, E | Failure, R>;
   readonly revokeIdentity: (
     input: typeof RevokeIdentity.Type
   ) => Effect.Effect<void, Failure>;
@@ -148,7 +154,7 @@ export class ChannelAccounts extends Context.Service<
       const sql = yield* PgClient.PgClient;
       // All account lifecycle writers take this lock. Short DB-only transactions
       // serialize revocation against confirmation/consumption, including first contact.
-      const transaction = <A, E>(effect: Effect.Effect<A, E>) =>
+      const transaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         sql.withTransaction(
           Effect.gen(function* () {
             yield* sql`SELECT pg_advisory_xact_lock(724193, 1)`;
@@ -362,10 +368,33 @@ export class ChannelAccounts extends Context.Service<
               return {
                 userId: identity.userId,
                 identityId: identity.id,
+                purpose: challenge.purpose,
                 principalId,
                 workspaceId: scope.workspaceId,
               };
             })
+          );
+        }
+      );
+      // Internal post-consumption issuance: the user is already committed and visible
+      // to the SDK's separate connection. Do not retry a failed or uncertain issuance.
+      const withLoginSession = Effect.fn("ChannelAccounts.withLoginSession")(
+        function* <A, E, R>(
+          owner: typeof SessionOwner.Type,
+          createSession: Effect.Effect<A, E, R>
+        ) {
+          const request = yield* decode(SessionOwner, owner);
+          return yield* transaction(
+            Effect.gen(function* () {
+              const rows = yield* sql`SELECT id FROM public.channel_identity
+              WHERE id = ${request.identityId} AND user_id = ${request.userId} AND revoked_at IS NULL`;
+              if (!rows.length) return yield* fail("identity_inactive");
+              return yield* createSession;
+            })
+          ).pipe(
+            // SDK Promises cannot be cancelled reliably: retain the lock until the
+            // insertion settles and the finalization commits, even on interruption.
+            Effect.uninterruptible
           );
         }
       );
@@ -405,6 +434,7 @@ export class ChannelAccounts extends Context.Service<
         confirmChallenge,
         previewChallenge,
         consumeChallenge,
+        withLoginSession,
         getChallengeStatus,
         revokeIdentity,
       });
