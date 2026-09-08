@@ -63,6 +63,11 @@ describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
       channel === "channel:linq"
         ? reactToMessageOutputSchema
         : addReactionToMessageOutputSchema;
+    const explicitUndefined = await original["~standard"].validate({
+      type: "heart",
+      operation: undefined,
+    });
+    expect(explicitUndefined.issues?.length).toBeGreaterThan(0);
     const valid = [
       { type: "thumbs_up" },
       { type: "thumbs_down" },

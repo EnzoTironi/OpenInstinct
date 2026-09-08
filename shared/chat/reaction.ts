@@ -9,6 +9,8 @@ const reactionTypeSchema = Schema.Literals([
   "question",
 ]);
 
+// JSON-shaped contract: only omission defaults to add. Explicit JS undefined
+// is intentionally rejected; value-level defaults would admit null on the wire.
 export const reactToMessageOutputSchema = Schema.Struct({
   operation: Schema.Literals(["add", "remove"])
     .annotate({ default: "add" })

@@ -17,6 +17,46 @@ const reactions = [
 ] as const;
 
 describe("reaction contract", () => {
+  it("defaults only omitted operation and rejects explicit undefined or null", () => {
+    for (const schema of [
+      reactToMessageOutputSchema,
+      addReactionToMessageOutputSchema,
+    ]) {
+      expect(Schema.decodeUnknownSync(schema)({ type: "heart" })).toEqual({
+        type: "heart",
+        operation: "add",
+      });
+      for (const operation of [undefined, null]) {
+        expect(
+          Result.isFailure(
+            Schema.decodeUnknownResult(schema)({ type: "heart", operation })
+          )
+        ).toBe(true);
+      }
+    }
+    expect(
+      Schema.decodeUnknownSync(reactToMessageToolResultSchema)({
+        kind: "tool-result",
+        toolName: "react_to_message",
+        output: { type: "heart" },
+      })
+    ).toEqual({
+      kind: "tool-result",
+      toolName: "react_to_message",
+      output: { type: "heart", operation: "add" },
+    });
+    for (const operation of [undefined, null]) {
+      expect(
+        Result.isFailure(
+          Schema.decodeUnknownResult(reactToMessageToolResultSchema)({
+            kind: "tool-result",
+            toolName: "react_to_message",
+            output: { type: "heart", operation },
+          })
+        )
+      ).toBe(true);
+    }
+  });
   it.each(reactions)("preserves %s and its display text", (type, text) => {
     expect(reactionTextFor(type)).toBe(text);
     expect(
