@@ -5,6 +5,10 @@ Date: 2026-09-08. Source baseline: `Merit-Systems/OpenInstinct` commit
 
 ## Decision
 
+The [complete product and execution blueprint](companion-blueprint.md) is the
+current target plan, including the subsequent Effect and Kernel decisions. This
+assessment preserves the initial source findings and observed checks.
+
 Use this private copy as the implementation candidate. Preserve the working
 application and Eve framework, then prove one complete messaging journey before
 expanding. This is a standalone companion; Zoen ontology comes later through an
