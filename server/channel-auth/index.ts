@@ -32,11 +32,9 @@ const KapsoCapability = Schema.Struct({
 const BrowserSecret = Schema.String.check(
   Schema.isPattern(/^[A-Za-z0-9_-]{43}$/u)
 );
-export interface ChannelAuthOptions {
-  readonly runEffect: <A, E>(
-    program: Effect.Effect<A, E, ChannelAccounts>
-  ) => Promise<A>;
-}
+export type ChannelAuthRunEffect = <A, E>(
+  program: Effect.Effect<A, E, ChannelAccounts>
+) => Promise<A>;
 class ChannelAuthError extends Schema.TaggedError<ChannelAuthError>()(
   "ChannelAuthError",
   {
@@ -127,37 +125,35 @@ const publicError = (error: ChannelAuthError | ChannelAccountError) => {
 };
 /** The sole Promise bridge; domain and SDK operations execute in the supplied runtime. */
 const execute = async <A, E>(
-  options: ChannelAuthOptions,
+  runEffect: ChannelAuthRunEffect,
   program: Effect.Effect<A, E, ChannelAccounts>
 ) => {
-  const result = await options
-    .runEffect(
-      program.pipe(
-        Effect.match({
-          onSuccess: (value) => ({ ok: true as const, value }),
-          onFailure: (error) => ({
-            ok: false as const,
-            error:
-              error instanceof ChannelAccountError ||
-              error instanceof ChannelAuthError
-                ? publicError(error)
-                : new APIError("INTERNAL_SERVER_ERROR", {
-                    message: "Unable to complete channel authentication",
-                  }),
-          }),
-        })
-      )
+  const result = await runEffect(
+    program.pipe(
+      Effect.match({
+        onSuccess: (value) => ({ ok: true as const, value }),
+        onFailure: (error) => ({
+          ok: false as const,
+          error:
+            error instanceof ChannelAccountError ||
+            error instanceof ChannelAuthError
+              ? publicError(error)
+              : new APIError("INTERNAL_SERVER_ERROR", {
+                  message: "Unable to complete channel authentication",
+                }),
+        }),
+      })
     )
-    .catch(() => {
-      throw new APIError("INTERNAL_SERVER_ERROR", {
-        message: "Unable to complete channel authentication",
-      });
+  ).catch(() => {
+    throw new APIError("INTERNAL_SERVER_ERROR", {
+      message: "Unable to complete channel authentication",
     });
+  });
   if (!result.ok) throw result.error;
   return result.value;
 };
 
-export const channelAuthPlugin = (options: ChannelAuthOptions) =>
+export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
   ({
     id: "channel-auth",
     endpoints: {
@@ -172,7 +168,7 @@ export const channelAuthPlugin = (options: ChannelAuthOptions) =>
         async (ctx) =>
           ctx.json(
             await execute(
-              options,
+              runEffect,
               Effect.gen(function* () {
                 const destination = yield* channelDestination(ctx.body.channel);
                 const current =
@@ -236,7 +232,7 @@ export const channelAuthPlugin = (options: ChannelAuthOptions) =>
         async (ctx) =>
           ctx.json(
             await execute(
-              options,
+              runEffect,
               Effect.gen(function* () {
                 const browserSecret = yield* readBrowserSecret(
                   ctx,
@@ -264,7 +260,7 @@ export const channelAuthPlugin = (options: ChannelAuthOptions) =>
         async (ctx) =>
           ctx.json(
             await execute(
-              options,
+              runEffect,
               Effect.gen(function* () {
                 const browserSecret = yield* readBrowserSecret(
                   ctx,

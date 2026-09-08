@@ -44,20 +44,19 @@ test("real BetterAuth router, signed browser challenge and database session", as
     trustedOrigins: [baseURL],
     advanced: { disableOriginCheck: false, disableCSRFCheck: false },
     plugins: [
-      channelAuthPlugin({
-        runEffect: (program) =>
-          runtime.runPromise(
-            program.pipe(
-              Effect.provideService(
-                ConfigProvider.ConfigProvider,
-                ConfigProvider.fromUnknown({
-                  TELEGRAM_BOT_ID: installationId,
-                  TELEGRAM_BOT_USERNAME: "channel_test_bot",
-                })
-              )
+      channelAuthPlugin((program) =>
+        runtime.runPromise(
+          program.pipe(
+            Effect.provideService(
+              ConfigProvider.ConfigProvider,
+              ConfigProvider.fromUnknown({
+                TELEGRAM_BOT_ID: installationId,
+                TELEGRAM_BOT_USERNAME: "channel_test_bot",
+              })
             )
-          ),
-      }),
+          )
+        )
+      ),
     ],
   });
   const request = (
