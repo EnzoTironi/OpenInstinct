@@ -1,6 +1,6 @@
 import type { EveEvalContext, EveEvalTurn } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
-import { z } from "zod";
+import { Result, Schema } from "effect";
 import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
 
 export const agentEvalTags = ["agent", "behavior"] as const;
@@ -12,18 +12,22 @@ export async function requireDeliveredText(
   const delivery = turn.requireToolCall("send_message", {
     status: "completed",
   });
-  const parsed = sendMessageOutputSchema.safeParse(delivery.input);
+  const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+    delivery.input
+  );
   const text =
-    parsed.success && parsed.data.kind === "message"
-      ? parsed.data.text
+    Result.isSuccess(parsed) && parsed.success.kind === "message"
+      ? parsed.success.text
       : undefined;
-  const parsedText = z.string().trim().min(1).safeParse(text);
+  const parsedText = Schema.decodeUnknownResult(
+    Schema.Trim.check(Schema.isMinLength(1))
+  )(text);
 
-  await t.require(parsedText.success, equals(true));
-  if (!parsedText.success) {
+  await t.require(Result.isSuccess(parsedText), equals(true));
+  if (!Result.isSuccess(parsedText)) {
     throw new Error("send_message did not deliver non-empty text.");
   }
-  return parsedText.data;
+  return parsedText.success;
 }
 
 export function assertPlainTextDelivery(t: EveEvalContext, text: string) {

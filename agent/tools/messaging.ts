@@ -1,3 +1,4 @@
+import { JsonSchema, Schema } from "effect";
 import { defineDynamic, defineTool, toolOutput } from "eve/tools";
 import { resolveModeValue } from "../lib/mode";
 import {
@@ -8,10 +9,36 @@ import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
 import { privateMessageTool } from "@agent/lib/private-message-tool";
 
 function defineSendMessage() {
+  const standard = Schema.toStandardJSONSchemaV1(
+    Schema.toStandardSchemaV1(sendMessageOutputSchema)
+  )["~standard"];
+
   return defineTool({
     description:
       "Send exactly one user-visible message to the current conversation. This is the delivery path for questions, progress updates, blockers, and final answers that need words. Choose kind message for plain text, private image artifacts, and HTTPS attachments; text and attachments may be combined, including in replies. Text is delivered exactly as written, so write it like a brief natural text message and do not use Markdown. Put nearly every response in a native quoted thread by setting replyTo: use current for an ordinary answer, clarification, status update, or follow-up prompted by the current user message, including when the user changes topics; use task with a task ID from Eve's Task state for delayed background work; and use automation with the automation ID supplied by a scheduled report. Omit replyTo only when the message is genuinely standalone and does not answer any particular user message, such as an unsolicited announcement or proactive notice, or when no applicable handle is available. Use only handles present in the current context. Choose kind link with a URL to send a standalone native preview. Put an ordinary URL in message text when a preview is not wanted. Call send_message multiple times only when you intentionally want separate messages. Call it directly without an assistant-text preamble, and do not repeat delivered content afterward.",
-    inputSchema: sendMessageOutputSchema,
+    inputSchema: {
+      "~standard": {
+        ...standard,
+        jsonSchema: {
+          ...standard.jsonSchema,
+          input(options) {
+            // Eve persists JSON Schema; attachments allow metadata that our decoder strips.
+            const document = Schema.toJsonSchemaDocument(
+              sendMessageOutputSchema,
+              {
+                includeAnnotationKey: (key) => key === "additionalProperties",
+              }
+            );
+            if (options.target === "draft-2020-12") return document.schema;
+            if (options.target === "draft-07")
+              return JsonSchema.toDocumentDraft07(document).schema;
+            throw new Error(
+              `Unsupported JSON Schema target: ${options.target}`
+            );
+          },
+        },
+      },
+    },
     execute(message) {
       return message;
     },

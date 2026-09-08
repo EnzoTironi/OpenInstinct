@@ -1,3 +1,4 @@
+import { Result, Schema } from "effect";
 import { defineEval } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
 import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
@@ -95,11 +96,13 @@ export default defineEval({
       } else {
         report.calledTool("send_message", {
           input: (input) => {
-            const parsed = sendMessageOutputSchema.safeParse(input);
+            const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+              input
+            );
             return (
-              parsed.success &&
-              parsed.data.kind === "message" &&
-              parsed.data.text?.includes(testCase.expectedDelivery) === true
+              Result.isSuccess(parsed) &&
+              parsed.success.kind === "message" &&
+              parsed.success.text?.includes(testCase.expectedDelivery) === true
             );
           },
           status: "completed",

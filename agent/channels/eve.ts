@@ -1,6 +1,6 @@
 import { eveChannel } from "eve/channels/eve";
 import { ForbiddenError, UnauthenticatedError } from "eve/channels/auth";
-import { Effect, Schedule } from "effect";
+import { Effect, Result, Schedule, Schema } from "effect";
 import { AuthUnavailable } from "@db/services/auth";
 import { isSessionOwned } from "@db/services/sessions";
 import {
@@ -45,7 +45,9 @@ export default eveChannel({
     async "action.result"(event, _channel, session) {
       if (
         event.status === "completed" &&
-        sendMessageToolResultSchema.safeParse(event.result).success
+        Result.isSuccess(
+          Schema.decodeUnknownResult(sendMessageToolResultSchema)(event.result)
+        )
       ) {
         await finalizeScheduledReportDelivery(session);
       }

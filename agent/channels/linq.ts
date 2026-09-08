@@ -1,3 +1,4 @@
+import { Result, Schema } from "effect";
 import { connectLinqCredentials } from "@vercel/connect/eve";
 import { LinqAPIV3 } from "@linqapp/sdk";
 import type { AdapterPostableMessage } from "chat";
@@ -97,8 +98,10 @@ export default linqChannel({
         return;
       }
 
-      const message = sendMessageToolResultSchema.safeParse(event.result);
-      if (event.status === "completed" && message.success) {
+      const message = Schema.decodeUnknownResult(sendMessageToolResultSchema)(
+        event.result
+      );
+      if (event.status === "completed" && Result.isSuccess(message)) {
         const { thread } = context;
         if (!thread) {
           throw new Error(
@@ -107,7 +110,7 @@ export default linqChannel({
         }
         const report = scheduledReportFromSession(session);
         const replyTarget = resolveLinqReplyTarget(
-          message.data.output.replyTo,
+          message.success.output.replyTo,
           session.session.auth
         );
         const requestedReplyMessageId =
@@ -144,8 +147,8 @@ export default linqChannel({
           return chatId;
         };
 
-        if (message.data.output.kind === "link") {
-          const { url } = message.data.output;
+        if (message.success.output.kind === "link") {
+          const { url } = message.success.output;
           const chatId = resolveExistingChatId();
           const apiKey = await credentials.apiKey();
           const client = new LinqAPIV3({ apiKey });
@@ -183,10 +186,10 @@ export default linqChannel({
           return;
         }
 
-        const attachments = message.data.output.attachments?.map(
+        const attachments = message.success.output.attachments?.map(
           ({ kind, ...attachment }) => ({ ...attachment, type: kind })
         );
-        const { text: requestedText } = message.data.output;
+        const { text: requestedText } = message.success.output;
         if (!requestedText) {
           if (attachments?.length) {
             await sendLinqMessage({

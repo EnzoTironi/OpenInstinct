@@ -1,3 +1,4 @@
+import { Result, Schema } from "effect";
 import type { MessageStreamEvent } from "eve/client";
 import type { EveMessagePart } from "eve/react";
 import {
@@ -114,9 +115,11 @@ function completedSendMessageOutput(event: MessageStreamEvent) {
     return undefined;
   }
 
-  const result = sendMessageToolResultSchema.safeParse(event.data.result);
-  return result.success
-    ? { callId: event.data.result.callId, output: result.data.output }
+  const result = Schema.decodeUnknownResult(sendMessageToolResultSchema)(
+    event.data.result
+  );
+  return Result.isSuccess(result)
+    ? { callId: event.data.result.callId, output: result.success.output }
     : undefined;
 }
 
