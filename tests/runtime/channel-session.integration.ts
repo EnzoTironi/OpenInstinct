@@ -12,6 +12,7 @@ import {
   requireChannelPrincipal,
 } from "../../agent/lib/channel-session";
 import { runtimeDatabase } from "./database";
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 
 const infrastructure = Layer.mergeAll(
   ChannelAccounts.layer,
@@ -32,7 +33,10 @@ test("channel callbacks require the current identity, owner, workspace and conve
         senderId: "918273",
       });
       yield* Effect.addFinalizer(() =>
-        sql`DELETE FROM public."user" WHERE id = ${identity.userId}`.pipe(
+        sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${identity.userId}`).workspaceId}`.pipe(
+          Effect.andThen(
+            sql`DELETE FROM public."user" WHERE id = ${identity.userId}`
+          ),
           Effect.orDie
         )
       );

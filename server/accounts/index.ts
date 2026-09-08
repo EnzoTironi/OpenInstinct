@@ -194,10 +194,15 @@ export class ChannelAccounts extends Context.Service<
           return publicIdentity(existing);
         }
         const userId = targetUserId ?? randomUUID();
-        if (!targetUserId)
+        if (!targetUserId) {
           yield* sql`INSERT INTO public."user"
         (id, name, email, "emailVerified", "createdAt", "updatedAt")
         VALUES (${userId}, 'Companion user', ${`${userId}@accounts.invalid`}, false, clock_timestamp(), clock_timestamp())`;
+          const scope = accessScopeForUser(`better-auth:${userId}`);
+          yield* sql`INSERT INTO workspaces (id) VALUES (${scope.workspaceId})`;
+          yield* sql`INSERT INTO workspace_memberships (workspace_id, user_id, role)
+            VALUES (${scope.workspaceId}, ${scope.userId}, 'owner')`;
+        }
         const id = randomUUID();
         yield* sql`INSERT INTO public.channel_identity
         (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)

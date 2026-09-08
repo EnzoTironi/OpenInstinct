@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
@@ -370,6 +371,7 @@ test("prompt preparation delegates revoked link rejection to account preview", a
         yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;
         yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
         yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
+        yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
         yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
       }
     }).pipe(

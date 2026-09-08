@@ -13,6 +13,7 @@ import {
 import { Messaging, PayloadConflict } from "../../server/messaging";
 
 import { runtimeDatabase } from "./database";
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 
 const dependencies = Layer.mergeAll(
   Messaging.layer,
@@ -32,10 +33,18 @@ const fixture = Effect.fn("transport.fixture")(function* (
 ) {
   const sql = yield* PgClient.PgClient;
   const userId = randomUUID();
+  const scope = accessScopeForUser(`better-auth:${userId}`);
   yield* Effect.acquireRelease(
     sql`INSERT INTO "user" (id, name, email) VALUES (${userId}, 'Transport proof', ${`${userId}@example.invalid`})`,
-    () => sql`DELETE FROM "user" WHERE id = ${userId}`.pipe(Effect.orDie)
+    () =>
+      sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`.pipe(
+        Effect.andThen(sql`DELETE FROM "user" WHERE id = ${userId}`),
+        Effect.orDie
+      )
   );
+  yield* sql`INSERT INTO workspaces (id) VALUES (${scope.workspaceId})`;
+  yield* sql`INSERT INTO workspace_memberships (workspace_id, user_id, role)
+    VALUES (${scope.workspaceId}, ${scope.userId}, 'owner')`;
   const identities = Array.from({ length: 7 }, () => randomUUID());
   yield* Effect.forEach(
     identities,

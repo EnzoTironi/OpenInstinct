@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 /* eslint-disable typescript/no-unsafe-type-assertion -- Synthetic callback data supplies only fields consumed by these handlers; all services remain real. */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -148,6 +149,7 @@ test("terminal channel events persist once per turn and enforce current authorit
     await serverRuntime.runPromise(
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;
+        yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${identity.userId}`).workspaceId}`;
         yield* sql`DELETE FROM public."user" WHERE id = ${identity.userId}`;
       })
     );

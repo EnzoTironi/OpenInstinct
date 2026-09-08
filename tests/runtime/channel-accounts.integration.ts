@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { test } from "vitest";
@@ -565,7 +566,8 @@ test("channel identities, browser binding, races and revocation against migrated
             yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
             yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
             for (const id of userIds)
-              yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
+              yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
+            yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
           }).pipe(Effect.orDie)
         )
       );
@@ -664,6 +666,7 @@ test("session issuance serializes with revocation across real PostgreSQL connect
         } finally {
           yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
           yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
+          yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
           yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
         }
       }
