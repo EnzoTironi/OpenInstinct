@@ -64,7 +64,8 @@
       "outputs": []
     },
     "lint:app": {
-      "outputs": []
+      "outputs": [],
+      "dependsOn": ["types:generate"]
     },
     "start:app": {
       "cache": false,
