@@ -37,6 +37,7 @@ export type MessagePayload = typeof MessagePayloadSchema.Type;
 export const AcceptInputSchema = Schema.Struct({
   identityId: IdentityId,
   eventId: reference,
+  sourceMessageId: reference,
   payload: MessagePayloadSchema,
 });
 export type AcceptInput = typeof AcceptInputSchema.Type;
@@ -83,6 +84,7 @@ export const MessageReceiptSchema = Schema.Struct({
   id: IdentityId,
   identityId: IdentityId,
   key: reference,
+  sourceMessageId: Schema.NullOr(reference),
   payload: MessagePayloadSchema,
   status: MessageStatus,
   attempts: Schema.Int,

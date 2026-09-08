@@ -12,7 +12,7 @@ can still see unresolved work; the caller remains responsible for read access.
 
 ## API
 
-- `accept({ identityId, eventId, payload })` and
+- `accept({ identityId, eventId, sourceMessageId, payload })` and
   `enqueue({ identityId, deliveryKey, payload })` return a `MessageReceipt` after
   their SQL transaction completes. Send the provider ACK only after this effect
   succeeds. Do not wrap acceptance in a still-uncommitted outer transaction.
@@ -59,3 +59,5 @@ sessions or treats an accepted candidate ID as proof of canonical ownership.
 
 `messaging.integration.ts` uses real PostgreSQL in `companion_messaging_test`.
 Its synthetic receipt IDs exercise storage transitions, not provider delivery.
+
+Inbox receipts and claims retain the required original provider `sourceMessageId` separately from the webhook event key. It participates in inbox replay conflict detection and survives service reconstruction for native reply/auth attribution. Outbox receipts and claims expose `sourceMessageId: null`; their intent hash remains payload-only.

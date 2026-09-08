@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { PgClient } from "@effect/sql-pg";
 import { Effect, Schema } from "effect";
 import {
@@ -39,8 +39,10 @@ export type Lane = keyof typeof queues;
 export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
   const queue = queues[lane];
   const table = sql(queue.table);
+  const sourceMessageId =
+    lane === "inbox" ? sql`source_message_id` : sql`NULL::text`;
   const columns = sql`id, identity_id AS "identityId", ${sql(queue.key)} AS key,
-    payload, status, attempts, lease_token AS "leaseToken",
+    ${sourceMessageId} AS "sourceMessageId", payload, status, attempts, lease_token AS "leaseToken",
     lease_expires_at::text AS "leaseExpiresAt", ${sql(queue.result)} AS "resultId",
     last_error AS "lastError"`;
 
@@ -58,26 +60,36 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
   const insert = Effect.fn("Messaging.insert")(function* (input: {
     identityId: string;
     key: string;
+    sourceMessageId: string | null;
     payload: MessagePayload;
   }) {
     yield* lockActive(input.identityId);
     const canonical = canonicalPayload(input.payload);
+    const hash =
+      lane === "inbox"
+        ? createHash("sha256")
+            .update(JSON.stringify([input.sourceMessageId, canonical.hash]))
+            .digest("hex")
+        : canonical.hash;
     const existing = yield* sql<{ id: string; hash: string }>`
       SELECT id, ${sql(queue.hash)} AS hash FROM ${table}
       WHERE identity_id = ${input.identityId} AND ${sql(queue.key)} = ${input.key}`;
     const previous = existing[0];
     if (previous) {
-      if (previous.hash !== canonical.hash) {
+      if (previous.hash !== hash) {
         return yield* new PayloadConflict({ id: previous.id });
       }
       const rows =
         yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${previous.id}`;
       return yield* decodeReceipt(rows[0]);
     }
+    const sourceColumn = lane === "inbox" ? sql`, source_message_id` : sql``;
+    const sourceValue =
+      lane === "inbox" ? sql`, ${input.sourceMessageId}` : sql``;
     const rows = yield* sql`INSERT INTO ${table}
-      (id, identity_id, ${sql(queue.key)}, ${sql(queue.hash)}, payload, status)
-      VALUES (${randomUUID()}, ${input.identityId}, ${input.key}, ${canonical.hash},
-        ${sql.json(canonical.payload)}, 'queued') RETURNING ${columns}`;
+      (id, identity_id, ${sql(queue.key)}, ${sql(queue.hash)}, payload, status${sourceColumn})
+      VALUES (${randomUUID()}, ${input.identityId}, ${input.key}, ${hash},
+        ${sql.json(canonical.payload)}, 'queued'${sourceValue}) RETURNING ${columns}`;
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
 

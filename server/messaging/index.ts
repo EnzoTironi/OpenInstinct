@@ -71,7 +71,11 @@ const makeMessaging = Effect.gen(function* () {
     }, protect),
     enqueue: Effect.fn("Messaging.enqueue")(function* (input: EnqueueInput) {
       const value = yield* decodeInput(EnqueueInputSchema)(input);
-      return yield* outbox.insert({ ...value, key: value.deliveryKey });
+      return yield* outbox.insert({
+        ...value,
+        key: value.deliveryKey,
+        sourceMessageId: null,
+      });
     }, protect),
     claimInbox: Effect.fn("Messaging.claimInbox")(function* (
       input: ClaimInput
