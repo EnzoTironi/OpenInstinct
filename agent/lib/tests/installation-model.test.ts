@@ -26,10 +26,23 @@ describe("installation model configuration", () => {
       COMPANION_MODEL_PROVIDER: "openrouter-free",
       OPENROUTER_API_KEY: "synthetic-constructor-only-key",
     });
-    expect(selected?.model.modelId).toBe("nvidia/nemotron-3.5-lightning:free");
-    expect(selected?.model.provider).toBe("openrouter");
-    expect(selected?.model.specificationVersion).toBe("v4");
-    expect(selected?.modelContextWindowTokens).toBe(1_000_000);
+    expect(selected).toMatchObject({
+      model: {
+        modelId: "nvidia/nemotron-3.5-lightning:free",
+        provider: "openrouter",
+        specificationVersion: "v4",
+      },
+      modelContextWindowTokens: 1_000_000,
+    });
+  });
+
+  it("constructs the native Codex model without an OpenRouter key", async () => {
+    const selected = await selectModel({
+      COMPANION_MODEL_PROVIDER: "codex-local",
+    });
+    expect(selected).toMatchObject({
+      model: { modelId: "gpt-5.3-codex-spark", specificationVersion: "v4" },
+    });
   });
 
   it("rejects missing, empty, whitespace-only and padded OpenRouter keys", async () => {
