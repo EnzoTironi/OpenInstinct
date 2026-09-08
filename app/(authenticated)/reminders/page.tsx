@@ -22,10 +22,10 @@ export default async function RemindersPage() {
         </p>
         <Button
           nativeButton={false}
-          render={<Link href="/chat" />}
+          render={<Link href="/chat?starter=reminder" />}
           variant="outline"
         >
-          Open conversation
+          Create a reminder
         </Button>
       </header>
       {Result.isFailure(result) ? (

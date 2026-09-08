@@ -36,8 +36,14 @@ export function ReminderList({ reminders, hasMore }: ReminderPage) {
     <>
       {reminders.length === 0 ? (
         <p className="type-supporting-body rounded-lg border border-border/50 p-6 text-muted-foreground">
-          No reminders to show yet. Ask Companion in a conversation when you
-          want a scheduled follow-up.
+          No reminders to show yet.{" "}
+          <Link
+            className="text-foreground underline underline-offset-4"
+            href="/chat?starter=reminder"
+          >
+            Create your first reminder
+          </Link>{" "}
+          with an editable request in chat.
         </p>
       ) : (
         <ul className="space-y-4">
