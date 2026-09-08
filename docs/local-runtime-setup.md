@@ -254,7 +254,6 @@ completion is not presented as delivery. The page shows UTC, caps the list at 50
 and keeps changes in the originating conversation; it adds no scheduler or write
 endpoint. Full failure recovery and provider delivery remain release gates.
 
-
 ## Self-hosted Google Workspace
 
 Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for a Google OAuth web
@@ -282,3 +281,13 @@ stays in the linked account row and is removed on unlink; raw account-info and
 token HTTP routes are disabled. This SDK limitation remains an explicit
 pre-admission gap. Live consent, refresh, provider revocation and native
 suspend/resume with Google are still unqualified without Google credentials.
+
+Focused local validation passed with a real Better Auth session and PostgreSQL:
+Home and native handoffs generated Google authorization URLs with offline consent
+and preserved state cookies. These checks used synthetic OAuth application
+configuration and stopped at the redirect; they made no Google request and did
+not substitute a provider response. Actual HTTP also verified unconfigured and
+malformed handoff errors, sign-in return preservation, and disabled raw token and
+account-info routes. The browser rechecked Home → the original conversation and
+mobile layout. Independent review approved the native service and Home wiring,
+including the narrowly handled `400 invalid_token` revocation retry.

@@ -591,6 +591,14 @@ callback fix is separately preserved in Eve source commit `9a90214`; its manual
 completed-step recovery evidence and interrupted-step limitation are recorded in
 the runtime setup document.
 
+The current product pass connects Home, editable first-chat examples, conversation
+return paths and a read-only reminders view to the existing runtime. Google now
+uses self-hosted Better Auth linking from Home and native Eve challenges, with
+scoped account access and cookie-preserving handoffs. Local HTTP/database checks
+cover the initiation path; live Google consent, refresh, revocation and native
+resumption remain unqualified. Better Auth's plaintext ID-token retention is an
+explicit pre-admission limitation recorded with the runtime evidence.
+
 ## Source and decision references
 
 - [Baseline and observed checks](companion-assessment.md).
