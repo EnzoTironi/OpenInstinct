@@ -19,6 +19,7 @@ describe("Google connection return destination", () => {
 
   it.each([
     undefined,
+    ["/chat/session-123"],
     "",
     "/",
     "/chat",

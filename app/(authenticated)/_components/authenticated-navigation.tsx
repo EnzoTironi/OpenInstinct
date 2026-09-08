@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -39,7 +40,9 @@ const navigation = [
 ] as const;
 
 export function AuthenticatedNavigation() {
-  const active = activeRoute(usePathname());
+  const pathname = usePathname();
+  const active = activeRoute(pathname);
+  const returnTo = googleWorkspaceReturnTo(pathname);
 
   return (
     <SidebarGroup>
@@ -59,7 +62,15 @@ export function AuthenticatedNavigation() {
                 >
                   <SidebarMenuButton
                     isActive={active === item.id}
-                    render={<Link href={item.href} />}
+                    render={
+                      <Link
+                        href={
+                          item.id === "workspace" && returnTo !== "/"
+                            ? `/?returnTo=${encodeURIComponent(returnTo)}`
+                            : item.href
+                        }
+                      />
+                    }
                   >
                     <Icon />
                     <span>{item.label}</span>

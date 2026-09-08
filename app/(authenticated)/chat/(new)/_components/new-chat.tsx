@@ -65,6 +65,7 @@ export function NewChat() {
     pendingTitle.current = chatTitle(message);
     try {
       await agent.send(messageContent(message));
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- Eve's onError callback updates this ref while send awaits.
       if (sendFailed.current) {
         throw new Error("Unable to open the conversation");
       }
@@ -85,7 +86,9 @@ export function NewChat() {
             aria-label="Message Companion"
             className="min-h-0"
             disabled={sending}
-            onChange={(event) => setDraft(event.currentTarget.value)}
+            onChange={(event) => {
+              setDraft(event.currentTarget.value);
+            }}
             placeholder="Tell me what you have in mind…"
             ref={inputRef}
             value={draft}

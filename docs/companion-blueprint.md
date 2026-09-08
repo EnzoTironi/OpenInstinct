@@ -581,6 +581,16 @@ before declaring recovery qualified. Continue independent implementation only
 within the package contracts; provider credentials and this protocol gate remain
 separate dependencies.
 
+The acceptance extension has now been implemented and independently reviewed in
+the isolated Workflow source commits `3586b56` / `37ff78d` and Eve source commit
+`2cf23d4`. It is not installed in this application yet. Integration and the
+remaining recovery qualification are deferred while product journeys are wired
+and polished, as directed in the product execution order. Preserve the current
+uncertain-input behavior until that integration is complete. The installed cold
+callback fix is separately preserved in Eve source commit `9a90214`; its manual
+completed-step recovery evidence and interrupted-step limitation are recorded in
+the runtime setup document.
+
 ## Source and decision references
 
 - [Baseline and observed checks](companion-assessment.md).

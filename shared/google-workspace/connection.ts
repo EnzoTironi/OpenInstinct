@@ -7,7 +7,9 @@ const chatReturnPathSchema = Schema.String.check(
 );
 
 /** Connection callbacks return only to a concrete chat, never another origin. */
-export function googleWorkspaceReturnTo(value: string | undefined) {
+export function googleWorkspaceReturnTo(
+  value: string | readonly string[] | undefined
+) {
   return Schema.is(chatReturnPathSchema)(value) ? value : "/";
 }
 
