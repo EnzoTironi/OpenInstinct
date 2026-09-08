@@ -65,11 +65,16 @@ export function AgentMessagePart({
 
       if (userVisibleOnly && inputRequest) {
         return (
-          <InputRequestActions
-            canRespond={canRespond}
-            part={part}
-            onInputResponses={onInputResponses}
-          />
+          <div className="space-y-3">
+            {inputRequest.kind === "tool-approval" ? (
+              <ToolInput input={part.input} />
+            ) : null}
+            <InputRequestActions
+              canRespond={canRespond}
+              part={part}
+              onInputResponses={onInputResponses}
+            />
+          </div>
         );
       }
 

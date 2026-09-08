@@ -51,6 +51,99 @@ describe("chat conversation", () => {
     expect(markup).not.toContain("DELIVERY_COMPLETE");
   });
 
+  it("shows one exact approval after multiple deliveries in the default conversation", () => {
+    const approval = {
+      type: "dynamic-tool",
+      toolName: "calendar_create_event",
+      toolCallId: "calendar-call",
+      state: "approval-requested",
+      approval: { id: "calendar-request" },
+      input: {
+        summary: "Dentist",
+        start: "2026-09-10T10:00:00-03:00",
+        end: "2026-09-10T11:00:00-03:00",
+        attendees: ["guest@example.com"],
+        timezone: "America/Sao_Paulo",
+        calendarId: "primary",
+      },
+      toolMetadata: {
+        eve: {
+          kind: "tool-call",
+          name: "calendar_create_event",
+          inputRequest: {
+            kind: "tool-approval",
+            requestId: "calendar-request",
+            prompt: "Create this calendar event?",
+            options: [
+              { id: "approve", label: "Approve" },
+              { id: "cancel", label: "Cancel" },
+            ],
+          },
+        },
+      },
+    } satisfies EveMessage["parts"][number];
+    const agent = {
+      data: {
+        messages: [
+          { id: "turn-1:assistant", role: "assistant", parts: [approval] },
+        ],
+      },
+      events: [
+        sendMessageResult("First delivery"),
+        {
+          ...sendMessageResult("Second delivery"),
+          data: { ...sendMessageResult("Second delivery").data, sequence: 2 },
+        },
+      ],
+      error: undefined,
+      respond: async () => undefined,
+      status: "ready",
+    } satisfies Pick<
+      ChatAgent,
+      "data" | "error" | "events" | "respond" | "status"
+    >;
+    const render = () =>
+      renderToStaticMarkup(
+        <ChatConversation agent={agent} traceView="imessage" />
+      );
+    const markup = render();
+    expect(markup.match(/Create this calendar event\?/g)).toHaveLength(1);
+    for (const detail of [
+      "First delivery",
+      "Second delivery",
+      "Dentist",
+      "2026-09-10T10:00:00-03:00",
+      "2026-09-10T11:00:00-03:00",
+      "guest@example.com",
+      "America/Sao_Paulo",
+      "primary",
+      "Approve",
+      "Cancel",
+    ])
+      expect(markup).toContain(detail);
+    const answered = {
+      ...approval,
+      state: "approval-responded",
+      approval: { id: "calendar-request", approved: true },
+    } satisfies EveMessage["parts"][number];
+    const settled = {
+      ...agent,
+      data: {
+        messages: [
+          { id: "turn-1:assistant", role: "assistant", parts: [answered] },
+        ],
+      },
+    } satisfies Pick<
+      ChatAgent,
+      "data" | "error" | "events" | "respond" | "status"
+    >;
+    expect(
+      renderToStaticMarkup(
+        <ChatConversation agent={settled} traceView="imessage" />
+      )
+    ).not.toContain("Create this calendar event?");
+  });
+
   it("keeps the previous visible message while a filtered assistant shell is pending", () => {
     const cancellationText =
       "Background task task_worker (browser-agent) is cancelled.";
@@ -171,7 +264,9 @@ function delivery(turnId: string, messageText: string): MessageStreamEvent {
   };
 }
 
-function sendMessageResult(text: string): MessageStreamEvent {
+function sendMessageResult(
+  text: string
+): Extract<MessageStreamEvent, { type: "action.result" }> {
   return {
     data: {
       result: {
