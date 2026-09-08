@@ -1,10 +1,14 @@
-import type { ChannelLoginStatus } from "@app/sign-in/_lib/channel-login";
-import type { channelChallengeSchema } from "@shared/identity/channel-auth";
+import type { ChannelAuthorizationStatus } from "@web/auth/channel/client";
+import type {
+  channelChallengeSchema,
+  channelChallengeRequestSchema,
+} from "@shared/identity/channel-auth";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 
 export function ChannelStatus({
   challenge,
+  purpose,
   status,
   busy,
   error,
@@ -12,7 +16,8 @@ export function ChannelStatus({
   onRestart,
 }: {
   readonly challenge: typeof channelChallengeSchema.Type;
-  readonly status: ChannelLoginStatus;
+  readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
+  readonly status: ChannelAuthorizationStatus;
   readonly busy: boolean;
   readonly error: string | undefined;
   readonly onContinue: () => void;
@@ -26,15 +31,16 @@ export function ChannelStatus({
           <>
             <h2 className="type-section-title">Confirm in {messenger}</h2>
             <p className="type-supporting-body mt-2 text-muted-foreground">
-              Open the chat and confirm the request to sign in to this browser.
-              Only approve it if you started it here. Then return to this tab.
+              {purpose === "login"
+                ? "Open the chat and confirm the request to sign in to this browser. Only approve it if you started it here. Then return to this tab."
+                : "Open the messenger account you want to link and confirm the request to link it to your current Companion account. Only approve it if you started it here. Then return to this tab."}
             </p>
             <Button
               className="mt-4 w-full"
               nativeButton={false}
               render={
                 <a
-                  aria-label={`Open ${messenger} to confirm sign-in`}
+                  aria-label={`Open ${messenger} to confirm ${purpose === "login" ? "sign-in" : "account linking"}`}
                   href={challenge.deepLink}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -57,7 +63,9 @@ export function ChannelStatus({
           <>
             <h2 className="type-section-title">Confirmed in {messenger}</h2>
             <p className="type-supporting-body mt-2 text-muted-foreground">
-              Continue to sign in to this browser.
+              {purpose === "login"
+                ? "Continue to sign in to this browser."
+                : "Finish linking this messenger account to your current Companion account."}
             </p>
             <Button
               className="mt-4 w-full"
@@ -65,7 +73,13 @@ export function ChannelStatus({
               onClick={onContinue}
               type="button"
             >
-              {busy ? "Signing in…" : "Enter this browser"}
+              {busy
+                ? purpose === "login"
+                  ? "Signing in…"
+                  : "Linking…"
+                : purpose === "login"
+                  ? "Enter this browser"
+                  : "Finish linking account"}
             </Button>
           </>
         ) : (
@@ -86,7 +100,11 @@ export function ChannelStatus({
       </div>
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>Sign-in needs attention</AlertTitle>
+          <AlertTitle>
+            {purpose === "login"
+              ? "Sign-in needs attention"
+              : "Account linking needs attention"}
+          </AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}

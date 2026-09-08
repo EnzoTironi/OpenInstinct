@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { ChannelAuthForm } from "@app/sign-in/_components/channel-form";
-import { safeCallbackUrl } from "@app/sign-in/_lib/channel-login";
+import { ChannelAuthForm } from "@web/auth/channel/form";
+import { safeCallbackUrl } from "@web/auth/channel/client";
 import { getAuthSession } from "@db/services/auth/session";
 
 export default async function SignInPage({
   searchParams,
 }: PageProps<"/sign-in">) {
-  const callbackValue = (await searchParams).callbackUrl;
+  const params = await searchParams;
+  const callbackValue = params.callbackUrl;
   const callbackUrl = safeCallbackUrl(
     Array.isArray(callbackValue) ? callbackValue[0] : callbackValue
   );
@@ -24,7 +25,13 @@ export default async function SignInPage({
             Sign in through the messenger you use with your assistant.
           </p>
         </div>
-        <ChannelAuthForm callbackUrl={callbackUrl} />
+        {params.reason === "channel-unlinked" ? (
+          <output className="type-supporting-body block text-muted-foreground">
+            Channel disconnected. You were signed out of all browsers. Use a
+            remaining linked channel to sign in again.
+          </output>
+        ) : null}
+        <ChannelAuthForm purpose="login" callbackUrl={callbackUrl} />
       </section>
     </main>
   );

@@ -2,13 +2,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { ChannelStatus } from "@app/sign-in/_components/channel-status";
+import { ChannelStatus } from "@web/auth/channel/status";
 import {
-  loginHttpError,
-  loginPollFailure,
+  channelHttpError,
+  channelPollFailure,
   invalidChannelChallenge,
   safeCallbackUrl,
-} from "@app/sign-in/_lib/channel-login";
+} from "@web/auth/channel/client";
 import { channelChallengeSchema } from "@shared/identity/channel-auth";
 
 const challenge = Schema.decodeUnknownSync(channelChallengeSchema)({
@@ -25,6 +25,7 @@ function renderStatus(
   return renderToStaticMarkup(
     createElement(ChannelStatus, {
       challenge,
+      purpose: "login",
       status,
       busy,
       error: undefined,
@@ -84,9 +85,9 @@ describe("browser-bound sign-in states", () => {
     }
   );
   it("provides actionable unavailable and lost-browser errors", () => {
-    expect(loginHttpError(503).message).toContain("other messenger");
-    expect(loginHttpError(403).message).toContain("Start again");
-    expect(loginHttpError(429).message).toContain("Wait");
+    expect(channelHttpError(503).message).toContain("other messenger");
+    expect(channelHttpError(403).message).toContain("Start again");
+    expect(channelHttpError(429).message).toContain("Wait");
   });
 });
 
@@ -97,10 +98,10 @@ describe("poll failure transitions", () => {
   it.each([400, 401, 403, 404, 409, 410])(
     "invalidates HTTP %s without another poll or messenger link",
     (status) => {
-      const failure = loginHttpError(status);
+      const failure = channelHttpError(status);
       expect(failure.status).toBe(status);
       expect(failure.category).toBe("terminal");
-      const next = loginPollFailure(failure, 0, now, expiry);
+      const next = channelPollFailure(failure, 0, now, expiry);
       expect(next).toEqual({ status: "invalid", failures: 0, delay: 0 });
       expect(renderStatus(next.status)).not.toContain("href=");
     }
@@ -109,16 +110,16 @@ describe("poll failure transitions", () => {
   it("invalidates malformed challenge data while retaining the actual response status", () => {
     const failure = invalidChannelChallenge(200);
     expect(failure.status).toBe(200);
-    expect(loginPollFailure(failure, 0, now, expiry).status).toBe("invalid");
+    expect(channelPollFailure(failure, 0, now, expiry).status).toBe("invalid");
   });
 
   it.each(["45", "Tue, 08 Sep 2026 11:00:45 GMT"])(
     "honors Retry-After %s on rate limiting",
     (header) => {
-      const failure = loginHttpError(429, header);
+      const failure = channelHttpError(429, header);
       expect(failure.retryAfter).toBe(header);
       expect(failure.category).toBe("rate-limit");
-      expect(loginPollFailure(failure, 0, now, expiry)).toEqual({
+      expect(channelPollFailure(failure, 0, now, expiry)).toEqual({
         status: "pending",
         failures: 0,
         delay: 45_000,
@@ -130,21 +131,21 @@ describe("poll failure transitions", () => {
     "backs off rate limits with absent or invalid Retry-After %s",
     (header) => {
       expect(
-        loginPollFailure(loginHttpError(429, header), 0, now, expiry).delay
+        channelPollFailure(channelHttpError(429, header), 0, now, expiry).delay
       ).toBe(30_000);
     }
   );
 
   it("bounds exponential transient retries and then invalidates the request", () => {
-    const failure = loginHttpError(503);
+    const failure = channelHttpError(503);
     let failures = 0;
     for (const delay of [4000, 8000, 16_000, 30_000]) {
-      const next = loginPollFailure(failure, failures, now, expiry);
+      const next = channelPollFailure(failure, failures, now, expiry);
       expect(next.status).toBe("pending");
       expect(next.delay).toBe(delay);
       failures = next.failures;
     }
-    expect(loginPollFailure(failure, failures, now, expiry)).toEqual({
+    expect(channelPollFailure(failure, failures, now, expiry)).toEqual({
       status: "invalid",
       failures: 5,
       delay: 0,
@@ -152,9 +153,11 @@ describe("poll failure transitions", () => {
   });
 
   it("never schedules another request beyond challenge expiry", () => {
-    const failure = loginHttpError(429, "3600");
-    expect(loginPollFailure(failure, 0, now, expiry).delay).toBe(expiry - now);
-    expect(loginPollFailure(failure, 0, expiry, expiry)).toEqual({
+    const failure = channelHttpError(429, "3600");
+    expect(channelPollFailure(failure, 0, now, expiry).delay).toBe(
+      expiry - now
+    );
+    expect(channelPollFailure(failure, 0, expiry, expiry)).toEqual({
       status: "expired",
       failures: 0,
       delay: 0,
@@ -163,7 +166,7 @@ describe("poll failure transitions", () => {
 
   it("applies Retry-After to transient server failures too", () => {
     expect(
-      loginPollFailure(loginHttpError(503, "60"), 0, now, expiry).delay
+      channelPollFailure(channelHttpError(503, "60"), 0, now, expiry).delay
     ).toBe(60_000);
   });
 });

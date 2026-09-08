@@ -1,46 +1,52 @@
 "use client";
 
 import type {
-  ChannelLoginError,
-  ChannelLoginStatus,
-} from "@app/sign-in/_lib/channel-login";
+  ChannelAuthorizationError,
+  ChannelAuthorizationStatus,
+} from "@web/auth/channel/client";
 import { Effect, Result } from "effect";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   channelChallengeSchema,
+  channelChallengeRequestSchema,
   channelProviderSchema,
 } from "@shared/identity/channel-auth";
 import {
-  checkChannelLogin,
-  completeChannelLogin,
-  loginHttpError,
-  loginPollFailure,
+  checkChannelAuthorization,
+  channelFailureMessage,
+  completeChannelAuthorization,
+  channelHttpError,
+  channelPollFailure,
   safeCallbackUrl,
-  startChannelLogin,
-} from "@app/sign-in/_lib/channel-login";
+  startChannelAuthorization,
+} from "@web/auth/channel/client";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
-import { ChannelStatus } from "./channel-status";
+import { ChannelStatus } from "./status";
+import { authClient } from "@web/auth/client";
 
 export function ChannelAuthForm({
   callbackUrl,
+  purpose,
 }: {
   readonly callbackUrl: string;
+  readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
 }) {
   const [challenge, setChallenge] =
     useState<typeof channelChallengeSchema.Type>();
-  const action = useLoginRequest();
+  const action = useAuthorizationRequest();
   function start(channel: typeof channelProviderSchema.Type) {
-    action.run(startChannelLogin(channel), setChallenge);
+    action.run(startChannelAuthorization(channel, purpose), setChallenge);
   }
 
   if (challenge)
     return (
-      <PendingLogin
+      <PendingAuthorization
         key={challenge.id}
         challenge={challenge}
         callbackUrl={callbackUrl}
+        purpose={purpose}
         onRestart={() => {
           setChallenge(undefined);
         }}
@@ -57,7 +63,13 @@ export function ChannelAuthForm({
         }}
         type="button"
       >
-        {action.busy ? "Preparing sign-in…" : "Continue with Telegram"}
+        {action.busy
+          ? purpose === "login"
+            ? "Preparing sign-in…"
+            : "Preparing link…"
+          : purpose === "login"
+            ? "Continue with Telegram"
+            : "Link Telegram"}
       </Button>
       <Button
         className="w-full"
@@ -69,34 +81,42 @@ export function ChannelAuthForm({
         type="button"
         variant="outline"
       >
-        Continue with WhatsApp
+        {purpose === "login" ? "Continue with WhatsApp" : "Link WhatsApp"}
       </Button>
       {action.error ? (
         <Alert variant="destructive">
-          <AlertDescription>{action.error}</AlertDescription>
+          <AlertDescription>
+            {channelFailureMessage(action.error, purpose)}
+          </AlertDescription>
         </Alert>
       ) : null}
+      {purpose === "link" && action.error?.status === 401 ? (
+        <SignInAgain callbackUrl={callbackUrl} />
+      ) : null}
       <p className="type-caption text-muted-foreground">
-        Choose a messenger, confirm this browser’s sign-in in chat, then return
-        here. No phone number or password to enter.
+        {purpose === "login"
+          ? "Choose a messenger, confirm this browser’s sign-in in chat, then return here. No phone number or password to enter."
+          : "Choose the messenger account you want to link. Confirm the link in that chat, then return here to finish. A recent sign-in is required."}
       </p>
     </div>
   );
 }
 
-function PendingLogin({
+function PendingAuthorization({
   challenge,
   callbackUrl,
+  purpose,
   onRestart,
 }: {
   readonly challenge: typeof channelChallengeSchema.Type;
   readonly callbackUrl: string;
+  readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
   readonly onRestart: () => void;
 }) {
   const router = useRouter();
-  const [status, setStatus] = useState<ChannelLoginStatus>("pending");
+  const [status, setStatus] = useState<ChannelAuthorizationStatus>("pending");
   const [error, setError] = useState<string>();
-  const action = useLoginRequest();
+  const action = useAuthorizationRequest();
 
   useEffect(() => {
     if (status !== "pending" && status !== "confirmed") return undefined;
@@ -113,7 +133,7 @@ function PendingLogin({
       const poll = Effect.gen(function* pollConfirmation() {
         let failures = 0;
         while (Date.now() < Date.parse(challenge.expiresAt)) {
-          const result = yield* checkChannelLogin(challenge.id).pipe(
+          const result = yield* checkChannelAuthorization(challenge.id).pipe(
             Effect.result
           );
           let delay = 2000;
@@ -125,7 +145,7 @@ function PendingLogin({
               return;
             }
           } else {
-            const next = loginPollFailure(
+            const next = channelPollFailure(
               result.failure,
               failures,
               Date.now(),
@@ -133,8 +153,8 @@ function PendingLogin({
             );
             setError(
               next.status === "invalid"
-                ? `${result.failure.message} Start a new request to continue.`
-                : result.failure.message
+                ? `${channelFailureMessage(result.failure, purpose)} Start a new request to continue.`
+                : channelFailureMessage(result.failure, purpose)
             );
             if (next.status !== "pending") {
               setStatus(next.status);
@@ -148,14 +168,14 @@ function PendingLogin({
         setStatus("expired");
       });
       void Effect.runPromise(poll, { signal: controller.signal }).catch(() => {
-        if (!controller.signal.aborted) setError(loginHttpError(0).message);
+        if (!controller.signal.aborted) setError(channelHttpError(0).message);
       });
     }
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [challenge, status]);
+  }, [challenge, status, purpose]);
 
   function complete() {
     if (status !== "confirmed") return;
@@ -163,32 +183,40 @@ function PendingLogin({
       setStatus("expired");
       return;
     }
-    action.run(completeChannelLogin(challenge.id), () => {
+    action.run(completeChannelAuthorization(challenge.id), () => {
       router.replace(safeCallbackUrl(callbackUrl));
       router.refresh();
     });
   }
 
   return (
-    <ChannelStatus
-      challenge={challenge}
-      status={status}
-      busy={action.busy}
-      error={action.error ?? error}
-      onContinue={complete}
-      onRestart={onRestart}
-    />
+    <div className="space-y-3">
+      <ChannelStatus
+        challenge={challenge}
+        purpose={purpose}
+        status={status}
+        busy={action.busy}
+        error={
+          action.error ? channelFailureMessage(action.error, purpose) : error
+        }
+        onContinue={complete}
+        onRestart={onRestart}
+      />
+      {purpose === "link" && action.error?.status === 401 ? (
+        <SignInAgain callbackUrl={callbackUrl} />
+      ) : null}
+    </div>
   );
 }
 
-function useLoginRequest() {
+function useAuthorizationRequest() {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<ChannelAuthorizationError>();
   const active = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => active.current?.abort(), []);
 
   function run<A>(
-    operation: Effect.Effect<A, ChannelLoginError>,
+    operation: Effect.Effect<A, ChannelAuthorizationError>,
     onSuccess: (value: A) => void
   ) {
     if (active.current) return;
@@ -200,7 +228,7 @@ function useLoginRequest() {
       operation.pipe(
         Effect.match({
           onFailure: (failure) => {
-            setError(failure.message);
+            setError(failure);
           },
           onSuccess,
         })
@@ -208,7 +236,7 @@ function useLoginRequest() {
       { signal: controller.signal }
     )
       .catch(() => {
-        if (!controller.signal.aborted) setError(loginHttpError(0).message);
+        if (!controller.signal.aborted) setError(channelHttpError(0));
       })
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -218,4 +246,21 @@ function useLoginRequest() {
       });
   }
   return { busy, error, run };
+}
+
+function SignInAgain({ callbackUrl }: { readonly callbackUrl: string }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => {
+        const destination = `/sign-in?callbackUrl=${encodeURIComponent(safeCallbackUrl(callbackUrl))}`;
+        void authClient.signOut().finally(() => {
+          window.location.assign(destination);
+        });
+      }}
+    >
+      Sign in again
+    </Button>
+  );
 }

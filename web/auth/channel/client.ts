@@ -39,8 +39,8 @@ export function safeCallbackUrl(value: string | undefined) {
   );
 }
 
-export class ChannelLoginError extends Schema.TaggedError<ChannelLoginError>()(
-  "ChannelLoginError",
+export class ChannelAuthorizationError extends Schema.TaggedError<ChannelAuthorizationError>()(
+  "ChannelAuthorizationError",
   {
     message: Schema.String,
     category: Schema.Literals(["terminal", "rate-limit", "transient"]),
@@ -49,12 +49,12 @@ export class ChannelLoginError extends Schema.TaggedError<ChannelLoginError>()(
   }
 ) {}
 
-export function loginHttpError(
+export function channelHttpError(
   status: number,
   retryAfter: string | null = null
 ) {
   const terminal = [400, 401, 403, 404, 409, 410].includes(status);
-  return new ChannelLoginError({
+  return new ChannelAuthorizationError({
     status,
     retryAfter,
     category: terminal
@@ -73,7 +73,7 @@ export function loginHttpError(
 }
 
 export function invalidChannelChallenge(status: number) {
-  return new ChannelLoginError({
+  return new ChannelAuthorizationError({
     status,
     retryAfter: null,
     category: "terminal",
@@ -81,7 +81,7 @@ export function invalidChannelChallenge(status: number) {
   });
 }
 
-export type ChannelLoginStatus =
+export type ChannelAuthorizationStatus =
   | typeof channelChallengeStatusSchema.Type.status
   | "invalid";
 
@@ -92,8 +92,8 @@ const retryDateSchema = Schema.String.check(
   )
 );
 
-export function loginPollFailure(
-  failure: ChannelLoginError,
+export function channelPollFailure(
+  failure: ChannelAuthorizationError,
   failures: number,
   now: number,
   expiresAt: number
@@ -130,7 +130,7 @@ export function loginPollFailure(
   };
 }
 
-const requestJson = Effect.fn("channelLogin.request")(
+const requestJson = Effect.fn("channelAuthorization.request")(
   function* <A>(
     path: string,
     init: RequestInit,
@@ -145,32 +145,35 @@ const requestJson = Effect.fn("channelLogin.request")(
           redirect: "error",
           signal,
         }),
-      catch: () => loginHttpError(0),
+      catch: () => channelHttpError(0),
     });
     if (!response.ok)
-      return yield* loginHttpError(
+      return yield* channelHttpError(
         response.status,
         response.headers.get("Retry-After")
       );
     const body = yield* Effect.tryPromise({
       try: () => response.text(),
-      catch: () => loginHttpError(0),
+      catch: () => channelHttpError(0),
     });
     return yield* Schema.decodeEffect(Schema.fromJsonString(responseSchema))(
       body
     ).pipe(Effect.mapError(() => invalidChannelChallenge(response.status)));
   },
   Effect.timeout("10 seconds"),
-  Effect.catchTag("TimeoutError", () => Effect.fail(loginHttpError(0)))
+  Effect.catchTag("TimeoutError", () => Effect.fail(channelHttpError(0)))
 );
 
-export const startChannelLogin = Effect.fn("channelLogin.start")(function* (
-  channel: typeof channelProviderSchema.Type
+export const startChannelAuthorization = Effect.fn(
+  "channelAuthorization.start"
+)(function* (
+  channel: typeof channelProviderSchema.Type,
+  purpose: typeof channelChallengeRequestSchema.Type.purpose
 ) {
   const intent = yield* Schema.decodeEffect(channelChallengeRequestSchema)({
     channel,
-    purpose: "login",
-  }).pipe(Effect.mapError(() => loginHttpError(400)));
+    purpose,
+  }).pipe(Effect.mapError(() => channelHttpError(400)));
   const challenge = yield* requestJson(
     "start",
     {
@@ -184,12 +187,12 @@ export const startChannelLogin = Effect.fn("channelLogin.start")(function* (
   return challenge;
 });
 
-export const checkChannelLogin = Effect.fn("channelLogin.status")(function* (
-  id: string
-) {
+export const checkChannelAuthorization = Effect.fn(
+  "channelAuthorization.status"
+)(function* (id: string) {
   const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
     id,
-  }).pipe(Effect.mapError(() => loginHttpError(400)));
+  }).pipe(Effect.mapError(() => channelHttpError(400)));
   return yield* requestJson(
     `status?id=${encodeURIComponent(input.id)}`,
     { method: "GET" },
@@ -197,19 +200,33 @@ export const checkChannelLogin = Effect.fn("channelLogin.status")(function* (
   );
 });
 
-export const completeChannelLogin = Effect.fn("channelLogin.complete")(
-  function* (id: string) {
-    const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
-      id,
-    }).pipe(Effect.mapError(() => loginHttpError(400)));
-    yield* requestJson(
-      "complete",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      },
-      channelChallengeCompletionSchema
-    );
-  }
-);
+export const completeChannelAuthorization = Effect.fn(
+  "channelAuthorization.complete"
+)(function* (id: string) {
+  const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
+    id,
+  }).pipe(Effect.mapError(() => channelHttpError(400)));
+  yield* requestJson(
+    "complete",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    channelChallengeCompletionSchema
+  );
+});
+
+export function channelFailureMessage(
+  failure: ChannelAuthorizationError,
+  purpose: typeof channelChallengeRequestSchema.Type.purpose
+) {
+  if (purpose === "login") return failure.message;
+  if (failure.status === 401)
+    return "Sign in again before linking another channel, then return to Account to start a new request.";
+  if (failure.status === 409)
+    return "This messenger account is linked to another Companion account. Choose a different messenger account.";
+  if (failure.category === "terminal")
+    return "This account-linking request could not be verified. Start a new request and confirm it in the messenger account you want to link.";
+  return failure.message;
+}
