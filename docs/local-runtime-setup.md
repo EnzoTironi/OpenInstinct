@@ -232,3 +232,24 @@ two workers fixed that resource contention without changing assertions or timeou
 limits. The same `pnpm check --force` command then passed all six tasks and all
 794 tests; the uncached production build also passed. The failed concurrent run
 remains recorded.
+
+## Product journey development
+
+Home now leads into conversation, history, personal information and reminders.
+First-chat examples populate editable drafts, including review of saved memory;
+they never send automatically. Browser checks with a real Better Auth session
+confirmed focus and draft editing, a visible native connection error with the
+draft preserved, and one real Spark request navigating to its session and showing
+the response. Desktop and mobile layouts were inspected.
+
+Google setup now carries a validated local conversation destination through the
+existing connection flow. The browser exercised chat → Home → the same chat and
+rejected an external return destination. Live Google authorization remains
+unqualified because the local connector is unavailable.
+
+The read-only reminders page consumes existing scheduled jobs and their latest
+execution and report states. Three real PostgreSQL cases cover account isolation,
+conversation ownership, empty results and the 50/51 row boundary. Schedule
+completion is not presented as delivery. The page shows UTC, caps the list at 50,
+and keeps changes in the originating conversation; it adds no scheduler or write
+endpoint. Full failure recovery and provider delivery remain release gates.

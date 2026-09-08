@@ -1,5 +1,6 @@
 import {
   ArrowUpRightIcon,
+  ClockIcon,
   HistoryIcon,
   MessageSquareIcon,
   UserRoundIcon,
@@ -31,9 +32,24 @@ export function HomeOverview() {
 
       <section aria-labelledby="your-companion-heading" className="space-y-4">
         <h2 className="type-section-title" id="your-companion-heading">
-          Make it personal
+          Keep track
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
+          <Button
+            nativeButton={false}
+            render={<Link href="/reminders" />}
+            variant="surface"
+          >
+            <ClockIcon aria-hidden="true" />
+            <span className="min-w-0 flex-1 space-y-1">
+              <span className="block type-label">Reminders</span>
+              <span className="block type-caption text-muted-foreground">
+                See what’s scheduled and return to a conversation to make
+                changes.
+              </span>
+            </span>
+            <ArrowUpRightIcon aria-hidden="true" />
+          </Button>
           <Button
             nativeButton={false}
             render={<Link href="/personal-info" />}

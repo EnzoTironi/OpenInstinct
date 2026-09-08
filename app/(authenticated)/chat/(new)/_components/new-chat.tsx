@@ -15,7 +15,7 @@ import {
 } from "@web/components/ai-elements/prompt-input";
 import { chatTitle, messageContent } from "../../_lib/message-input";
 import { api } from "@web/trpc/client";
-import { chatStarters } from "../../_lib/starters";
+import { chatStarters } from "../_lib/starters";
 
 export function NewChat({
   initialDraft = "",

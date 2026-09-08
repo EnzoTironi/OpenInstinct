@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ClockIcon,
   HistoryIcon,
   KeyRoundIcon,
   GlobeIcon,
@@ -28,6 +29,12 @@ const navigation = [
     icon: HistoryIcon,
     id: "history",
     label: "Conversation history",
+  },
+  {
+    href: "/reminders",
+    icon: ClockIcon,
+    id: "reminders",
+    label: "Reminders",
   },
   {
     href: "/personal-info",
@@ -101,6 +108,7 @@ function activeRoute(pathname: string) {
   if (pathname === "/") return "workspace";
   if (pathname.startsWith("/vault")) return "vault";
   if (pathname.startsWith("/personal-info")) return "personal-info";
+  if (pathname.startsWith("/reminders")) return "reminders";
   if (pathname.startsWith("/chat/history")) return "history";
   if (pathname.startsWith("/chat")) return "chat";
   if (pathname.startsWith("/tasks")) return "tasks";

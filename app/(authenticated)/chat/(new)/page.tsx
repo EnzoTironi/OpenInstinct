@@ -1,5 +1,5 @@
 import { NewChat } from "./_components/new-chat";
-import { chatStarters } from "../_lib/starters";
+import { chatStarters } from "./_lib/starters";
 
 export default async function NewChatPage({
   searchParams,
