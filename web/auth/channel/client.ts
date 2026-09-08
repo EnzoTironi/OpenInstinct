@@ -39,6 +39,27 @@ export function safeCallbackUrl(value: string | undefined) {
   );
 }
 
+interface SignOutResult {
+  readonly data: { readonly success: boolean } | null;
+  readonly error: {
+    readonly status: number;
+    readonly statusText: string;
+  } | null;
+}
+
+export function reauthenticationDestination(
+  outcome: PromiseSettledResult<SignOutResult>,
+  callbackUrl: string
+) {
+  if (
+    outcome.status === "rejected" ||
+    outcome.value.error ||
+    outcome.value.data?.success !== true
+  )
+    return undefined;
+  return `/sign-in?callbackUrl=${encodeURIComponent(safeCallbackUrl(callbackUrl))}`;
+}
+
 export class ChannelAuthorizationError extends Schema.TaggedError<ChannelAuthorizationError>()(
   "ChannelAuthorizationError",
   {

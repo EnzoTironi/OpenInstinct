@@ -19,6 +19,7 @@ import {
   channelHttpError,
   channelPollFailure,
   safeCallbackUrl,
+  reauthenticationDestination,
   startChannelAuthorization,
 } from "@web/auth/channel/client";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
@@ -250,18 +251,41 @@ function useAuthorizationRequest() {
 }
 
 function SignInAgain({ callbackUrl }: { readonly callbackUrl: string }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
-    <Button
-      type="button"
-      variant="outline"
-      onClick={() => {
-        const destination = `/sign-in?callbackUrl=${encodeURIComponent(safeCallbackUrl(callbackUrl))}`;
-        void authClient.signOut().finally(() => {
-          window.location.assign(destination);
-        });
-      }}
-    >
-      Sign in again
-    </Button>
+    <div className="space-y-3">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          setFailed(false);
+          void Promise.allSettled([authClient.signOut()]).then(([outcome]) => {
+            const destination = reauthenticationDestination(
+              outcome,
+              callbackUrl
+            );
+            if (destination) {
+              window.location.assign(destination);
+              return undefined;
+            }
+            setFailed(true);
+            setBusy(false);
+            return undefined;
+          });
+        }}
+      >
+        {busy ? "Signing out…" : "Sign in again"}
+      </Button>
+      {failed ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Unable to sign out. Check your connection and try again.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
   );
 }

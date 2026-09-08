@@ -1,7 +1,11 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { channelHttpError, channelFailureMessage } from "./client";
+import {
+  channelHttpError,
+  channelFailureMessage,
+  reauthenticationDestination,
+} from "./client";
 import { ChannelAuthForm } from "./form";
 import { ChannelStatus } from "./status";
 
@@ -77,5 +81,53 @@ describe("shared channel authorization", () => {
     expect(channelFailureMessage(original, "link")).toContain(
       "account-linking request"
     );
+  });
+});
+
+describe("reauthentication redirect policy", () => {
+  it("does not redirect a rejected logout", () => {
+    expect(
+      reauthenticationDestination(
+        { status: "rejected", reason: new Error("connection lost") },
+        "/account"
+      )
+    ).toBeUndefined();
+  });
+  it("does not redirect a fulfilled logout containing an error", () => {
+    expect(
+      reauthenticationDestination(
+        {
+          status: "fulfilled",
+          value: {
+            data: null,
+            error: { status: 503, statusText: "Service Unavailable" },
+          },
+        },
+        "/account"
+      )
+    ).toBeUndefined();
+  });
+  it("requires an affirmative logout result", () => {
+    expect(
+      reauthenticationDestination(
+        {
+          status: "fulfilled",
+          value: { data: { success: false }, error: null },
+        },
+        "/account"
+      )
+    ).toBeUndefined();
+  });
+  it("allows reauthentication after confirmed logout and sanitizes the callback", () => {
+    const outcome = {
+      status: "fulfilled" as const,
+      value: { data: { success: true }, error: null },
+    };
+    expect(reauthenticationDestination(outcome, "/account")).toBe(
+      "/sign-in?callbackUrl=%2Faccount"
+    );
+    expect(
+      reauthenticationDestination(outcome, "https://attacker.invalid")
+    ).toBe("/sign-in?callbackUrl=%2F");
   });
 });
