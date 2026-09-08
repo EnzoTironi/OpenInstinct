@@ -1,3 +1,4 @@
+import { renderChannelInput } from "./channel-input";
 import { createHash } from "node:crypto";
 import { Effect } from "effect";
 import type { ChannelEvents } from "eve/channels";
@@ -53,6 +54,8 @@ export function privateChannelEvents(channel: Identity["channel"]) {
         })
       );
     },
+    "input.requested": (event, _channel, context) =>
+      enqueueInput(channel, event, context),
     "authorization.required": (event, _channel, context) =>
       enqueueAuthorization(channel, event, context),
     "turn.failed": terminal,
@@ -61,6 +64,7 @@ export function privateChannelEvents(channel: Identity["channel"]) {
     ChannelEvents,
     | "message.completed"
     | "authorization.required"
+    | "input.requested"
     | "turn.failed"
     | "turn.cancelled"
   >;
@@ -103,6 +107,30 @@ function enqueueAuthorization(
         deliveryKey: `authorization:${key}`,
         text,
       });
+    })
+  );
+}
+
+function enqueueInput(
+  channel: Identity["channel"],
+  event: Parameters<NonNullable<ChannelEvents["input.requested"]>>[0],
+  context: Parameters<NonNullable<ChannelEvents["input.requested"]>>[2]
+) {
+  return serverRuntime.runPromise(
+    Effect.gen(function* () {
+      const identity = yield* requireChannelPrincipal(
+        channel,
+        context.session.auth.current ?? context.session.auth.initiator ?? null
+      );
+      const transport = yield* ChannelTransport;
+      for (const request of event.requests) {
+        yield* transport.enqueueText({
+          identityId: identity.id,
+          deliveryKey: `input:${context.session.id}:${request.requestId}`,
+          text: renderChannelInput(context.session.id, request),
+        });
+      }
+      yield* transport.drainOutbox(identity.id);
     })
   );
 }

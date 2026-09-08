@@ -1,4 +1,5 @@
 import { defineDynamic, defineTool } from "eve/tools";
+import { authorizeApprovalResponse } from "@agent/lib/approval-response";
 import { always } from "eve/tools/approval";
 import { z } from "zod";
 import {
@@ -38,7 +39,7 @@ export const calendarCheckAvailability = defineTool({
 });
 
 export const calendarCreateEvent = defineTool({
-  approval: always(),
+  approval: { request: always(), response: authorizeApprovalResponse },
   description:
     "Create a confirmed private Google Calendar event. This requires user approval and sends updates to attendees.",
   inputSchema: calendarEventSchema,
