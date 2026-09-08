@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Effect } from "effect";
 import type { ChannelEvents } from "eve/channels";
 import type { Identity } from "../../server/accounts";
@@ -52,10 +53,56 @@ export function privateChannelEvents(channel: Identity["channel"]) {
         })
       );
     },
+    "authorization.required": (event, _channel, context) =>
+      enqueueAuthorization(channel, event, context),
     "turn.failed": terminal,
     "turn.cancelled": terminal,
   } satisfies Pick<
     ChannelEvents,
-    "message.completed" | "turn.failed" | "turn.cancelled"
+    | "message.completed"
+    | "authorization.required"
+    | "turn.failed"
+    | "turn.cancelled"
   >;
+}
+
+function enqueueAuthorization(
+  channel: Identity["channel"],
+  event: Parameters<NonNullable<ChannelEvents["authorization.required"]>>[0],
+  context: Parameters<NonNullable<ChannelEvents["authorization.required"]>>[2]
+) {
+  return serverRuntime.runPromise(
+    Effect.gen(function* () {
+      const auth =
+        context.session.auth.current ?? context.session.auth.initiator ?? null;
+      const identity = yield* requireChannelPrincipal(channel, auth);
+      const transport = yield* ChannelTransport;
+      const challenge = event.authorization;
+      const text = [
+        `Connect ${challenge?.displayName ?? event.name}`,
+        event.description,
+        challenge?.instructions,
+        challenge?.userCode ? `Code: ${challenge.userCode}` : undefined,
+        challenge?.url,
+      ]
+        .filter((line) => line !== undefined)
+        .join("\n\n");
+      const key = createHash("sha256")
+        .update(
+          JSON.stringify([
+            context.session.id,
+            event.turnId,
+            event.stepIndex,
+            event.name,
+            event.attemptId ?? event.sequence,
+          ])
+        )
+        .digest("hex");
+      yield* transport.enqueueText({
+        identityId: identity.id,
+        deliveryKey: `authorization:${key}`,
+        text,
+      });
+    })
+  );
 }
