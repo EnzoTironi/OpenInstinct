@@ -85,10 +85,12 @@ read version atomically. Stale writes produce Eve's native conflict error. Empty
 content is persisted with a new version. This storage adapter does not establish
 the source, export, deletion and retained-summary semantics of P06.
 
-The dedicated runtime profile passed 37 tests across nine files. These exercise
+The dedicated runtime profile passed 38 tests across ten files. These exercise
 real PostgreSQL and Better Auth, including linking races/replay, delivery leases,
 identity revocation, workflow stream persistence, memory CAS, reconnects, and
-cancellation of a write blocked by an actual database lock. The inherited unit
+cancellation of a write blocked by an actual database lock. Native failure and
+cancellation handlers persist one fixed, sanitized notice per turn, including
+concurrent replay and revoked-identity rejection. The inherited unit
 suite separately passed 759 tests before the subsequent focused schema regression
 was added; inherited mocks remain regression evidence only.
 
@@ -106,12 +108,25 @@ a plain Standard Schema wrapper correct these boundaries. The latter has six
 regression cases through the actual installed schema codec, with failure before
 the correction and success after it.
 
-The rebuilt native run reaches model execution and stops with
-`MODEL_CALL_FAILED`: no AI Gateway credentials are configured. This is not an
-end-to-end model or provider qualification. In particular, interrupted model-step
-replay, native approvals, stop/correction UX, voice/files, scheduled execution and
-real channel delivery remain unqualified. Existing Telegram/Kapso webhook
-configuration has not been redirected to this local server.
+Local model selection now supports `COMPANION_MODEL_PROVIDER=codex-local` through
+Eve's public `chatgpt` provider and the existing Codex login. It selects exactly
+`gpt-5.3-codex-spark`, low reasoning, an explicit 128,000-token context window and
+no reasoning summary. The summary option otherwise fails at the provider; the
+missing context metadata otherwise fails Eve model selection. Neither failure
+falls back to a different model. `gateway` remains the default. The optional
+`openrouter-free` profile uses a fixed free model and zero-price provider routing;
+its live inference remains unqualified.
+
+A real Better Auth session created through a browser challenge and signed
+synthetic confirmation completed a native Spark turn that saved a preference in
+PostgreSQL. After restarting the application and Eve, a new session recalled the
+exact preference without receiving it in its prompt. However, the model repeated
+the response tool call in both runs: the single-response oracle failed. These
+artifacts establish persistence and recall, not successful conversational UX.
+
+Interrupted model-step replay, native approvals, stop/correction UX, voice/files,
+scheduled execution and real channel delivery remain unqualified. Existing
+Telegram/Kapso webhook configuration has not been redirected to this local server.
 
 The latest full lint check passed after converting independent parser cases to
 parameterized tests. TS7 and the uncached production build passed. Ripwire still

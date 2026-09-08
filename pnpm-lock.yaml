@@ -39,6 +39,9 @@ importers:
       '@onkernel/sdk':
         specifier: ^0.96.0
         version: 0.96.0
+      '@openrouter/ai-sdk-provider':
+        specifier: 3.0.0
+        version: 3.0.0(ai@7.0.83(zod@4.4.3))(zod@4.4.3)
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -1711,6 +1714,13 @@ packages:
 
   '@onkernel/sdk@0.96.0':
     resolution: {integrity: sha512-x23psMiKLsHA2CSuvvyHkcxVx/d5UN3PynloVWf4Fgy3Qt9pYotIXb7DEidXJBFYfIodNBMuHl9wPguK3r6Zow==}
+
+  '@openrouter/ai-sdk-provider@3.0.0':
+    resolution: {integrity: sha512-m9XTSWoODH2RM5OsZpaGiN7QRR8cdP5paBWq699Tu3JVmGPBKT8xF8XwV0ZBVVsjikD/JgWfak4VSsTR4wAVbg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      ai: ^7.0.0
+      zod: ^3.25.76 || ^4.1.8
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -9294,6 +9304,11 @@ snapshots:
   '@onkernel/sdk@0.49.0': {}
 
   '@onkernel/sdk@0.96.0': {}
+
+  '@openrouter/ai-sdk-provider@3.0.0(ai@7.0.83(zod@4.4.3))(zod@4.4.3)':
+    dependencies:
+      ai: 7.0.83(zod@4.4.3)
+      zod: 4.4.3
 
   '@opentelemetry/api@1.9.0': {}
 

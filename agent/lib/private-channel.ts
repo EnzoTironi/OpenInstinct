@@ -12,11 +12,8 @@ import { Telegram } from "../../server/channels/telegram";
 import { Kapso } from "../../server/channels/kapso";
 import { readVerifiedWebhook } from "../../server/channels/webhook";
 import { serverRuntime } from "../../server/runtime";
-import {
-  drainChannelInbox,
-  handoffChannelMessage,
-  requireChannelPrincipal,
-} from "./channel-session";
+import { drainChannelInbox, handoffChannelMessage } from "./channel-session";
+import { privateChannelEvents } from "./private-channel-events";
 
 export function privateChannel(channel: Identity["channel"]) {
   const definition: ChannelDefinition<undefined, void, Lease> = {
@@ -132,33 +129,7 @@ export function privateChannel(channel: Identity["channel"]) {
       serverRuntime.runPromise(
         handoffChannelMessage(channel, target, auth, context)
       ),
-    events: {
-      "message.completed": (event, _channel, context) => {
-        const text = event.message;
-        if (
-          !text?.trim() ||
-          text.trim() === "DELIVERY_COMPLETE" ||
-          event.finishReason === "tool-calls"
-        )
-          return Promise.resolve();
-        return serverRuntime.runPromise(
-          Effect.gen(function* () {
-            const auth =
-              context.session.auth.current ??
-              context.session.auth.initiator ??
-              null;
-            const identity = yield* requireChannelPrincipal(channel, auth);
-            const transport = yield* ChannelTransport;
-            yield* transport.enqueueText({
-              identityId: identity.id,
-              deliveryKey: `message:${context.session.id}:${event.turnId}:${String(event.stepIndex)}:${String(event.sequence)}`,
-              text,
-            });
-            yield* transport.drainOutbox(identity.id);
-          })
-        );
-      },
-    },
+    events: privateChannelEvents(channel),
   };
   return defineChannel(definition);
 }

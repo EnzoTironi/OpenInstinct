@@ -12,14 +12,14 @@ import { serverRuntime } from "../../server/runtime";
 
 test("terminal channel events persist once per turn and enforce current authority", async () => {
   const url = await Effect.runPromise(Config.string("DATABASE_URL"));
-  assert.equal(new URL(url).pathname, "/companion_messaging_test");
+  assert.equal(new URL(url).pathname, "/companion_runtime_test");
   await serverRuntime.runPromise(
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
       const rows = yield* sql<{
         name: string;
       }>`SELECT current_database() AS name`;
-      assert.equal(rows[0]?.name, "companion_messaging_test");
+      assert.equal(rows[0]?.name, "companion_runtime_test");
     })
   );
   const identity = await serverRuntime.runPromise(

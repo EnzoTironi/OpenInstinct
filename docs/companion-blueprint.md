@@ -555,16 +555,29 @@ Preserve upstream mock tests as regression checks until their replacement lands.
 
 ## Current evidence and next action
 
-The fork is private, history preserved, and Effect 4.0.0-rc.112 is installed. The
-last foundation run passed 698 existing tests, typecheck, lint and formatting.
-Knip correctly reports the unused Effect dependency; production build lacks the
-required database/Kernel environment. No Telegram/Kapso implementation, full Effect
-migration, provider qualification or deployment has been completed.
+The private fork now composes Effect account/linking services, durable channel
+inbox/outbox, Telegram/Kapso adapters, Better Auth onboarding, a PostgreSQL Workflow
+world and PostgreSQL profile documents. The production build and native signed
+synthetic channel path run locally. These implemented components do not yet satisfy
+all acceptance gates of their packages.
 
-Next: execute runtime qualification with the existing source, audit the Kapso
-adapter's actual lifecycle/state semantics, then migrate the first real ownership
-service into Effect. These steps retire the largest architectural uncertainties
-before multiplying interfaces or product features.
+The [runtime evidence](local-runtime-setup.md) separates unit regression, actual
+PostgreSQL/HTTP checks and external-provider qualification. Native authenticated
+Spark turns now save and recall a PostgreSQL preference across a full service
+restart using the existing Codex login. Both runs repeated the response tool call;
+the single-response oracle remains failed. Real channel delivery is unqualified.
+
+P01/P04 also have an explicit native handoff gap: a crash after Eve acceptance but
+before application receipt persistence leaves the inbox uncertain. Eve 0.49.0 and
+the inspected 0.52.2 public send API do not expose caller-supplied input idempotency
+or an acceptance lookup for that input. The public authenticated HTTP create route
+does provide `operationId` for create-once ownership while the session is resumable;
+that primitive does not cover custom-channel follow-ups or permanent input receipts.
+Never resend ambiguous follow-up entries.
+Evaluate a minimal upstream acceptance extension and prove the interrupted handoff
+before declaring recovery qualified. Continue independent implementation only
+within the package contracts; provider credentials and this protocol gate remain
+separate dependencies.
 
 ## Source and decision references
 

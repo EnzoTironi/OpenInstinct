@@ -5,6 +5,7 @@ import { getGatewayModel } from "@db/services/settings";
 import { scopeFromPrincipal } from "@agent/lib/principal-scope";
 import { requireChannelPrincipal } from "@agent/lib/channel-session";
 import { serverRuntime } from "../server/runtime";
+import { installationModel } from "./lib/installation-model";
 
 export default defineAgent({
   experimental: {
@@ -34,7 +35,11 @@ export default defineAgent({
             requireChannelPrincipal(channel, caller)
           );
         }
-        return getGatewayModel(scopeFromPrincipal(caller));
+        const scope = scopeFromPrincipal(caller);
+        return (
+          (await serverRuntime.runPromise(installationModel)) ??
+          (await getGatewayModel(scope))
+        );
       },
     },
   }),
