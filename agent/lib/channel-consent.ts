@@ -8,7 +8,7 @@ const identifier = Schema.NonEmptyString.check(
 );
 const revision = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u));
 const reference = Schema.Struct({ requestId: identifier, revision });
-export const candidateSchema = Schema.Struct({
+const candidateSchema = Schema.Struct({
   intent: Schema.Literals([
     "approve",
     "cancel",
@@ -21,8 +21,6 @@ export const candidateSchema = Schema.Struct({
 const decodeCandidate = Schema.decodeUnknownResult(candidateSchema, {
   onExcessProperty: "error",
 });
-
-export type ChannelConsentCandidate = typeof candidateSchema.Type;
 
 type ConsentJsonValue = InputRequest["action"]["input"][string] | undefined;
 
