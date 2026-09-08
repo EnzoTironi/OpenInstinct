@@ -199,12 +199,16 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                       }
                     : issueInput
                 );
+                const message =
+                  ctx.body.channel === "kapso"
+                    ? `/start ${challenge.token}`
+                    : challenge.token;
                 const response = yield* Schema.decodeUnknownEffect(
                   channelChallengeSchema
                 )({
                   id: challenge.challengeId,
                   channel: ctx.body.channel,
-                  deepLink: `${destination.url}?${destination.parameter}=${encodeURIComponent(challenge.token)}`,
+                  deepLink: `${destination.url}?${destination.parameter}=${encodeURIComponent(message)}`,
                   expiresAt: challenge.expiresAt,
                 });
                 const cookie = browserCookie(ctx, challenge.challengeId);

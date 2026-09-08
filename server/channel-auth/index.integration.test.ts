@@ -37,6 +37,10 @@ test("real BetterAuth router, signed browser challenge and database session", as
   const pool = new Pool({ connectionString: url });
   const installationId = `plugin-test-${randomUUID()}`;
   const baseURL = "http://localhost:3000";
+  let configuration = ConfigProvider.fromUnknown({
+    TELEGRAM_BOT_ID: installationId,
+    TELEGRAM_BOT_USERNAME: "channel_test_bot",
+  });
   const auth = betterAuth({
     baseURL,
     database: pool,
@@ -47,13 +51,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
       channelAuthPlugin((program) =>
         runtime.runPromise(
           program.pipe(
-            Effect.provideService(
-              ConfigProvider.ConfigProvider,
-              ConfigProvider.fromUnknown({
-                TELEGRAM_BOT_ID: installationId,
-                TELEGRAM_BOT_USERNAME: "channel_test_bot",
-              })
-            )
+            Effect.provideService(ConfigProvider.ConfigProvider, configuration)
           )
         )
       ),
@@ -234,6 +232,38 @@ test("real BetterAuth router, signed browser challenge and database session", as
       [identity.userId]
     );
     assert.equal(sessionCount.rows[0]?.count, 1);
+    configuration = ConfigProvider.fromUnknown({
+      KAPSO_PHONE_NUMBER_ID: installationId,
+      KAPSO_PHONE_NUMBER: "+5511999999999",
+    });
+    const kapsoStarted = await request("/channel-auth/start", "POST", "", {
+      channel: "kapso",
+      purpose: "login",
+    });
+    assert.equal(kapsoStarted.status, 200);
+    const kapsoChallenge = Schema.decodeUnknownSync(channelChallengeSchema)(
+      await kapsoStarted.json()
+    );
+    const whatsapp = new URL(kapsoChallenge.deepLink);
+    assert.equal(whatsapp.origin, "https://wa.me");
+    assert.equal(whatsapp.pathname, "/5511999999999");
+    const text = whatsapp.searchParams.get("text");
+    assert.ok(text);
+    assert.match(text, /^\/start [A-Za-z0-9_-]{43}$/u);
+    const kapsoPreview = await runtime.runPromise(
+      Effect.gen(function* () {
+        const accounts = yield* ChannelAccounts;
+        return yield* accounts.previewChallenge({
+          token: text.slice(7),
+          sender: {
+            channel: "kapso",
+            installationId,
+            senderId: "5511888888888",
+          },
+        });
+      })
+    );
+    assert.equal(kapsoPreview.id, kapsoChallenge.id);
   } finally {
     await runtime.runPromise(
       Effect.gen(function* () {
