@@ -8,6 +8,12 @@ that assessment remains the record of the inspected baseline and checks.
 
 ## Product promise
 
+**Send it something you need handled. Trust it to follow through.**
+
+The [product direction](product-direction.md) applies the final focus and experience
+review to this architecture. It governs launch presentation, coherent defaults,
+end-to-end journeys and what to defer; it does not waive correctness gates.
+
 A capable personal assistant in the conversations people already use. It remembers
 what matters, acts through their existing tools, follows through over time, and
 makes both its actions and its limits understandable. WhatsApp through Kapso and
@@ -442,6 +448,12 @@ or isolation/lifecycle needs.
 
 ## Execution plan
 
+Deliver the [cross-package experience slices](product-direction.md#how-this-changes-execution)
+incrementally. The table below describes capability dependencies and final
+acceptance, not a waterfall requiring every subsystem to be finished before an
+internal conversation can be exercised. Keep scope limitations explicit, and
+retain all admission gates before involving real users.
+
 Every package delivers a usable slice, a source change list and an acceptance
 record. These are proposed work packages, not finished tickets or date estimates.
 The coordinator owns manifests, runtime composition, shared contracts, migrations
@@ -504,9 +516,19 @@ execution and shared group contexts are separately qualified expansion releases.
 The first pilot can use Telegram while WhatsApp activation is pending, with the
 limitation stated clearly.
 
+Release presentation uses one recommended assistant configuration, point-of-need
+connections and conversation-first controls. Model/runtime pickers, marketplace
+and builder surfaces are not launch onboarding. Operator configuration and
+self-hosting remain explicit. Verify consent-to-chat return, correction, expiry,
+unsupported input and uncertain outcomes as complete user experiences.
+
 Track a repeatable eval set across all enabled channels and execution profiles:
 
 - Real task completion verified against destination state, not model self-report.
+- Uncoached task completion, repeated-use value and time/interventions spent
+  supervising; comprehension of permissions, completion and recovery.
+- Successful consent-to-conversation return without restating the task, and
+  consistent correction/stop behavior across both launch channels.
 - First meaningful acknowledgement, first useful response and completion latency,
   including p50/p95 under declared load, cold start and provider failures.
 - Cost per successful task, aborted task and proactive day; token, tool and compute
