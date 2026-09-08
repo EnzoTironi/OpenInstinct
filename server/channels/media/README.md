@@ -12,17 +12,18 @@ Supported input:
 
 | Input                                   | Limit                            | Agent receives                                                       |
 | --------------------------------------- | -------------------------------- | -------------------------------------------------------------------- |
-| PNG/JPEG                                | 3 MiB each                       | Actual byte-backed Eve file part                                     |
-| PDF                                     | Within the 10 MiB message budget | Actual byte-backed Eve file part                                     |
+| PNG/JPEG                                | 3 MiB each                       | Explicit model-unavailable response                                  |
+| PDF                                     | Within the 10 MiB message budget | Explicit model-unavailable response                                  |
 | UTF-8 plain text, CSV, JSON             | 64 KiB each                      | Decoded text with the attachment name                                |
 | Ogg/Opus or WAV PCM 16-bit, mono/stereo | 3 MiB and 120 seconds each       | Actual transcription text, also sent back to the user for correction |
 
 There are at most three attachments and 10 MiB total. File content is untrusted
 user input. MIME declarations must agree with recognized byte signatures; unknown
 types and invalid UTF-8 are rejected. Other audio formats, video, archives and
-office documents remain unsupported, with a text alternative. Images/PDFs also
-require a selected model that supports that input. Eve owns their staging and
-subsequent provider hydration, as documented in its installed `docs/sandbox.mdx`.
+office documents remain unsupported, with a text alternative. Images/PDFs are currently rejected before Eve handoff: Spark and the configured
+free model are text-only, and the gateway model resolver exposes no verified
+input-capability contract. Unknown models fail closed as well. Enabling binary
+input requires that contract and live model verification; no captions are fabricated.
 
 Provider downloads use only references from the verified durable inbox:
 
@@ -57,7 +58,7 @@ is installed by this slice.
 
 The generated transcript is limited to 3,000 characters and returned to the chat
 with a correction prompt. Original provider references remain in the inbox;
-transcripts/text and staged files follow Eve's existing history/sandbox lifetime.
+transcripts/text follow Eve's existing history/sandbox lifetime.
 This slice does not add account deletion or a separate retention store.
 
 ## Focused evidence

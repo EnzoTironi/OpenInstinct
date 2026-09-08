@@ -18,6 +18,7 @@ export class ChannelMediaError extends Schema.TaggedError<ChannelMediaError>()(
   {
     reason: Schema.Literals([
       "unsupported_type",
+      "model_input_unavailable",
       "too_large",
       "invalid_media",
       "download_failed",
@@ -37,8 +38,10 @@ export function mediaFailureMessage(error: ChannelMediaError) {
       return "Please send a voice note no longer than two minutes, or send the information as text.";
     case "transcription_unavailable":
       return "Voice transcription is unavailable on this installation. Please send the information as text.";
+    case "model_input_unavailable":
+      return "Image and PDF reading is unavailable with the current model. Please send a UTF-8 text file or paste the information as text.";
     case "unsupported_type":
-      return "I can read PNG/JPEG images, PDFs and UTF-8 text files. Voice supports Ogg/Opus or 16-bit PCM WAV when transcription is configured. Please send a supported file or paste the information as text.";
+      return "I can read UTF-8 text files. Voice supports Ogg/Opus or 16-bit PCM WAV when transcription is configured. Please send a supported file or paste the information as text.";
     default:
       return "I couldn’t read this attachment. Please resend it or send the information as text.";
   }
@@ -118,3 +121,15 @@ export const decodeMediaText = Effect.fn("decodeMediaText")(function* (
     Effect.mapError(() => new ChannelMediaError({ reason: "invalid_media" }))
   );
 });
+
+/** No current model resolver exposes verified binary input capabilities.
+ * Spark and the configured free model are text-only; unknown models fail closed.
+ */
+export const requireChannelModelInput = Effect.fn("requireChannelModelInput")(
+  function* (mediaType: string) {
+    if (mediaType.startsWith("image/") || mediaType === "application/pdf")
+      yield* new ChannelMediaError({
+        reason: "model_input_unavailable",
+      });
+  }
+);

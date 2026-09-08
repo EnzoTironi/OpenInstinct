@@ -24,7 +24,7 @@ const dispatchChannels = Effect.fn("dispatchChannels")(function* (
           Effect.gen(function* () {
             const claim = yield* messaging.claimInbox({
               identityId: identity.id,
-              leaseSeconds: 30,
+              leaseSeconds: 150,
             });
             if (!claim) return;
             // The destination validates this lease and loads its stored payload.
