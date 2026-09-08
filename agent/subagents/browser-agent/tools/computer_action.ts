@@ -1,7 +1,7 @@
 import { defineTool, toolOutput, toolOutputPart } from "eve/tools";
 import type { ComputerBatchParams } from "@onkernel/sdk/resources/browsers/computer";
 import { z } from "zod";
-import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
 import { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
 import { withVaultScreenshotMask } from "@agent/subagents/browser-agent/lib/vault-screenshot-mask";
@@ -110,7 +110,7 @@ export default defineTool({
     const scope = await requireWorkerScope(context);
     await requireOwnedBrowserSession(scope, input.session_id);
 
-    const computer = kernel.browsers.computer;
+    const computer = getKernel().browsers.computer;
     const data: unknown[] = [];
     let pendingActions: ComputerBatchParams.Action[] = [];
     let screenshotBase64: string | undefined;

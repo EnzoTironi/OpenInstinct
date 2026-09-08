@@ -47,7 +47,7 @@ vi.mock("@vercel/blob", () => ({
   put: mocks.put,
 }));
 vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
-  kernel: {
+  getKernel: () => ({
     browsers: {
       computer: { captureScreenshot: mocks.captureScreenshot },
       fetch: mocks.fetch,
@@ -55,7 +55,7 @@ vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
       playwright: { execute: mocks.playwrightExecute },
       retrieve: mocks.retrieve,
     },
-  },
+  }),
 }));
 
 import captureBrowserImage from "@agent/subagents/browser-agent/tools/capture_browser_image";

@@ -1,6 +1,5 @@
-import Kernel from "@onkernel/sdk";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { z } from "zod";
-import { env } from "@shared/environment";
 import type { AutofillClaim } from "./protocol";
 import {
   classifyNativeLoginControl,
@@ -611,9 +610,11 @@ async function withKernelPage<T>(
     readonly sessionId: readonly string[];
   }) => Promise<T>
 ) {
-  const browser = await new Kernel({
-    apiKey: env.KERNEL_API_KEY,
-  }).browsers.retrieve(browserSessionId, {}, { signal });
+  const browser = await getKernel().browsers.retrieve(
+    browserSessionId,
+    {},
+    { signal }
+  );
   const connection = await CdpConnection.connect(browser.cdp_ws_url, signal);
 
   try {

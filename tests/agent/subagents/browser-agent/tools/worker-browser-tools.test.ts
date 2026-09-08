@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as WorkerAccess from "@agent/subagents/browser-agent/lib/access";
 import * as OwnedBrowser from "@agent/subagents/browser-agent/lib/owned-browser";
-import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { toolContextFor } from "@tests/helpers/tool-context";
 import computerAction from "@agent/subagents/browser-agent/tools/computer_action";
 
 const mocks = {
-  batch: vi.spyOn(kernel.browsers.computer, "batch"),
-  readClipboard: vi.spyOn(kernel.browsers.computer, "readClipboard"),
+  batch: vi.spyOn(getKernel().browsers.computer, "batch"),
+  readClipboard: vi.spyOn(getKernel().browsers.computer, "readClipboard"),
   requireOwnedBrowserSession: vi.spyOn(
     OwnedBrowser,
     "requireOwnedBrowserSession"
   ),
   requireWorkerScope: vi.spyOn(WorkerAccess, "requireWorkerScope"),
-  writeClipboard: vi.spyOn(kernel.browsers.computer, "writeClipboard"),
+  writeClipboard: vi.spyOn(getKernel().browsers.computer, "writeClipboard"),
 };
 
 beforeEach(() => {

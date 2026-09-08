@@ -5,7 +5,7 @@ import {
   type LoopToolSpec,
 } from "@onkernel/browser-loop";
 import { defineState } from "eve/context";
-import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 
 /* oxlint-disable anti-slop/no-unsafe-dictionary-type -- Browser Loop's materialized vendor tool accepts arbitrary JSON input by contract. */
 
@@ -63,14 +63,18 @@ async function resourcesFor(sessionId: string, signal?: AbortSignal) {
   const cached = resourcesBySession.get(sessionId);
   if (cached) return cached;
 
-  const browser = await kernel.browsers.retrieve(sessionId, {}, { signal });
+  const browser = await getKernel().browsers.retrieve(
+    sessionId,
+    {},
+    { signal }
+  );
 
   type Options = ConstructorParameters<typeof LoopExecutionResources>[0];
   const resources = new LoopExecutionResources({
     browser,
     // SAFETY: Browser Loop pins an older nominal Kernel SDK type, while the shared client is API-compatible with that exact runtime contract.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions, typescript/no-unsafe-type-assertion -- the assertion bridges duplicate nominal SDK installations at the vendor boundary
-    client: kernel as unknown as Options["client"],
+    client: getKernel() as unknown as Options["client"],
   });
   const refState = refStates.get()[sessionId];
   if (refState) {

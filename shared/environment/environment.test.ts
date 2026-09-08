@@ -103,7 +103,7 @@ describe("environment", () => {
     expect(env.SECRET_ENCRYPTION_KEY).toBeUndefined();
   });
 
-  it.each(["DATABASE_URL", "KERNEL_API_KEY"])(
+  it.each(["DATABASE_URL"])(
     "keeps %s required in local development",
     async (name) => {
       vi.stubEnv(name, "");
@@ -126,10 +126,7 @@ describe("environment", () => {
     expect(env.SECRET_ENCRYPTION_KEY).toBe(key);
   });
 
-  it.each([
-    ["DATABASE_URL", "Invalid environment variables"],
-    ["KERNEL_API_KEY", "Invalid environment variables"],
-  ])(
+  it.each([["DATABASE_URL", "Invalid environment variables"]])(
     "rejects a missing required %s value during import",
     async (name, errorMessage) => {
       vi.stubEnv(name, "");
@@ -202,4 +199,11 @@ describe("environment", () => {
       expect(localPhoneAuthBypassEnabled).toBe(expected);
     }
   );
+
+  it("allows non-browser application configuration without a Kernel key", async () => {
+    vi.stubEnv("KERNEL_API_KEY", undefined);
+    const { env } = await import("@shared/environment");
+    expect(env.KERNEL_API_KEY).toBeUndefined();
+    expect(env.DATABASE_URL).toBe(requiredEnvironment.DATABASE_URL);
+  });
 });
