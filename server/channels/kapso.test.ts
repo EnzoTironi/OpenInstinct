@@ -1,0 +1,181 @@
+import { Effect, type Schema } from "effect";
+import { expect, test } from "vitest";
+import { parseKapsoWebhook } from "./kapso";
+import { ProviderInputError } from "./provider-errors";
+
+const now = 1_800_000_000_000;
+const installation = {
+  phoneNumberId: "123456789",
+  phoneNumber: "+15550001111",
+};
+const baseMessage = {
+  id: "wamid.incoming",
+  timestamp: String(now / 1000),
+  type: "text",
+  from: "15550002222",
+  text: { body: "hello" },
+  kapso: { direction: "inbound", status: "received" },
+};
+const base = {
+  phone_number_id: installation.phoneNumberId,
+  message: baseMessage,
+  conversation: {
+    phone_number_id: installation.phoneNumberId,
+    phone_number: "+15550002222",
+    contact_name: "Never an identity",
+  },
+};
+const parse = (value: Schema.Json) =>
+  Effect.runPromise(parseKapsoWebhook(value, installation, now));
+
+test("preserves wamid/from and ignores display names and derived content", async () => {
+  const events = await parse({
+    ...base,
+    message: {
+      ...baseMessage,
+      from_user_id: "US.123",
+      kapso: {
+        ...baseMessage.kapso,
+        content: "URL https://untrusted.invalid",
+        transcript: { text: "not authoritative" },
+      },
+    },
+  });
+  expect(events[0]).toMatchObject({
+    kind: "message",
+    eventId: "wamid.incoming",
+    senderId: "15550002222",
+    installationId: "123456789",
+    payload: { text: "hello" },
+  });
+  expect(JSON.stringify(events)).not.toContain("untrusted");
+  expect(JSON.stringify(events)).not.toContain("Never an identity");
+});
+
+test("normalizes media references and login commands without media URLs or raw token payloads", async () => {
+  const media = await parse({
+    ...base,
+    message: {
+      ...baseMessage,
+      type: "image",
+      image: { id: "media_123", caption: "look" },
+      kapso: {
+        ...baseMessage.kapso,
+        media_url: "https://untrusted.invalid",
+        media_data: {
+          url: "https://untrusted.invalid",
+          content_type: "image/png",
+          filename: "photo.png",
+        },
+      },
+    },
+  });
+  expect(media[0]).toMatchObject({
+    kind: "message",
+    payload: {
+      text: "look",
+      attachments: [
+        { id: "media_123", mediaType: "image/png", name: "photo.png" },
+      ],
+    },
+  });
+  expect(JSON.stringify(media)).not.toContain("https://");
+  const token = "a".repeat(43);
+  const command = await parse({
+    ...base,
+    message: { ...baseMessage, text: { body: `/confirm ${token}` } },
+  });
+  expect(command[0]).toMatchObject({
+    kind: "command",
+    command: "confirm",
+    token,
+  });
+  expect(command[0]).not.toHaveProperty("payload");
+});
+
+test("ignores status/outbound/group/system events and rejects unsupported ID-only identity", async () => {
+  expect(
+    await parse({
+      ...base,
+      message: {
+        ...baseMessage,
+        kapso: { direction: "outbound", status: "sent" },
+      },
+    })
+  ).toEqual([]);
+  expect(
+    await parse({
+      ...base,
+      message: {
+        ...baseMessage,
+        kapso: { direction: "inbound", status: "delivered" },
+      },
+    })
+  ).toEqual([]);
+  expect(
+    await parse({
+      ...base,
+      conversation: { ...base.conversation, is_group: true },
+    })
+  ).toEqual([]);
+  expect(
+    await parse({ ...base, message: { ...baseMessage, type: "system" } })
+  ).toEqual([]);
+  const idOnly = { ...baseMessage, from_user_id: "US.123" };
+  const { from: _phone, ...unsupported } = idOnly;
+  await expect(parse({ ...base, message: unsupported })).rejects.toMatchObject({
+    reason: "unsupported_identity",
+  });
+});
+
+test("requires installation and contact consistency", async () => {
+  await expect(
+    parse({ ...base, phone_number_id: "999999" })
+  ).rejects.toMatchObject({ reason: "wrong_installation" });
+  await expect(
+    parse({
+      ...base,
+      conversation: { ...base.conversation, phone_number_id: "999999" },
+    })
+  ).rejects.toMatchObject({ reason: "wrong_installation" });
+  await expect(
+    parse({
+      ...base,
+      conversation: { ...base.conversation, phone_number: "15550003333" },
+    })
+  ).rejects.toMatchObject({ reason: "wrong_installation" });
+  await expect(
+    parse({ ...base, message: { ...baseMessage, to: "15550003333" } })
+  ).rejects.toMatchObject({ reason: "wrong_installation" });
+});
+
+test("accepts up to32 batched events and rejects larger or stale/future input", async () => {
+  const data = Array.from({ length: 32 }, (_, index) => ({
+    ...base,
+    message: { ...baseMessage, id: `wamid.${String(index)}` },
+  }));
+  const events = await parse({
+    batch: true,
+    type: "whatsapp.message.received",
+    data,
+  });
+  expect(events).toHaveLength(32);
+  expect(events.at(-1)?.eventId).toBe("wamid.31");
+  await expect(
+    parse({
+      batch: true,
+      type: "whatsapp.message.received",
+      data: [...data, base],
+    })
+  ).rejects.toBeInstanceOf(ProviderInputError);
+  await Promise.all(
+    [now / 1000 - 86_401, now / 1000 + 61].map(async (timestamp) => {
+      await expect(
+        parse({
+          ...base,
+          message: { ...baseMessage, timestamp: String(timestamp) },
+        })
+      ).rejects.toBeInstanceOf(ProviderInputError);
+    })
+  );
+});
