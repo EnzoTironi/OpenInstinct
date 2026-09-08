@@ -1,3 +1,7 @@
+import {
+  claimScheduledReport,
+  getScheduledReportChannel,
+} from "../../db/services/scheduled-agent-jobs";
 import { randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { ConfigProvider, Effect, Layer } from "effect";
@@ -323,5 +327,43 @@ test.each(["last", "all"] as const)(
           yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
         ).toHaveLength(missing === "all" ? 0 : 2);
       })
+    )
+);
+
+test.each(["telegram", "kapso"] as const)(
+  "legacy report claim leaves %s pending until atomic native enqueue",
+  (channel) =>
+    run(
+      ({ runId }) =>
+        Effect.gen(function* () {
+          const sql = yield* PgClient.PgClient;
+          expect(
+            yield* Effect.tryPromise(() => getScheduledReportChannel(runId))
+          ).toBe(channel);
+          expect(
+            yield* Effect.tryPromise(() => claimScheduledReport(runId))
+          ).toBeUndefined();
+          expect(
+            (yield* sql<{
+              status: string;
+              lease: string | null;
+            }>`SELECT report_status AS status, report_lease_token AS lease
+      FROM scheduled_agent_runs WHERE id = ${runId}`)[0]
+          ).toEqual({ status: "pending", lease: null });
+          expect(
+            yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
+          ).toHaveLength(0);
+          yield* dispatchNativeScheduledReport(runId);
+          expect(
+            (yield* sql<{
+              status: string;
+            }>`SELECT report_status AS status FROM scheduled_agent_runs WHERE id = ${runId}`)[0]
+              ?.status
+          ).toBe("queued");
+          expect(
+            yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
+          ).toHaveLength(3);
+        }),
+      channel
     )
 );

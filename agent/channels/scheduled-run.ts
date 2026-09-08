@@ -14,6 +14,7 @@ import {
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
 import {
   claimScheduledAgentRunInput,
+  getScheduledReportChannel,
   finishScheduledAgentRunInput,
   restoreScheduledAgentRunInput,
 } from "@db/services/scheduled-agent-jobs";
@@ -80,9 +81,17 @@ export default defineChannel({
                 () => new ScheduledCallbackRejected({ status: 400 })
               )
             );
-            waitUntil(
-              dispatchScheduledReport({ attachSession, to }, input.runId)
+            const channel = yield* Effect.tryPromise(() =>
+              getScheduledReportChannel(input.runId)
             );
+            if (channel)
+              waitUntil(
+                dispatchScheduledReport(
+                  { attachSession, to },
+                  input.runId,
+                  channel
+                )
+              );
             return new Response(null, { status: 202 });
           }).pipe(
             Effect.provideService(

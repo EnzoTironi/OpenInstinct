@@ -1,42 +1,30 @@
 import type { ToolContext } from "eve/tools";
-import { Effect, Option, Schema } from "effect";
+import { Option, Schema } from "effect";
 import { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
-import { requireChannelPrincipal } from "../channel-session";
-import {
-  requireScheduleMembership,
-  ScheduleOwnerInactive,
-} from "../../../server/schedules/channel-owner";
+import { ScheduleOwnerInactive } from "../../../server/schedules/channel-owner";
 import type {
   createScheduledAgentJob,
   listScheduledAgentJobs,
 } from "@db/services/scheduled-agent-jobs";
 import { scopeFromPrincipal } from "@agent/lib/principal-scope";
 
-export const scheduleOwner = Effect.fn("scheduleOwner")(function* (
-  context: ToolContext
-) {
+export function scheduleOwner(context: ToolContext) {
   const auth = context.session.auth.current;
-  if (auth?.principalType !== "user") return yield* new ScheduleOwnerInactive();
-  const conversationChannel = yield* Schema.decodeUnknownEffect(
+  if (auth?.principalType !== "user") throw new ScheduleOwnerInactive();
+  const conversationChannel = Schema.decodeUnknownSync(
     scheduledConversationChannelSchema
   )(auth.attributes.conversationChannel);
   const scope = scopeFromPrincipal(auth);
-  if (conversationChannel === "telegram" || conversationChannel === "kapso") {
-    const identity = yield* requireChannelPrincipal(conversationChannel, auth);
-    yield* requireScheduleMembership(scope);
-    return {
-      conversation: { conversationChannel, conversationId: identity.id },
-      scope,
-    };
-  }
   const conversationId =
     conversationChannel === "eve"
       ? context.session.id
-      : yield* Schema.decodeUnknownEffect(
-          Schema.String.check(Schema.isStartsWith("linq:"))
+      : Schema.decodeUnknownSync(
+          conversationChannel === "linq"
+            ? Schema.String.check(Schema.isStartsWith("linq:"))
+            : Schema.String.check(Schema.isUUID())
         )(auth.attributes.conversationId);
   return { conversation: { conversationChannel, conversationId }, scope };
-});
+}
 
 export function scheduleReplyAnchor(context: ToolContext) {
   const auth = context.session.auth.current;

@@ -112,7 +112,7 @@ function dispatchRecoverableReport(
   report: Awaited<ReturnType<typeof listRecoverableScheduledReports>>[number]
 ) {
   return report.conversationChannel !== "eve"
-    ? dispatchScheduledReport({ to }, report.runId)
+    ? dispatchScheduledReport({ to }, report.runId, report.conversationChannel)
     : postScheduledReport(report.runId);
 }
 

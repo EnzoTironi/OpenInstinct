@@ -656,6 +656,15 @@ export async function releaseScheduledAgentRun(
   return released?.status;
 }
 
+export async function getScheduledReportChannel(runId: string) {
+  const run = await db.query.scheduledAgentRuns.findFirst({
+    columns: { id: true },
+    where: eq(scheduledAgentRuns.id, runId),
+    with: { job: { columns: { conversationChannel: true } } },
+  });
+  return run?.job.conversationChannel;
+}
+
 export async function claimScheduledReport(runId: string, now = new Date()) {
   const reportLeaseToken = randomUUID();
   const [claimed] = await db
@@ -669,6 +678,15 @@ export async function claimScheduledReport(runId: string, now = new Date()) {
     .where(
       and(
         eq(scheduledAgentRuns.id, runId),
+        inArray(
+          scheduledAgentRuns.jobId,
+          db
+            .select({ id: scheduledAgentJobs.id })
+            .from(scheduledAgentJobs)
+            .where(
+              inArray(scheduledAgentJobs.conversationChannel, ["eve", "linq"])
+            )
+        ),
         inArray(scheduledAgentRuns.status, [
           "completed",
           "dead_letter",
