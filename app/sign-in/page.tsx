@@ -1,53 +1,30 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { LocalPhoneAuthForm } from "@app/sign-in/_components/local-form";
-import { PhoneOtpAuthForm } from "@app/sign-in/_components/otp-form";
-import { env, localPhoneAuthBypassEnabled } from "@shared/environment";
+import { ChannelAuthForm } from "@app/sign-in/_components/channel-form";
+import { safeCallbackUrl } from "@app/sign-in/_lib/channel-login";
 import { getAuthSession } from "@db/services/auth/session";
-import { readLinqOnboardingPhoneNumber } from "@db/services/auth/linq";
 
 export default async function SignInPage({
   searchParams,
 }: PageProps<"/sign-in">) {
-  if (await getAuthSession(await headers())) redirect("/");
-
   const callbackValue = (await searchParams).callbackUrl;
-  const requestedCallback = Array.isArray(callbackValue)
-    ? callbackValue[0]
-    : callbackValue;
-  const callbackUrl =
-    requestedCallback?.startsWith("/") && !requestedCallback.startsWith("//")
-      ? requestedCallback
-      : "/";
-  const linqConfigured = env.LINQ_CONNECTOR !== undefined;
-  const linqPhoneNumber =
-    localPhoneAuthBypassEnabled || !env.LINQ_CONNECTOR
-      ? undefined
-      : (env.LINQ_PHONE_NUMBER ??
-        (await readLinqOnboardingPhoneNumber(env.LINQ_CONNECTOR)));
-
+  const callbackUrl = safeCallbackUrl(
+    Array.isArray(callbackValue) ? callbackValue[0] : callbackValue
+  );
+  if (await getAuthSession(await headers())) redirect(callbackUrl);
   return (
     <main className="flex min-h-svh items-center justify-center bg-background px-4 py-8 text-foreground">
       <section className="w-full max-w-sm space-y-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="type-page-title">Sign In</h1>
+        <div className="space-y-2">
+          <p className="type-caption text-muted-foreground">
+            Your assistant, one conversation away
+          </p>
+          <h1 className="type-page-title">Pick up the conversation</h1>
           <p className="type-supporting-body text-muted-foreground">
-            Enter your phone number to sign in.
+            Sign in through the messenger you use with your assistant.
           </p>
         </div>
-        {!localPhoneAuthBypassEnabled && !linqConfigured ? (
-          <p className="type-supporting-body text-muted-foreground">
-            iMessage sign-in is not configured for this deployment. Attach a
-            Linq connector through Vercel Connect.
-          </p>
-        ) : localPhoneAuthBypassEnabled ? (
-          <LocalPhoneAuthForm callbackUrl={callbackUrl} />
-        ) : (
-          <PhoneOtpAuthForm
-            callbackUrl={callbackUrl}
-            linqPhoneNumber={linqPhoneNumber}
-          />
-        )}
+        <ChannelAuthForm callbackUrl={callbackUrl} />
       </section>
     </main>
   );
