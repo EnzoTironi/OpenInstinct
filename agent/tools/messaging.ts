@@ -17,7 +17,7 @@ function defineSendMessage() {
     },
     toModelOutput() {
       return toolOutput.text(
-        "The message was submitted to the active channel. Do not repeat it in assistant text."
+        "This successful call has already created one user-visible message for the current conversation. Do not repeat the same content through another send_message call or in assistant text. If the current request is fulfilled, end the turn now with DELIVERY_COMPLETE. Send another message only for distinct information the user still needs, such as a later result after an earlier progress update."
       );
     },
   });
