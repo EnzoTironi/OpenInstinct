@@ -1,7 +1,7 @@
 import { defineChannel, POST } from "eve/channels";
 import { routeAuth, vercelOidc } from "eve/channels/auth";
 import { parseInputResponses, resolveTextToResponses } from "eve/client";
-import { Config, Effect, Option, Result, Schema } from "effect";
+import { Config, ConfigProvider, Effect, Option, Result, Schema } from "effect";
 import {
   ScheduledCallbackRejected,
   readScheduledCallbackBody,
@@ -29,8 +29,7 @@ const authenticatedBody = Effect.fn("authenticatedScheduledCallbackBody")(
         try: () => routeAuth(request, [vercelOidc()]),
         catch: () => new ScheduledCallbackRejected({ status: 401 }),
       });
-      if (auth instanceof Response)
-        return yield* new ScheduledCallbackRejected({ status: 401 });
+      if (auth instanceof Response) return auth;
       return yield* readScheduledCallbackBody(request);
     }
     return yield* readVerifiedScheduledCallback(request, route);
@@ -68,6 +67,7 @@ export default defineChannel({
               request,
               "/internal/scheduled-run/report"
             );
+            if (raw instanceof Response) return raw;
             const input = yield* Schema.decodeUnknownEffect(
               Schema.fromJsonString(
                 scheduledCallbackBodies["/internal/scheduled-run/report"]
@@ -83,6 +83,10 @@ export default defineChannel({
             );
             return new Response(null, { status: 202 });
           }).pipe(
+            Effect.provideService(
+              ConfigProvider.ConfigProvider,
+              ConfigProvider.fromEnv()
+            ),
             Effect.catchTag("ScheduledCallbackRejected", (error) =>
               Effect.succeed(
                 new Response("Scheduled callback rejected", {
@@ -104,6 +108,7 @@ export default defineChannel({
               request,
               "/internal/scheduled-run/respond"
             );
+            if (raw instanceof Response) return raw;
             return yield* Schema.decodeUnknownEffect(
               Schema.fromJsonString(
                 scheduledCallbackBodies["/internal/scheduled-run/respond"]
@@ -114,7 +119,13 @@ export default defineChannel({
                 () => new ScheduledCallbackRejected({ status: 400 })
               )
             );
-          }).pipe(Effect.result),
+          }).pipe(
+            Effect.provideService(
+              ConfigProvider.ConfigProvider,
+              ConfigProvider.fromEnv()
+            ),
+            Effect.result
+          ),
           { signal: request.signal }
         );
         if (Result.isFailure(decoded)) {
@@ -122,6 +133,7 @@ export default defineChannel({
             status: decoded.failure.status,
           });
         }
+        if (decoded.success instanceof Response) return decoded.success;
         const input = decoded.success;
         const claimed = await claimScheduledAgentRunInput(
           input.runId,

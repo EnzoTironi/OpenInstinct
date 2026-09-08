@@ -1,5 +1,5 @@
 import { getVercelOidcToken } from "@vercel/oidc";
-import { Config, Effect, Option, Schema } from "effect";
+import { Config, ConfigProvider, Effect, Option, Schema } from "effect";
 import {
   ScheduledCallbackRejected,
   scheduledCallbackBodies,
@@ -57,7 +57,14 @@ export function postScheduledRunRoute<Route extends ScheduledCallbackRoute>(
   route: Route,
   body: (typeof scheduledCallbackBodies)[Route]["Type"]
 ) {
-  return Effect.runPromise(postScheduledRequest(route, body));
+  return Effect.runPromise(
+    postScheduledRequest(route, body).pipe(
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromEnv()
+      )
+    )
+  );
 }
 
 export function postScheduledReport(runId: string) {
@@ -70,6 +77,11 @@ export function postScheduledReport(runId: string) {
       if (!response.ok)
         return yield* new ScheduledCallbackRejected({ status: 503 });
       return undefined;
-    })
+    }).pipe(
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromEnv()
+      )
+    )
   );
 }

@@ -1,10 +1,14 @@
+import { randomBytes } from "node:crypto";
+import { ConfigProvider, Effect } from "effect";
+import { routeAuth, vercelOidc } from "eve/channels/auth";
+import { scheduledCallbackHeaders } from "../../../server/internal/scheduled-callback-auth";
 import type {
   ChannelResolveSession,
   ChannelSource,
   RouteHandlerArgs,
   Session,
 } from "eve/channels";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import scheduledRunChannel from "@agent/channels/scheduled-run";
 
 const scheduledRunPaths = [
@@ -13,31 +17,87 @@ const scheduledRunPaths = [
 ] as const;
 
 describe("scheduled run channel authentication", () => {
-  for (const path of scheduledRunPaths) {
-    it(`rejects an unauthenticated request to ${path}`, async () => {
-      const route = scheduledRunChannel.routes.find(
-        (candidate) =>
-          candidate.transport !== "websocket" &&
-          candidate.method === "POST" &&
-          candidate.path === path
-      );
-      if (!route || route.transport === "websocket") {
-        throw new Error(`The scheduled run route ${path} is unavailable.`);
-      }
+  beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", undefined);
+    vi.stubEnv("BETTER_AUTH_URL", "https://assistant.example");
+    vi.stubEnv("SECRET_ENCRYPTION_KEY", randomBytes(32).toString("base64"));
+  });
+  afterEach(() => vi.unstubAllEnvs());
 
-      const response = await route.handler(
+  it.each(scheduledRunPaths)(
+    "rejects unsigned self-hosted requests to %s even in Eve dev mode",
+    async (path) => {
+      vi.stubEnv("EVE_DEV", "1");
+      const response = await scheduledRoute(path).handler(
         new Request(`https://assistant.example${path}`, {
           body: "not valid JSON",
           method: "POST",
         }),
         unexpectedRouteContext()
       );
-
       expect(response.status).toBe(401);
+      expect(response.headers.get("www-authenticate")).toBeNull();
+    }
+  );
+
+  it.each(scheduledRunPaths)(
+    "preserves the complete native Vercel challenge for %s",
+    async (path) => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      const request = new Request(`https://assistant.example${path}`, {
+        body: "not valid JSON",
+        method: "POST",
+      });
+      const expected = await routeAuth(request.clone(), [vercelOidc()]);
+      if (!(expected instanceof Response))
+        throw new Error("Expected the native authentication challenge");
+      const response = await scheduledRoute(path).handler(
+        request,
+        unexpectedRouteContext()
+      );
+      expect(response.status).toBe(expected.status);
+      expect([...response.headers]).toEqual([...expected.headers]);
       expect(response.headers.get("www-authenticate")).toBe("Bearer");
-    });
-  }
+      expect(await response.text()).toBe(await expected.text());
+    }
+  );
+
+  it.each(scheduledRunPaths)(
+    "authenticates a signed request before rejecting invalid JSON on %s",
+    async (path) => {
+      const body = "not valid JSON";
+      const headers = await Effect.runPromise(
+        scheduledCallbackHeaders(path, body).pipe(
+          Effect.provideService(
+            ConfigProvider.ConfigProvider,
+            ConfigProvider.fromEnv()
+          )
+        )
+      );
+      const response = await scheduledRoute(path).handler(
+        new Request(`https://assistant.example${path}`, {
+          body,
+          headers,
+          method: "POST",
+        }),
+        unexpectedRouteContext()
+      );
+      expect(response.status).toBe(400);
+    }
+  );
 });
+
+function scheduledRoute(path: (typeof scheduledRunPaths)[number]) {
+  const route = scheduledRunChannel.routes.find(
+    (candidate) =>
+      candidate.transport !== "websocket" &&
+      candidate.method === "POST" &&
+      candidate.path === path
+  );
+  if (!route || route.transport === "websocket")
+    throw new Error(`The scheduled run route ${path} is unavailable.`);
+  return route;
+}
 
 describe("scheduled run channel handoff", () => {
   it("starts a scheduled worker from the channel's native receive hook", async () => {

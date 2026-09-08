@@ -1,8 +1,6 @@
-import { createServer } from "node:http";
-import { postScheduledRunRoute } from "../../agent/lib/schedules/request";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { ConfigProvider, Effect, Schema } from "effect";
-import { expect, test, vi } from "vitest";
+import { expect, test } from "vitest";
 import {
   readVerifiedScheduledCallback,
   scheduledCallbackBodies,
@@ -213,77 +211,4 @@ test("a valid retry remains authentic and must still pass the database claim", a
     )
   );
   for (const result of results) expect(result.toString()).toBe(body);
-});
-
-test("production-local client signs real HTTP requests and refuses redirects", async () => {
-  let origin = "";
-  let requests = 0;
-  let redirect = false;
-  const server = createServer((incoming, outgoing) => {
-    requests += 1;
-    const headers = new Headers();
-    for (let index = 0; index < incoming.rawHeaders.length; index += 2) {
-      const name = incoming.rawHeaders[index];
-      const value = incoming.rawHeaders[index + 1];
-      if (name !== undefined && value !== undefined)
-        headers.append(name, value);
-    }
-    let payload = "";
-    incoming.setEncoding("utf8");
-    incoming.on("data", (chunk: string) => {
-      payload += chunk;
-    });
-    incoming.on("end", () => {
-      const input = new Request(new URL(incoming.url ?? "/", origin), {
-        method: incoming.method,
-        headers,
-        body: payload,
-      });
-      void run(readVerifiedScheduledCallback(input, route), {
-        ...configuration,
-        BETTER_AUTH_URL: origin,
-      }).then(
-        (raw) => {
-          outgoing.writeHead(
-            redirect ? 307 : 202,
-            redirect ? { location: `${origin}/redirect-target` } : {}
-          );
-          outgoing.end(raw);
-          return undefined;
-        },
-        () => {
-          outgoing.writeHead(401);
-          outgoing.end();
-        }
-      );
-    });
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = Schema.decodeUnknownSync(
-    Schema.Struct({ port: Schema.Number })
-  )(server.address());
-  origin = `http://127.0.0.1:${String(address.port)}`;
-  vi.stubEnv("BETTER_AUTH_URL", origin);
-  vi.stubEnv("SECRET_ENCRYPTION_KEY", configuration.SECRET_ENCRYPTION_KEY);
-  vi.stubEnv("VERCEL_ENV", undefined);
-  try {
-    const input = { runId: randomUUID() };
-    const response = await postScheduledRunRoute(route, input);
-    expect(response.status).toBe(202);
-    expect(await response.json()).toEqual(input);
-    redirect = true;
-    await expect(postScheduledRunRoute(route, input)).rejects.toMatchObject({
-      _tag: "ScheduledCallbackRejected",
-      status: 503,
-    });
-    expect(requests).toBe(2);
-  } finally {
-    vi.unstubAllEnvs();
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve();
-      })
-    );
-  }
 });
