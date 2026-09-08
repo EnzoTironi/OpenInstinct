@@ -1,3 +1,5 @@
+import { serverRuntime } from "../../server/runtime";
+import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
 import { defineChannel, POST } from "eve/channels";
 import { routeAuth, vercelOidc } from "eve/channels/auth";
 import { parseInputResponses, resolveTextToResponses } from "eve/client";
@@ -157,17 +159,33 @@ export default defineChannel({
           return new Response(null, { status: 422 });
         }
         try {
+          const channel = claimed.job.conversationChannel;
+          if (channel === "telegram" || channel === "kapso") {
+            await serverRuntime.runPromise(
+              requireScheduledChannelOwner({
+                ...claimed.job,
+                conversationChannel: channel,
+              })
+            );
+          }
+          const attributes = {
+            conversationChannel: claimed.job.conversationChannel,
+            conversationId: claimed.job.conversationId,
+            scheduleId: claimed.job.id,
+            scheduledRunId: claimed.run.id,
+            workspaceId: claimed.job.workspaceId,
+          };
           const result = await attachSession(
             claimed.run.workerSessionId
           ).respond(responses, {
             auth: {
-              attributes: {
-                conversationChannel: claimed.job.conversationChannel,
-                conversationId: claimed.job.conversationId,
-                scheduleId: claimed.job.id,
-                scheduledRunId: claimed.run.id,
-                workspaceId: claimed.job.workspaceId,
-              },
+              attributes:
+                channel === "telegram" || channel === "kapso"
+                  ? {
+                      ...attributes,
+                      channelIdentityId: claimed.job.conversationId,
+                    }
+                  : attributes,
               authenticator: "scheduled-input",
               issuer: "open-instinct",
               principalId: claimed.job.createdByUserId,

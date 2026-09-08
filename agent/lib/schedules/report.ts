@@ -1,3 +1,5 @@
+import { serverRuntime } from "../../../server/runtime";
+import { dispatchNativeScheduledReport } from "../../../server/schedules/native-report";
 import type { AttachSessionFn } from "eve/channels";
 import type { ScheduleToFn } from "eve/schedules";
 import {
@@ -18,6 +20,8 @@ export async function dispatchScheduledReport(
   },
   runId: string
 ) {
+  if (await serverRuntime.runPromise(dispatchNativeScheduledReport(runId)))
+    return;
   const claimed = await claimScheduledReport(runId);
   const leaseToken = claimed?.run.reportLeaseToken;
   if (!claimed || !leaseToken) return;

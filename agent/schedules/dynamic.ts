@@ -1,3 +1,5 @@
+import { serverRuntime } from "../../server/runtime";
+import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
 import { defineSchedule, type ScheduleToFn } from "eve/schedules";
 import scheduledRunChannel from "@agent/channels/scheduled-run";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
@@ -57,6 +59,15 @@ async function executeScheduledRun(
     scheduledFor: claim.run.scheduledFor.toISOString(),
   });
   try {
+    const channel = claim.job.conversationChannel;
+    if (channel === "telegram" || channel === "kapso") {
+      await serverRuntime.runPromise(
+        requireScheduledChannelOwner({
+          ...claim.job,
+          conversationChannel: channel,
+        })
+      );
+    }
     const session = await to(scheduledRunChannel, {
       restart: claim.run.workerSessionId !== null,
       runId: claim.run.id,
@@ -100,7 +111,7 @@ function dispatchRecoverableReport(
   to: ScheduleToFn,
   report: Awaited<ReturnType<typeof listRecoverableScheduledReports>>[number]
 ) {
-  return report.conversationChannel === "linq"
+  return report.conversationChannel !== "eve"
     ? dispatchScheduledReport({ to }, report.runId)
     : postScheduledReport(report.runId);
 }
@@ -120,15 +131,20 @@ function scheduledWorkerAuth(
 ) {
   const leaseToken = claim.run.leaseToken;
   if (!leaseToken) throw new Error("A scheduled run claim requires a lease.");
+  const attributes = {
+    conversationChannel: claim.job.conversationChannel,
+    conversationId: claim.job.conversationId,
+    scheduleId: claim.job.id,
+    scheduledRunLeaseToken: leaseToken,
+    scheduledRunId: claim.run.id,
+    workspaceId: claim.job.workspaceId,
+  };
   return {
-    attributes: {
-      conversationChannel: claim.job.conversationChannel,
-      conversationId: claim.job.conversationId,
-      scheduleId: claim.job.id,
-      scheduledRunLeaseToken: leaseToken,
-      scheduledRunId: claim.run.id,
-      workspaceId: claim.job.workspaceId,
-    },
+    attributes:
+      claim.job.conversationChannel === "telegram" ||
+      claim.job.conversationChannel === "kapso"
+        ? { ...attributes, channelIdentityId: claim.job.conversationId }
+        : attributes,
     authenticator: "scheduled-worker",
     issuer: "open-instinct",
     principalId: claim.job.createdByUserId,

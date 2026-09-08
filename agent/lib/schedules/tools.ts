@@ -1,34 +1,51 @@
 import type { ToolContext } from "eve/tools";
-import { z } from "zod";
+import { Effect, Option, Schema } from "effect";
+import { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
+import { requireChannelPrincipal } from "../channel-session";
+import {
+  requireScheduleMembership,
+  ScheduleOwnerInactive,
+} from "../../../server/schedules/channel-owner";
 import type {
   createScheduledAgentJob,
   listScheduledAgentJobs,
 } from "@db/services/scheduled-agent-jobs";
 import { scopeFromPrincipal } from "@agent/lib/principal-scope";
 
-export function scheduleOwner(context: ToolContext) {
+export const scheduleOwner = Effect.fn("scheduleOwner")(function* (
+  context: ToolContext
+) {
   const auth = context.session.auth.current;
-  if (auth?.principalType !== "user") {
-    throw new Error("An authenticated user is required to manage schedules.");
+  if (auth?.principalType !== "user") return yield* new ScheduleOwnerInactive();
+  const conversationChannel = yield* Schema.decodeUnknownEffect(
+    scheduledConversationChannelSchema
+  )(auth.attributes.conversationChannel);
+  const scope = scopeFromPrincipal(auth);
+  if (conversationChannel === "telegram" || conversationChannel === "kapso") {
+    const identity = yield* requireChannelPrincipal(conversationChannel, auth);
+    yield* requireScheduleMembership(scope);
+    return {
+      conversation: { conversationChannel, conversationId: identity.id },
+      scope,
+    };
   }
-  const conversationChannel = z
-    .enum(["eve", "linq"])
-    .parse(auth.attributes.conversationChannel);
   const conversationId =
     conversationChannel === "eve"
       ? context.session.id
-      : z.string().startsWith("linq:").parse(auth.attributes.conversationId);
-  return {
-    conversation: { conversationChannel, conversationId },
-    scope: scopeFromPrincipal(auth),
-  };
-}
+      : yield* Schema.decodeUnknownEffect(
+          Schema.String.check(Schema.isStartsWith("linq:"))
+        )(auth.attributes.conversationId);
+  return { conversation: { conversationChannel, conversationId }, scope };
+});
 
 export function scheduleReplyAnchor(context: ToolContext) {
   const auth = context.session.auth.current;
   if (auth?.attributes.conversationChannel !== "linq") return undefined;
-  const messageId = z.string().min(1).safeParse(auth.attributes.linqMessageId);
-  return messageId.success ? messageId.data : undefined;
+  return Option.getOrUndefined(
+    Schema.decodeUnknownOption(Schema.NonEmptyString)(
+      auth.attributes.linqMessageId
+    )
+  );
 }
 
 export function scheduleSummary(
@@ -56,6 +73,7 @@ export function scheduleListSummary(
       ? {
           completedAt: latestRun.completedAt?.toISOString() ?? null,
           id: latestRun.id,
+          pendingInputRequests: latestRun.pendingInputRequests,
           lastError: latestRun.lastError,
           reportStatus: latestRun.reportStatus,
           scheduledFor: latestRun.scheduledFor.toISOString(),

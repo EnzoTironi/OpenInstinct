@@ -1,3 +1,5 @@
+import { scheduledConversationChannelSchema } from "../../shared/schedules/conversation";
+import { scheduledReportStatusSchema } from "../../shared/schedules/report-status";
 import { PgClient } from "@effect/sql-pg";
 import { Effect, Schema } from "effect";
 import type { AccessScope } from "../../shared/identity/access-scope";
@@ -7,7 +9,7 @@ const reminderSchema = Schema.Struct({
   prompt: Schema.String,
   status: Schema.Literals(["active", "paused", "completed"]),
   nextRunAt: Schema.NullOr(Schema.Date),
-  conversationChannel: Schema.Literals(["eve", "linq"]),
+  conversationChannel: scheduledConversationChannelSchema,
   originalSessionId: Schema.NullOr(Schema.String),
   latestRunStatus: Schema.NullOr(
     Schema.Literals([
@@ -18,16 +20,7 @@ const reminderSchema = Schema.Struct({
       "dead_letter",
     ])
   ),
-  latestReportStatus: Schema.NullOr(
-    Schema.Literals([
-      "not_ready",
-      "not_needed",
-      "pending",
-      "queued",
-      "delivered",
-      "suppressed",
-    ])
-  ),
+  latestReportStatus: Schema.NullOr(scheduledReportStatusSchema),
   latestScheduledFor: Schema.NullOr(Schema.Date),
 });
 const decodeReminders = Schema.decodeUnknownEffect(

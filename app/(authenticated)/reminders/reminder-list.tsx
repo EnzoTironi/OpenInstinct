@@ -22,6 +22,15 @@ const reportLabels = {
   queued: "Report queued",
   delivered: "Report delivered",
   suppressed: "Report suppressed",
+  failed: "Delivery failed; some parts may have been sent",
+  cancelled: "Delivery stopped; some parts may have been sent",
+  uncertain: "Delivery uncertain; automatic retry blocked",
+};
+const channelLabels = {
+  eve: "Companion",
+  linq: "Linq",
+  telegram: "Telegram",
+  kapso: "WhatsApp",
 };
 const dateFormatter = new Intl.DateTimeFormat("en", {
   dateStyle: "medium",
@@ -76,9 +85,7 @@ function ReminderCard({
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{jobLabels[reminder.status]}</Badge>
         <span className="type-caption text-muted-foreground">
-          {reminder.conversationChannel === "linq"
-            ? "Linq conversation"
-            : "Companion conversation"}
+          {channelLabels[reminder.conversationChannel]} conversation
         </span>
       </div>
       <p className="type-supporting-body wrap-break-word whitespace-pre-wrap">
@@ -130,8 +137,8 @@ function ReminderCard({
         </Link>
       ) : (
         <p className="type-caption text-muted-foreground">
-          {reminder.conversationChannel === "linq"
-            ? "Return to the original conversation in Linq to manage this schedule."
+          {reminder.conversationChannel !== "eve"
+            ? `Return to the original conversation in ${channelLabels[reminder.conversationChannel]} to manage this schedule.`
             : "The original conversation is not available to this account."}
         </p>
       )}

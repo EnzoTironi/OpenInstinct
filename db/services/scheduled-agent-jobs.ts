@@ -33,7 +33,7 @@ const exhaustedRunOutcome = {
 } satisfies ScheduledRunOutcome;
 
 export interface CreateScheduledAgentJob {
-  readonly conversationChannel: "eve" | "linq";
+  readonly conversationChannel: typeof scheduledAgentJobs.$inferSelect.conversationChannel;
   readonly conversationId: string;
   readonly missedRunPolicy: "catch_up" | "run_latest";
   readonly prompt: string;
@@ -714,7 +714,13 @@ export async function listRecoverableScheduledReports(
             eq(scheduledAgentRuns.reportStatus, "pending"),
             and(
               eq(scheduledAgentRuns.reportStatus, "queued"),
-              lte(scheduledAgentRuns.reportLeaseExpiresAt, now)
+              or(
+                inArray(scheduledAgentJobs.conversationChannel, [
+                  "telegram",
+                  "kapso",
+                ]),
+                lte(scheduledAgentRuns.reportLeaseExpiresAt, now)
+              )
             )
           )
         )
@@ -723,6 +729,10 @@ export async function listRecoverableScheduledReports(
       .limit(limit)
       .for("update", { of: scheduledAgentRuns, skipLocked: true });
     const stale = reports
+      .filter(
+        ({ conversationChannel }) =>
+          conversationChannel === "eve" || conversationChannel === "linq"
+      )
       .map(({ run }) => run)
       .filter((run) => run.reportStatus === "queued");
     if (stale.length > 0) {
