@@ -3,9 +3,9 @@
 import {
   HistoryIcon,
   KeyRoundIcon,
-  ListTodoIcon,
+  GlobeIcon,
   MessageSquareIcon,
-  PanelsTopLeftIcon,
+  HouseIcon,
   UserRoundIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,22 +20,22 @@ import {
 } from "@web/components/ui/sidebar";
 
 const navigation = [
-  { href: "/", icon: PanelsTopLeftIcon, id: "workspace", label: "Workspace" },
-  { href: "/vault", icon: KeyRoundIcon, id: "vault", label: "Vault" },
+  { href: "/", icon: HouseIcon, id: "workspace", label: "Home" },
+  { href: "/chat", icon: MessageSquareIcon, id: "chat", label: "Conversation" },
+  {
+    href: "/chat/history",
+    icon: HistoryIcon,
+    id: "history",
+    label: "Conversation history",
+  },
   {
     href: "/personal-info",
     icon: UserRoundIcon,
     id: "personal-info",
     label: "Personal info",
   },
-  { href: "/chat", icon: MessageSquareIcon, id: "chat", label: "Chat" },
-  {
-    href: "/chat/history",
-    icon: HistoryIcon,
-    id: "history",
-    label: "All chats",
-  },
-  { href: "/tasks", icon: ListTodoIcon, id: "tasks", label: "Tasks" },
+  { href: "/tasks", icon: GlobeIcon, id: "tasks", label: "Browser activity" },
+  { href: "/vault", icon: KeyRoundIcon, id: "vault", label: "Vault" },
 ] as const;
 
 export function AuthenticatedNavigation() {
@@ -49,7 +49,14 @@ export function AuthenticatedNavigation() {
             {navigation.map((item) => {
               const Icon = item.icon;
               return (
-                <SidebarMenuItem key={item.id}>
+                <SidebarMenuItem
+                  className={
+                    item.id === "tasks"
+                      ? "mt-4 border-t border-border/50 pt-4"
+                      : undefined
+                  }
+                  key={item.id}
+                >
                   <SidebarMenuButton
                     isActive={active === item.id}
                     render={<Link href={item.href} />}

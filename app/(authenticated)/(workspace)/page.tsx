@@ -1,11 +1,4 @@
-import {
-  BotIcon,
-  CloudIcon,
-  ImageIcon,
-  MailIcon,
-  MessageSquareIcon,
-} from "lucide-react";
-import Link from "next/link";
+import { BotIcon, MailIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   getTokenResponse,
@@ -14,13 +7,12 @@ import {
 } from "@vercel/connect";
 import { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
-import { Badge } from "@web/components/ui/badge";
-import { Button } from "@web/components/ui/button";
 import { getGatewayModel } from "@db/services/settings";
 import { env } from "@shared/environment";
 import { googleWorkspaceTokenParams } from "@shared/google-workspace/connection";
 import { requireRequestScope } from "@web/auth/request-scope";
 import { GoogleWorkspaceAction } from "./_components/google-workspace-action";
+import { HomeOverview } from "./_components/home-overview";
 import { ModelSelector } from "./_components/model-selector";
 
 export default async function Page({ searchParams }: PageProps<"/">) {
@@ -30,14 +22,10 @@ export default async function Page({ searchParams }: PageProps<"/">) {
     readGoogleWorkspaceConnection(scope.userId),
     getGatewayModel(scope),
   ]);
-  const browserReady = true;
-  const imageStorageReady = Boolean(
-    env.BLOB_STORE_ID ?? env.BLOB_READ_WRITE_TOKEN
-  );
 
   return (
     <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="sr-only">Workspace</h1>
+      <HomeOverview />
 
       {google === "unavailable" ? (
         <Alert>
@@ -49,43 +37,21 @@ export default async function Page({ searchParams }: PageProps<"/">) {
         </Alert>
       ) : null}
 
-      <ChannelsSection
-        browserReady={browserReady}
-        linqConfigured={env.LINQ_CONNECTOR !== undefined}
-        linqPhoneNumber={env.LINQ_PHONE_NUMBER}
-      />
       <GoogleWorkspaceSection connection={googleWorkspace} />
 
-      <WorkspaceSection headingId="connectors-heading" title="Infrastructure">
-        <div className="divide-y divide-border/50 border-y border-border/50">
-          <ConnectorRow
-            action={<Badge variant="success">Connected</Badge>}
-            description="Run isolated browsers in your Kernel account."
-            icon={<CloudIcon />}
-            label="Kernel browser"
-          />
-          <ConnectorRow
-            action={
-              <Badge variant={imageStorageReady ? "success" : "secondary"}>
-                {imageStorageReady ? "Connected" : "Setup required"}
-              </Badge>
-            }
-            description={
-              imageStorageReady
-                ? "Store browser images in a private Vercel Blob store."
-                : "Connect a private Vercel Blob store to share browser images."
-            }
-            icon={<ImageIcon />}
-            label="Vercel Blob"
-          />
+      <details className="rounded-lg border border-border/50 p-4">
+        <summary className="cursor-pointer type-label">
+          Advanced settings
+        </summary>
+        <div className="mt-3">
           <ConnectorRow
             action={<ModelSelector modelId={gatewayModel} />}
-            description={gatewayModel}
+            description="Choose the model used when this installation runs through AI Gateway."
             icon={<BotIcon />}
             label="AI Gateway model"
           />
         </div>
-      </WorkspaceSection>
+      </details>
     </div>
   );
 }
@@ -148,83 +114,6 @@ async function readGoogleWorkspaceConnection(
     }
     return { accountLabel: null, state: "unavailable" };
   }
-}
-
-export function ChannelsSection({
-  browserReady,
-  linqConfigured,
-  linqPhoneNumber,
-}: {
-  readonly browserReady: boolean;
-  readonly linqConfigured: boolean;
-  readonly linqPhoneNumber?: string;
-}) {
-  return (
-    <WorkspaceSection headingId="channels-heading" title="Channels">
-      <div className="grid gap-2 sm:grid-cols-2">
-        {browserReady ? (
-          <Button
-            nativeButton={false}
-            render={<Link href="/chat" />}
-            variant="surface"
-          >
-            <MessageSquareIcon />
-            WebChat
-          </Button>
-        ) : (
-          <Button disabled variant="surface">
-            <MessageSquareIcon />
-            WebChat
-          </Button>
-        )}
-        {linqConfigured && linqPhoneNumber ? (
-          <Button
-            nativeButton={false}
-            render={
-              <a aria-label="Open iMessage" href={`sms:${linqPhoneNumber}`} />
-            }
-            variant="surface"
-          >
-            <MailIcon />
-            iMessage
-          </Button>
-        ) : (
-          <Button disabled variant="surface">
-            <MailIcon />
-            iMessage
-          </Button>
-        )}
-      </div>
-      <p className="type-caption text-muted-foreground">
-        {channelAvailabilityMessage({
-          browserReady,
-          linqConfigured,
-          linqPhoneNumber,
-        })}
-      </p>
-    </WorkspaceSection>
-  );
-}
-
-function channelAvailabilityMessage({
-  browserReady,
-  linqConfigured,
-  linqPhoneNumber,
-}: {
-  readonly browserReady: boolean;
-  readonly linqConfigured: boolean;
-  readonly linqPhoneNumber?: string;
-}) {
-  return [
-    browserReady
-      ? "WebChat is ready."
-      : "KERNEL_API_KEY is required to enable WebChat.",
-    linqConfigured && linqPhoneNumber
-      ? `iMessage opens ${linqPhoneNumber}.`
-      : linqConfigured
-        ? "Linq is connected. Use its assigned line to start an iMessage."
-        : "Set up Linq to enable iMessage.",
-  ].join(" ");
 }
 
 function WorkspaceSection({
