@@ -1,4 +1,5 @@
 import { defineAgent, defineDynamic } from "eve";
+import { Effect } from "effect";
 import { scheduledRunIdentity } from "@agent/lib/schedules/identity";
 import { isScheduledAgentRunLeaseActive } from "@db/services/scheduled-agent-run-leases";
 import { getGatewayModel } from "@db/services/settings";
@@ -37,7 +38,7 @@ export default defineAgent({
         }
         const scope = scopeFromPrincipal(caller);
         return (
-          (await serverRuntime.runPromise(installationModel)) ??
+          (await Effect.runPromise(installationModel)) ??
           (await getGatewayModel(scope))
         );
       },
