@@ -1,6 +1,9 @@
 import type { KnipConfig } from "knip";
 
 export default {
+  vitest: {
+    config: ["vitest.config.ts", "vitest.runtime.config.ts"],
+  },
   entry: [
     "agent/channels/**/*.ts",
     "agent/hooks/**/*.ts",

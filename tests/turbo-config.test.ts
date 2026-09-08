@@ -13,7 +13,11 @@ const applicationEnvironment = [
   "SECRET_ENCRYPTION_KEY",
   "VERCEL_*",
 ];
-const runtimeEnvironment = applicationEnvironment;
+const runtimeEnvironment = [
+  "AI_GATEWAY_API_KEY",
+  ...applicationEnvironment,
+  "WORKFLOW_*",
+];
 
 describe("Turbo configuration", () => {
   it("scopes application environment variables to their owning tasks", async () => {

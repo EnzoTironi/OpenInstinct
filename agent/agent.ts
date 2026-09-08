@@ -7,6 +7,9 @@ import { scopeFromPrincipal } from "@agent/lib/principal-scope";
 export default defineAgent({
   experimental: {
     tasks: true,
+    workflow: {
+      world: "@workflow/world-postgres",
+    },
   },
   model: defineDynamic({
     events: {
