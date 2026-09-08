@@ -42,6 +42,9 @@ describe("installation model configuration", () => {
     });
     expect(selected).toMatchObject({
       model: { modelId: "gpt-5.3-codex-spark", specificationVersion: "v4" },
+      modelOptions: {
+        providerOptions: { openai: { reasoningSummary: null } },
+      },
     });
   });
 
