@@ -34,6 +34,34 @@ pnpm test:runtime
 
 The CI storage job supplies the same dedicated database through environment variables, migrates the application, runs workflow setup twice to check repeatability, exercises storage, and builds both servers. Its database and random installation keys are ephemeral. Storage tests use synthetic inputs through real PostgreSQL; they do not establish provider delivery or authenticated Eve replay.
 
+## Scheduled callbacks
+
+Self-hosted report and input callbacks use the existing installation encryption
+key. Set `SECRET_ENCRYPTION_KEY` to a base64-encoded 32-byte random value, and use
+the same value in the caller and Eve processes. `BETTER_AUTH_URL` must identify
+the same public origin in both processes. The callback client permits HTTPS, or
+HTTP on `localhost`, `127.0.0.1` and `[::1]` for local use. It rejects redirects.
+
+Next forwards exactly `/internal/scheduled-run/report` and
+`/internal/scheduled-run/respond` to Eve. These routes authenticate their own
+requests; a browser cookie is not a service credential. The local signature uses
+a purpose-specific derived key and binds the configured origin, POST method,
+route, timestamp and raw body digest. Signatures expire after 60 seconds, with a
+five-second allowance for future clock drift. Keep instance clocks synchronized.
+
+This is time-bounded authentication. Replays within that window remain subject
+to the existing run and report claims; the signature does not add a separate
+replay journal or a new exactly-once guarantee. Vercel deployments retain native
+OIDC authentication and its challenge responses. No development identity bypass
+is enabled for local production callbacks.
+
+The distinct `WORKFLOW_LOCAL_BASE_URL` still addresses the internal Workflow
+service, not this public callback audience. Signed success through the complete
+production routing was verified: unsigned and altered requests returned 401;
+valid signatures reached the report and response handlers with nonexistent run
+IDs and returned 202 and 409 respectively. These probes dispatched no scheduled
+work. Execution across restart remains a separate qualification step.
+
 ## Credential readiness
 
 | Variable             | Current use                                       | Verification                                                                                                                                                                                              |
@@ -91,7 +119,7 @@ identity revocation, workflow stream persistence, memory CAS, reconnects, and
 cancellation of a write blocked by an actual database lock. Native failure and
 cancellation handlers persist one fixed, sanitized notice per turn, including
 concurrent replay and revoked-identity rejection. The inherited unit
-suite separately passed 772 tests across 85 files; inherited mocks remain
+suite separately passed 781 tests across 86 files; inherited mocks remain
 regression evidence only. One preceding run timed out because pure model
 configuration unnecessarily initialized all database services. Running that
 configuration Effect without the database runtime corrected the dependency;
@@ -134,6 +162,19 @@ The corrected save and full-restart recall runs each completed with exactly one
 response tool result; the save also performed exactly one memory write. Failure
 artifacts remain retained. This finite scenario is not a general guarantee of
 model behavior or a real messaging-provider delivery test.
+
+A second authenticated user received `UNKNOWN` for the first user's preference;
+the original document remained intact. A subsequent native removal changed the
+document version and removed that preference. After another full restart, a new
+session for the original user also received `UNKNOWN`. These scenarios exercise
+scoped recall and removal, not the complete export, retention or deletion policy.
+
+A native cancellation request was accepted during streamed tool input. The
+response tool still completed before `turn.cancelled` and `session.waiting` were
+observed, so the stricter no-send-after-request oracle failed and remains recorded.
+The asynchronous cancellation boundary did settle. A follow-up on that same
+session then completed as a new turn with exactly one `RESUMED` response. Prompt
+interruption of model execution is not established by that recovery result.
 
 Interrupted model-step replay, native approvals, stop/correction UX, voice/files,
 scheduled execution and real channel delivery remain unqualified. Existing
