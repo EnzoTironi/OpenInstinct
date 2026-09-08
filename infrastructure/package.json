@@ -1,0 +1,23 @@
+{
+  "name": "companion-infrastructure",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "plan": "umask 077 && mkdir -p .alchemy && chmod 700 .alchemy && alchemy plan",
+    "deploy": "umask 077 && mkdir -p .alchemy && chmod 700 .alchemy && alchemy deploy",
+    "destroy": "umask 077 && mkdir -p .alchemy && chmod 700 .alchemy && alchemy destroy",
+    "types:check": "../node_modules/.bin/tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.0-rc.112",
+    "alchemy": "2.0.0-beta.76",
+    "effect": "4.0.0-rc.112"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.4"
+  }
+}

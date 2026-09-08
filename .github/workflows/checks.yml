@@ -33,8 +33,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install isolated infrastructure dependencies
+        run: pnpm --dir infrastructure install --frozen-lockfile
+
       - name: Run checks
         run: pnpm check
+
+      - name: Check isolated infrastructure
+        run: |
+          pnpm --dir infrastructure peers check
+          pnpm --dir infrastructure types:check
 
   runtime-storage:
     name: Runtime storage and build

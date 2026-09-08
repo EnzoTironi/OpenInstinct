@@ -21,6 +21,9 @@ cp .env.example .env.local
 chmod 600 .env.local
 ```
 
+For a local PostgreSQL instance, use the [Alchemy and Effect stack](infrastructure/README.md).
+It creates a named data volume and exposes PostgreSQL only on loopback.
+
 Configure your PostgreSQL URLs, public application URL, and independent random
 Better Auth and encryption secrets in `.env.local`. Follow the exact setup in
 [local runtime setup](docs/local-runtime-setup.md#build-and-run-locally), including
