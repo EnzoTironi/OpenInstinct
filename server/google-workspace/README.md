@@ -11,7 +11,9 @@ Direct `auth.api` calls remain available to these server operations.
 provider check. Only the four business API scopes are required; Google identity
 scope aliases do not determine tool authorization.
 
-`connectGoogleWorkspace(headers, callbackURL)` returns `{ url, headers }`.
+`connectGoogleWorkspace(headers, callbackURL, errorCallbackURL?)` returns `{ url, headers }`.
+Both callback URLs must belong to the installation origin; the error destination
+defaults to the success destination for the native Eve flow.
 Its HTTP consumer must forward every `headers.getSetCookie()` value separately.
 The return URL must belong to the installation origin. `disconnectGoogleWorkspace`
 requires real session headers, revokes the provider token before unlinking, and
@@ -55,3 +57,10 @@ node --env-file=.env.local --env-file=.env.runtime.local node_modules/tsx/dist/c
 It inserts an isolated synthetic membership, issues a real encrypted handoff,
 removes that membership, verifies subsequent authorization and challenge issuance
 fail, and removes its workspace in cleanup. It makes no Google API calls.
+
+Home uses the same kickoff route without `flow`, passing only `returnTo`. The
+current authenticated session owns that link operation. The existing chat-return
+validator restricts the success destination; it receives `google=connected`.
+Provider errors return to `/?google=unavailable&returnTo=<validated-chat>`.
+When `flow` is present, even if empty or malformed, the native principal-bound
+handoff remains mandatory; it cannot fall through into the Home flow.

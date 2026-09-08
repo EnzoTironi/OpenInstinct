@@ -1,5 +1,7 @@
 import { Effect } from "effect";
 import { authentication } from "@db/services/auth";
+import { applicationOrigin } from "@shared/environment/origin";
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 import { serverRuntime } from "../../../../server/runtime";
 import {
   connectGoogleWorkspace,
@@ -10,8 +12,9 @@ import { readGoogleWorkspaceChallenge } from "../../../../server/google-workspac
 export async function GET(request: Request) {
   return serverRuntime.runPromise(
     Effect.gen(function* () {
-      const flow = new URL(request.url).searchParams.get("flow");
-      if (!flow || flow.length > 8192)
+      const params = new URL(request.url).searchParams;
+      const flow = params.get("flow");
+      if (flow !== null && (!flow || flow.length > 8192))
         return handoffFailure("invalid_callback");
       const auth = yield* authentication;
       const session = yield* Effect.tryPromise({
@@ -19,13 +22,15 @@ export async function GET(request: Request) {
         catch: () => new GoogleWorkspaceError({ reason: "unauthenticated" }),
       });
       if (!session) return handoffFailure("unauthenticated");
-      const callbackURL = yield* readGoogleWorkspaceChallenge(
-        flow,
-        session.user.id
-      );
+      const home = homeCallbacks(params.get("returnTo") ?? undefined);
+      const callbackURL =
+        flow === null
+          ? home.callbackURL
+          : yield* readGoogleWorkspaceChallenge(flow, session.user.id);
       const result = yield* connectGoogleWorkspace(
         request.headers,
-        callbackURL
+        callbackURL,
+        flow === null ? home.errorCallbackURL : callbackURL
       );
       const headers = new Headers({
         Location: result.url,
@@ -78,4 +83,15 @@ function handoffFailure(reason: GoogleWorkspaceError["reason"]) {
       },
     }
   );
+}
+
+function homeCallbacks(returnTo: string | undefined) {
+  const origin = applicationOrigin();
+  const path = googleWorkspaceReturnTo(returnTo);
+  const callback = new URL(path, origin);
+  callback.searchParams.set("google", "connected");
+  const errorCallback = new URL("/", origin);
+  errorCallback.searchParams.set("google", "unavailable");
+  errorCallback.searchParams.set("returnTo", path);
+  return { callbackURL: callback.href, errorCallbackURL: errorCallback.href };
 }

@@ -164,19 +164,28 @@ export const getGoogleWorkspaceToken = Effect.fn("getGoogleWorkspaceToken")(
   }
 );
 
+const googleCallbackURL = Effect.fn("googleCallbackURL")(function* (
+  value: string
+) {
+  const url = yield* Effect.try({
+    try: () => new URL(value, applicationOrigin()),
+    catch: () => new GoogleWorkspaceError({ reason: "invalid_callback" }),
+  });
+  if (url.origin !== applicationOrigin() || url.username || url.password) {
+    return yield* new GoogleWorkspaceError({ reason: "invalid_callback" });
+  }
+  return url.href;
+});
+
 export const connectGoogleWorkspace = Effect.fn("connectGoogleWorkspace")(
-  function* (headers: Headers, callbackURL: string) {
+  function* (
+    headers: Headers,
+    callbackURL: string,
+    errorCallbackURL: string = callbackURL
+  ) {
     yield* requireConfiguration();
-    const callback = yield* Effect.try({
-      try: () => new URL(callbackURL, applicationOrigin()),
-      catch: () => new GoogleWorkspaceError({ reason: "invalid_callback" }),
-    });
-    if (
-      callback.origin !== applicationOrigin() ||
-      callback.username ||
-      callback.password
-    )
-      return yield* new GoogleWorkspaceError({ reason: "invalid_callback" });
+    const callback = yield* googleCallbackURL(callbackURL);
+    const errorCallback = yield* googleCallbackURL(errorCallbackURL);
     const auth = yield* authentication;
     const session = yield* Effect.tryPromise({
       try: () => auth.api.getSession({ headers }),
@@ -194,8 +203,8 @@ export const connectGoogleWorkspace = Effect.fn("connectGoogleWorkspace")(
           returnHeaders: true,
           body: {
             provider: "google",
-            callbackURL: callback.href,
-            errorCallbackURL: callback.href,
+            callbackURL: callback,
+            errorCallbackURL: errorCallback,
             disableRedirect: true,
             scopes: [...googleWorkspaceScopes],
           },
