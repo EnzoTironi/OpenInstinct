@@ -184,6 +184,7 @@ function PendingAuthorization({
       return;
     }
     action.run(completeChannelAuthorization(challenge.id), () => {
+      if (purpose === "link") onRestart();
       router.replace(safeCallbackUrl(callbackUrl));
       router.refresh();
     });
