@@ -272,6 +272,13 @@ test("channel identities, browser binding, races and revocation against migrated
           link,
         });
         yield* rejected(
+          accounts.previewChallenge({
+            token: conflict.token,
+            sender: { ...sender, senderId: "67890" },
+          }),
+          "account_conflict"
+        );
+        yield* rejected(
           accounts.confirmChallenge({
             token: conflict.token,
             sender: { ...sender, senderId: "67890" },
@@ -333,6 +340,31 @@ test("channel identities, browser binding, races and revocation against migrated
           browserSecret,
           link,
         });
+        yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp() - interval '11 minutes' WHERE id = ${sessionId}`;
+        yield* rejected(
+          accounts.previewChallenge({
+            token: staleLink.token,
+            sender: staleSender,
+          }),
+          "session_invalid"
+        );
+        yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp(), "expiresAt" = clock_timestamp() - interval '1 second' WHERE id = ${sessionId}`;
+        yield* rejected(
+          accounts.previewChallenge({
+            token: staleLink.token,
+            sender: staleSender,
+          }),
+          "session_invalid"
+        );
+        yield* sql`UPDATE public.session SET "expiresAt" = clock_timestamp() + interval '1 hour', "userId" = ${other.userId} WHERE id = ${sessionId}`;
+        yield* rejected(
+          accounts.previewChallenge({
+            token: staleLink.token,
+            sender: staleSender,
+          }),
+          "session_invalid"
+        );
+        yield* sql`UPDATE public.session SET "userId" = ${first.userId} WHERE id = ${sessionId}`;
         yield* accounts.confirmChallenge({
           token: staleLink.token,
           sender: staleSender,
@@ -514,6 +546,15 @@ test("channel identities, browser binding, races and revocation against migrated
         yield* rejected(
           accounts.previewChallenge({ token: pending.token, sender }),
           "invalid_challenge"
+        );
+        const revokedLogin = yield* accounts.issueChallenge({
+          channel: "telegram",
+          installationId,
+          browserSecret,
+        });
+        yield* rejected(
+          accounts.previewChallenge({ token: revokedLogin.token, sender }),
+          "identity_inactive"
         );
         const sessions =
           yield* sql`SELECT id FROM public.session WHERE "userId" = ${first.userId}`;

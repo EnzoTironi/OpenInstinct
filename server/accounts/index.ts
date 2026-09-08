@@ -252,18 +252,44 @@ export class ChannelAccounts extends Context.Service<
       const previewChallenge = Effect.fn("ChannelAccounts.previewChallenge")(
         function* (input: typeof PreviewChallenge.Type) {
           const request = yield* decode(PreviewChallenge, input);
-          const rows = yield* sql<
-            typeof ChallengePreview.Type
-          >`SELECT id, purpose,
-            to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "expiresAt"
-            FROM public.channel_auth_challenge
-            WHERE token_hash = ${hash(request.token)} AND channel = ${request.sender.channel}
-            AND installation_id = ${request.sender.installationId}
-            AND confirmed_at IS NULL AND consumed_at IS NULL AND cancelled_at IS NULL
-            AND expires_at > clock_timestamp()`;
-          const preview = rows[0];
-          if (!preview) return yield* fail("invalid_challenge");
-          return preview;
+          return yield* transaction(
+            Effect.gen(function* () {
+              const rows = yield* sql<
+                typeof ChallengePreview.Type &
+                  Pick<
+                    typeof ChallengeRow.Type,
+                    "targetUserId" | "requestingSessionId"
+                  >
+              >`
+              SELECT id, purpose, target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId",
+              to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "expiresAt"
+              FROM public.channel_auth_challenge
+              WHERE token_hash = ${hash(request.token)} AND channel = ${request.sender.channel}
+              AND installation_id = ${request.sender.installationId}
+              AND confirmed_at IS NULL AND consumed_at IS NULL AND cancelled_at IS NULL
+              AND expires_at > clock_timestamp()`;
+              const preview = rows[0];
+              if (!preview) return yield* fail("invalid_challenge");
+              const existing = yield* findIdentity(request.sender);
+              if (existing?.revoked) return yield* fail("identity_inactive");
+              if (preview.purpose === "link") {
+                if (!preview.targetUserId || !preview.requestingSessionId)
+                  return yield* fail("invalid_challenge");
+                yield* requireSession(
+                  preview.targetUserId,
+                  preview.requestingSessionId,
+                  true
+                );
+                if (existing && existing.userId !== preview.targetUserId)
+                  return yield* fail("account_conflict");
+              }
+              return {
+                id: preview.id,
+                purpose: preview.purpose,
+                expiresAt: preview.expiresAt,
+              };
+            })
+          );
         }
       );
       const confirmChallenge = Effect.fn("ChannelAccounts.confirmChallenge")(
