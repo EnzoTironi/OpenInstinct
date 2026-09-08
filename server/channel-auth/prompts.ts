@@ -114,7 +114,7 @@ export class ChannelAuthPrompts extends Context.Service<
         yield* sql`UPDATE public.channel_auth_prompt p SET status = 'cancelled', token_ciphertext = NULL,
         lease_token = NULL, lease_expires_at = NULL, last_error = 'challenge_inactive'
         FROM public.channel_auth_challenge c WHERE c.id = p.challenge_id
-        AND p.status IN ('queued', 'dispatching')
+        AND p.status = 'queued'
         AND (c.expires_at <= clock_timestamp() OR c.cancelled_at IS NOT NULL OR c.confirmed_at IS NOT NULL OR c.consumed_at IS NOT NULL)`;
       });
       const select = Effect.fn("ChannelAuthPrompts.select")(function* (
@@ -133,7 +133,7 @@ export class ChannelAuthPrompts extends Context.Service<
       ) {
         yield* sql`UPDATE public.channel_auth_prompt SET status = ${status}, token_ciphertext = NULL,
         lease_token = NULL, lease_expires_at = NULL, last_error = ${status === "failed" ? "invalid_envelope" : "challenge_inactive"}
-        WHERE challenge_id = ${challengeId} AND status IN ('queued', 'dispatching')`;
+        WHERE challenge_id = ${challengeId} AND status = 'queued'`;
       });
       const preview = Effect.fn("ChannelAuthPrompts.preview")(
         (input: typeof PreviewChallenge.Type) =>
@@ -203,10 +203,7 @@ export class ChannelAuthPrompts extends Context.Service<
                 existing.installationId !== request.sender.installationId
               )
                 return yield* error("conflict");
-              if (
-                existing.status === "queued" ||
-                existing.status === "dispatching"
-              ) {
+              if (existing.status === "queued") {
                 const valid = yield* preview(request);
                 if (!valid) {
                   yield* cancel(challenge.id, "cancelled");
@@ -299,19 +296,16 @@ export class ChannelAuthPrompts extends Context.Service<
             const row = yield* select(lease.challengeId);
             if (!row) return false;
             const envelope = yield* decrypt(row);
-            if (!envelope) {
-              yield* cancel(lease.challengeId, "failed");
-              return false;
-            }
-            if (!(yield* preview(envelope))) {
-              yield* cancel(lease.challengeId, "cancelled");
-              return false;
-            }
+            // A failed recheck prevents new I/O, but must not erase a receipt
+            // from I/O that already began under this lease.
+            if (!envelope || !(yield* preview(envelope))) return false;
             yield* retire;
             const active = yield* sql<{ valid: boolean }>`SELECT EXISTS (
-              SELECT 1 FROM public.channel_auth_prompt WHERE challenge_id = ${lease.challengeId}
-              AND lease_token = ${lease.leaseToken} AND status = 'dispatching'
-              AND lease_expires_at > clock_timestamp()) AS valid`;
+              SELECT 1 FROM public.channel_auth_prompt p JOIN public.channel_auth_challenge c ON c.id = p.challenge_id
+              WHERE p.challenge_id = ${lease.challengeId} AND p.lease_token = ${lease.leaseToken}
+              AND p.status = 'dispatching' AND p.lease_expires_at > clock_timestamp()
+              AND c.expires_at > clock_timestamp() AND c.confirmed_at IS NULL
+              AND c.cancelled_at IS NULL AND c.consumed_at IS NULL) AS valid`;
             return active[0]?.valid === true;
           })
         );
