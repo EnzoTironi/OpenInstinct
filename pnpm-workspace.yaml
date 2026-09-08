@@ -18,6 +18,7 @@ allowBuilds:
   "@google/genai": false
   cbor-extract: false
   esbuild: true
+  msgpackr-extract: false
   protobufjs: false
   sharp: true
 patchedDependencies:

@@ -102,3 +102,24 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Effect application architecture
+
+Use Effect 4 (`effect@rc`, exact resolution in the lockfile) throughout owned
+application logic: services, I/O, configuration, validation, typed errors,
+resource lifetimes, concurrency, retries and observability. Migrate existing
+features as complete slices, including callers and tests. Do not keep duplicate
+Promise and Effect implementations of the same application behavior.
+
+Eve remains the owner of agent turns, sessions and durable workflow execution.
+Bridge Effect into Eve/Next/Better Auth/SDK callbacks at their public boundaries;
+keep runtime execution out of inner services. Propagate cancellation and map typed
+errors deliberately. Do not introduce a second scheduler or agent loop. React
+components remain idiomatic React; shared application logic follows Effect.
+Use framework-required schemas at integration edges only; avoid maintaining two
+independent domain schemas. Retain third-party libraries through narrow adapters
+where needed rather than rewriting their internals.
+
+Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
+**completely**, and follow the links in the file when required. For APIs not
+covered by that guide, search `node_modules/effect/src`.

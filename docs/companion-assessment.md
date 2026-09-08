@@ -15,8 +15,9 @@ through Kapso and Telegram. Paid model APIs are acceptable initially. Using a
 user's ChatGPT subscription is a later execution option. One generic agent serves
 all use cases; segment-specific examples belong in evals rather than new handlers.
 
-This is a source assessment, not a running-service qualification. No dependencies,
-models, channels, migrations or deployment were executed for this assessment.
+This is a source assessment, not a running-service qualification. The initial assessment did not execute dependencies, models, channels, migrations
+or deployment. The subsequent Effect foundation change installs `effect@rc`;
+validation results for that change are recorded separately below.
 
 ## Repository provenance
 
@@ -50,17 +51,17 @@ in its graph; this is orientation evidence, not proof of correct boundaries.
 
 ## Required change map
 
-| Area | Current source evidence | Intended change | Acceptance evidence |
-| --- | --- | --- | --- |
-| Identity and onboarding | `db/services/auth/index.ts` sends OTP through Linq; `agent/channels/eve.ts` expects a phone number and has a local benchmark identity path | Keep account/session machinery; introduce verified channel identities linked to a stable user. Telegram must not require a phone number. Account linking must prove control of both identities. Remove privileged local identity paths from the product | Two real accounts cannot read, link, approve or deliver into each other's sessions; revoked/unlinked identities lose access |
-| Messaging | `agent/channels/linq.ts`, `db/services/auth/linq.ts`, `agent/lib/linq-image-artifact/` | Native Eve Telegram channel if its installed contract fits; Kapso adapter at Eve's channel boundary. Update text, attachments, reply targets, status and auth delivery together | Verified webhook, durable dedup before ACK, duplicate/reordered events, restart, attachments, cancellation and outbound timeout with explicit unknown delivery |
-| Runtime and hosting | `next.config.ts` uses `withEve`; `compose.yaml` provisions only Postgres; `turbo.json` has Vercel-specific deployment/environment assumptions | Keep Eve as loop/session owner. Add documented Node/container startup, durable workflow backend and proxy routes, migrations, health checks and shutdown. Verify the workflow backend against the exact Eve version | Fresh-host setup, process restart during work, scheduler recovery, two workers without duplicate external effects, backup/restore |
-| Models | `agent/agent.ts` calls `getGatewayModel`; `db/services/settings.ts` stores Gateway-style model IDs | Direct model-provider configuration and a supported model allowlist with user budgets. Gateway can remain an optional deployment choice | Real tool call and streamed turn; cancellation, provider errors, token/cost accounting and limits |
-| Memory and artifacts | `agent/memory/profile.ts` uses Vercel Blob outside local memory; installation secrets and image routes also import Blob | Durable self-hosted memory/object storage through existing framework interfaces where available. Explicit installation keys; no process-local production fallback | Two-user isolation, restart persistence, artifact authorization/expiry, correction and deletion, restored data decrypts with restored keys |
-| OAuth/integrations | `shared/google-workspace/connection.ts`, `agent/lib/google-workspace/client.ts` and workspace UI use Vercel Connect | Retain Google tool behavior; supply independently hosted grant/token lifecycle. Connect remains optional, not a mandatory self-host dependency. Start with Calendar scopes and add Gmail when needed | Real consent, callback ownership, concurrent refresh, revocation, reconnect and failed-grant handling |
-| Browser/computer | `agent/subagents/browser-agent/lib/kernel.ts`; `shared/environment/env.ts` requires `KERNEL_API_KEY` globally | Make browser capability optional so messaging can start without Kernel. Evaluate another backend only when browser journey is measured. Full computer/CLI access is a separate capability, not implied by browser support | Browser-disabled boot; later real per-user sandbox lifecycle, isolation, file persistence, secret boundaries and cleanup |
-| Schedules and proactive delivery | `db/services/scheduled-agent-jobs.ts`, `db/services/scheduled-agent-run-leases.ts`, `agent/channels/scheduled-run.ts`, `agent/lib/schedules/report-lifecycle.ts` | Reuse leases/report semantics; adapt channel targets, time zones, opt-out and delivery recovery. WhatsApp delivery must respect the channel's current template/window rules | Cancel/reschedule race, expired lease, restart before/after dispatch, DST and opt-out suppressing queued delivery |
-| Product and quality | Existing web chat, vault, tasks and evals; source tests include imported-module mocks | Preserve useful UI; prioritize chat onboarding and account/connections controls. Rebrand after the complete journey works. Add real DB/HTTP/channel evidence alongside pure tests | Same tasks, model and environment for comparisons; task success, first useful response, completion latency, cost, unnecessary confirmations and unwanted proactive messages |
+| Area                             | Current source evidence                                                                                                                                          | Intended change                                                                                                                                                                                                                                         | Acceptance evidence                                                                                                                                                         |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity and onboarding          | `db/services/auth/index.ts` sends OTP through Linq; `agent/channels/eve.ts` expects a phone number and has a local benchmark identity path                       | Keep account/session machinery; introduce verified channel identities linked to a stable user. Telegram must not require a phone number. Account linking must prove control of both identities. Remove privileged local identity paths from the product | Two real accounts cannot read, link, approve or deliver into each other's sessions; revoked/unlinked identities lose access                                                 |
+| Messaging                        | `agent/channels/linq.ts`, `db/services/auth/linq.ts`, `agent/lib/linq-image-artifact/`                                                                           | Native Eve Telegram channel if its installed contract fits; Kapso adapter at Eve's channel boundary. Update text, attachments, reply targets, status and auth delivery together                                                                         | Verified webhook, durable dedup before ACK, duplicate/reordered events, restart, attachments, cancellation and outbound timeout with explicit unknown delivery              |
+| Runtime and hosting              | `next.config.ts` uses `withEve`; `compose.yaml` provisions only Postgres; `turbo.json` has Vercel-specific deployment/environment assumptions                    | Keep Eve as loop/session owner. Add documented Node/container startup, durable workflow backend and proxy routes, migrations, health checks and shutdown. Verify the workflow backend against the exact Eve version                                     | Fresh-host setup, process restart during work, scheduler recovery, two workers without duplicate external effects, backup/restore                                           |
+| Models                           | `agent/agent.ts` calls `getGatewayModel`; `db/services/settings.ts` stores Gateway-style model IDs                                                               | Direct model-provider configuration and a supported model allowlist with user budgets. Gateway can remain an optional deployment choice                                                                                                                 | Real tool call and streamed turn; cancellation, provider errors, token/cost accounting and limits                                                                           |
+| Memory and artifacts             | `agent/memory/profile.ts` uses Vercel Blob outside local memory; installation secrets and image routes also import Blob                                          | Durable self-hosted memory/object storage through existing framework interfaces where available. Explicit installation keys; no process-local production fallback                                                                                       | Two-user isolation, restart persistence, artifact authorization/expiry, correction and deletion, restored data decrypts with restored keys                                  |
+| OAuth/integrations               | `shared/google-workspace/connection.ts`, `agent/lib/google-workspace/client.ts` and workspace UI use Vercel Connect                                              | Retain Google tool behavior; supply independently hosted grant/token lifecycle. Connect remains optional, not a mandatory self-host dependency. Start with Calendar scopes and add Gmail when needed                                                    | Real consent, callback ownership, concurrent refresh, revocation, reconnect and failed-grant handling                                                                       |
+| Browser/computer                 | `agent/subagents/browser-agent/lib/kernel.ts`; `shared/environment/env.ts` requires `KERNEL_API_KEY` globally                                                    | Make browser capability optional so messaging can start without Kernel. Evaluate another backend only when browser journey is measured. Full computer/CLI access is a separate capability, not implied by browser support                               | Browser-disabled boot; later real per-user sandbox lifecycle, isolation, file persistence, secret boundaries and cleanup                                                    |
+| Schedules and proactive delivery | `db/services/scheduled-agent-jobs.ts`, `db/services/scheduled-agent-run-leases.ts`, `agent/channels/scheduled-run.ts`, `agent/lib/schedules/report-lifecycle.ts` | Reuse leases/report semantics; adapt channel targets, time zones, opt-out and delivery recovery. WhatsApp delivery must respect the channel's current template/window rules                                                                             | Cancel/reschedule race, expired lease, restart before/after dispatch, DST and opt-out suppressing queued delivery                                                           |
+| Product and quality              | Existing web chat, vault, tasks and evals; source tests include imported-module mocks                                                                            | Preserve useful UI; prioritize chat onboarding and account/connections controls. Rebrand after the complete journey works. Add real DB/HTTP/channel evidence alongside pure tests                                                                       | Same tasks, model and environment for comparisons; task success, first useful response, completion latency, cost, unnecessary confirmations and unwanted proactive messages |
 
 The two phone assumptions in identity are important: merely adding a Telegram
 webhook leaves web authentication and account ownership tied to iMessage.
@@ -76,8 +77,11 @@ installation keys and artifacts must move coherently.
 ## Dependency decisions
 
 1. Keep Eve 0.49 as the initial candidate and its current lockfile for baseline
-   reproduction. Do not add a second custom agent loop or rewrite the repository
-   into Effect simply to match Zoen. New runtime APIs must follow installed docs.
+   reproduction. Use Effect throughout owned application logic, as explicitly requested after
+   the initial assessment. Keep Eve as agent/session/workflow owner, with narrow
+   runtime bridges at framework callbacks. Migrate complete features and their
+   callers/tests rather than maintaining parallel implementations. React remains
+   idiomatic React. New runtime APIs must follow installed docs.
 2. Keep Better Auth, Postgres/Drizzle, existing Google clients and UI where they
    satisfy the changed contracts. Prefer existing native Eve integrations over
    custom infrastructure.
@@ -100,8 +104,9 @@ installation keys and artifacts must move coherently.
 
 ## Proposed implementation packages
 
-This assessment does not start implementation. The packages below describe the
-next work, rather than completed or currently running changes.
+The Effect dependency and contributor instructions are the first authorized
+foundation change. The remaining packages describe proposed product work; they
+are not yet implemented.
 
 Each package must compile and have its own acceptance evidence before integration.
 Do not create parallel replacement implementations for the same runtime concern.
@@ -139,7 +144,7 @@ Completed: full-history clone of upstream main; source/manifest/workflow/license
 inspection; architecture map; confirmed private GitHub visibility and remote main
 SHA; documented the change map. No application code has been modified.
 
-Not yet proved: frozen install/build/tests, live Postgres behavior, workflow-world
+At the initial assessment, not yet proved: frozen install/build/tests, live Postgres behavior, workflow-world
 compatibility, provider calls, channel delivery, multi-user security, sandbox
 isolation and recovery. Existing mock-based tests are useful regression evidence
 but will not count as proof of the external behavior they replace.
@@ -151,3 +156,73 @@ and https://github.com/vercel/eve/blob/main/docs/channels/telegram.mdx.
 The standalone requirements/research already recorded under
 `/Users/enzotironi/eve/docs/` remain preserved; this assessment specializes them to
 the cloned application rather than importing the unfinished Zoen implementation.
+
+## Replicating the Linq experience across channels
+
+Replicate the user flow and shared application behavior, using each provider's
+native transport. A user messages the assistant, establishes a verified identity,
+continues an Eve session, grants access to tools when needed, approves consequential
+actions and receives results or scheduled follow-ups in that channel.
+
+- Telegram: use its stable sender ID scoped to the bot installation and a private
+  conversation. Do not infer identity from username or require a phone number.
+  A short-lived, one-use linking challenge can connect a web account after proof
+  of both the web session and the channel. Verify the webhook secret before
+  accepting updates; use provider update IDs for durable deduplication.
+- Kapso/WhatsApp: verify the signature on the raw request before trusting the
+  sender or receiving business number. Scope sender identity to the configured
+  channel installation; normalize only after verification. Account linking uses
+  the same proof-of-control service. Handle templates, delivery statuses, media
+  and ambiguous outbound timeouts in the adapter.
+- Reuse session ownership, tool execution, memory, approvals, scheduling and reply
+  intents. Extract shared behavior where both real adapters consume it; do not
+  copy the Linq file twice or create a speculative channel framework.
+- Keep channel authentication separate from web-session authentication: a valid
+  provider webhook does not authenticate a browser. A shared phone number or
+  claimed username does not authorize linking two existing accounts.
+
+Effect owns the shared application services and adapter I/O. Eve consumes these
+through its native channel/tool hooks. Before introducing our own inbox/outbox,
+inspect the installed Eve channel durability guarantees and implement only the
+missing acceptance properties. Framework execution remains single-owned.
+
+First migration slices: channel identity/linking; authenticated inbound acceptance;
+Eve dispatch and outbound delivery; scheduling/reporting; memory and integration
+services. Each slice updates all consumers and tests atomically. Start each slice
+with existing behavior evidence, and prove failure, cancellation, restart and
+cross-owner cases at the relevant boundary. Do not hide defects as retryable errors.
+
+Provider references checked on 2026-09-08:
+[Telegram Bot API](https://core.telegram.org/bots/api) and
+[Kapso webhook security](https://docs.kapso.ai/docs/platform/webhooks/security).
+
+## Effect foundation validation
+
+The follow-up installs and locks `effect@4.0.0-rc.112`, updates contributor
+instructions and this plan. No application behavior has yet migrated to Effect.
+
+- Frozen install passed on Node 24 with pnpm 11.24.0. Explicitly disabled the
+  optional `msgpackr-extract` native build script; existing build policy remains
+  enabled for esbuild and sharp. The first install stopped on pnpm's unconfigured
+  build-script entry; the explicit policy resolved it.
+- Direct Effect import and execution passed.
+- Existing suite: 80 files, 698 tests passed. This includes upstream mock-based
+  tests and does not qualify Telegram/Kapso or real external-provider behavior.
+- Type generation, TypeScript checking, lint and formatting passed. Initial
+  documentation formatting failure was corrected before the full rerun.
+- Aggregate checks remain red: Knip correctly reports `effect` as unused until
+  the first application slice is migrated. No ignore or artificial consumer was
+  added to conceal this foundation state.
+- Production build failed collecting sign-in page data because `DATABASE_URL`
+  and `KERNEL_API_KEY` are absent. No fake credentials or environment bypass was
+  supplied. This is not a successful production-build qualification.
+- Ripwire quality delta reports two major verbosity findings in the generated
+  lockfile's package/snapshot tables. These are dependency metadata growth, not
+  application complexity; the generated lockfile was retained intact.
+- Independent review found no foundation blocker and requested explicit
+  separation of installation evidence from remaining runtime work, recorded here.
+
+Local evidence logs: `/tmp/openinstinct-effect-check.log` (initial formatting
+failure), `/tmp/openinstinct-effect-check-final.log` (complete checks), and
+`/tmp/openinstinct-effect-build.log` (build failure). These local logs are not
+portable CI evidence.
