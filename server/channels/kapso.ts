@@ -57,6 +57,7 @@ const message = Schema.Struct({
   kapso: Schema.Struct({
     direction: Schema.String,
     status: Schema.String,
+    origin: Schema.optionalKey(Schema.String),
     media_data: Schema.optionalKey(
       Schema.Struct({
         filename: Schema.optionalKey(ProviderReferenceSchema),
@@ -80,7 +81,7 @@ const batch = Schema.Struct({
   type: Schema.String,
   data: Schema.Array(envelope).check(
     Schema.isMinLength(1),
-    Schema.isMaxLength(32)
+    Schema.isMaxLength(100)
   ),
 });
 const malformed = () =>
@@ -105,6 +106,14 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
   if (
     incoming?.kapso.direction !== "inbound" ||
     incoming.kapso.status !== "received"
+  )
+    return null;
+  // Documented live origins; direction/status still exclude Business App sends.
+  // https://docs.kapso.ai/docs/platform/webhooks/advanced#message-origin
+  // History imports, missing and future origins must never become login commands.
+  if (
+    incoming.kapso.origin !== "cloud_api" &&
+    incoming.kapso.origin !== "business_app"
   )
     return null;
   if (

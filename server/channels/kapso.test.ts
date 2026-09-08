@@ -14,7 +14,7 @@ const baseMessage = {
   type: "text",
   from: "15550002222",
   text: { body: "hello" },
-  kapso: { direction: "inbound", status: "received" },
+  kapso: { direction: "inbound", status: "received", origin: "cloud_api" },
 };
 const base = {
   phone_number_id: installation.phoneNumberId,
@@ -149,8 +149,8 @@ test("requires installation and contact consistency", async () => {
   ).rejects.toMatchObject({ reason: "wrong_installation" });
 });
 
-test("accepts up to32 batched events and rejects larger or stale/future input", async () => {
-  const data = Array.from({ length: 32 }, (_, index) => ({
+test("accepts 100 batched events and rejects larger or stale/future input", async () => {
+  const data = Array.from({ length: 100 }, (_, index) => ({
     ...base,
     message: { ...baseMessage, id: `wamid.${String(index)}` },
   }));
@@ -159,8 +159,8 @@ test("accepts up to32 batched events and rejects larger or stale/future input", 
     type: "whatsapp.message.received",
     data,
   });
-  expect(events).toHaveLength(32);
-  expect(events.at(-1)?.eventId).toBe("wamid.31");
+  expect(events).toHaveLength(100);
+  expect(events.at(-1)?.eventId).toBe("wamid.99");
   await expect(
     parse({
       batch: true,
@@ -179,3 +179,64 @@ test("accepts up to32 batched events and rejects larger or stale/future input", 
     })
   );
 });
+
+test("accepts the provider default batch of 50", async () => {
+  const data = Array.from({ length: 50 }, (_, index) => ({
+    ...base,
+    message: { ...baseMessage, id: `wamid.${String(index)}` },
+  }));
+  expect(
+    await parse({ batch: true, type: "whatsapp.message.received", data })
+  ).toHaveLength(50);
+});
+
+test.each(["cloud_api", "business_app"])(
+  "accepts live %s origin with inbound received direction",
+  async (origin) => {
+    const kapso = { ...baseMessage.kapso, origin };
+    expect(
+      await parse({ ...base, message: { ...baseMessage, kapso } })
+    ).toHaveLength(1);
+    const events = await parse({
+      ...base,
+      message: {
+        ...baseMessage,
+        kapso,
+        text: { body: `/confirm ${"a".repeat(43)}` },
+      },
+    });
+    expect(events[0]).toMatchObject({ kind: "command", command: "confirm" });
+    expect(
+      await parse({
+        ...base,
+        message: { ...baseMessage, kapso: { ...kapso, direction: "outbound" } },
+      })
+    ).toEqual([]);
+  }
+);
+
+test.each(["history_sync", "unknown_future_origin", undefined])(
+  "ignores %s origin before text or login normalization",
+  async (origin) => {
+    const kapso: Schema.MutableJsonObject = {
+      direction: "inbound",
+      status: "received",
+    };
+    if (origin !== undefined) kapso.origin = origin;
+    await Promise.all(
+      [
+        "hello",
+        `/confirm ${"a".repeat(43)}`,
+        "/confirm invalid",
+        `/start ${"a".repeat(43)}`,
+      ].map(async (body) => {
+        expect(
+          await parse({
+            ...base,
+            message: { ...baseMessage, kapso, text: { body } },
+          })
+        ).toEqual([]);
+      })
+    );
+  }
+);
