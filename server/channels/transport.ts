@@ -1,6 +1,7 @@
 import { PgClient } from "@effect/sql-pg";
 import { Config, Context, Effect, Layer, Schema } from "effect";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { ChannelAccounts, IdentitySchema, type Identity } from "../accounts";
 import {
   IdentityId,
@@ -104,6 +105,13 @@ const makeTransport = Effect.gen(function* () {
           )
         );
       if (active.id !== identity.id || active.userId !== identity.userId)
+        return yield* new ChannelTransportError({
+          reason: "identity_inactive",
+        });
+      const scope = accessScopeForUser(`better-auth:${active.userId}`);
+      const membership = yield* sql`SELECT 1 FROM workspace_memberships
+        WHERE workspace_id = ${scope.workspaceId} AND user_id = ${scope.userId}`;
+      if (membership.length !== 1)
         return yield* new ChannelTransportError({
           reason: "identity_inactive",
         });
