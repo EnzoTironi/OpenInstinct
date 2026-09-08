@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Redacted } from "effect";
 
 const requiredEnvironment = {
   BETTER_AUTH_SECRET: "test-auth-secret-0123456789abcdefghijklmnop",
@@ -18,6 +19,8 @@ describe("environment", () => {
     }
     vi.stubEnv("LINQ_CONNECTOR", "");
     vi.stubEnv("LINQ_PHONE_NUMBER", "");
+    vi.stubEnv("GOOGLE_CLIENT_ID", "");
+    vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
   });
 
   afterEach(() => {
@@ -39,6 +42,22 @@ describe("environment", () => {
     expect(env.GOOGLE_CONNECTOR_UID).toBe("google/open-instinct");
     expect(env.LINQ_CONNECTOR).toBeUndefined();
     expect(env.LINQ_PHONE_NUMBER).toBeUndefined();
+  });
+
+  it("keeps Google optional and redacts its configured client secret", async () => {
+    const unconfigured = await import("@shared/environment");
+    expect(unconfigured.env.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(unconfigured.env.GOOGLE_CLIENT_SECRET).toBeUndefined();
+
+    vi.resetModules();
+    vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client-id");
+    vi.stubEnv("GOOGLE_CLIENT_SECRET", "synthetic-client-secret");
+    const { env } = await import("@shared/environment");
+    expect(env.GOOGLE_CLIENT_ID).toBe("synthetic-client-id");
+    expect(Redacted.isRedacted(env.GOOGLE_CLIENT_SECRET)).toBe(true);
+    expect(JSON.stringify(env.GOOGLE_CLIENT_SECRET)).not.toContain(
+      "synthetic-client-secret"
+    );
   });
 
   it("provides stable auth and encryption defaults in local development", async () => {
