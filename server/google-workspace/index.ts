@@ -106,14 +106,13 @@ export const readGoogleWorkspaceConnection = Effect.fn(
 )(function* (scope: AccessScope) {
   yield* googleWorkspaceUserId(scope);
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET)
-    return { state: "unavailable" as const, accountLabel: null };
+    return { state: "unavailable" as const };
   const account = yield* findAccount(scope);
   return {
     state:
       account?.hasToken && hasGoogleWorkspaceScopes(account.scope)
         ? ("connected" as const)
         : ("disconnected" as const),
-    accountLabel: null,
   };
 });
 

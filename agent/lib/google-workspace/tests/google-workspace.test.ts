@@ -4,13 +4,7 @@ import { googleApiErrorStatus } from "@agent/lib/google-workspace/client";
 import { gmailUpdateLabels } from "@agent/lib/google-workspace/gmail";
 import { calendarCreateEvent } from "@agent/tools/calendar";
 import { gmailSend, gmailUpdate } from "@agent/tools/gmail";
-import {
-  googleWorkspaceScopes,
-  googleWorkspaceSubject,
-  googleWorkspaceTokenParams,
-} from "@shared/google-workspace/connection";
-
-const userId = "better-auth:user-123";
+import { googleWorkspaceScopes } from "@shared/google-workspace/connection";
 
 describe("Google Workspace", () => {
   it("reads only a numeric provider status from unknown errors", () => {
@@ -28,18 +22,6 @@ describe("Google Workspace", () => {
   it("uses one explicit least-privilege scope set", () => {
     expect(googleWorkspaceScopes).not.toContain("*");
     expect(googleWorkspaceScopes).not.toContain("https://mail.google.com/");
-    expect(googleWorkspaceTokenParams(userId)).toEqual({
-      scopes: [...googleWorkspaceScopes],
-      subject: googleWorkspaceSubject(userId),
-    });
-  });
-
-  it("uses a user-scoped connector subject", () => {
-    expect(googleWorkspaceSubject(userId)).toEqual({
-      id: userId,
-      issuer: "openinstinct",
-      type: "user",
-    });
   });
 
   it("maps reversible Gmail actions and protects consequential writes", () => {

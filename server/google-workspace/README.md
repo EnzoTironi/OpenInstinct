@@ -6,9 +6,8 @@ configuration must enable Google only when both client credentials are configure
 encrypt OAuth tokens, and disable the raw HTTP token/link/unlink/account-info routes.
 Direct `auth.api` calls remain available to these server operations.
 
-`readGoogleWorkspaceConnection(scope)` returns `state` and a nullable
-`accountLabel`; it reads grant metadata without exposing tokens or claiming a live
-provider check. Only the four business API scopes are required; Google identity
+`readGoogleWorkspaceConnection(scope)` returns only `state`; it reads grant
+metadata without exposing tokens or claiming a live provider check. Only the four business API scopes are required; Google identity
 scope aliases do not determine tool authorization.
 
 `connectGoogleWorkspace(headers, callbackURL, errorCallbackURL?)` returns `{ url, headers }`.
