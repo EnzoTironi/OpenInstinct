@@ -7,12 +7,16 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { workspaceMemberships } from "./workspaces";
+import { channelOutbox } from "./messaging";
+import { scheduledConversationChannelSchema } from "@shared/schedules/conversation";
+import { scheduledReportStatusSchema } from "@shared/schedules/report-status";
 
 export const scheduledAgentJobs = pgTable(
   "scheduled_agent_jobs",
@@ -22,7 +26,7 @@ export const scheduledAgentJobs = pgTable(
     createdByUserId: text("created_by_user_id").notNull(),
     prompt: text("prompt").notNull(),
     conversationChannel: text("conversation_channel", {
-      enum: ["eve", "linq"],
+      enum: scheduledConversationChannelSchema.literals,
     }).notNull(),
     conversationId: text("conversation_id").notNull(),
     replyAnchorMessageId: text("reply_anchor_message_id"),
@@ -75,7 +79,7 @@ export const scheduledAgentJobs = pgTable(
     }).onDelete("cascade"),
     check(
       "scheduled_agent_jobs_conversation_channel_check",
-      sql`${table.conversationChannel} IN ('eve', 'linq')`
+      sql`${table.conversationChannel} IN ('eve', 'linq', 'telegram', 'kapso')`
     ),
     check(
       "scheduled_agent_jobs_conversation_id_check",
@@ -133,14 +137,7 @@ export const scheduledAgentRuns = pgTable(
     >(),
     outcome: jsonb("outcome"),
     reportStatus: text("report_status", {
-      enum: [
-        "not_ready",
-        "not_needed",
-        "pending",
-        "queued",
-        "delivered",
-        "suppressed",
-      ],
+      enum: scheduledReportStatusSchema.literals,
     })
       .notNull()
       .default("not_ready"),
@@ -196,7 +193,7 @@ export const scheduledAgentRuns = pgTable(
     ),
     check(
       "scheduled_agent_runs_report_status_check",
-      sql`${table.reportStatus} IN ('not_ready', 'not_needed', 'pending', 'queued', 'delivered', 'suppressed')`
+      sql`${table.reportStatus} IN ('not_ready', 'not_needed', 'pending', 'queued', 'delivered', 'suppressed', 'failed', 'cancelled', 'uncertain')`
     ),
     uniqueIndex("scheduled_agent_runs_occurrence_idx").on(
       table.jobId,
@@ -209,6 +206,37 @@ export const scheduledAgentRuns = pgTable(
     index("scheduled_agent_runs_report_idx").on(
       table.reportStatus,
       table.updatedAt.asc()
+    ),
+  ]
+);
+
+export const scheduledAgentReportOutputs = pgTable(
+  "scheduled_agent_report_outputs",
+  {
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => scheduledAgentRuns.id, { onDelete: "cascade" }),
+    reportSequence: integer("report_sequence").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    outboxId: uuid("outbox_id")
+      .notNull()
+      .references(() => channelOutbox.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    primaryKey({
+      name: "scheduled_agent_report_outputs_pkey",
+      columns: [table.runId, table.reportSequence, table.chunkIndex],
+    }),
+    uniqueIndex("scheduled_agent_report_outputs_outbox_uidx").on(
+      table.outboxId
+    ),
+    check(
+      "scheduled_agent_report_outputs_sequence_check",
+      sql`${table.reportSequence} >= 0`
+    ),
+    check(
+      "scheduled_agent_report_outputs_chunk_check",
+      sql`${table.chunkIndex} >= 0`
     ),
   ]
 );
