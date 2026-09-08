@@ -8,7 +8,11 @@ import {
   readGoogleWorkspaceChallenge,
   validateGoogleCallback,
 } from "./challenge";
-import { googleWorkspaceUserId, hasGoogleWorkspaceScopes } from "./index";
+import {
+  googleWorkspaceUserId,
+  hasGoogleWorkspaceScopes,
+  isInvalidGoogleRevocationToken,
+} from "./index";
 
 const callback =
   "https://example.com/eve/v1/connections/google-workspace/callback/attempt/token";
@@ -90,5 +94,26 @@ describe("native Google authorization boundary", () => {
         )
       ).toBe(false);
     expect(hasGoogleWorkspaceScopes(null)).toBe(false);
+  });
+});
+
+describe("Google revocation error classification", () => {
+  it("accepts only the explicit invalid-token revocation response", () => {
+    expect(
+      isInvalidGoogleRevocationToken({
+        response: { status: 400, data: { error: "invalid_token" } },
+      })
+    ).toBe(true);
+  });
+  it.each([
+    null,
+    { response: { status: 400 } },
+    { response: { status: 400, data: { error: "invalid_request" } } },
+    { response: { status: 401, data: { error: "invalid_token" } } },
+    { response: { status: 503, data: { error: "invalid_token" } } },
+    { response: { status: 400, data: "invalid_token" } },
+    { message: "invalid_token", code: "ETIMEDOUT" },
+  ])("does not treat other failures as confirmed invalidation: %j", (cause) => {
+    expect(isInvalidGoogleRevocationToken(cause)).toBe(false);
   });
 });

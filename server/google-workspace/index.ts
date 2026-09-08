@@ -216,6 +216,15 @@ export const connectGoogleWorkspace = Effect.fn("connectGoogleWorkspace")(
   }
 );
 
+export const isInvalidGoogleRevocationToken = Schema.is(
+  Schema.Struct({
+    response: Schema.Struct({
+      status: Schema.Literal(400),
+      data: Schema.Struct({ error: Schema.Literal("invalid_token") }),
+    }),
+  })
+);
+
 export const disconnectGoogleWorkspace = Effect.fn("disconnectGoogleWorkspace")(
   function* (headers: Headers) {
     const auth = yield* authentication;
@@ -237,18 +246,26 @@ export const disconnectGoogleWorkspace = Effect.fn("disconnectGoogleWorkspace")(
     )(rows);
     const encrypted = tokens[0]?.token;
     if (encrypted) {
-      yield* Effect.tryPromise({
-        try: async () => {
-          const token = Redacted.make(
+      const token = yield* Effect.tryPromise({
+        try: async () =>
+          Redacted.make(
             await symmetricDecrypt({
               data: encrypted,
               key: (await auth.$context).secretConfig,
             })
-          );
-          await new google.OAuth2().revokeToken(Redacted.value(token));
-        },
+          ),
         catch: () => new GoogleWorkspaceError({ reason: "unavailable" }),
       });
+      yield* Effect.tryPromise({
+        try: () => new google.OAuth2().revokeToken(Redacted.value(token)),
+        catch: (cause) => Redacted.make(cause),
+      }).pipe(
+        Effect.catch((cause) =>
+          isInvalidGoogleRevocationToken(Redacted.value(cause))
+            ? Effect.void
+            : new GoogleWorkspaceError({ reason: "unavailable" })
+        )
+      );
     }
     yield* Effect.tryPromise({
       try: () =>

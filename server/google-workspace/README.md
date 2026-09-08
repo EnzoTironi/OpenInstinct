@@ -63,3 +63,18 @@ validator restricts the success destination; it receives `google=connected`.
 Provider errors return to `/?google=unavailable&returnTo=<validated-chat>`.
 When `flow` is present, even if empty or malformed, the native principal-bound
 handoff remains mandatory; it cannot fall through into the Home flow.
+
+For revocation retries, only an explicit HTTP 400 `invalid_token` response from
+Google's revoke call permits local unlink after a rejected request. The
+[Google revocation endpoint reference](https://developers.google.com/identity/openid-connect/reference#revocation_endpoint)
+defines that error as an expired or already revoked token. This lets a retry
+finish local removal after a previous revoke succeeded but unlink failed.
+Network failures, malformed responses, decryption failures and other error codes
+retain the local account. Classification tests use synthetic values in the pure
+decoder; they do not execute or qualify provider revocation.
+
+Better Auth 1.7.2 encrypts persisted access and refresh tokens with the configured
+OAuth encryption option, but its callback and refresh paths persist `idToken`
+in plaintext. This adapter neither consumes nor exposes that ID token and does
+not claim to encrypt or remove it. Database protection for that persisted identity
+payload remains a limitation of the installed Better Auth storage behavior.
