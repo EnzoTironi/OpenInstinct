@@ -1,0 +1,57 @@
+# Self-hosted Google Workspace
+
+Better Auth owns provider account storage, encrypted OAuth tokens, OAuth state,
+the `/api/auth/callback/google` callback, and token refresh. The root authentication
+configuration must enable Google only when both client credentials are configured,
+encrypt OAuth tokens, and disable the raw HTTP token/link/unlink/account-info routes.
+Direct `auth.api` calls remain available to these server operations.
+
+`readGoogleWorkspaceConnection(scope)` returns `state` and a nullable
+`accountLabel`; it reads grant metadata without exposing tokens or claiming a live
+provider check. Only the four business API scopes are required; Google identity
+scope aliases do not determine tool authorization.
+
+`connectGoogleWorkspace(headers, callbackURL)` returns `{ url, headers }`.
+Its HTTP consumer must forward every `headers.getSetCookie()` value separately.
+The return URL must belong to the installation origin. `disconnectGoogleWorkspace`
+requires real session headers, revokes the provider token before unlinking, and
+retains the local record when revocation fails. Revocation never runs inside a
+local authority transaction. Tokens must already use Better Auth encryption;
+there is no plaintext-token compatibility path.
+
+Eve uses its public three-method interactive authorization adapter. Its challenge
+links to `/api/google-workspace/connect?flow=...`. A ten-minute encrypted envelope,
+created with Better Auth's public JWT crypto and the existing installation secret,
+binds the native principal's Better Auth user ID to Eve's same-origin callback.
+The browser route requires that exact signed-in user before asking Better Auth to
+link Google. Challenge issuance and browser linking both require current workspace
+membership; a surviving Better Auth cookie does not restore revoked membership. Better Auth independently owns the OAuth verification record and
+state cookie. Eve completion has callback params, not browser headers; it reads
+only the pending principal's owned Google account. No custom completion route,
+OAuth database, refresh loop, or token cache is introduced.
+
+Account lookup requires current personal-workspace membership and canonical
+Google issuer. It fails closed on ambiguous multiple Google accounts. After
+Better Auth token retrieval/refresh, ownership, membership, account ID, token
+presence and business scopes are reread before returning a redacted bearer.
+A deletion after that final read, or provider revocation during an already-running
+request, remains an in-flight race. Eve owns per-step token caching; provider 401s
+request native reauthorization. Other provider failures expose only a typed HTTP
+status, never Gaxios request configuration, response bodies, or bearer tokens.
+
+The focused tests exercise real encryption/tamper rejection, principal binding,
+callback restrictions, business scope checks and pure provider-error redaction.
+Live Google consent, renewal, revocation, concurrent provider races, and end-to-end
+Eve suspension/resumption require configured Google credentials and are not
+claimed by those tests. Existing SDK mock tests are not provider qualification.
+
+Run the focused real PostgreSQL membership check with the initialized runtime-test
+schema (the check refuses any database except `companion_runtime_test`):
+
+```sh
+node --env-file=.env.local --env-file=.env.runtime.local node_modules/tsx/dist/cli.mjs server/google-workspace/membership.integration.ts
+```
+
+It inserts an isolated synthetic membership, issues a real encrypted handoff,
+removes that membership, verifies subsequent authorization and challenge issuance
+fail, and removes its workspace in cleanup. It makes no Google API calls.

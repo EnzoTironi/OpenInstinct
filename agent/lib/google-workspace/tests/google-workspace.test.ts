@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseCalendarAvailability } from "@agent/lib/google-workspace/calendar";
-import { googleWorkspaceAuthOptions } from "@agent/lib/google-workspace/client";
+import { googleApiErrorStatus } from "@agent/lib/google-workspace/client";
 import { gmailUpdateLabels } from "@agent/lib/google-workspace/gmail";
 import { calendarCreateEvent } from "@agent/tools/calendar";
 import { gmailSend, gmailUpdate } from "@agent/tools/gmail";
@@ -13,6 +13,18 @@ import {
 const userId = "better-auth:user-123";
 
 describe("Google Workspace", () => {
+  it("reads only a numeric provider status from unknown errors", () => {
+    expect(
+      googleApiErrorStatus({
+        response: { status: 401 },
+        config: { headers: { Authorization: "sensitive" } },
+      })
+    ).toBe(401);
+    expect(
+      googleApiErrorStatus({ response: { status: "401" } })
+    ).toBeUndefined();
+    expect(googleApiErrorStatus(null)).toBeUndefined();
+  });
   it("uses one explicit least-privilege scope set", () => {
     expect(googleWorkspaceScopes).not.toContain("*");
     expect(googleWorkspaceScopes).not.toContain("https://mail.google.com/");
@@ -20,10 +32,6 @@ describe("Google Workspace", () => {
       scopes: [...googleWorkspaceScopes],
       subject: googleWorkspaceSubject(userId),
     });
-    expect(googleWorkspaceAuthOptions.tokenParams).toEqual({
-      scopes: [...googleWorkspaceScopes],
-    });
-    expect(googleWorkspaceAuthOptions.validate).toBe(true);
   });
 
   it("uses a user-scoped connector subject", () => {

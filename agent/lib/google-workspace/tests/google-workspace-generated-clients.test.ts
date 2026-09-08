@@ -5,7 +5,7 @@ import * as PeopleApi from "@googleapis/people";
 import type { ToolContext } from "eve/tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCalendarEvent } from "@agent/lib/google-workspace/calendar";
-import { withGoogleAuth } from "@agent/lib/google-workspace/client";
+import { googleApiFailure } from "@agent/lib/google-workspace/client";
 import { searchGoogleContacts } from "@agent/lib/google-workspace/contacts";
 import { sendGmail } from "@agent/lib/google-workspace/gmail";
 
@@ -16,27 +16,20 @@ interface RequestOptions {
 const calendarMock = vi.spyOn(CalendarApi, "calendar");
 const gmailMock = vi.spyOn(GmailApi, "gmail");
 const peopleMock = vi.spyOn(PeopleApi, "people");
-const setCredentialsMock = vi.spyOn(
-  GmailApi.auth.OAuth2.prototype,
-  "setCredentials"
-);
 
 afterEach(() => vi.clearAllMocks());
 
 describe("generated Google Workspace clients", () => {
-  it("hands the Connect token to Google and requests reauthorization on 401", async () => {
-    const ctx = toolContext();
-    const error = new GoogleApiError(401);
-
-    await expect(withGoogleAuth(ctx, () => Promise.reject(error))).rejects.toBe(
-      error
-    );
-
-    expect(ctx.getToken).toHaveBeenCalledOnce();
-    expect(setCredentialsMock).toHaveBeenCalledWith({
-      access_token: "google-access-token",
+  it("strips token-bearing request details from provider failures", () => {
+    const failure = googleApiFailure({
+      response: { status: 401, data: "private response" },
+      config: { headers: { Authorization: "Bearer private-token" } },
+      message: "request included private-token",
     });
-    expect(ctx.requireAuth).toHaveBeenCalledOnce();
+    expect(failure.status).toBe(401);
+    expect(JSON.stringify(failure)).not.toContain("private");
+    expect(String(failure)).not.toContain("private");
+    expect(failure.cause).toBeUndefined();
   });
 
   it("sends typed Gmail requests with a stable retry-safe message ID", async () => {
