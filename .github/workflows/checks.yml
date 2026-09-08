@@ -37,7 +37,8 @@ jobs:
         run: pnpm --dir infrastructure install --frozen-lockfile
 
       - name: Run checks
-        run: pnpm check
+        # Each compiler/linter/test process also uses its own CPU pool.
+        run: pnpm check --concurrency=1
 
       - name: Check isolated infrastructure
         run: |
