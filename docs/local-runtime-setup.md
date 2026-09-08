@@ -176,8 +176,19 @@ The asynchronous cancellation boundary did settle. A follow-up on that same
 session then completed as a new turn with exactly one `RESUMED` response. Prompt
 interruption of model execution is not established by that recovery result.
 
-Interrupted model-step replay, native approvals, stop/correction UX, voice/files,
-scheduled execution and real channel delivery remain unqualified. Existing
+A native scheduled probe now survives a cold restart before its due time and a
+second restart after delivery. The authenticated Spark session created one job;
+one worker run completed on its first attempt and delivered one report to the
+original session. The second restart retained the same 32 events and did not
+repeat the report. This exposed a native Eve defect: persisted dynamic tools
+lost their executable callbacks after process restart. The package patch now
+skips obsolete turn-callback restoration between completed turns, while retaining
+restoration for active continuations and pending approvals. Three installed-package
+regression tests cover those cases. This proves the local scheduled report path; external channel
+delivery and general interrupted model-step replay still require separate proof.
+
+Native approvals, stop/correction UX, voice/files and real channel delivery
+remain unqualified. Existing
 Telegram/Kapso webhook configuration has not been redirected to this local server.
 
 The latest full lint check passed after converting independent parser cases to
@@ -185,3 +196,11 @@ parameterized tests. TS7 and the uncached production build passed. Ripwire still
 reports generated migration metadata size, recent code churn and a small
 initialization-retry duplication; its quality gate is not green. Those findings
 were not suppressed, and local validation does not establish CI execution.
+
+After the shared message schema migration to Effect, the complete uncached unit
+suite passed 794 tests in 89 files. The scheduled-report schema oracle now uses
+the actual installed Eve Standard Schema contract and checks all three decoded
+reply values. Full TS7 and lint checks also passed. Earlier full-suite failures
+(two PGlite timeouts during concurrent heavy checks and the obsolete Zod-instance
+assertion) remain recorded; the successful suite ran without concurrent heavy
+checks.
