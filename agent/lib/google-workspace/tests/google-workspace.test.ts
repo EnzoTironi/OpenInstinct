@@ -1,3 +1,5 @@
+import type { ApprovalContext } from "eve/tools/approval";
+import { authorizeApprovalResponse } from "@agent/lib/approval-response";
 import { describe, expect, it } from "vitest";
 import { parseCalendarAvailability } from "@agent/lib/google-workspace/calendar";
 import { googleApiErrorStatus } from "@agent/lib/google-workspace/client";
@@ -34,9 +36,45 @@ describe("Google Workspace", () => {
       removeLabelIds: [],
     });
     expect(gmailUpdate.approval).toBeUndefined();
-    expect(gmailSend.approval).toBeTypeOf("function");
-    expect(calendarCreateEvent.approval).toBeTypeOf("function");
   });
+
+  it.each([
+    ["gmail-send", gmailSend],
+    ["calendar-create-event", calendarCreateEvent],
+  ] as const)(
+    "%s requires approval on every call and binds the response authorizer",
+    async (toolName, tool) => {
+      const approval = tool.approval;
+      expect(approval).toBeDefined();
+      if (!approval || !("request" in approval)) {
+        throw new Error(
+          "Consequential writes require request and response policies."
+        );
+      }
+      expect(approval.response).toBe(authorizeApprovalResponse);
+      for (const approvedTools of [new Set<string>(), new Set([toolName])]) {
+        // Request decisions must remain independent of sandbox and skill I/O.
+        const context = {
+          approvedTools,
+          callId: "call-1",
+          toolName,
+          session: {
+            id: "session-1",
+            auth: { current: null, initiator: null },
+            turn: { id: "turn-1", sequence: 1 },
+          },
+          getSandbox: () => {
+            throw new Error("Request policy must not access a sandbox.");
+          },
+          getSkill: () => {
+            throw new Error("Request policy must not access a skill.");
+          },
+        } satisfies ApprovalContext<never>;
+        // oxlint-disable-next-line eslint/no-await-in-loop
+        expect(await approval.request(context)).toBe("user-approval");
+      }
+    }
+  );
 
   it("does not treat calendar API errors as availability", () => {
     expect(() =>
