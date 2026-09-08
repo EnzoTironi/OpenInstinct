@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HookContext } from "eve/hooks";
 import type { saveChat } from "@db/services/chats";
@@ -21,7 +22,10 @@ type MessageReceivedHandler = NonNullable<
   NonNullable<typeof sessionOwner.events>["message.received"]
 >;
 
-const scope = { userId: "user-1", workspaceId: "workspace-1" };
+const scope = {
+  userId: "user-1",
+  workspaceId: accessScopeForUser("user-1").workspaceId,
+};
 const context = {
   agent: { name: "test-agent" },
   channel: { kind: "channel:linq" },

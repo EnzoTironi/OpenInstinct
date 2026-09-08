@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HookContext } from "eve/hooks";
 import { z } from "zod";
@@ -36,7 +37,10 @@ vi.mock(
   })
 );
 
-const scope = { userId: "user-1", workspaceId: "workspace-1" };
+const scope = {
+  userId: "user-1",
+  workspaceId: accessScopeForUser("user-1").workspaceId,
+};
 const context = {
   agent: { name: "test-agent" },
   channel: {},

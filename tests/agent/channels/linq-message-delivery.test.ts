@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import type { LinqChannelConfig } from "eve/channels/linq";
 import {
   createLinqAdapter,
@@ -675,7 +676,7 @@ describe("Linq message delivery", () => {
     expect(linqChannelCapture.readImage).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user-1",
-        workspaceId: "workspace-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
       }),
       artifactId,
       { rootSessionId: "session-1", signal: undefined }
@@ -723,7 +724,7 @@ describe("Linq message delivery", () => {
     expect(linqChannelCapture.readImage).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user-1",
-        workspaceId: "workspace-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
       }),
       artifactId,
       { rootSessionId: "scheduled-run-session", signal: undefined }
@@ -963,12 +964,12 @@ function sessionContext(
           scheduledReportSequence: "1",
           scheduledRunId: "00000000-0000-4000-8000-000000000002",
           scheduledRunSessionId: "scheduled-run-session",
-          workspaceId: "workspace-1",
+          workspaceId: accessScopeForUser("user-1").workspaceId,
         }
       : {
           conversationChannel: "linq",
           conversationId: "linq:dm:chat-1",
-          workspaceId: "workspace-1",
+          workspaceId: accessScopeForUser("user-1").workspaceId,
         };
   if (authenticator !== "scheduled-result" && currentMessageId) {
     attributes.linqMessageId = currentMessageId;

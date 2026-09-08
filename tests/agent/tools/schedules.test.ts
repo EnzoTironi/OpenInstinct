@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import type {
   DynamicResolveContext,
   ToolContext,
@@ -72,7 +73,10 @@ describe("schedule tools", () => {
       toolContext("schedules-answer", "linq")
     );
     expect(services.getInput).toHaveBeenCalledExactlyOnceWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       {
         conversationChannel: "linq",
         conversationId: "linq:dm:chat-1",
@@ -145,7 +149,10 @@ describe("schedule tools", () => {
       "timing",
     ]);
     expect(services.create).toHaveBeenCalledExactlyOnceWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       {
         conversationChannel: "linq",
         conversationId: "linq:dm:chat-1",
@@ -174,7 +181,10 @@ describe("schedule tools", () => {
 
     expect(inputProperties(listSchedules.inputSchema)).toEqual([]);
     expect(services.list).toHaveBeenCalledExactlyOnceWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       {
         conversationChannel: "linq",
         conversationId: "linq:dm:chat-1",
@@ -202,7 +212,10 @@ describe("schedule tools", () => {
       "timing",
     ]);
     expect(services.update).toHaveBeenCalledExactlyOnceWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       {
         conversationChannel: "linq",
         conversationId: "linq:dm:chat-1",
@@ -295,7 +308,10 @@ describe("schedule tools", () => {
     );
 
     expect(services.create).toHaveBeenCalledWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       expect.objectContaining({
         conversationChannel: "eve",
         conversationId: "session-1",
@@ -370,7 +386,7 @@ function toolContext(
             conversationId: "linq:dm:chat-1",
             linqMessageId: "message-1",
             linqThreadId: "linq:dm:chat-1",
-            workspaceId: "workspace-1",
+            workspaceId: accessScopeForUser("user-1").workspaceId,
           },
           authenticator,
           principalId: "user-1",
@@ -446,7 +462,7 @@ function scheduledJob(
       timezone: "America/New_York",
     },
     updatedAt: new Date("2026-09-01T12:00:00.000Z"),
-    workspaceId: "workspace-1",
+    workspaceId: accessScopeForUser("user-1").workspaceId,
   };
 }
 
