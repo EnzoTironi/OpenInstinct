@@ -1,6 +1,6 @@
-import { z } from "zod";
+import { Effect, Schema } from "effect";
 
-const reactionTypeSchema = z.enum([
+const reactionTypeSchema = Schema.Literals([
   "thumbs_up",
   "thumbs_down",
   "heart",
@@ -9,15 +9,25 @@ const reactionTypeSchema = z.enum([
   "question",
 ]);
 
-export const reactToMessageOutputSchema = z.object({
-  operation: z.enum(["add", "remove"]).default("add"),
+export const reactToMessageOutputSchema = Schema.Struct({
+  operation: Schema.Literals(["add", "remove"])
+    .annotate({ default: "add" })
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed("add"))),
   type: reactionTypeSchema,
+}).annotate({
+  additionalProperties: true,
+  parseOptions: { onExcessProperty: "ignore" },
 });
 
-export const addReactionToMessageOutputSchema =
-  reactToMessageOutputSchema.extend({
-    operation: z.literal("add").default("add"),
-  });
+export const addReactionToMessageOutputSchema = Schema.Struct({
+  ...reactToMessageOutputSchema.fields,
+  operation: Schema.Literal("add")
+    .annotate({ default: "add" })
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed("add"))),
+}).annotate({
+  additionalProperties: true,
+  parseOptions: { onExcessProperty: "ignore" },
+});
 
 const reactionText = {
   exclamation: "‼️",
@@ -26,14 +36,14 @@ const reactionText = {
   question: "❓",
   thumbs_down: "👎",
   thumbs_up: "👍",
-} as const satisfies Record<z.infer<typeof reactionTypeSchema>, string>;
+} as const satisfies Record<typeof reactionTypeSchema.Type, string>;
 
-export function reactionTextFor(type: z.infer<typeof reactionTypeSchema>) {
+export function reactionTextFor(type: typeof reactionTypeSchema.Type) {
   return reactionText[type];
 }
 
-export const reactToMessageToolResultSchema = z.object({
-  kind: z.literal("tool-result"),
+export const reactToMessageToolResultSchema = Schema.Struct({
+  kind: Schema.Literal("tool-result"),
   output: reactToMessageOutputSchema,
-  toolName: z.literal("react_to_message"),
-});
+  toolName: Schema.Literal("react_to_message"),
+}).annotate({ parseOptions: { onExcessProperty: "ignore" } });

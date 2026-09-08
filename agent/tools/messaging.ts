@@ -66,13 +66,35 @@ export default defineDynamic({
       const isLinq = context.channel.kind === "channel:linq";
       const send_message = defineSendMessage();
 
+      const reactionSchema = isLinq
+        ? reactToMessageOutputSchema
+        : addReactionToMessageOutputSchema;
+      const reactionStandard = Schema.toStandardJSONSchemaV1(
+        Schema.toStandardSchemaV1(reactionSchema)
+      )["~standard"];
       const react_to_message = defineTool({
         description: isLinq
           ? "Add or remove a native iMessage Tapback on the user's current message. Use this instead of send_message when a reaction fully communicates a lightweight acknowledgement and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question."
           : "Acknowledge the user's current message with one compact reaction displayed in the conversation. Use this instead of send_message when the reaction fully communicates the response and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question.",
-        inputSchema: isLinq
-          ? reactToMessageOutputSchema
-          : addReactionToMessageOutputSchema,
+        inputSchema: {
+          "~standard": {
+            ...reactionStandard,
+            jsonSchema: {
+              ...reactionStandard.jsonSchema,
+              input(options) {
+                const document = Schema.toJsonSchemaDocument(reactionSchema, {
+                  includeAnnotationKey: (key) => key === "additionalProperties",
+                });
+                if (options.target === "draft-2020-12") return document.schema;
+                if (options.target === "draft-07")
+                  return JsonSchema.toDocumentDraft07(document).schema;
+                throw new Error(
+                  `Unsupported JSON Schema target: ${options.target}`
+                );
+              },
+            },
+          },
+        },
         execute(reaction) {
           return reaction;
         },

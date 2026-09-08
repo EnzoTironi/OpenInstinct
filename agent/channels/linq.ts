@@ -69,8 +69,10 @@ export default linqChannel({
   credentials,
   events: {
     async "action.result"(event, context, session) {
-      const reaction = reactToMessageToolResultSchema.safeParse(event.result);
-      if (event.status === "completed" && reaction.success) {
+      const reaction = Schema.decodeUnknownResult(
+        reactToMessageToolResultSchema
+      )(event.result);
+      if (event.status === "completed" && Result.isSuccess(reaction)) {
         if (!context.thread) {
           throw new Error(
             "react_to_message requires an active Linq conversation thread."
@@ -81,17 +83,17 @@ export default linqChannel({
           throw new Error("react_to_message requires a current Linq message.");
         }
         const adapter = context.bot.getAdapter("linq");
-        if (reaction.data.output.operation === "remove") {
+        if (reaction.success.output.operation === "remove") {
           await adapter.removeReaction(
             context.thread.id,
             messageId,
-            reaction.data.output.type
+            reaction.success.output.type
           );
         } else {
           await adapter.addReaction(
             context.thread.id,
             messageId,
-            reaction.data.output.type
+            reaction.success.output.type
           );
         }
         await finalizeScheduledReportDelivery(session);

@@ -114,11 +114,13 @@ const reactionEvals = [
       thanked.calledTool("react_to_message", {
         count: 1,
         input: (input) => {
-          const parsed = reactToMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(reactToMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.operation === "add" &&
-            ["heart", "thumbs_up"].includes(parsed.data.type)
+            Result.isSuccess(parsed) &&
+            parsed.success.operation === "add" &&
+            ["heart", "thumbs_up"].includes(parsed.success.type)
           );
         },
         status: "completed",

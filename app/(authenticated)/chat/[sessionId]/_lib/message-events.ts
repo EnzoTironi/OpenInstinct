@@ -104,9 +104,11 @@ function completedReactionOutput(event: MessageStreamEvent) {
     return undefined;
   }
 
-  const result = reactToMessageToolResultSchema.safeParse(event.data.result);
-  return result.success && result.data.output.operation === "add"
-    ? { callId: event.data.result.callId, output: result.data.output }
+  const result = Schema.decodeUnknownResult(reactToMessageToolResultSchema)(
+    event.data.result
+  );
+  return Result.isSuccess(result) && result.success.output.operation === "add"
+    ? { callId: event.data.result.callId, output: result.success.output }
     : undefined;
 }
 
