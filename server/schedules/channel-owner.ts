@@ -8,7 +8,7 @@ export class ScheduleOwnerInactive extends Schema.TaggedError<ScheduleOwnerInact
   {}
 ) {}
 
-export const requireScheduleMembership = Effect.fn("requireScheduleMembership")(
+const requireScheduleMembership = Effect.fn("requireScheduleMembership")(
   function* (scope: AccessScope) {
     const sql = yield* PgClient.PgClient;
     const rows = yield* sql`SELECT user_id FROM workspace_memberships
