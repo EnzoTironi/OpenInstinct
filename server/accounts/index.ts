@@ -2,19 +2,23 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { Context, Effect, Layer, Schema } from "effect";
 import type { SqlError } from "effect/unstable/sql/SqlError";
+import {
+  channelProviderSchema,
+  type channelChallengeStatusSchema,
+} from "../../shared/identity/channel-auth.ts";
 import { accessScopeForUser } from "../../shared/identity/access-scope.ts";
 
 const Identifier = Schema.NonEmptyString.check(Schema.isTrimmed());
 const Uuid = Schema.String.check(Schema.isUUID());
 const Secret = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{43}$/));
-const Channel = Schema.Literals(["telegram", "kapso"]);
+
 export const VerifiedSender = Schema.Struct({
-  channel: Channel,
+  channel: channelProviderSchema,
   installationId: Identifier,
   senderId: Identifier,
 });
 export const IssueChallenge = Schema.Struct({
-  channel: Channel,
+  channel: channelProviderSchema,
   installationId: Identifier,
   browserSecret: Secret,
   link: Schema.optionalKey(
@@ -24,6 +28,10 @@ export const IssueChallenge = Schema.Struct({
 export const ConfirmChallenge = Schema.Struct({
   token: Secret,
   sender: VerifiedSender,
+});
+export const ChallengeStatus = Schema.Struct({
+  challengeId: Uuid,
+  browserSecret: Secret,
 });
 export const ConsumeChallenge = Schema.Struct({
   challengeId: Uuid,
@@ -52,7 +60,7 @@ export class ChannelAccountError extends Schema.TaggedError<ChannelAccountError>
 export interface Identity {
   readonly id: string;
   readonly userId: string;
-  readonly channel: "telegram" | "kapso";
+  readonly channel: typeof channelProviderSchema.Type;
   readonly installationId: string;
   readonly senderId: string;
 }
@@ -62,7 +70,7 @@ interface IdentityRow extends Identity {
 interface ChallengeRow {
   readonly id: string;
   readonly purpose: "login" | "link";
-  readonly channel: "telegram" | "kapso";
+  readonly channel: typeof channelProviderSchema.Type;
   readonly installationId: string;
   readonly targetUserId: string | null;
   readonly requestingSessionId: string | null;
@@ -82,6 +90,9 @@ interface Accounts {
   readonly confirmChallenge: (
     input: typeof ConfirmChallenge.Type
   ) => Effect.Effect<{ challengeId: string }, Failure>;
+  readonly getChallengeStatus: (
+    input: typeof ChallengeStatus.Type
+  ) => Effect.Effect<typeof channelChallengeStatusSchema.Type, Failure>;
   readonly consumeChallenge: (
     input: typeof ConsumeChallenge.Type
   ) => Effect.Effect<
@@ -248,6 +259,23 @@ export class ChannelAccounts extends Context.Service<
           );
         }
       );
+      const getChallengeStatus = Effect.fn(
+        "ChannelAccounts.getChallengeStatus"
+      )(function* (input: typeof ChallengeStatus.Type) {
+        const request = yield* decode(ChallengeStatus, input);
+        const rows = yield* sql<typeof channelChallengeStatusSchema.Type>`
+            SELECT CASE
+              WHEN consumed_at IS NOT NULL THEN 'consumed'
+              WHEN cancelled_at IS NOT NULL OR expires_at <= clock_timestamp() THEN 'expired'
+              WHEN confirmed_at IS NOT NULL THEN 'confirmed'
+              ELSE 'pending'
+            END AS status
+            FROM public.channel_auth_challenge
+            WHERE id = ${request.challengeId} AND browser_secret_hash = ${hash(request.browserSecret)}`;
+        const result = rows[0];
+        if (!result) return yield* fail("invalid_challenge");
+        return result;
+      });
       const consumeChallenge = Effect.fn("ChannelAccounts.consumeChallenge")(
         function* (input: typeof ConsumeChallenge.Type) {
           const request = yield* decode(ConsumeChallenge, input);
@@ -330,6 +358,7 @@ export class ChannelAccounts extends Context.Service<
         issueChallenge,
         confirmChallenge,
         consumeChallenge,
+        getChallengeStatus,
         revokeIdentity,
       });
     })

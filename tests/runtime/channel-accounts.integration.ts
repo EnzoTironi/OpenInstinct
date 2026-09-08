@@ -83,6 +83,27 @@ test("channel identities, browser binding, races and revocation against migrated
           installationId,
           browserSecret,
         });
+        const statusInput = {
+          challengeId: challenge.challengeId,
+          browserSecret,
+        };
+        assert.deepEqual(yield* accounts.getChallengeStatus(statusInput), {
+          status: "pending",
+        });
+        yield* rejected(
+          accounts.getChallengeStatus({
+            ...statusInput,
+            browserSecret: secret(),
+          }),
+          "invalid_challenge"
+        );
+        yield* rejected(
+          accounts.getChallengeStatus({
+            ...statusInput,
+            challengeId: randomUUID(),
+          }),
+          "invalid_challenge"
+        );
         yield* rejected(
           accounts.consumeChallenge({
             challengeId: challenge.challengeId,
@@ -109,6 +130,12 @@ test("channel identities, browser binding, races and revocation against migrated
           }),
           "invalid_challenge"
         );
+        assert.deepEqual(yield* accounts.getChallengeStatus(statusInput), {
+          status: "confirmed",
+        });
+        assert.deepEqual(yield* accounts.getChallengeStatus(statusInput), {
+          status: "confirmed",
+        });
         const consumes = yield* Effect.all(
           Array.from({ length: 8 }, () =>
             accounts
@@ -130,6 +157,9 @@ test("channel identities, browser binding, races and revocation against migrated
           { concurrency: "unbounded" }
         );
         assert.equal(consumes.filter(Boolean).length, 1);
+        assert.deepEqual(yield* accounts.getChallengeStatus(statusInput), {
+          status: "consumed",
+        });
         assert.equal(
           consumes.find(Boolean)?.principalId,
           `better-auth:${first.userId}`
@@ -233,6 +263,13 @@ test("channel identities, browser binding, races and revocation against migrated
           }),
           "invalid_challenge"
         );
+        assert.deepEqual(
+          yield* accounts.getChallengeStatus({
+            challengeId: expiredConsumption.challengeId,
+            browserSecret,
+          }),
+          { status: "expired" }
+        );
         const pending = yield* accounts.issueChallenge({
           channel: "telegram",
           installationId,
@@ -257,6 +294,13 @@ test("channel identities, browser binding, races and revocation against migrated
             browserSecret,
           }),
           "invalid_challenge"
+        );
+        assert.deepEqual(
+          yield* accounts.getChallengeStatus({
+            challengeId: pending.challengeId,
+            browserSecret,
+          }),
+          { status: "expired" }
         );
         const sessions =
           yield* sql`SELECT id FROM public.session WHERE "userId" = ${first.userId}`;
