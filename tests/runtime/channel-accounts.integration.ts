@@ -308,12 +308,131 @@ test("channel identities, browser binding, races and revocation against migrated
           }),
           "session_invalid"
         );
+        yield* rejected(
+          accounts.getActiveIdentity(linkedSender),
+          "identity_inactive"
+        );
         const linked = yield* accounts.consumeChallenge({
           challengeId: linking.challengeId,
           browserSecret,
           currentSessionId: sessionId,
         });
         assert.equal(linked.userId, first.userId);
+        const staleSender = { ...sender, senderId: "stale-link-proof" };
+        const staleLink = yield* accounts.issueChallenge({
+          channel: "telegram",
+          installationId,
+          browserSecret,
+          link,
+        });
+        yield* accounts.confirmChallenge({
+          token: staleLink.token,
+          sender: staleSender,
+        });
+        yield* rejected(
+          accounts.getActiveIdentity(staleSender),
+          "identity_inactive"
+        );
+        yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp() - interval '11 minutes' WHERE id = ${sessionId}`;
+        yield* rejected(
+          accounts.consumeChallenge({
+            challengeId: staleLink.challengeId,
+            browserSecret,
+            currentSessionId: sessionId,
+          }),
+          "session_invalid"
+        );
+        yield* rejected(
+          accounts.getActiveIdentity(staleSender),
+          "identity_inactive"
+        );
+        yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp() WHERE id = ${sessionId}`;
+        yield* sql`UPDATE public.channel_auth_challenge SET created_at = clock_timestamp() - interval '6 minutes', expires_at = clock_timestamp() - interval '1 second' WHERE id = ${staleLink.challengeId}`;
+        yield* rejected(
+          accounts.consumeChallenge({
+            challengeId: staleLink.challengeId,
+            browserSecret,
+            currentSessionId: sessionId,
+          }),
+          "invalid_challenge"
+        );
+        yield* rejected(
+          accounts.getActiveIdentity(staleSender),
+          "identity_inactive"
+        );
+        const newLoginSender = {
+          ...sender,
+          senderId: "new-login-at-consumption",
+        };
+        const newLogin = yield* accounts.issueChallenge({
+          channel: "telegram",
+          installationId,
+          browserSecret,
+        });
+        yield* accounts.confirmChallenge({
+          token: newLogin.token,
+          sender: newLoginSender,
+        });
+        yield* rejected(
+          accounts.getActiveIdentity(newLoginSender),
+          "identity_inactive"
+        );
+        const activatedLogin = yield* accounts.consumeChallenge({
+          challengeId: newLogin.challengeId,
+          browserSecret,
+        });
+        userIds.add(activatedLogin.userId);
+        assert.equal(
+          (yield* accounts.getActiveIdentity(newLoginSender)).userId,
+          activatedLogin.userId
+        );
+        const abandonedSender = {
+          ...sender,
+          senderId: "abandoned-login-proof",
+        };
+        const abandoned = yield* accounts.issueChallenge({
+          channel: "telegram",
+          installationId,
+          browserSecret,
+        });
+        const beforeProofUsers = yield* sql<{
+          count: number;
+        }>`SELECT count(*)::int AS count FROM public."user"`;
+        yield* accounts.confirmChallenge({
+          token: abandoned.token,
+          sender: abandonedSender,
+        });
+        yield* rejected(
+          accounts.getActiveIdentity(abandonedSender),
+          "identity_inactive"
+        );
+        const afterProofUsers = yield* sql<{
+          count: number;
+        }>`SELECT count(*)::int AS count FROM public."user"`;
+        assert.equal(afterProofUsers[0]?.count, beforeProofUsers[0]?.count);
+        yield* rejected(
+          accounts.consumeChallenge({
+            challengeId: abandoned.challengeId,
+            browserSecret: secret(),
+          }),
+          "invalid_challenge"
+        );
+        yield* rejected(
+          accounts.getActiveIdentity(abandonedSender),
+          "identity_inactive"
+        );
+        yield* sql`UPDATE public.channel_auth_challenge SET created_at = clock_timestamp() - interval '6 minutes', expires_at = clock_timestamp() - interval '1 second' WHERE id = ${abandoned.challengeId}`;
+        yield* rejected(
+          accounts.consumeChallenge({
+            challengeId: abandoned.challengeId,
+            browserSecret,
+          }),
+          "invalid_challenge"
+        );
+        yield* rejected(
+          accounts.getActiveIdentity(abandonedSender),
+          "identity_inactive"
+        );
         const expiring = yield* accounts.issueChallenge({
           channel: "telegram",
           installationId,

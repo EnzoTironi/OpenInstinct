@@ -75,6 +75,7 @@ const ChallengeRow = Schema.Struct({
   targetUserId: Schema.NullOr(Identifier),
   requestingSessionId: Schema.NullOr(Identifier),
   identityId: Schema.NullOr(Uuid),
+  confirmedSenderId: Schema.NullOr(Identifier),
 });
 export const PreviewChallenge = ConfirmChallenge;
 export const ChallengePreview = Schema.Struct({
@@ -267,7 +268,7 @@ export class ChannelAccounts extends Context.Service<
               const rows = yield* sql<
                 typeof ChallengeRow.Type
               >`SELECT id, purpose, channel, installation_id AS "installationId",
-          target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId"
+          target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
           FROM public.channel_auth_challenge WHERE token_hash = ${hash(request.token)}
           AND consumed_at IS NULL AND cancelled_at IS NULL AND confirmed_at IS NULL
           AND expires_at > clock_timestamp() FOR UPDATE`;
@@ -286,12 +287,17 @@ export class ChannelAccounts extends Context.Service<
                   challenge.requestingSessionId
                 );
               }
-              const identity = yield* provision(
-                request.sender,
-                challenge.targetUserId ?? undefined
-              );
-              yield* sql`UPDATE public.channel_auth_challenge SET identity_id = ${identity.id}, confirmed_at = clock_timestamp()
-          WHERE id = ${challenge.id}`;
+              const existing = yield* findIdentity(request.sender);
+              if (existing?.revoked) return yield* fail("identity_inactive");
+              if (
+                existing &&
+                challenge.targetUserId &&
+                existing.userId !== challenge.targetUserId
+              )
+                return yield* fail("account_conflict");
+              yield* sql`UPDATE public.channel_auth_challenge
+                SET confirmed_sender_id = ${request.sender.senderId}, confirmed_at = clock_timestamp()
+                WHERE id = ${challenge.id}`;
               return { challengeId: challenge.id };
             })
           );
@@ -322,12 +328,12 @@ export class ChannelAccounts extends Context.Service<
               const rows = yield* sql<
                 typeof ChallengeRow.Type
               >`SELECT id, purpose, channel, installation_id AS "installationId",
-          target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId"
+          target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
           FROM public.channel_auth_challenge WHERE id = ${request.challengeId}
           AND browser_secret_hash = ${hash(request.browserSecret)} AND confirmed_at IS NOT NULL
           AND consumed_at IS NULL AND cancelled_at IS NULL AND expires_at > clock_timestamp() FOR UPDATE`;
               const challenge = rows[0];
-              if (!challenge?.identityId)
+              if (!challenge?.confirmedSenderId)
                 return yield* fail("invalid_challenge");
               if (challenge.purpose === "link") {
                 if (
@@ -338,27 +344,24 @@ export class ChannelAccounts extends Context.Service<
                   return yield* fail("session_invalid");
                 yield* requireSession(
                   challenge.targetUserId,
-                  challenge.requestingSessionId
+                  challenge.requestingSessionId,
+                  true
                 );
               }
-              const identities = yield* sql<{
-                userId: string;
-              }>`SELECT user_id AS "userId" FROM public.channel_identity
-          WHERE id = ${challenge.identityId} AND revoked_at IS NULL
-          AND channel = ${challenge.channel} AND installation_id = ${challenge.installationId}`;
-              const identity = identities[0];
-              if (!identity) return yield* fail("identity_inactive");
-              if (
-                challenge.targetUserId &&
-                identity.userId !== challenge.targetUserId
-              )
-                return yield* fail("account_conflict");
-              yield* sql`UPDATE public.channel_auth_challenge SET consumed_at = clock_timestamp() WHERE id = ${challenge.id}`;
+              const identity = yield* provision(
+                {
+                  channel: challenge.channel,
+                  installationId: challenge.installationId,
+                  senderId: challenge.confirmedSenderId,
+                },
+                challenge.targetUserId ?? undefined
+              );
+              yield* sql`UPDATE public.channel_auth_challenge SET identity_id = ${identity.id}, consumed_at = clock_timestamp() WHERE id = ${challenge.id}`;
               const principalId = `better-auth:${identity.userId}`;
               const scope = accessScopeForUser(principalId);
               return {
                 userId: identity.userId,
-                identityId: challenge.identityId,
+                identityId: identity.id,
                 principalId,
                 workspaceId: scope.workspaceId,
               };
@@ -384,7 +387,11 @@ export class ChannelAccounts extends Context.Service<
               yield* sql`UPDATE public.channel_auth_challenge SET cancelled_at = clock_timestamp()
           WHERE consumed_at IS NULL AND cancelled_at IS NULL
           AND (identity_id = ${request.identityId} OR target_user_id = ${request.userId}
-            OR requesting_session_id IN (SELECT id FROM public.session WHERE "userId" = ${request.userId}))`;
+            OR requesting_session_id IN (SELECT id FROM public.session WHERE "userId" = ${request.userId})
+            OR EXISTS (SELECT 1 FROM public.channel_identity i WHERE i.id = ${request.identityId}
+              AND i.channel = public.channel_auth_challenge.channel
+              AND i.installation_id = public.channel_auth_challenge.installation_id
+              AND i.sender_id = public.channel_auth_challenge.confirmed_sender_id))`;
               yield* sql`DELETE FROM public.session WHERE "userId" = ${request.userId}`;
               return undefined;
             })
