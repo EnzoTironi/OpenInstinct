@@ -1,68 +1,75 @@
-import { readFile } from "node:fs/promises";
 import { getVercelOidcToken } from "@vercel/oidc";
-import { z } from "zod";
-import { env } from "@shared/environment";
-import { applicationOrigin } from "@shared/environment/origin";
+import { Config, Effect, Option, Schema } from "effect";
+import {
+  ScheduledCallbackRejected,
+  scheduledCallbackBodies,
+  scheduledCallbackHeaders,
+  scheduledCallbackOrigin,
+  type ScheduledCallbackRoute,
+} from "../../../server/internal/scheduled-callback-auth";
 
-const eveDevServerSchema = z.object({
-  appRoot: z.string(),
-  origin: z.url(),
+const postScheduledRequest = Effect.fn("postScheduledRequest")(function* <
+  Route extends ScheduledCallbackRoute,
+>(route: Route, body: (typeof scheduledCallbackBodies)[Route]["Type"]) {
+  const value = yield* route === "/internal/scheduled-run/report"
+    ? Schema.decodeUnknownEffect(
+        scheduledCallbackBodies["/internal/scheduled-run/report"],
+        { onExcessProperty: "error" }
+      )(body)
+    : Schema.decodeUnknownEffect(
+        scheduledCallbackBodies["/internal/scheduled-run/respond"],
+        { onExcessProperty: "error" }
+      )(body);
+  const serialized = JSON.stringify(value);
+  const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
+  let origin: string;
+  let headers: Headers;
+  if (Option.isSome(vercel)) {
+    const hostname = yield* Config.string("VERCEL_URL");
+    origin = new URL(`https://${hostname}`).origin;
+    const token = yield* Effect.tryPromise({
+      try: () => getVercelOidcToken(),
+      catch: () => new ScheduledCallbackRejected({ status: 503 }),
+    });
+    headers = new Headers({
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+      "x-vercel-trusted-oidc-idp-token": token,
+    });
+  } else {
+    origin = yield* scheduledCallbackOrigin;
+    headers = yield* scheduledCallbackHeaders(route, serialized);
+  }
+  return yield* Effect.tryPromise({
+    try: (signal) =>
+      fetch(new URL(route, origin), {
+        body: serialized,
+        headers,
+        method: "POST",
+        redirect: "error",
+        signal,
+      }),
+    catch: () => new ScheduledCallbackRejected({ status: 503 }),
+  }).pipe(Effect.timeout("10 seconds"));
 });
 
-interface ScheduledRunRequestBodies {
-  "/internal/scheduled-run/report": { runId: string };
-  "/internal/scheduled-run/respond": {
-    answer: string;
-    leaseToken: string;
-    runId: string;
-  };
+export function postScheduledRunRoute<Route extends ScheduledCallbackRoute>(
+  route: Route,
+  body: (typeof scheduledCallbackBodies)[Route]["Type"]
+) {
+  return Effect.runPromise(postScheduledRequest(route, body));
 }
 
-export async function postScheduledRunRoute<
-  Route extends keyof ScheduledRunRequestBodies,
->(route: Route, body: ScheduledRunRequestBodies[Route]) {
-  const token = env.VERCEL_ENV ? await getVercelOidcToken() : undefined;
-  const headers = new Headers({ "content-type": "application/json" });
-  if (token) {
-    headers.set("authorization", `Bearer ${token}`);
-    headers.set("x-vercel-trusted-oidc-idp-token", token);
-  }
-  const origin = await scheduledRunOrigin();
-  return fetch(new URL(route, origin), {
-    body: JSON.stringify(body),
-    headers,
-    method: "POST",
-    redirect: "error",
-  });
-}
-
-async function scheduledRunOrigin() {
-  if (env.VERCEL_ENV && env.VERCEL_URL) {
-    return `https://${env.VERCEL_URL}`;
-  }
-  if (env.NODE_ENV === "development") {
-    try {
-      const registry = eveDevServerSchema.parse(
-        JSON.parse(await readFile(".eve/next-dev-server.json", "utf8"))
+export function postScheduledReport(runId: string) {
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const response = yield* postScheduledRequest(
+        "/internal/scheduled-run/report",
+        { runId }
       );
-      if (registry.appRoot === process.cwd()) {
-        return new URL(registry.origin).origin;
-      }
-    } catch {
-      // Standalone development does not create the Next.js server registry.
-    }
-  }
-  return applicationOrigin();
-}
-
-export async function postScheduledReport(runId: string) {
-  const response = await postScheduledRunRoute(
-    "/internal/scheduled-run/report",
-    { runId }
+      if (!response.ok)
+        return yield* new ScheduledCallbackRejected({ status: 503 });
+      return undefined;
+    })
   );
-  if (!response.ok) {
-    throw new Error(
-      `Scheduled report callback failed (${String(response.status)}).`
-    );
-  }
 }

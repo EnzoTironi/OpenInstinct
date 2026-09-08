@@ -1,7 +1,14 @@
 import { defineChannel, POST } from "eve/channels";
-import { localDev, routeAuth, vercelOidc } from "eve/channels/auth";
+import { routeAuth, vercelOidc } from "eve/channels/auth";
 import { parseInputResponses, resolveTextToResponses } from "eve/client";
-import { z } from "zod";
+import { Config, Effect, Option, Result, Schema } from "effect";
+import {
+  ScheduledCallbackRejected,
+  readScheduledCallbackBody,
+  readVerifiedScheduledCallback,
+  scheduledCallbackBodies,
+  type ScheduledCallbackRoute,
+} from "../../server/internal/scheduled-callback-auth";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
 import {
   claimScheduledAgentRunInput,
@@ -9,21 +16,37 @@ import {
   restoreScheduledAgentRunInput,
 } from "@db/services/scheduled-agent-jobs";
 
-const scheduledRunTargetSchema = z.strictObject({
-  restart: z.boolean().optional(),
-  runId: z.uuid(),
+const scheduledRunTargetSchema = Schema.Struct({
+  restart: Schema.optionalKey(Schema.Boolean),
+  runId: Schema.String.check(Schema.isUUID()),
 });
-const reportSchema = z.strictObject({ runId: z.uuid() });
-const respondSchema = z.strictObject({
-  answer: z.string().trim().min(1).max(8_000),
-  leaseToken: z.uuid(),
-  runId: z.uuid(),
-});
-const internalRouteAuth = [vercelOidc(), localDev()];
+
+const authenticatedBody = Effect.fn("authenticatedScheduledCallbackBody")(
+  function* (request: Request, route: ScheduledCallbackRoute) {
+    const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
+    if (Option.isSome(vercel)) {
+      const auth = yield* Effect.tryPromise({
+        try: () => routeAuth(request, [vercelOidc()]),
+        catch: () => new ScheduledCallbackRejected({ status: 401 }),
+      });
+      if (auth instanceof Response)
+        return yield* new ScheduledCallbackRejected({ status: 401 });
+      return yield* readScheduledCallbackBody(request);
+    }
+    return yield* readVerifiedScheduledCallback(request, route);
+  },
+  Effect.catchTag("ConfigError", () =>
+    Effect.fail(new ScheduledCallbackRejected({ status: 503 }))
+  )
+);
 
 export default defineChannel({
   async receive(input, { from }) {
-    const target = scheduledRunTargetSchema.parse(input.target);
+    const target = await Effect.runPromise(
+      Schema.decodeUnknownEffect(scheduledRunTargetSchema, {
+        onExcessProperty: "error",
+      })(input.target)
+    );
     const source = from(`scheduled-run:${target.runId}`);
     if (target.restart) {
       await source.reset({
@@ -39,23 +62,67 @@ export default defineChannel({
     POST(
       "/internal/scheduled-run/report",
       async (request, { attachSession, to, waitUntil }) => {
-        const auth = await routeAuth(request, internalRouteAuth);
-        if (auth instanceof Response) return auth;
-        const parsed = reportSchema.safeParse(await request.json());
-        if (parsed.success) {
-          waitUntil(
-            dispatchScheduledReport({ attachSession, to }, parsed.data.runId)
-          );
-        }
-        return new Response(null, { status: 202 });
+        return Effect.runPromise(
+          Effect.gen(function* () {
+            const raw = yield* authenticatedBody(
+              request,
+              "/internal/scheduled-run/report"
+            );
+            const input = yield* Schema.decodeUnknownEffect(
+              Schema.fromJsonString(
+                scheduledCallbackBodies["/internal/scheduled-run/report"]
+              ),
+              { onExcessProperty: "error" }
+            )(raw.toString("utf8")).pipe(
+              Effect.mapError(
+                () => new ScheduledCallbackRejected({ status: 400 })
+              )
+            );
+            waitUntil(
+              dispatchScheduledReport({ attachSession, to }, input.runId)
+            );
+            return new Response(null, { status: 202 });
+          }).pipe(
+            Effect.catchTag("ScheduledCallbackRejected", (error) =>
+              Effect.succeed(
+                new Response("Scheduled callback rejected", {
+                  status: error.status,
+                })
+              )
+            )
+          ),
+          { signal: request.signal }
+        );
       }
     ),
     POST(
       "/internal/scheduled-run/respond",
       async (request, { attachSession }) => {
-        const auth = await routeAuth(request, internalRouteAuth);
-        if (auth instanceof Response) return auth;
-        const input = respondSchema.parse(await request.json());
+        const decoded = await Effect.runPromise(
+          Effect.gen(function* () {
+            const raw = yield* authenticatedBody(
+              request,
+              "/internal/scheduled-run/respond"
+            );
+            return yield* Schema.decodeUnknownEffect(
+              Schema.fromJsonString(
+                scheduledCallbackBodies["/internal/scheduled-run/respond"]
+              ),
+              { onExcessProperty: "error" }
+            )(raw.toString("utf8")).pipe(
+              Effect.mapError(
+                () => new ScheduledCallbackRejected({ status: 400 })
+              )
+            );
+          }).pipe(Effect.result),
+          { signal: request.signal }
+        );
+        if (Result.isFailure(decoded)) {
+          return new Response("Scheduled callback rejected", {
+            status: decoded.failure.status,
+          });
+        }
+        const input = decoded.success;
         const claimed = await claimScheduledAgentRunInput(
           input.runId,
           input.leaseToken
