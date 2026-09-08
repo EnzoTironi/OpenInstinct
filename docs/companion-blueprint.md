@@ -564,8 +564,10 @@ all acceptance gates of their packages.
 The [runtime evidence](local-runtime-setup.md) separates unit regression, actual
 PostgreSQL/HTTP checks and external-provider qualification. Native authenticated
 Spark turns now save and recall a PostgreSQL preference across a full service
-restart using the existing Codex login. Both runs repeated the response tool call;
-the single-response oracle remains failed. Real channel delivery is unqualified.
+restart using the existing Codex login. Initial duplicate responses were corrected
+through the delivery receipt and completion instructions. The repeated save and
+restart-recall scenario passed its single-response oracle. Real channel delivery
+and the remaining P01 gates are unqualified.
 
 P01/P04 also have an explicit native handoff gap: a crash after Eve acceptance but
 before application receipt persistence leaves the inbox uncertain. Eve 0.49.0 and

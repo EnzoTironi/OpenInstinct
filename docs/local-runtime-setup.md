@@ -91,8 +91,11 @@ identity revocation, workflow stream persistence, memory CAS, reconnects, and
 cancellation of a write blocked by an actual database lock. Native failure and
 cancellation handlers persist one fixed, sanitized notice per turn, including
 concurrent replay and revoked-identity rejection. The inherited unit
-suite separately passed 759 tests before the subsequent focused schema regression
-was added; inherited mocks remain regression evidence only.
+suite separately passed 772 tests across 85 files; inherited mocks remain
+regression evidence only. One preceding run timed out because pure model
+configuration unnecessarily initialized all database services. Running that
+configuration Effect without the database runtime corrected the dependency;
+the original lease-validation tests were unchanged.
 
 The composed production HTTP path accepted verified synthetic Telegram messages
 and assigned a burst to the same native session in order. It rejected unsigned
@@ -111,7 +114,9 @@ the correction and success after it.
 Local model selection now supports `COMPANION_MODEL_PROVIDER=codex-local` through
 Eve's public `chatgpt` provider and the existing Codex login. It selects exactly
 `gpt-5.3-codex-spark`, low reasoning, an explicit 128,000-token context window and
-no reasoning summary. The summary option otherwise fails at the provider; the
+no reasoning summary. The context setting follows the
+[documented Spark window](https://openai.com/index/introducing-gpt-5-3-codex-spark/).
+The summary option otherwise fails at the provider; the
 missing context metadata otherwise fails Eve model selection. Neither failure
 falls back to a different model. `gateway` remains the default. The optional
 `openrouter-free` profile uses a fixed free model and zero-price provider routing;
@@ -120,9 +125,15 @@ its live inference remains unqualified.
 A real Better Auth session created through a browser challenge and signed
 synthetic confirmation completed a native Spark turn that saved a preference in
 PostgreSQL. After restarting the application and Eve, a new session recalled the
-exact preference without receiving it in its prompt. However, the model repeated
-the response tool call in both runs: the single-response oracle failed. These
-artifacts establish persistence and recall, not successful conversational UX.
+exact preference without receiving it in its prompt. Initial runs repeated the
+response tool call and failed the single-response oracle. The receipt and shared
+instructions now explicitly prohibit repeating the same content through another
+tool call and require ending a fulfilled turn. Independent review preserved
+channel-specific delivery status and legitimate progress followed by a result.
+The corrected save and full-restart recall runs each completed with exactly one
+response tool result; the save also performed exactly one memory write. Failure
+artifacts remain retained. This finite scenario is not a general guarantee of
+model behavior or a real messaging-provider delivery test.
 
 Interrupted model-step replay, native approvals, stop/correction UX, voice/files,
 scheduled execution and real channel delivery remain unqualified. Existing
