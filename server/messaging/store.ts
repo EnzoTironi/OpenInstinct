@@ -28,7 +28,7 @@ const queues = {
     table: "channel_outbox",
     key: "delivery_key",
     hash: "intent_hash",
-    order: "created_at",
+    order: "sequence",
     result: "provider_message_id",
     completedAt: "sent_at",
     completed: "sent",

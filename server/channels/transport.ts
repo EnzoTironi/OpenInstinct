@@ -266,18 +266,24 @@ const makeTransport = Effect.gen(function* () {
       });
       return yield* sql.withTransaction(
         Effect.gen(function* () {
-          // Reserve the complete :0..:4 key group under the same identity lock as Messaging.
-          // A replay that adds or removes whole chunks is still a changed intent.
+          // Reserve the numeric suffix namespace under Messaging's identity lock.
+          // At most five chunks are valid; a sixth existing key already proves conflict.
           yield* sql`SELECT id FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
-          const keys = Array.from(
-            { length: 5 },
-            (_, index) => `${value.deliveryKey}:${String(index)}`
-          );
+          const prefix = `${value.deliveryKey}:`;
+          const keys = payloads.map((_, index) => `${prefix}${String(index)}`);
           const existing = yield* sql<{
             id: string;
-          }>`SELECT id FROM channel_outbox
-          WHERE identity_id = ${value.identityId} AND ${sql.in("delivery_key", keys)}`;
-          if (existing[0] && existing.length !== payloads.length)
+            key: string;
+          }>`SELECT id, delivery_key AS key FROM channel_outbox
+          WHERE identity_id = ${value.identityId}
+            AND left(delivery_key, char_length(${prefix})) = ${prefix}
+            AND substring(delivery_key FROM char_length(${prefix}) + 1) ~ '^[0-9]+$'
+          LIMIT 6`;
+          if (
+            existing[0] &&
+            (existing.length !== keys.length ||
+              existing.some((row) => !keys.includes(row.key)))
+          )
             return yield* new PayloadConflict({ id: existing[0].id });
           return yield* Effect.forEach(payloads, (payload, index) =>
             messaging.enqueue({

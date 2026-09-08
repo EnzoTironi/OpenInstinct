@@ -366,3 +366,89 @@ test.each([
     })
   )
 );
+
+test("claims atomic text chunks in enqueue order despite tied timestamps and reversed UUID order", () =>
+  run((transport, messaging, sql, identities) =>
+    Effect.gen(function* () {
+      const identityId = identities[0];
+      if (!identityId) throw new Error("Missing fixture");
+      const chunks = ["a", "b", "c", "d"].map((letter) => letter.repeat(4000));
+      const receipts = yield* transport.enqueueText({
+        identityId,
+        deliveryKey: "ordered",
+        text: chunks.join(""),
+      });
+      expect(receipts).toHaveLength(4);
+      const timestamps = yield* sql<{
+        count: number;
+      }>`SELECT count(DISTINCT created_at)::int AS count
+        FROM channel_outbox WHERE identity_id = ${identityId}`;
+      expect(timestamps[0]?.count).toBe(1);
+      // Make the old UUID tie-breaker deterministically wrong using real stored fixtures.
+      const prefix = randomUUID().slice(0, 24);
+      yield* Effect.forEach(
+        receipts,
+        (receipt, index) =>
+          sql`UPDATE channel_outbox SET id = ${`${prefix}${String(4 - index).padStart(12, "0")}`}
+          WHERE id = ${receipt.id}`
+      );
+      const delivered: string[] = [];
+      yield* Effect.forEach(chunks, (text, index) =>
+        Effect.gen(function* () {
+          const claim = yield* messaging.claimOutbox({
+            identityId,
+            leaseSeconds: 30,
+          });
+          if (!claim) throw new Error("Missing ordered claim");
+          expect(claim.key).toBe(`ordered:${String(index)}`);
+          expect(claim.payload.text).toBe(text);
+          delivered.push(text);
+          // This receipt exercises queue settlement only; it is not provider evidence.
+          const settled = yield* messaging.markSent({
+            lease: { identityId, id: claim.id, leaseToken: claim.leaseToken },
+            receipt: {
+              status: "sent",
+              providerMessageId: `storage-order-fixture-${String(index)}`,
+            },
+          });
+          expect(settled.status).toBe("sent");
+        })
+      );
+      expect(delivered.join("")).toBe(chunks.join(""));
+      expect(
+        yield* messaging.claimOutbox({ identityId, leaseSeconds: 30 })
+      ).toBeNull();
+    })
+  ));
+
+test("rejects a stored chunk key hole even when its count matches the requested chunks", () =>
+  run((transport, messaging, sql, identities) =>
+    Effect.gen(function* () {
+      const identityId = identities[0];
+      if (!identityId) throw new Error("Missing fixture");
+      yield* messaging.enqueue({
+        identityId,
+        deliveryKey: "hole:0",
+        payload: { text: "a".repeat(4000) },
+      });
+      yield* messaging.enqueue({
+        identityId,
+        deliveryKey: "hole:2",
+        payload: { text: "unexpected extra chunk" },
+      });
+      expect(
+        yield* transport
+          .enqueueText({
+            identityId,
+            deliveryKey: "hole",
+            text: "a".repeat(4001),
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(PayloadConflict);
+      const rows = yield* sql<{
+        key: string;
+      }>`SELECT delivery_key AS key FROM channel_outbox
+        WHERE identity_id = ${identityId} ORDER BY delivery_key`;
+      expect(rows.map((row) => row.key)).toEqual(["hole:0", "hole:2"]);
+    })
+  ));
