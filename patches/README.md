@@ -21,6 +21,11 @@ Eve patch (not a second queue engine).
   3. P06 unstructured-forget mid-turn recall refresh: after `save_memory` /
      `remove_memory`, enqueue `PendingMemoryToolRefresh` and apply it in the tool
      loop before the next model step (`requireRefresh` fail-closed).
+  4. Compiler alignment restored from Companion 0.49: `request-input` tools
+     (e.g. `ask_question`) mark `runtimeEntry` so resolve-tool can load authored
+     schemas after SIGKILL/cold start. Upstream 0.52 only required runtimeEntry
+     when `hasExecute`.
+
 - `@workflow/world@5.0.0-beta.32` — workflow recovery / acceptance cohort.
 - `@workflow/world-postgres@5.0.0-beta.39` — PGWorld renewable worker leases,
   generation fencing, and owner-aware Graphile completion (SIGKILL reclaim).
