@@ -83,10 +83,23 @@ jobs:
       - name: Generate ephemeral installation keys
         run: |
           node --input-type=module <<'JS'
-          import { randomBytes } from 'node:crypto';
+          import { randomBytes, randomUUID } from 'node:crypto';
           import { appendFileSync } from 'node:fs';
-          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${randomBytes(32).toString('hex')}\nSECRET_ENCRYPTION_KEY=${randomBytes(32).toString('base64')}\n`);
+          appendFileSync(
+            process.env.GITHUB_ENV,
+            [
+              `BETTER_AUTH_SECRET=${randomBytes(32).toString('hex')}`,
+              `SECRET_ENCRYPTION_KEY=${randomBytes(32).toString('base64')}`,
+              // Runtime proofs that exercise channel identity need a stable
+              // installation id for the job; product Telegram credentials are unused.
+              `TELEGRAM_BOT_ID=ci-runtime-${randomUUID()}`,
+              `TELEGRAM_BOT_USERNAME=ci_runtime_bot`,
+              '',
+            ].join('\n'),
+          );
           JS
+      - name: Install ffprobe for native audio preflight
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Migrate application and workflow databases
         run: |
           pnpm db:migrate
