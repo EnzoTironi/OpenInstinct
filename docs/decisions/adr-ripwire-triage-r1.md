@@ -18,16 +18,16 @@ and thresholds are not suppressed.
 
 This ADR consolidates those notes with a fresh read on `f2dadf9` using:
 
-| Lens | Command / source | Result snapshot |
-| ---- | ---------------- | --------------- |
-| Dependency health | `ripwire . --deps` | `nccd=0.75`, `acd=6.2`, `shape=horizontal`, `dep_files=573` |
-| Godfiles | `--deps` `<godfiles>` | Top afferent: `server/runtime.ts` 41, `server/accounts/index.ts` 33, `shared/identity/access-scope.ts` 30 |
-| Stable-deps instability | `--deps` `<stabledeps>` | 12 high-gap edges (listing capped in the run) |
-| Declared oxlint layers | `tools/oxlint/architecture` + mirrored `--arch` rules | **0** violations (agent/app/db/shared/web only) |
-| Proposed agent→server boundary | aspirational `--arch` deny `agent -> server` | **85** new edges; exit 2; **no** `.ripwire_arch_baseline` written |
-| Quality panel | `ripwire . --quality-panel=default` | `eligible=1352`, `ranked=36`, `deep_untested=3` |
-| Knip | `knip.config.ts` | Intentional ignores for AI Elements / shadcn surfaces |
-| Prior documented deltas | `docs/local-runtime-setup.md` | Churn / verbosity / migration-journal findings remain recorded; gate not green |
+| Lens                           | Command / source                                      | Result snapshot                                                                                           |
+| ------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Dependency health              | `ripwire . --deps`                                    | `nccd=0.75`, `acd=6.2`, `shape=horizontal`, `dep_files=573`                                               |
+| Godfiles                       | `--deps` `<godfiles>`                                 | Top afferent: `server/runtime.ts` 41, `server/accounts/index.ts` 33, `shared/identity/access-scope.ts` 30 |
+| Stable-deps instability        | `--deps` `<stabledeps>`                               | 12 high-gap edges (listing capped in the run)                                                             |
+| Declared oxlint layers         | `tools/oxlint/architecture` + mirrored `--arch` rules | **0** violations (agent/app/db/shared/web only)                                                           |
+| Proposed agent→server boundary | aspirational `--arch` deny `agent -> server`          | **85** new edges; exit 2; **no** `.ripwire_arch_baseline` written                                         |
+| Quality panel                  | `ripwire . --quality-panel=default`                   | `eligible=1352`, `ranked=36`, `deep_untested=3`                                                           |
+| Knip                           | `knip.config.ts`                                      | Intentional ignores for AI Elements / shadcn surfaces                                                     |
+| Prior documented deltas        | `docs/local-runtime-setup.md`                         | Churn / verbosity / migration-journal findings remain recorded; gate not green                            |
 
 `server/` is **not** a production layer in
 `local-architecture/no-forbidden-layer-imports`. Oxlint therefore cannot see
@@ -53,22 +53,22 @@ baseline-suppress an aspirational `--arch` deny.
 Severity: **H** = change amplification / wrong-layer risk; **M** = hotspot or
 policy gap; **L** = recorded noise / intentional ignore; **OK** = healthy signal.
 
-| ID | Severity | Finding | Evidence | Action for R1 | Later fix posture |
-| -- | -------- | ------- | -------- | ------------- | ----------------- |
-| RW-01 | H | Coupling density high (`nccd=0.75`; healthy guide `<0.25`) | `--deps` health | **Defer** | Reduce hubs / formalize `server` boundaries; trend `nccd` over releases |
-| RW-02 | H | God hub `server/runtime.ts` (afferent **41**) | `--deps` godfiles; 22 of 85 aspirational agent→server edges target it | **Defer** | Split Effect runtime Layers / narrow public surface before new features pile on |
-| RW-03 | M | God hubs `server/accounts/index.ts` (33), `shared/identity/access-scope.ts` (30), `server/channels/principal.ts` (20), `server/channels/transport.ts` (17) | `--deps` godfiles | **Defer** | Extract read-only contracts into `shared` where ownership allows |
-| RW-04 | H | Agent→server coupling (**85** edges / **28** agent files); oxlint omits `server` layer | aspirational `--arch`; oxlint `productionLayers` | **Defer** (do **not** baseline) | Decide whether `server` becomes a sixth oxlint layer + deny list; fix edges or explicit `allow` with rationale |
-| RW-05 | M | Agent→`@db` direct imports (**28** agent files) while Effect slices own persistence in `server`/`db` | ripgrep on `agent/` | **Defer** | Prefer agent→server/shared contracts; avoid new agent→db edges in R1 feature PRs when a server API exists |
-| RW-06 | M | Stable-dependency instability (**12** listed high-gap edges), e.g. artifacts barrel→access, messaging barrel→store/input-response, runtime→browser-worker/device/transport | `--deps` stabledeps | **Defer** | Tighten barrels; invert unstable edges when touching those modules |
-| RW-07 | L | Prior Ripwire quality deltas (short-horizon churn, CI/Turbo verbosity, migration metadata, queue-factory growth, init-retry duplication) recorded with gate not green | `docs/local-runtime-setup.md` | **Accept recorded / defer** | Fix only when editing those files; never suppress to greenwash |
-| RW-08 | L | Lockfile / generated snapshot verbosity called out in foundation notes | `docs/companion-assessment.md` | **Accept recorded / defer** | Generated growth is metadata, not app complexity; keep lockfile intact |
-| RW-09 | L | Knip `ignoreIssues` for `web/components/ai-elements/**` and `web/components/ui/**` | `knip.config.ts` | **Accept** (intentional registry surface) | Revisit if chat stops using the registry pattern |
-| RW-10 | M | Quality-panel multi-family hotspots (`ranked=36`) including schedules, browser tools, chat UI, evals; `deep_untested=3` | `--quality-panel=default` | **Defer** | Prefer `--quality-delta` on the owning PR over a repo-wide cleanup |
-| RW-11 | M | Native-cohort structural delta vs `4b9e378`: six blocking findings (queue factory growth/churn, integration-helper churn, migration-journal growth) + 51 generated new-symbol rows | `docs/local-runtime-setup.md` | **Defer** | No suppression ledger; address when queue/migration owners change again |
-| RW-12 | OK | No resolved dependency cycles | `--deps` / companion assessment | **Keep** | Re-check after large graph moves |
-| RW-13 | OK | Oxlint `local-architecture/no-forbidden-layer-imports` green for declared layers | mirrored `--arch` → 0 violations | **Keep enforced** | Do not weaken deny map |
-| RW-14 | L | Strict quality-panel cut unreachable for TS (confusion/state families C/C++-only) | `--quality-panel=strict` `unavailable=confusion,state` | **Accept tool limit** | Use `default`/`lenient` for orientation; `--quality-delta` for PR gates |
+| ID    | Severity | Finding                                                                                                                                                                            | Evidence                                                              | Action for R1                             | Later fix posture                                                                                              |
+| ----- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| RW-01 | H        | Coupling density high (`nccd=0.75`; healthy guide `<0.25`)                                                                                                                         | `--deps` health                                                       | **Defer**                                 | Reduce hubs / formalize `server` boundaries; trend `nccd` over releases                                        |
+| RW-02 | H        | God hub `server/runtime.ts` (afferent **41**)                                                                                                                                      | `--deps` godfiles; 22 of 85 aspirational agent→server edges target it | **Defer**                                 | Split Effect runtime Layers / narrow public surface before new features pile on                                |
+| RW-03 | M        | God hubs `server/accounts/index.ts` (33), `shared/identity/access-scope.ts` (30), `server/channels/principal.ts` (20), `server/channels/transport.ts` (17)                         | `--deps` godfiles                                                     | **Defer**                                 | Extract read-only contracts into `shared` where ownership allows                                               |
+| RW-04 | H        | Agent→server coupling (**85** edges / **28** agent files); oxlint omits `server` layer                                                                                             | aspirational `--arch`; oxlint `productionLayers`                      | **Defer** (do **not** baseline)           | Decide whether `server` becomes a sixth oxlint layer + deny list; fix edges or explicit `allow` with rationale |
+| RW-05 | M        | Agent→`@db` direct imports (**28** agent files) while Effect slices own persistence in `server`/`db`                                                                               | ripgrep on `agent/`                                                   | **Defer**                                 | Prefer agent→server/shared contracts; avoid new agent→db edges in R1 feature PRs when a server API exists      |
+| RW-06 | M        | Stable-dependency instability (**12** listed high-gap edges), e.g. artifacts barrel→access, messaging barrel→store/input-response, runtime→browser-worker/device/transport         | `--deps` stabledeps                                                   | **Defer**                                 | Tighten barrels; invert unstable edges when touching those modules                                             |
+| RW-07 | L        | Prior Ripwire quality deltas (short-horizon churn, CI/Turbo verbosity, migration metadata, queue-factory growth, init-retry duplication) recorded with gate not green              | `docs/local-runtime-setup.md`                                         | **Accept recorded / defer**               | Fix only when editing those files; never suppress to greenwash                                                 |
+| RW-08 | L        | Lockfile / generated snapshot verbosity called out in foundation notes                                                                                                             | `docs/companion-assessment.md`                                        | **Accept recorded / defer**               | Generated growth is metadata, not app complexity; keep lockfile intact                                         |
+| RW-09 | L        | Knip `ignoreIssues` for `web/components/ai-elements/**` and `web/components/ui/**`                                                                                                 | `knip.config.ts`                                                      | **Accept** (intentional registry surface) | Revisit if chat stops using the registry pattern                                                               |
+| RW-10 | M        | Quality-panel multi-family hotspots (`ranked=36`) including schedules, browser tools, chat UI, evals; `deep_untested=3`                                                            | `--quality-panel=default`                                             | **Defer**                                 | Prefer `--quality-delta` on the owning PR over a repo-wide cleanup                                             |
+| RW-11 | M        | Native-cohort structural delta vs `4b9e378`: six blocking findings (queue factory growth/churn, integration-helper churn, migration-journal growth) + 51 generated new-symbol rows | `docs/local-runtime-setup.md`                                         | **Defer**                                 | No suppression ledger; address when queue/migration owners change again                                        |
+| RW-12 | OK       | No resolved dependency cycles                                                                                                                                                      | `--deps` / companion assessment                                       | **Keep**                                  | Re-check after large graph moves                                                                               |
+| RW-13 | OK       | Oxlint `local-architecture/no-forbidden-layer-imports` green for declared layers                                                                                                   | mirrored `--arch` → 0 violations                                      | **Keep enforced**                         | Do not weaken deny map                                                                                         |
+| RW-14 | L        | Strict quality-panel cut unreachable for TS (confusion/state families C/C++-only)                                                                                                  | `--quality-panel=strict` `unavailable=confusion,state`                | **Accept tool limit**                     | Use `default`/`lenient` for orientation; `--quality-delta` for PR gates                                        |
 
 **Count:** **14** ledger items (11 actionable/deferred debt or policy rows + 3 OK/tool-limit rows).
 
@@ -93,7 +93,7 @@ policy gap; **L** = recorded noise / intentional ignore; **OK** = healthy signal
 
 ## Consequences
 
-- R1 workers continue feature work; they should avoid *new* unjustified agent→server
+- R1 workers continue feature work; they should avoid _new_ unjustified agent→server
   or hub growth when a thinner boundary already exists, but are not blocked by this
   ledger.
 - Any PR that adds a Ripwire/Knip/oxlint baseline or ignore must cite a ledger ID and
