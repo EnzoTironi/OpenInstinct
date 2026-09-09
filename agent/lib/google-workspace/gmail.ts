@@ -101,33 +101,51 @@ export async function updateGmail(
   return { action, updatedCount: ids.length };
 }
 
-/** Stable RFC822 Message-ID for one Eve tool call (session + callId). */
-export function gmailSendMessageId(ctx: {
+/**
+ * Stable send idempotency key for one Eve tool call (session + callId).
+ * Live Gmail `users.messages.send` rewrites RFC822 Message-ID, so reconciliation
+ * uses this searchable custom header value instead of rfc822msgid.
+ */
+export function gmailSendIdempotencyKey(ctx: {
   callId: string;
   session: { id: string };
 }) {
   const stableId = createHash("sha256")
     .update(`${ctx.session.id}:${ctx.callId}`)
     .digest("hex")
-    .slice(0, 48);
-  return `<openinstinct-${stableId}@local>`;
+    .slice(0, 40);
+  return `openinstinct-send-${stableId}`;
 }
 
-/** Gmail search operator for the exact Message-ID (no angle brackets). */
+/** Quoted Gmail search for the exact idempotency key token. */
+export function gmailSendIdempotencyQuery(key: string) {
+  return `"${key}"`;
+}
+
+/** Correlation Message-ID (Gmail rewrites on send; not used for reconcile). */
+export function gmailSendMessageId(ctx: {
+  callId: string;
+  session: { id: string };
+}) {
+  return `<${gmailSendIdempotencyKey(ctx)}@local>`;
+}
+
+/** rfc822msgid query helper (insufficient alone on live Gmail send). */
 export function gmailSendMessageIdQuery(messageId: string) {
   const bare = messageId.replace(/^<|>$/gu, "");
   return `rfc822msgid:${bare}`;
 }
 
 /**
- * Send with outbox-style Message-ID idempotency: look up the stable Message-ID
- * before send and after uncertain provider failures. Gmail does not reject
- * duplicate Message-IDs on send, so provider lookup is the reconciliation path.
+ * Send with outbox-style idempotency. Live Gmail replaces client Message-ID on
+ * send, so we stamp `X-OpenInstinct-Idempotency-Key` (preserved + indexed) and
+ * reconcile via quoted key search before send and after uncertain failures.
  */
 export async function sendGmail(
   ctx: ToolContext,
   payload: z.infer<typeof gmailSendSchema>
 ) {
+  const idempotencyKey = gmailSendIdempotencyKey(ctx);
   const messageId = gmailSendMessageId(ctx);
   const headers = [
     `To: ${payload.to.map(safeHeader).join(", ")}`,
@@ -139,6 +157,7 @@ export async function sendGmail(
       : []),
     `Subject: ${safeHeader(payload.subject)}`,
     `Message-ID: ${messageId}`,
+    `X-OpenInstinct-Idempotency-Key: ${idempotencyKey}`,
     ...(payload.inReplyTo
       ? [
           `In-Reply-To: ${safeHeader(payload.inReplyTo)}`,
@@ -154,9 +173,9 @@ export async function sendGmail(
     "utf8"
   ).toString("base64url");
   return withGmail(ctx, async (client) => {
-    const existing = await findSentGmailByMessageId(
+    const existing = await findSentGmailByIdempotencyKey(
       client,
-      messageId,
+      idempotencyKey,
       ctx.abortSignal
     );
     if (existing) return existing;
@@ -176,13 +195,13 @@ export async function sendGmail(
     } catch (error) {
       // Uncertain outcomes (timeout / transport / 5xx) must not blind-resend.
       // Client 4xx failures other than rate limits stay fail-closed unless the
-      // Message-ID already landed (provider accepted before the error surfaced).
+      // idempotency key already landed (provider accepted before the error surfaced).
       const status = googleApiErrorStatus(error);
       const uncertain = status === undefined || status >= 500 || status === 429;
       if (!uncertain) throw error;
-      const recovered = await findSentGmailByMessageId(
+      const recovered = await findSentGmailByIdempotencyKey(
         client,
-        messageId,
+        idempotencyKey,
         ctx.abortSignal
       );
       if (recovered) return recovered;
@@ -191,15 +210,15 @@ export async function sendGmail(
   });
 }
 
-async function findSentGmailByMessageId(
+async function findSentGmailByIdempotencyKey(
   client: ReturnType<typeof gmail>,
-  messageId: string,
+  idempotencyKey: string,
   signal: AbortSignal
 ) {
   const listed = await client.users.messages.list(
     {
       maxResults: 1,
-      q: gmailSendMessageIdQuery(messageId),
+      q: gmailSendIdempotencyQuery(idempotencyKey),
       userId: "me",
     },
     { signal }

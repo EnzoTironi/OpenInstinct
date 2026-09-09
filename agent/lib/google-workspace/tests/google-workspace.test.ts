@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import { parseCalendarAvailability } from "@agent/lib/google-workspace/calendar";
 import { googleApiErrorStatus } from "@agent/lib/google-workspace/client";
 import {
+  gmailSendIdempotencyKey,
+  gmailSendIdempotencyQuery,
   gmailSendMessageId,
-  gmailSendMessageIdQuery,
   gmailUpdateLabels,
 } from "@agent/lib/google-workspace/gmail";
 import { calendarCreateEvent } from "@agent/tools/calendar";
@@ -42,27 +43,28 @@ describe("Google Workspace", () => {
     expect(gmailUpdate.approval).toBeUndefined();
   });
 
-  it("derives a stable Gmail Message-ID query for outbox-style reconciliation", () => {
-    const messageId = gmailSendMessageId({
+  it("derives a stable Gmail idempotency key query for outbox-style reconciliation", () => {
+    const key = gmailSendIdempotencyKey({
       callId: "call-1",
       session: { id: "session-1" },
     });
-    expect(messageId).toMatch(/^<openinstinct-[0-9a-f]{48}@local>$/u);
-    expect(gmailSendMessageIdQuery(messageId)).toBe(
-      `rfc822msgid:${messageId.slice(1, -1)}`
-    );
+    expect(key).toMatch(/^openinstinct-send-[0-9a-f]{40}$/u);
+    expect(gmailSendIdempotencyQuery(key)).toBe(`"${key}"`);
     expect(
-      gmailSendMessageId({
+      gmailSendMessageId({ callId: "call-1", session: { id: "session-1" } })
+    ).toBe(`<${key}@local>`);
+    expect(
+      gmailSendIdempotencyKey({
         callId: "call-1",
         session: { id: "session-1" },
       })
-    ).toBe(messageId);
+    ).toBe(key);
     expect(
-      gmailSendMessageId({
+      gmailSendIdempotencyKey({
         callId: "call-2",
         session: { id: "session-1" },
       })
-    ).not.toBe(messageId);
+    ).not.toBe(key);
   });
 
   it.each([
