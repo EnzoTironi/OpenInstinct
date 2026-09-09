@@ -52,8 +52,29 @@ redaction, and live-authority deny paths (revoke/pause/unavailable) against Effe
 Layer fixtures for `BrowserWorkerAccess` and `ResolvedInstallationSecrets`. They do
 **not** claim live Google provider consent. Live Google consent, renewal, revocation,
 concurrent provider races, and end-to-end Eve suspension/resumption require configured
-Google credentials and a real IdP redirect — left unqualified here (Gmail send remains
-a separate worker). Existing SDK mock tests are not provider qualification.
+Google credentials and a real IdP redirect — left unqualified here.
+
+### Gmail send intent (Message-ID / outbox semantics)
+
+`sendGmail` stamps a stable RFC822 `Message-ID` derived from
+`session.id:callId` (`<openinstinct-{sha256.slice(0,48)}@local>`). Because Gmail's
+`users.messages.send` does **not** treat that header as an idempotency key, the
+send path applies outbox-style reconciliation:
+
+1. **Pre-dispatch lookup** via `rfc822msgid:` for the exact Message-ID; if a
+   message already exists, return it and skip send (Eve step replay / identical
+   retry).
+2. **Uncertain-outcome reconcile** after send failures with no status, HTTP 5xx,
+   or 429: look up the Message-ID again before propagating the error. Definite
+   client 4xx failures (except 429) fail closed without claiming success unless
+   the pre-dispatch lookup already found the mail.
+
+Focused Gmail send tests in
+`agent/lib/google-workspace/tests/google-workspace-generated-clients.test.ts`
+are **SDK fixture** mocks (list/get/send). They prove Message-ID stability,
+replay-without-resend, uncertain recovery, and fail-closed 4xx behavior. They
+do **not** claim live Gmail provider delivery, quota, or concurrent-race
+qualification — those require a live Google grant and remain unqualified.
 
 Run the focused real PostgreSQL membership check with the initialized runtime-test
 schema (the check refuses any database except `companion_runtime_test`):
