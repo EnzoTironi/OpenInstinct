@@ -6,12 +6,12 @@ Eve patch (not a second queue engine).
 
 ## Root pin table (fencing cohort)
 
-| Pin | Source of truth | Active artifact |
-| --- | --- | --- |
-| Eve `0.52.2+main.59ec96cc99f65a80` | `package.json` → `eve` URL `https://pkg.eve.dev/59ec96cc99f65a80…/eve.tgz` | `patches/eve@0.52.2+main.59ec96cc99f65a80.patch` (wired as `eve` in `pnpm-workspace.yaml`) |
-| `@workflow/world@5.0.0-beta.32` | lockfile + patchedDependencies | `patches/@workflow__world@5.0.0-beta.32.patch` |
-| `@workflow/world-postgres@5.0.0-beta.39` | `package.json` + patchedDependencies | `patches/@workflow__world-postgres@5.0.0-beta.39.patch` (lease fencing) |
-| `@linqapp/chat-sdk-adapter@0.5.1` | `package.json` + patchedDependencies | `patches/@linqapp__chat-sdk-adapter@0.5.1.patch` |
+| Pin                                      | Source of truth                                                            | Active artifact                                                                            |
+| ---------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Eve `0.52.2+main.59ec96cc99f65a80`       | `package.json` → `eve` URL `https://pkg.eve.dev/59ec96cc99f65a80…/eve.tgz` | `patches/eve@0.52.2+main.59ec96cc99f65a80.patch` (wired as `eve` in `pnpm-workspace.yaml`) |
+| `@workflow/world@5.0.0-beta.32`          | lockfile + patchedDependencies                                             | `patches/@workflow__world@5.0.0-beta.32.patch`                                             |
+| `@workflow/world-postgres@5.0.0-beta.39` | `package.json` + patchedDependencies                                       | `patches/@workflow__world-postgres@5.0.0-beta.39.patch` (lease fencing)                    |
+| `@linqapp/chat-sdk-adapter@0.5.1`        | `package.json` + patchedDependencies                                       | `patches/@linqapp__chat-sdk-adapter@0.5.1.patch`                                           |
 
 Lockfile `patchedDependencies` hashes must match `sha256` of those patch files. App migrations run before workflow world setup: `pnpm db:migrate` then `pnpm workflow:migrate`.
 
