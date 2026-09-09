@@ -2,6 +2,7 @@ import { serverRuntime } from "../../server/runtime";
 import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
 import { defineChannel, POST } from "eve/channels";
 import { parseInputResponses, resolveTextToResponses } from "eve/client";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { ConfigProvider, Effect, Result, Schema } from "effect";
 import {
   InternalCallbackRejected,
@@ -73,6 +74,7 @@ export default defineChannel({
               );
             return new Response(null, { status: 202 });
           }).pipe(
+            Effect.provide(ResolvedInstallationSecrets.layer),
             Effect.provideService(
               ConfigProvider.ConfigProvider,
               ConfigProvider.fromEnv()
@@ -110,6 +112,7 @@ export default defineChannel({
               )
             );
           }).pipe(
+            Effect.provide(ResolvedInstallationSecrets.layer),
             Effect.provideService(
               ConfigProvider.ConfigProvider,
               ConfigProvider.fromEnv()
@@ -119,9 +122,10 @@ export default defineChannel({
           { signal: request.signal }
         );
         if (Result.isFailure(decoded)) {
-          return new Response("Scheduled callback rejected", {
-            status: decoded.failure.status,
-          });
+          const failure = decoded.failure;
+          const status =
+            failure instanceof InternalCallbackRejected ? failure.status : 503;
+          return new Response("Scheduled callback rejected", { status });
         }
         if (decoded.success instanceof Response) return decoded.success;
         const input = decoded.success;

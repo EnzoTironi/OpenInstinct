@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { get, put } from "@vercel/blob";
+import { Effect, Redacted } from "effect";
 import { z } from "zod";
 import type { InstallationSecrets } from "@db/services/installation-secrets";
 
@@ -140,6 +141,32 @@ describe("installation secrets", () => {
     expect(mocks.put).toHaveBeenCalledOnce();
   });
 
+  it("Effect layer injects the same explicit-env resolved secrets", async () => {
+    const configured = {
+      betterAuthSecret: Buffer.alloc(32, 7).toString("base64"),
+      secretEncryptionKey: Buffer.alloc(32, 8).toString("base64"),
+      version: 1 as const,
+    };
+    vi.stubEnv("BETTER_AUTH_SECRET", configured.betterAuthSecret);
+    vi.stubEnv("SECRET_ENCRYPTION_KEY", configured.secretEncryptionKey);
+
+    const { ResolvedInstallationSecrets } =
+      await import("@db/services/installation-secrets");
+    const resolved = await Effect.runPromise(
+      Effect.gen(function* () {
+        const secrets = yield* ResolvedInstallationSecrets;
+        return {
+          betterAuthSecret: Redacted.value(secrets.betterAuthSecret),
+          secretEncryptionKey: Redacted.value(secrets.secretEncryptionKey),
+          version: 1 as const,
+        };
+      }).pipe(Effect.provide(ResolvedInstallationSecrets.layer))
+    );
+
+    expect(resolved).toEqual(configured);
+    expect(mocks.get).not.toHaveBeenCalled();
+    expect(mocks.put).not.toHaveBeenCalled();
+  });
   it("rejects malformed installation-secret storage", async () => {
     mocks.get.mockResolvedValue(blobResult({ version: 1 }));
 

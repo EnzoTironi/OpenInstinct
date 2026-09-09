@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { PgClient } from "@effect/sql-pg";
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
-import { Config, Context, Effect, Layer, Redacted, Schema } from "effect";
+import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import {
   ChannelAccountError,
@@ -80,15 +81,6 @@ const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) =>
   Schema.decodeUnknownEffect(schema)(input).pipe(
     Effect.mapError(() => error("invalid_input"))
   );
-const encryptionKey = Config.redacted("BETTER_AUTH_SECRET").pipe(
-  Effect.flatMap((key) =>
-    Schema.decodeUnknownEffect(Schema.String.check(Schema.isMinLength(32)))(
-      Redacted.value(key)
-    ).pipe(Effect.as(key))
-  ),
-  Effect.mapError(() => error("crypto_unavailable"))
-);
-
 /** A single encrypted confirmation prompt per challenge. No provider I/O or polling. */
 export class ChannelAuthPrompts extends Context.Service<
   ChannelAuthPrompts,
@@ -99,6 +91,14 @@ export class ChannelAuthPrompts extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
       const accounts = yield* ChannelAccounts;
+      const installation = yield* ResolvedInstallationSecrets;
+      const encryptionKey = Effect.gen(function* () {
+        const key = installation.betterAuthSecret;
+        yield* Schema.decodeUnknownEffect(
+          Schema.String.check(Schema.isMinLength(32))
+        )(Redacted.value(key));
+        return key;
+      }).pipe(Effect.mapError(() => error("crypto_unavailable")));
       const transaction = <A, E>(operation: Effect.Effect<A, E>) =>
         sql.withTransaction(
           Effect.gen(function* () {

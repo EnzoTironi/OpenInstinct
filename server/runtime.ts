@@ -1,3 +1,4 @@
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { PgClient } from "@effect/sql-pg";
 import { Config, Layer, ManagedRuntime } from "effect";
 import { ChannelAccounts } from "./accounts";
@@ -22,7 +23,8 @@ const infrastructure = Layer.mergeAll(
   MemoryDocuments.layer,
   PersonalMemory.layer,
   Telegram.layer,
-  Kapso.layer
+  Kapso.layer,
+  ResolvedInstallationSecrets.layer
 ).pipe(Layer.provideMerge(database));
 
 const services = Layer.mergeAll(

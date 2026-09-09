@@ -5,14 +5,8 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { betterAuth } from "better-auth";
-import {
-  Config,
-  ConfigProvider,
-  Effect,
-  Layer,
-  ManagedRuntime,
-  Schema,
-} from "effect";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
+import { Config, Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { Pool } from "pg";
 import { test } from "vitest";
 import { NativeDeviceAuth } from "../../server/accounts/device";
@@ -31,24 +25,26 @@ test("native browser binding requires same-session approval before BetterAuth ca
   const url = await Effect.runPromise(
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
   );
+  const secret = randomBytes(32).toString("base64url");
   const runtime = ManagedRuntime.make(
     NativeDeviceAuth.layer.pipe(
       Layer.provideMerge(ChannelAccounts.layer),
+      Layer.provideMerge(
+        ResolvedInstallationSecrets.layerFromResolved({
+          betterAuthSecret: secret,
+          secretEncryptionKey: randomBytes(32).toString("base64"),
+        })
+      ),
       Layer.provideMerge(runtimeDatabase)
     )
   );
-  const secret = randomBytes(32).toString("base64url");
-  const config = ConfigProvider.fromUnknown({ BETTER_AUTH_SECRET: secret });
   const run = <A, E>(
     program: Effect.Effect<
       A,
       E,
       NativeDeviceAuth | ChannelAccounts | PgClient.PgClient
     >
-  ) =>
-    runtime.runPromise(
-      program.pipe(Effect.provideService(ConfigProvider.ConfigProvider, config))
-    );
+  ) => runtime.runPromise(program);
   const pool = new Pool({ connectionString: url });
   const baseURL = "http://localhost:3000";
   const auth = betterAuth({

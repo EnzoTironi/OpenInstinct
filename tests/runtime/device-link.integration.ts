@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { betterAuth } from "better-auth";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import {
   Config,
   ConfigProvider,
@@ -37,16 +38,21 @@ test("native account linking pins purpose, both proofs and one browser session w
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
   );
   const pool = new Pool({ connectionString: databaseUrl });
+  const installationId = randomUUID();
+  const secret = randomBytes(32).toString("base64url");
   const runtime = ManagedRuntime.make(
     NativeDeviceAuth.layer.pipe(
       Layer.provideMerge(ChannelAccounts.layer),
+      Layer.provideMerge(
+        ResolvedInstallationSecrets.layerFromResolved({
+          betterAuthSecret: secret,
+          secretEncryptionKey: randomBytes(32).toString("base64"),
+        })
+      ),
       Layer.provideMerge(runtimeDatabase)
     )
   );
-  const installationId = randomUUID();
-  const secret = randomBytes(32).toString("base64url");
   const configuration = ConfigProvider.fromUnknown({
-    BETTER_AUTH_SECRET: secret,
     KAPSO_PHONE_NUMBER_ID: installationId,
     KAPSO_PHONE_NUMBER: "+5511999999999",
   });
