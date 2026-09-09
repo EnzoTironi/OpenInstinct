@@ -311,6 +311,13 @@ provider I/O atomic with revocation.
 Native Telegram/Kapso schedule tools resolve the authenticated channel owner.
 The existing Eve schedule loop invokes the agent and stores report chunks in the
 durable outbox with a transactionally recorded report/output association.
+
+HTTP 429 from a channel provider is a retryable rejection: the outbox keeps the
+same delivery identity, records `adapter_rate_limited`, and becomes claimable
+again after the provider `Retry-After` / `retry_after` delay (bounded). Permanent
+4xx responses still fail the intent; ambiguous transport or 5xx outcomes remain
+uncertain.
+
 The reminders page distinguishes queued, sent, failed, cancelled and uncertain
 delivery. Eve/Linq operations retain their existing dispatch path and do not
 initialize native authority services. No second scheduler was added.
@@ -391,7 +398,6 @@ inbox-only recovery metadata while retaining the existing outbox rules. No
 suppression ledger or baseline change was used. The quality gate is not green;
 passing compilation and tests does not change that result.
 
-
 The v3 native cohort pins application and vendored Zod to 4.5.4; the external AI
 SDK resolves that peer as well. In a separate fresh database, the actual
 application accepted a private-channel test input, bound its native profile key,
@@ -433,7 +439,6 @@ application SIGKILL second-model-reply qualification. Accepted-input wake recove
 this lock reclaim are separate properties—wake publication alone does not prove resumed
 model execution. Groups remain paused. Manual Graphile unlock is not part of the
 qualified path.
-
 
 On the same isolated application database, the browser completed a genuine Better
 Auth session using synthetic confirmation through the actual channel-account

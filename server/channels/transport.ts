@@ -139,6 +139,11 @@ const makeTransport = Effect.gen(function* () {
       lane === "inbox"
         ? sql`q.status = 'uncertain' AND q.native_input IS NOT NULL`
         : sql`FALSE`;
+    // Outbox may park a queued row until lease_expires_at after HTTP 429.
+    const queuedReady =
+      lane === "outbox"
+        ? sql`q.status = 'queued' AND (q.lease_expires_at IS NULL OR q.lease_expires_at <= clock_timestamp())`
+        : sql`q.status = 'queued'`;
     const rows = yield* sql`SELECT ${identityColumns}
       FROM channel_identity i
       JOIN LATERAL (
@@ -146,7 +151,7 @@ const makeTransport = Effect.gen(function* () {
         WHERE q.identity_id = i.id AND (
           (${recoverable})
           OR (q.status = 'dispatching' AND q.lease_expires_at <= clock_timestamp())
-          OR (q.status = 'queued' AND (${cancelRevoked} OR NOT EXISTS (
+          OR ((${queuedReady}) AND (${cancelRevoked} OR NOT EXISTS (
             SELECT 1 FROM ${table} blocker WHERE blocker.identity_id = i.id AND (
               blocker.status = 'uncertain' OR
               (blocker.status = 'dispatching' AND blocker.lease_expires_at > clock_timestamp())
@@ -234,6 +239,13 @@ const makeTransport = Effect.gen(function* () {
           messaging
             .markOutboxFailed({ lease, reason: "adapter_rejected" })
             .pipe(Effect.as("failed" as const)),
+        ProviderRetryable: (error) =>
+          messaging
+            .scheduleOutboxRetry({
+              lease,
+              retryAfterSeconds: error.retryAfterSeconds,
+            })
+            .pipe(Effect.as("deferred" as const)),
         ProviderUncertain: () =>
           messaging
             .markOutboxUncertain({ lease, reason: "handoff_unknown" })
