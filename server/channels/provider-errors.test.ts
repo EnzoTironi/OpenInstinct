@@ -144,17 +144,27 @@ describe("requestProviderJson status classification", () => {
     expect(error).toMatchObject({ status: 400 });
   });
 
-  it("keeps 408 and 5xx as ProviderUncertain", async () => {
-    for (const status of [408, 503] as const) {
-      await using server = createServer((_request, response) => {
-        response.writeHead(status);
-        response.end("later");
-      }).listen(0, "127.0.0.1");
-      await once(server, "listening");
-      const error = await Effect.runPromise(
-        call(fixtureUrl(server)).pipe(Effect.flip)
-      );
-      expect(error).toBeInstanceOf(ProviderUncertain);
-    }
+  it("keeps 408 as ProviderUncertain", async () => {
+    await using server = createServer((_request, response) => {
+      response.writeHead(408);
+      response.end("later");
+    }).listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const error = await Effect.runPromise(
+      call(fixtureUrl(server)).pipe(Effect.flip)
+    );
+    expect(error).toBeInstanceOf(ProviderUncertain);
+  });
+
+  it("keeps 5xx as ProviderUncertain", async () => {
+    await using server = createServer((_request, response) => {
+      response.writeHead(503);
+      response.end("later");
+    }).listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const error = await Effect.runPromise(
+      call(fixtureUrl(server)).pipe(Effect.flip)
+    );
+    expect(error).toBeInstanceOf(ProviderUncertain);
   });
 });

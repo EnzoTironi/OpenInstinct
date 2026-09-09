@@ -3,8 +3,8 @@ import {
   FetchHttpClient,
   Headers,
   HttpClient,
-  HttpClientResponse,
   type HttpClientRequest,
+  type HttpClientResponse,
 } from "effect/unstable/http";
 
 const provider = Schema.Literals(["telegram", "kapso"]);
@@ -127,10 +127,9 @@ const retryAfterFromBody = (text: string): number | undefined => {
     Schema.fromJsonString(telegramRetryAfterSchema)
   )(text);
   if (Option.isNone(decoded)) return undefined;
+  // Schema.Number already established the domain value at the decode boundary.
   const value = decoded.value.parameters?.retry_after;
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
+  return value !== undefined && Number.isFinite(value) ? value : undefined;
 };
 
 const resolveRetryAfterSeconds = Effect.fn("resolveRetryAfterSeconds")(

@@ -15,8 +15,8 @@ describe("outbox transport 429 contract", () => {
     expect(transportSource).toMatch(
       /ProviderRejected:\s*\(\)\s*=>\s*messaging\s*\.markOutboxFailed/
     );
-    const retryableHandler = transportSource.match(
-      /ProviderRetryable:[\s\S]*?(?=ProviderUncertain:|ProviderInputError:)/u
+    const retryableHandler = /ProviderRetryable:[\s\S]*?(?=ProviderUncertain:|ProviderInputError:)/u.exec(
+      transportSource
     )?.[0];
     expect(retryableHandler).toBeDefined();
     expect(retryableHandler).not.toContain("markOutboxFailed");

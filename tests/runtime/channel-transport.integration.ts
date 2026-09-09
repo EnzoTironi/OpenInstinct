@@ -16,6 +16,8 @@ import { Messaging, PayloadConflict } from "../../server/messaging";
 import { runtimeDatabase } from "./database";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 
+const unusedAdapterMethod = () => Effect.die("unused");
+
 const dependencies = Layer.mergeAll(
   Messaging.layer,
   ChannelAccounts.layer,
@@ -656,12 +658,11 @@ test("the dispatcher recovers native inputs before and after preparation while b
   ));
 
 test("HTTP 429 schedules retry_after deferral instead of terminal failure", () => {
-  const unused = () => Effect.die("unused");
-  const rateLimitedTelegram = Layer.succeed(Telegram, {
-    parse: unused,
-    downloadMedia: unused,
-    sendLoginConfirmation: unused,
-    answerCallbackQuery: unused,
+  const rateLimitedTelegramService = {
+    parse: unusedAdapterMethod,
+    downloadMedia: unusedAdapterMethod,
+    sendLoginConfirmation: unusedAdapterMethod,
+    answerCallbackQuery: unusedAdapterMethod,
     sendText: () =>
       Effect.fail(
         new ProviderRetryable({
@@ -670,12 +671,17 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
           retryAfterSeconds: 12,
         })
       ),
-  } as unknown as Telegram["Service"]);
-  const idleKapso = Layer.succeed(Kapso, {
-    parse: unused,
-    downloadMedia: unused,
-    sendText: unused,
-  } as unknown as Kapso["Service"]);
+  } satisfies Telegram["Service"];
+  const rateLimitedTelegram = Layer.succeed(
+    Telegram,
+    rateLimitedTelegramService
+  );
+  const idleKapsoService = {
+    parse: unusedAdapterMethod,
+    downloadMedia: unusedAdapterMethod,
+    sendText: unusedAdapterMethod,
+  } satisfies Kapso["Service"];
+  const idleKapso = Layer.succeed(Kapso, idleKapsoService);
   const localDependencies = Layer.mergeAll(
     Messaging.layer,
     ChannelAccounts.layer,
