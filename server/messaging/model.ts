@@ -103,7 +103,7 @@ const providerMessageId = Schema.String.check(
   Schema.isTrimmed()
 );
 
-export const OutboxResolutionDecisionSchema = Schema.Union([
+const OutboxResolutionDecisionSchema = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("mark_delivered"),
     providerMessageId,
