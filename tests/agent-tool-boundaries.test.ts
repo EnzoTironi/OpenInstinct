@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import rootAgent from "@agent/agent";
 
 const rootTools = "agent/tools";
 const rootMemory = "agent/memory/profile.ts";
@@ -18,24 +19,23 @@ function toolFiles(directory: string, root = directory): string[] {
 
 describe("root and worker capability boundaries", () => {
   it("keeps root coordination separate from browser execution", () => {
+    expect(rootAgent.defaultTools).toBe(false);
     expect(toolFiles(rootTools)).toEqual([
       "artifacts.ts",
       "ask_question.ts",
-      "bash.ts",
       "calendar.ts",
-      "connection_search.ts",
       "contacts.ts",
       "device-auth.ts",
       "gmail.ts",
-      "load_skill.ts",
       "messaging.ts",
       "personal-memory.ts",
-      "read_file.ts",
       "respond-to-approval.ts",
       "schedules.ts",
-      "todo.ts",
+      "task_cancel.ts",
+      "task_update.ts",
       "vault.ts",
-      "write_file.ts",
+      "web_fetch.ts",
+      "web_search.ts",
     ]);
     expect(existsSync(`${rootTools}/sendMessage.ts`)).toBe(false);
     expect(existsSync("agent/extensions/kernel/extension.ts")).toBe(false);
@@ -44,18 +44,6 @@ describe("root and worker capability boundaries", () => {
     );
     expect(existsSync("agent/skills/browser-execution/SKILL.md")).toBe(false);
     expect(existsSync(`${rootTools}/agent.ts`)).toBe(false);
-    for (const tool of [
-      "bash",
-      "connection_search",
-      "load_skill",
-      "read_file",
-      "todo",
-      "write_file",
-    ]) {
-      expect(readFileSync(`${rootTools}/${tool}.ts`, "utf8")).toContain(
-        "disableTool()"
-      );
-    }
     const rootInstructions = readFileSync(
       "agent/instructions/content/role/interactive.md",
       "utf8"

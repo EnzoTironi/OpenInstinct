@@ -9,6 +9,7 @@ import { serverRuntime } from "../server/runtime";
 import { installationModel } from "./lib/installation-model";
 
 export default defineAgent({
+  defaultTools: false,
   experimental: {
     tasks: true,
     workflow: {

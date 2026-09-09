@@ -9,3 +9,4 @@ export * from "./schedules";
 export * from "./sessions";
 export * from "./vault";
 export * from "./workspaces";
+export * from "./workstreams";
