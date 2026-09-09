@@ -17,6 +17,11 @@ patterns.
 
 ## Run locally
 
+**Self-host / ops (Release-1):** see [docs/self-host.md](docs/self-host.md) for
+Alchemy `local`/`dev`/`staging`, install/migrate/run, `.env.local` **names**,
+Telegram/Google/Kapso pointers, Graphile fencing / SIGKILL, quotas ADR, account
+delete limits, and live qualification gaps.
+
 Use Node.js 24 and pnpm 11.24.0. PostgreSQL stores application records and the
 compatible Workflow world. Start with:
 
