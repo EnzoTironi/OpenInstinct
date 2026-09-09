@@ -118,11 +118,12 @@ profile key. That run then failed before the model call because of a schema
 compatibility error in the native package; it does not establish a successful
 model turn, recovery, or messenger delivery for the current package cohort.
 
-## Native recall-refresh (P06)
+## Native unstructured forget + recall-refresh (P06)
 
 After Eve `fileMemory` `save_memory` / `remove_memory` persists a profile document,
-the recalled projection is refreshed **before** the next model step. There is no
-second memory engine: storage and recall stay on Eve `fileMemory` plus the existing
+the recalled projection is refreshed **before** the next model step so forgetting
+an unstructured note cannot leave stale projected content. There is no second
+memory engine: storage and recall stay on Eve `fileMemory` plus the existing
 PostgreSQL document backend.
 
 ### Order
@@ -130,9 +131,9 @@ PostgreSQL document backend.
 1. **Storage** — Eve `fileMemory` mutates the scoped document (CAS write).
 2. **Refresh** — the same provider `recall["turn.started"]` reads the document and
    builds the keyed `file-memory-document` projection.
-3. **Next model step** — the harness applies that refresh (stable id supersession)
-   before the following model call. A dirty fence refuses to treat the pre-mutation
-   projection as authoritative.
+3. **Next model step** — the Eve harness applies that refresh (stable id
+   supersession / drop-if-absent) before the following model call. A dirty fence
+   refuses to treat the pre-mutation projection as authoritative.
 
 ### Fail closed
 
@@ -142,13 +143,22 @@ next step: either the tool fails (refresh error) or the step fails closed when a
 mutating memory tool result is present without a pending refresh. A later
 `turn.started` recall still reads storage truth.
 
+### Limits (documented, not claimed complete)
+
+- **Model-history / summaries:** ordinary conversation messages and prior summaries
+  may still mention a forgotten fact. This slice prevents stale **recalled note
+  projection** after `remove_memory`; it does not rewrite chat history.
+- **PG races:** native save/remove linearization and revocation races are covered
+  by the existing personal-memory PostgreSQL suites; this Effect path fail-closes
+  when refresh cannot apply rather than serving a dirty projection.
+- **Full account erase/restore:** export today is not full-account backup; deletion
+  and restore reconciliation remain separate P06 gates.
+
 ### Code
 
 - `agent/lib/personal-memory-recall-refresh.ts` — Effect-native order helpers.
 - `agent/lib/personal-memory-provider.ts` — wraps mutating tools with refresh.
-- Companion Eve patch — enqueues/applies mid-turn recall refresh in the tool loop.
+- Companion Eve `0.52` patch — enqueues/applies mid-turn recall refresh in the
+  memory tool callbacks and tool loop (`PendingMemoryToolRefresh`).
 
 Evidence: `agent/lib/tests/personal-memory-recall-refresh.test.ts`.
-
-This slice does not claim the remaining P06 correction/forget, deletion or restore
-acceptance gates.

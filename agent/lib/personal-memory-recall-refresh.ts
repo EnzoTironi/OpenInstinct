@@ -8,15 +8,19 @@ import type {
 import type { ToolContext } from "eve/tools";
 
 /**
- * P06 native recall-refresh order (fail closed):
+ * P06 unstructured forget + native recall-refresh (fail closed):
  *
- * 1. Eve `fileMemory` save_memory / remove_memory persists the document.
+ * 1. Eve `fileMemory` `save_memory` / `remove_memory` persists the document.
  * 2. Refresh the recalled projection from the same provider (no second engine).
- * 3. Only then may the next model step observe projected notes.
+ * 3. Eve harness applies that refresh before the next model step so forgotten
+ *    unstructured notes cannot linger in the mid-turn projection.
  *
  * A crash or error after storage and before a successful refresh must not leave
  * the prior projection authoritative: the mutation is treated as incomplete for
- * model context until refresh succeeds (or a later turn.started recall runs).
+ * model context until refresh succeeds (or a later `turn.started` recall runs).
+ *
+ * Limits (not claimed here): ordinary conversation/history/summaries may still
+ * mention a forgotten fact; full account erase/restore is a separate P06 gate.
  */
 export interface RecalledProjection {
   readonly messages: readonly MemoryRecallMessage[];
@@ -58,20 +62,39 @@ export function recalledProjectionFrom(
   return { messages: result.messages };
 }
 
-/** Supersede keyed recall messages the way Eve projections do (stable id wins). */
+/**
+ * Build the next-model-step note projection after a fileMemory mutation.
+ *
+ * Refreshed storage truth is authoritative. Prior keyed notes absent from the
+ * refresh are dropped (forgotten). Prior unkeyed fragments are never kept —
+ * they would resurrect unstructured notes from an older projection.
+ */
 export function projectNotesForNextModelStep(
   prior: RecalledProjection,
   refreshed: RecalledProjection
 ): RecalledProjection {
+  const refreshedIds = new Set(
+    refreshed.messages.flatMap((message) =>
+      message.id === undefined ? [] : [message.id]
+    )
+  );
   const byId = new Map<string, MemoryRecallMessage>();
   const unkeyed: MemoryRecallMessage[] = [];
-  for (const message of [...prior.messages, ...refreshed.messages]) {
+
+  for (const message of prior.messages) {
+    if (message.id === undefined) continue;
+    if (!refreshedIds.has(message.id)) continue;
+    byId.set(message.id, message);
+  }
+
+  for (const message of refreshed.messages) {
     if (message.id === undefined) {
       unkeyed.push(message);
       continue;
     }
     byId.set(message.id, message);
   }
+
   return { messages: [...byId.values(), ...unkeyed] };
 }
 
