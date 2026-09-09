@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@linqapp/chat-sdk-adapter@0.5.1': 78b56cdd08c4250ad2680c094858b28d6d6935538d8e59e6dd578f106c77b9e7
-  '@workflow/world-postgres@5.0.0-beta.39': 89d53a08a5bc7873bdecb09eba6711c039cc74fcd3fda1d043d4bb9376b8d1bd
+  '@workflow/world-postgres@5.0.0-beta.39': 5b4d2fdce9240706380a85625fbbaf9bdee2524f897503e94267167654f2e4e4
   '@workflow/world@5.0.0-beta.32': b7062e525a86bcbc7ad9724d90ac6002ac71a3fb91c5ea89ea10cf2fa7bb3971
   eve@0.49.0: 6faf0701b763e5afc3564fb1324ae5f38b047ed09ed6ac55bfb4e6f92225e1f8
 
@@ -88,7 +88,7 @@ importers:
         version: 3.8.5
       '@workflow/world-postgres':
         specifier: 5.0.0-beta.39
-        version: 5.0.0-beta.39(patch_hash=89d53a08a5bc7873bdecb09eba6711c039cc74fcd3fda1d043d4bb9376b8d1bd)(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(supports-color@7.2.0)(typescript@7.0.2)
+        version: 5.0.0-beta.39(patch_hash=5b4d2fdce9240706380a85625fbbaf9bdee2524f897503e94267167654f2e4e4)(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(supports-color@7.2.0)(typescript@7.0.2)
       ai:
         specifier: ^7.0.79
         version: 7.0.83(zod@4.5.4)
@@ -11021,7 +11021,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
 
-  '@workflow/world-postgres@5.0.0-beta.39(patch_hash=89d53a08a5bc7873bdecb09eba6711c039cc74fcd3fda1d043d4bb9376b8d1bd)(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(supports-color@7.2.0)(typescript@7.0.2)':
+  '@workflow/world-postgres@5.0.0-beta.39(patch_hash=5b4d2fdce9240706380a85625fbbaf9bdee2524f897503e94267167654f2e4e4)(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(supports-color@7.2.0)(typescript@7.0.2)':
     dependencies:
       '@vercel/queue': 0.5.0(@opentelemetry/api@1.9.1)
       '@workflow/errors': 5.0.0-beta.19

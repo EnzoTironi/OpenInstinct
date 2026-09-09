@@ -68,5 +68,6 @@
     "source/workflow-recovery-addon.patch": "27b9a4d56bf113921bdcfaba0a9a948e9601b1c61a5dd9d6c60257d2c9e84bcc",
     "source/workflow.patch": "b6db86e2ceb6e78d36d67e41cd2b24d1f2d97a624cc8b3d72155de3e4219ad17",
     "source/workflow-lease-fencing-addon.patch": "228c1ab51951bed9926ce92d4b6e9d2388efe2f3dc7548fd3af97c89d4994706"
-  }
+  },
+  "workflowLeaseFencingNote": "Real PostgreSQL package proofs: stale dead-worker reclaim; healthy heartbeat retention; stale complete/fail rejection; world reclaim without manual forceUnlock. Companion SIGKILL second-reply app proof PASSED 2026-09-09 under /tmp/companion-keyed-proof-v3 (Graphile reclaim + retomada reply; no manual unlock). Nitro soft-fails owner-aware completeJob require when graphile-worker is bundled."
 }

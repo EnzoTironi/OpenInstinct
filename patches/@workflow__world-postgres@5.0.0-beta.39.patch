@@ -1236,12 +1236,13 @@ index 0000000000000000000000000000000000000000..529ba0c7638f9f6546660fae92c1f2ca
 \ No newline at end of file
 diff --git a/dist/worker-lease.js b/dist/worker-lease.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..8921fe32bf96dfcafc51ea8d1f27edc938385300
+index 0000000000000000000000000000000000000000..942dc6de67ba0805518de97f01bd2b6c18fad7f9
 --- /dev/null
 +++ b/dist/worker-lease.js
-@@ -0,0 +1,195 @@
+@@ -0,0 +1,213 @@
 +import { AsyncLocalStorage } from 'node:async_hooks';
 +import { createRequire } from 'node:module';
++import { join } from 'node:path';
 +import { WorkflowWorldError } from '@workflow/errors';
 +export const DEFAULT_WORKER_LEASE_TIMING = {
 +    leaseMs: 30_000,
@@ -1393,8 +1394,25 @@ index 0000000000000000000000000000000000000000..8921fe32bf96dfcafc51ea8d1f27edc9
 + * a job another worker holds.
 + */
 +export function installOwnerAwareGraphileCompletion() {
-+    const require = createRequire(import.meta.url);
-+    const mod = require('graphile-worker/dist/sql/completeJob.js');
++    // Eve/Nitro bundles graphile-worker into the world chunk, so createRequire(import.meta.url)
++    // cannot resolve the package from .output. Prefer package resolution from cwd; if that
++    // also fails, skip the monkey-patch. SIGKILL reclaim still uses force_unlock_workers via
++    // reclaimExpiredWorkerLeases. SIGSTOP owner-aware complete remains best-effort when the
++    // module is resolvable (dev / unbundled).
++    let mod;
++    try {
++        const require = createRequire(import.meta.url);
++        mod = require('graphile-worker/dist/sql/completeJob.js');
++    }
++    catch {
++        try {
++            const requireFromCwd = createRequire(join(process.cwd(), 'package.json'));
++            mod = requireFromCwd('graphile-worker/dist/sql/completeJob.js');
++        }
++        catch {
++            return;
++        }
++    }
 +    if (mod.completeJob.__workflowOwnerAware) {
 +        return;
 +    }

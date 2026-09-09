@@ -428,11 +428,25 @@ lease and Graphile `locked_at` so long jobs are not falsely unlocked.
 
 Package proofs (real PostgreSQL, 4 tests) cover stale dead-worker reclaim, healthy
 heartbeat retention, stale complete/fail rejection, and automatic world reclaim without
-manual unlock. This lands fencing for abandoned Graphile work; it is **not** yet a full
-application SIGKILL second-model-reply qualification. Accepted-input wake recovery and
-this lock reclaim are separate properties—wake publication alone does not prove resumed
-model execution. Groups remain paused. Manual Graphile unlock is not part of the
-qualified path.
+manual unlock. Defaults: `workerLease: { leaseMs: 30000, heartbeatMs: 10000, reclaimIntervalMs: 5000 }`.
+
+Companion SIGKILL second-reply proof (**pass**, 2026-09-09, artifacts
+`/tmp/companion-keyed-proof-v3/`): after warm `pronto`, SIGKILL while a lock-owning
+worker held the mid-ack turn; after lease expiry/restart, Graphile job reclaim under
+fencing unlocked the dead worker without `forceUnlockWorkers`, the dispatcher accepted
+the same input on attempt 2, and the user-visible second model reply `retomada` was
+stored. `success.json` records `manualUnlock: false` and
+`graphileOrphanRecovery: proven-via-worker-lease-fencing`. Accepted-input wake alone is
+not treated as success—both Graphile reclaim and the second outbox reply were required.
+Harness: `/tmp/companion-keyed-proof-v3/run.mjs` (also `run.log`, `warm.json`,
+`before-restart.json`, `graphile-reclaimed.json`, `success.json`). Proof DB:
+`companion_keyed_proof_v3_20260909` via `.env.keyed-proof-v3`.
+
+Bundled Eve/Nitro cannot resolve `graphile-worker/dist/sql/completeJob.js` via
+`createRequire(import.meta.url)`; owner-aware completeJob install soft-fails and falls
+back to cwd resolution. SIGKILL reclaim does not depend on that monkey-patch. Groups
+remain paused. Manual Graphile unlock is not part of the qualified path.
+
 
 
 On the same isolated application database, the browser completed a genuine Better
