@@ -22,13 +22,19 @@ there is no plaintext-token compatibility path.
 
 Eve uses its public three-method interactive authorization adapter. Its challenge
 links to `/api/google-workspace/connect?flow=...`. A ten-minute encrypted envelope,
-created with Better Auth's public JWT crypto and the existing installation secret,
-binds the native principal's Better Auth user ID to Eve's same-origin callback.
+created with Better Auth's public JWT crypto and the unified
+`ResolvedInstallationSecrets` Effect layer, binds the native principal's Better
+Auth user ID to Eve's same-origin callback.
 The browser route requires that exact signed-in user before asking Better Auth to
-link Google. Challenge issuance and browser linking both require current workspace
-membership; a surviving Better Auth cookie does not restore revoked membership. Better Auth independently owns the OAuth verification record and
-state cookie. Eve completion has callback params, not browser headers; it reads
-only the pending principal's owned Google account. No custom completion route,
+link Google. Challenge issuance requires **live delegated authority** through the
+same `BrowserWorkerAccess` checks as browser vault tools (active channel identity,
+valid web session, non-paused schedule + live lease, or current membership) — not
+workspace ownership alone. Browser linking still requires current workspace
+membership; a surviving Better Auth cookie does not restore revoked membership.
+Fail-closed: revoke, pause, expired lease, or unavailable live-authority verification
+denies challenge issuance. Better Auth independently owns the OAuth verification
+record and state cookie. Eve completion has callback params, not browser headers; it
+reads only the pending principal's owned Google account. No custom completion route,
 OAuth database, refresh loop, or token cache is introduced.
 
 Account lookup requires current personal-workspace membership and canonical
@@ -40,11 +46,14 @@ request, remains an in-flight race. Eve owns per-step token caching; provider 40
 request native reauthorization. Other provider failures expose only a typed HTTP
 status, never Gaxios request configuration, response bodies, or bearer tokens.
 
-The focused tests exercise real encryption/tamper rejection, principal binding,
-callback restrictions, business scope checks and pure provider-error redaction.
-Live Google consent, renewal, revocation, concurrent provider races, and end-to-end
-Eve suspension/resumption require configured Google credentials and are not
-claimed by those tests. Existing SDK mock tests are not provider qualification.
+The focused tests are **fixture** qualification: real encryption/tamper rejection,
+principal binding, callback restrictions, business scope checks, pure provider-error
+redaction, and live-authority deny paths (revoke/pause/unavailable) against Effect
+Layer fixtures for `BrowserWorkerAccess` and `ResolvedInstallationSecrets`. They do
+**not** claim live Google provider consent. Live Google consent, renewal, revocation,
+concurrent provider races, and end-to-end Eve suspension/resumption require configured
+Google credentials and a real IdP redirect — left unqualified here (Gmail send remains
+a separate worker). Existing SDK mock tests are not provider qualification.
 
 Run the focused real PostgreSQL membership check with the initialized runtime-test
 schema (the check refuses any database except `companion_runtime_test`):

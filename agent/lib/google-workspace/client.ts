@@ -6,6 +6,7 @@ import {
   defineInteractiveAuthorization,
   type ConnectionPrincipal,
 } from "eve/connections";
+import type { SessionAuthContext } from "eve/context";
 import type { ToolContext } from "eve/tools";
 import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 import { serverRuntime } from "../../../server/runtime";
@@ -19,6 +20,24 @@ function googleScope(principal: ConnectionPrincipal) {
       retryable: false,
     });
   return scopeFromPrincipal(principal);
+}
+
+/** Project Eve's connection principal into the live-authority SessionAuth shape. */
+function liveGoogleConsentPrincipal(
+  principal: ConnectionPrincipal
+): SessionAuthContext {
+  if (principal.type !== "user")
+    throw new ConnectionAuthorizationFailedError("google-workspace", {
+      reason: "principal_required",
+      retryable: false,
+    });
+  return {
+    attributes: principal.attributes ?? {},
+    // Eve stores the session authenticator on issuer when no IdP issuer is set.
+    authenticator: principal.issuer ?? "unknown",
+    principalId: principal.id,
+    principalType: "user",
+  };
 }
 
 async function readToken(principal: ConnectionPrincipal) {
@@ -51,7 +70,10 @@ const googleWorkspaceAuth = defineInteractiveAuthorization({
   getToken: ({ principal }) => readToken(principal),
   async startAuthorization({ principal, callbackUrl }) {
     const url = await serverRuntime.runPromise(
-      createGoogleWorkspaceChallenge(googleScope(principal), callbackUrl).pipe(
+      createGoogleWorkspaceChallenge(
+        liveGoogleConsentPrincipal(principal),
+        callbackUrl
+      ).pipe(
         Effect.catchTag("GoogleWorkspaceError", (error) =>
           Effect.fail(
             new ConnectionAuthorizationFailedError("google-workspace", {
