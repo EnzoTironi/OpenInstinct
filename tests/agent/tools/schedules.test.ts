@@ -1,3 +1,4 @@
+import { Predicate } from "effect";
 import { isToolSchema } from "../../../node_modules/eve/dist/src/tools/schema.js";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import type {
@@ -259,15 +260,21 @@ describe("schedule tools", () => {
       "send_message",
     ]);
     const reportSend =
-      reportMessaging && !("execute" in reportMessaging)
+      Predicate.isObject(reportMessaging) &&
+      !("execute" in reportMessaging) &&
+      "send_message" in reportMessaging
         ? reportMessaging.send_message
         : undefined;
     const interactiveSend =
-      interactiveMessaging && !("execute" in interactiveMessaging)
+      Predicate.isObject(interactiveMessaging) &&
+      !("execute" in interactiveMessaging) &&
+      "send_message" in interactiveMessaging
         ? interactiveMessaging.send_message
         : undefined;
     const debugSend =
-      debugMessaging && !("execute" in debugMessaging)
+      Predicate.isObject(debugMessaging) &&
+      !("execute" in debugMessaging) &&
+      "send_message" in debugMessaging
         ? debugMessaging.send_message
         : undefined;
     const reply = {

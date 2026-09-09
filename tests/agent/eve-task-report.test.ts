@@ -59,7 +59,7 @@ test("cohort identity is the native initiating turn, independent of order or ter
     [a, b, other],
     [other, b, a],
   ]) {
-    const state = { "eve.tasks": { tasks } };
+    const state = { "eve.tasks": { version: 2, tasks } };
     for (const taskDeliveryId of ["a:result", "b:cancelled"]) {
       const projected = resolveTaskDeliveryContext({ state, taskDeliveryId });
       assert.equal(projected?.cohortId, "turn_launch");
@@ -80,6 +80,7 @@ test("cohort identity is the native initiating turn, independent of order or ter
 test("pending and initiating projections preserve the same cohort identity without marking settled", () => {
   const state = {
     "eve.tasks": {
+      version: 2,
       tasks: [task("a", "launch"), task("b", "launch", "pending")],
     },
   };

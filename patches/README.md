@@ -1,20 +1,44 @@
 # Companion patches
 
-This Companion branch keeps Effect-native runtime patches and does **not** yet
-switch Eve to the upstream `pkg.eve.dev` `0.52.2+main.59ec96cc99f65a80` pin.
+This Companion branch uses the upstream Merit-Systems `pkg.eve.dev`
+`0.52.2+main.59ec96cc99f65a80` Eve pin with a **single** Effect-safe Companion
+Eve patch (not a second queue engine).
 
 ## Active patchedDependencies (see `pnpm-workspace.yaml`)
 
 - `@linqapp/chat-sdk-adapter@0.5.1` — native `replyToMessageId` delivery.
-- `eve@0.49.0` — Companion Eve recovery / native-runtime cohort patch, plus P06 mid-turn fileMemory recall-refresh before the next model step (fail closed).
+- `eve` (URL pin `https://pkg.eve.dev/59ec96cc99f65a80f7a2daf4ca5e2a0ad95455f2/eve.tgz`,
+  identity `0.52.2+main.59ec96cc99f65a80`) —
+  `patches/eve@0.52.2+main.59ec96cc99f65a80.patch`. This is one patch that
+  combines:
+  1. The parked upstream 0.52 Linq compiled re-export / `reply_to` mapping.
+  2. Companion native-runtime recovery ported from `eve@0.49.0` via Eve source
+     rebase onto `59ec96cc99f65a80f7a2daf4ca5e2a0ad95455f2`, rebuilt against the
+     Companion workflow recovery tarballs (`@workflow/core@5.0.0-beta.47` with
+     `recoverHookResume`). Public contracts kept:
+     `recoverInputAcceptance`, keyed `inputId` acceptance, `SessionInputReceipt`,
+     payload-free `recoverSessionInputReceipt` / `recoverHookResume`.
 - `@workflow/world@5.0.0-beta.32` — workflow recovery / acceptance cohort.
 - `@workflow/world-postgres@5.0.0-beta.39` — PGWorld renewable worker leases,
   generation fencing, and owner-aware Graphile completion (SIGKILL reclaim).
 
-Native-runtime rebuild notes and manifests live under `patches/native-runtime/`.
+Application Zod remains `4.5.4`. Native-runtime rebuild notes live under
+`patches/native-runtime/`.
 
-## Parked upstream Eve patch
+## Historical / superseded
 
-`eve@0.52.2+main.59ec96cc99f65a80.patch` arrived via upstream Merit-Systems sync.
-It is kept in-tree for a future Effect-safe Eve upgrade, but it is **not** wired
-in `patchedDependencies` while Companion remains on `eve@^0.49.0` with fencing.
+- `eve@0.49.0.patch` — previous Companion Eve recovery patch against registry
+  `eve@0.49.0`. Kept for archaeology; **not** wired while the app is on the
+  0.52 URL pin.
+
+Companion-side 0.52 public-shape notes (this branch):
+
+- `experimental.tasks` is no longer a public compiler key (0.52 allows
+  `instrumentationProviders` + `workflow` only). Native task tools remain
+  framework-default; session `taskReport` / `cohortId` stay in the overlay.
+- Public `eve/tools/ask_question` re-exports `ASK_QUESTION_INPUT_SCHEMA`.
+- `defineDynamic({ rebindMissingCallbacks: true })` is restored on the overlay
+  (0.52 stock uses `markDynamicCallbackRebind` only).
+- Two `eve-cold-tool-rebind` unit fixtures are skipped: 0.52 fail-closed
+  rebind requires transformed durable descriptors this helper surface does not
+  stamp. Recovery APIs (`recoverInputAcceptance`, restore-turn) remain present.

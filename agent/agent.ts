@@ -10,7 +10,9 @@ import { installationModel } from "./lib/installation-model";
 
 export default defineAgent({
   experimental: {
-    tasks: true,
+    // 0.52 public compiler only allows instrumentationProviders + workflow.
+    // Native task tools remain the framework default; Companion recovery still
+    // overlays taskReport / cohortId on session context.
     workflow: {
       world: "@workflow/world-postgres",
     },

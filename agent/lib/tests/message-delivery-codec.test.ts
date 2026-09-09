@@ -20,7 +20,8 @@ const tools = await onTurnStarted(
     session: { id: "codec-proof", auth: { current: null, initiator: null } },
   }
 );
-if (!tools) throw new Error("Interactive messaging tools are required.");
+if (!tools || !("send_message" in tools))
+  throw new Error("Interactive messaging tools are required.");
 const original = tools.send_message.inputSchema;
 const decodeJsonObject = Schema.decodeSync(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))

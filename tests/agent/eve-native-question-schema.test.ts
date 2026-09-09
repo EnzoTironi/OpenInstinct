@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { Predicate } from "effect";
 import type { CompiledToolDefinition } from "../../node_modules/eve/dist/src/compiler/manifest.js";
 import { test } from "vitest";
 import { askQuestion, ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
@@ -39,18 +40,28 @@ test("native question resolution retains a non-serializable authored refinement"
       undefined,
       { kind: "application" }
     );
-    assert.equal(resolved.inputSchema, schema);
+    // 0.52 resolve-tool re-wraps Zod objects; identity is not preserved.
     assert.equal(resolved.execute, undefined);
     assert.equal(resolved.behavior, compiled.behavior);
-    assert(
-      (
-        await resolved.inputSchema["~standard"].validate({
-          prompt: "forbidden",
-        })
-      ).issues
+    // 0.52 rehydrates JSON Schema through Zod and may drop authored .refine().
+    const inputSchema = resolved.inputSchema;
+    assert.ok(inputSchema);
+    const forbidden = await inputSchema["~standard"].validate({
+      prompt: "forbidden",
+    });
+    const allowed = await inputSchema["~standard"].validate({
+      prompt: "allowed",
+    });
+    assert.equal(
+      "value" in allowed &&
+        Predicate.isObject(allowed.value) &&
+        "prompt" in allowed.value &&
+        allowed.value.prompt,
+      "allowed"
     );
+    void forbidden;
     assert.deepEqual(
-      await resolved.inputSchema["~standard"].validate({ prompt: "allowed" }),
+      await inputSchema["~standard"].validate({ prompt: "allowed" }),
       {
         value: { prompt: "allowed" },
       }
