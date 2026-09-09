@@ -7,7 +7,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCalendarEvent } from "@agent/lib/google-workspace/calendar";
 import { googleApiFailure } from "@agent/lib/google-workspace/client";
 import { searchGoogleContacts } from "@agent/lib/google-workspace/contacts";
-import { sendGmail } from "@agent/lib/google-workspace/gmail";
+import {
+  gmailSendMessageId,
+  gmailSendMessageIdQuery,
+  sendGmail,
+} from "@agent/lib/google-workspace/gmail";
 
 interface RequestOptions {
   signal: AbortSignal;
@@ -35,6 +39,14 @@ describe("generated Google Workspace clients", () => {
   it("sends typed Gmail requests with a stable retry-safe message ID", async () => {
     const ctx = toolContext();
     const client = GmailApi.gmail({ version: "v1" });
+    const list = vi
+      .fn<
+        (
+          request: { maxResults?: number; q: string; userId: string },
+          options: RequestOptions
+        ) => Promise<{ data: { messages?: { id: string }[] } }>
+      >()
+      .mockResolvedValue({ data: { messages: [] } });
     const send = vi
       .fn<
         (
@@ -46,7 +58,14 @@ describe("generated Google Workspace clients", () => {
         ) => Promise<{ data: { id: string; threadId: string } }>
       >()
       .mockResolvedValue({ data: { id: "sent-1", threadId: "thread-1" } });
-    Object.defineProperty(client.users.messages, "send", { value: send });
+    Object.defineProperty(client.users.messages, "list", {
+      configurable: true,
+      value: list,
+    });
+    Object.defineProperty(client.users.messages, "send", {
+      configurable: true,
+      value: send,
+    });
     googleClients({ gmail: client });
 
     await sendGmail(ctx, {
@@ -57,25 +76,201 @@ describe("generated Google Workspace clients", () => {
       to: ["person@example.com"],
     });
 
-    const stableId = createHash("sha256")
-      .update("session-1:call-1")
-      .digest("hex")
-      .slice(0, 48);
+    const messageId = gmailSendMessageId(ctx);
     const raw = Buffer.from(
       [
         "To: person@example.com",
         "Subject: Status",
-        `Message-ID: <openinstinct-${stableId}@local>`,
+        `Message-ID: ${messageId}`,
         "MIME-Version: 1.0",
         'Content-Type: text/plain; charset="UTF-8"',
         "Content-Transfer-Encoding: 8bit",
       ].join("\r\n") + "\r\n\r\nHello",
       "utf8"
     ).toString("base64url");
+    expect(list).toHaveBeenCalledWith(
+      {
+        maxResults: 1,
+        q: gmailSendMessageIdQuery(messageId),
+        userId: "me",
+      },
+      { signal: ctx.abortSignal }
+    );
     expect(send).toHaveBeenCalledWith(
       { requestBody: { raw }, userId: "me" },
       { signal: ctx.abortSignal }
     );
+  });
+
+  it("replays an identical Gmail send by recovering the Message-ID without resending", async () => {
+    const ctx = toolContext();
+    const client = GmailApi.gmail({ version: "v1" });
+    const messageId = gmailSendMessageId(ctx);
+    const list = vi
+      .fn<
+        (
+          request: { maxResults?: number; q: string; userId: string },
+          options: RequestOptions
+        ) => Promise<{ data: { messages?: { id: string }[] } }>
+      >()
+      .mockResolvedValue({ data: { messages: [{ id: "existing-1" }] } });
+    const get = vi
+      .fn<
+        (
+          request: { format?: string; id: string; userId: string },
+          options: RequestOptions
+        ) => Promise<{ data: { id: string; threadId: string } }>
+      >()
+      .mockResolvedValue({
+        data: { id: "existing-1", threadId: "thread-existing" },
+      });
+    const send = vi.fn<() => never>(() => {
+      throw new Error(
+        "Gmail send must not run when Message-ID already exists."
+      );
+    });
+    Object.defineProperty(client.users.messages, "list", {
+      configurable: true,
+      value: list,
+    });
+    Object.defineProperty(client.users.messages, "get", {
+      configurable: true,
+      value: get,
+    });
+    Object.defineProperty(client.users.messages, "send", {
+      configurable: true,
+      value: send,
+    });
+    googleClients({ gmail: client });
+
+    await expect(
+      sendGmail(ctx, {
+        bcc: [],
+        body: "Hello",
+        cc: [],
+        subject: "Status",
+        to: ["person@example.com"],
+      })
+    ).resolves.toEqual({ id: "existing-1", threadId: "thread-existing" });
+
+    expect(list).toHaveBeenCalledWith(
+      {
+        maxResults: 1,
+        q: gmailSendMessageIdQuery(messageId),
+        userId: "me",
+      },
+      { signal: ctx.abortSignal }
+    );
+    expect(get).toHaveBeenCalledWith(
+      { format: "minimal", id: "existing-1", userId: "me" },
+      { signal: ctx.abortSignal }
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("reconciles an uncertain Gmail send via Message-ID lookup instead of failing closed on a landed mail", async () => {
+    const ctx = toolContext();
+    const client = GmailApi.gmail({ version: "v1" });
+    const messageId = gmailSendMessageId(ctx);
+    const list = vi
+      .fn<
+        (
+          request: { maxResults?: number; q: string; userId: string },
+          options: RequestOptions
+        ) => Promise<{ data: { messages?: { id: string }[] } }>
+      >()
+      .mockResolvedValueOnce({ data: { messages: [] } })
+      .mockResolvedValueOnce({ data: { messages: [{ id: "landed-1" }] } });
+    const get = vi
+      .fn<
+        (
+          request: { format?: string; id: string; userId: string },
+          options: RequestOptions
+        ) => Promise<{ data: { id: string; threadId: string } }>
+      >()
+      .mockResolvedValue({
+        data: { id: "landed-1", threadId: "thread-landed" },
+      });
+    const send = vi
+      .fn<() => Promise<never>>()
+      .mockRejectedValue(new GoogleApiError(503));
+    Object.defineProperty(client.users.messages, "list", {
+      configurable: true,
+      value: list,
+    });
+    Object.defineProperty(client.users.messages, "get", {
+      configurable: true,
+      value: get,
+    });
+    Object.defineProperty(client.users.messages, "send", {
+      configurable: true,
+      value: send,
+    });
+    googleClients({ gmail: client });
+
+    await expect(
+      sendGmail(ctx, {
+        bcc: [],
+        body: "Hello",
+        cc: [],
+        subject: "Status",
+        to: ["person@example.com"],
+      })
+    ).resolves.toEqual({ id: "landed-1", threadId: "thread-landed" });
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(list).toHaveBeenNthCalledWith(
+      2,
+      {
+        maxResults: 1,
+        q: gmailSendMessageIdQuery(messageId),
+        userId: "me",
+      },
+      { signal: ctx.abortSignal }
+    );
+    expect(get).toHaveBeenCalledWith(
+      { format: "minimal", id: "landed-1", userId: "me" },
+      { signal: ctx.abortSignal }
+    );
+  });
+
+  it("fails closed on definite Gmail client errors without claiming Message-ID success", async () => {
+    const ctx = toolContext();
+    const client = GmailApi.gmail({ version: "v1" });
+    const list = vi
+      .fn<
+        (
+          request: { maxResults?: number; q: string; userId: string },
+          options: RequestOptions
+        ) => Promise<{ data: { messages?: { id: string }[] } }>
+      >()
+      .mockResolvedValue({ data: { messages: [] } });
+    const send = vi
+      .fn<() => Promise<never>>()
+      .mockRejectedValue(new GoogleApiError(400));
+    Object.defineProperty(client.users.messages, "list", {
+      configurable: true,
+      value: list,
+    });
+    Object.defineProperty(client.users.messages, "send", {
+      configurable: true,
+      value: send,
+    });
+    googleClients({ gmail: client });
+
+    await expect(
+      sendGmail(ctx, {
+        bcc: [],
+        body: "Hello",
+        cc: [],
+        subject: "Status",
+        to: ["person@example.com"],
+      })
+    ).rejects.toMatchObject({ status: 400 });
+
+    expect(list).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledOnce();
   });
 
   it("recovers a duplicate Calendar insert using the stable event ID", async () => {

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { gmail, type gmail_v1 } from "@googleapis/gmail";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
-import { withGoogleAuth } from "./client";
+import { googleApiErrorStatus, withGoogleAuth } from "./client";
 
 type GmailMessage = gmail_v1.Schema$Message;
 type GmailPart = gmail_v1.Schema$MessagePart;
@@ -101,14 +101,34 @@ export async function updateGmail(
   return { action, updatedCount: ids.length };
 }
 
-export async function sendGmail(
-  ctx: ToolContext,
-  payload: z.infer<typeof gmailSendSchema>
-) {
+/** Stable RFC822 Message-ID for one Eve tool call (session + callId). */
+export function gmailSendMessageId(ctx: {
+  callId: string;
+  session: { id: string };
+}) {
   const stableId = createHash("sha256")
     .update(`${ctx.session.id}:${ctx.callId}`)
     .digest("hex")
     .slice(0, 48);
+  return `<openinstinct-${stableId}@local>`;
+}
+
+/** Gmail search operator for the exact Message-ID (no angle brackets). */
+export function gmailSendMessageIdQuery(messageId: string) {
+  const bare = messageId.replace(/^<|>$/gu, "");
+  return `rfc822msgid:${bare}`;
+}
+
+/**
+ * Send with outbox-style Message-ID idempotency: look up the stable Message-ID
+ * before send and after uncertain provider failures. Gmail does not reject
+ * duplicate Message-IDs on send, so provider lookup is the reconciliation path.
+ */
+export async function sendGmail(
+  ctx: ToolContext,
+  payload: z.infer<typeof gmailSendSchema>
+) {
+  const messageId = gmailSendMessageId(ctx);
   const headers = [
     `To: ${payload.to.map(safeHeader).join(", ")}`,
     ...(payload.cc.length
@@ -118,7 +138,7 @@ export async function sendGmail(
       ? [`Bcc: ${payload.bcc.map(safeHeader).join(", ")}`]
       : []),
     `Subject: ${safeHeader(payload.subject)}`,
-    `Message-ID: <openinstinct-${stableId}@local>`,
+    `Message-ID: ${messageId}`,
     ...(payload.inReplyTo
       ? [
           `In-Reply-To: ${safeHeader(payload.inReplyTo)}`,
@@ -134,18 +154,67 @@ export async function sendGmail(
     "utf8"
   ).toString("base64url");
   return withGmail(ctx, async (client) => {
+    const existing = await findSentGmailByMessageId(
+      client,
+      messageId,
+      ctx.abortSignal
+    );
+    if (existing) return existing;
+
     const requestBody = payload.threadId
       ? { raw, threadId: payload.threadId }
       : { raw };
-    const { data } = await client.users.messages.send(
-      {
-        requestBody,
-        userId: "me",
-      },
-      { signal: ctx.abortSignal }
-    );
-    return data;
+    try {
+      const { data } = await client.users.messages.send(
+        {
+          requestBody,
+          userId: "me",
+        },
+        { signal: ctx.abortSignal }
+      );
+      return data;
+    } catch (error) {
+      // Uncertain outcomes (timeout / transport / 5xx) must not blind-resend.
+      // Client 4xx failures other than rate limits stay fail-closed unless the
+      // Message-ID already landed (provider accepted before the error surfaced).
+      const status = googleApiErrorStatus(error);
+      const uncertain = status === undefined || status >= 500 || status === 429;
+      if (!uncertain) throw error;
+      const recovered = await findSentGmailByMessageId(
+        client,
+        messageId,
+        ctx.abortSignal
+      );
+      if (recovered) return recovered;
+      throw error;
+    }
   });
+}
+
+async function findSentGmailByMessageId(
+  client: ReturnType<typeof gmail>,
+  messageId: string,
+  signal: AbortSignal
+) {
+  const listed = await client.users.messages.list(
+    {
+      maxResults: 1,
+      q: gmailSendMessageIdQuery(messageId),
+      userId: "me",
+    },
+    { signal }
+  );
+  const id = listed.data.messages?.[0]?.id;
+  if (!id) return null;
+  const { data } = await client.users.messages.get(
+    {
+      format: "minimal",
+      id,
+      userId: "me",
+    },
+    { signal }
+  );
+  return data;
 }
 
 export function gmailUpdateLabels(action: GmailUpdateAction) {

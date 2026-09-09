@@ -3,7 +3,11 @@ import { authorizeApprovalResponse } from "@agent/lib/approval-response";
 import { describe, expect, it } from "vitest";
 import { parseCalendarAvailability } from "@agent/lib/google-workspace/calendar";
 import { googleApiErrorStatus } from "@agent/lib/google-workspace/client";
-import { gmailUpdateLabels } from "@agent/lib/google-workspace/gmail";
+import {
+  gmailSendMessageId,
+  gmailSendMessageIdQuery,
+  gmailUpdateLabels,
+} from "@agent/lib/google-workspace/gmail";
 import { calendarCreateEvent } from "@agent/tools/calendar";
 import { gmailSend, gmailUpdate } from "@agent/tools/gmail";
 import { googleWorkspaceScopes } from "@shared/google-workspace/connection";
@@ -36,6 +40,29 @@ describe("Google Workspace", () => {
       removeLabelIds: [],
     });
     expect(gmailUpdate.approval).toBeUndefined();
+  });
+
+  it("derives a stable Gmail Message-ID query for outbox-style reconciliation", () => {
+    const messageId = gmailSendMessageId({
+      callId: "call-1",
+      session: { id: "session-1" },
+    });
+    expect(messageId).toMatch(/^<openinstinct-[0-9a-f]{48}@local>$/u);
+    expect(gmailSendMessageIdQuery(messageId)).toBe(
+      `rfc822msgid:${messageId.slice(1, -1)}`
+    );
+    expect(
+      gmailSendMessageId({
+        callId: "call-1",
+        session: { id: "session-1" },
+      })
+    ).toBe(messageId);
+    expect(
+      gmailSendMessageId({
+        callId: "call-2",
+        session: { id: "session-1" },
+      })
+    ).not.toBe(messageId);
   });
 
   it.each([
