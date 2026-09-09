@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { betterAuth } from "better-auth";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import {
   Config,
   ConfigProvider,
@@ -35,9 +36,16 @@ test("real BetterAuth router, signed browser challenge and database session", as
   const url = await Effect.runPromise(
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
   );
+  const secret = randomBytes(32).toString("base64url");
   const runtime = ManagedRuntime.make(
     NativeDeviceAuth.layer.pipe(
       Layer.provideMerge(ChannelAccounts.layer),
+      Layer.provideMerge(
+        ResolvedInstallationSecrets.layerFromResolved({
+          betterAuthSecret: secret,
+          secretEncryptionKey: randomBytes(32).toString("base64"),
+        })
+      ),
       Layer.provideMerge(runtimeDatabase)
     )
   );
@@ -51,7 +59,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
   const auth = betterAuth({
     baseURL,
     database: pool,
-    secret: randomBytes(32).toString("base64url"),
+    secret,
     trustedOrigins: [baseURL],
     advanced: { disableOriginCheck: false, disableCSRFCheck: false },
     plugins: [

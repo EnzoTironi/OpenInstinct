@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import {
   Clock,
   Config,
@@ -60,24 +61,20 @@ export const internalCallbackOrigin = Config.string("BETTER_AUTH_URL").pipe(
   Effect.map((value) => new URL(value).origin),
   Effect.mapError(() => reject(503))
 );
-const callbackKey = Config.redacted("SECRET_ENCRYPTION_KEY").pipe(
-  Effect.flatMap((secret) =>
-    Schema.decodeUnknownEffect(
-      Schema.String.check(
-        Schema.isBase64(),
-        Schema.makeFilter((value) => Buffer.from(value, "base64").length === 32)
-      )
-    )(Redacted.value(secret))
-  ),
-  Effect.map((value) =>
-    Redacted.make(
-      createHmac("sha256", Buffer.from(value, "base64"))
-        .update("companion/internal-callback/v1")
-        .digest()
+const callbackKey = Effect.gen(function* () {
+  const installation = yield* ResolvedInstallationSecrets;
+  const secret = yield* Schema.decodeUnknownEffect(
+    Schema.String.check(
+      Schema.isBase64(),
+      Schema.makeFilter((value) => Buffer.from(value, "base64").length === 32)
     )
-  ),
-  Effect.mapError(() => reject(503))
-);
+  )(Redacted.value(installation.secretEncryptionKey));
+  return Redacted.make(
+    createHmac("sha256", Buffer.from(secret, "base64"))
+      .update("companion/internal-callback/v1")
+      .digest()
+  );
+}).pipe(Effect.mapError(() => reject(503)));
 
 function signature(
   key: Redacted.Redacted<Buffer>,
