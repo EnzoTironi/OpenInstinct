@@ -11,6 +11,7 @@ import { ChannelTransport } from "./channels/transport";
 import { ChannelAuthPrompts } from "./channel-auth/prompts";
 import { MemoryDocuments } from "./memory/documents";
 import { PersonalMemory } from "./personal-memory";
+import { BrowserWorkerAccess } from "./browser-worker";
 
 const database = PgClient.layerConfig({
   url: Config.redacted("DATABASE_URL"),
@@ -19,6 +20,7 @@ const database = PgClient.layerConfig({
 
 const infrastructure = Layer.mergeAll(
   ChannelAccounts.layer,
+  BrowserWorkerAccess.layer,
   Messaging.layer,
   MemoryDocuments.layer,
   PersonalMemory.layer,

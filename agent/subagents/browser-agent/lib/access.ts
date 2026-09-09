@@ -1,6 +1,7 @@
 import type { SessionContext } from "eve/context";
 import { isSessionOwned } from "@db/services/sessions";
 import { scopeFromPrincipal } from "../../../../shared/identity/principal-scope";
+import { assertLiveWorkerAuthority } from "./live-authority";
 
 export async function requireWorkerScope(
   context: Pick<SessionContext, "session">
@@ -18,5 +19,6 @@ export async function requireWorkerScope(
   if (!ownsWorker || !ownsParent) {
     throw new Error("The authenticated user does not own this worker session.");
   }
+  await assertLiveWorkerAuthority(caller);
   return scope;
 }
