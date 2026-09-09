@@ -23,6 +23,10 @@ application operations; routes and tools must resolve authority first:
   row and membership before and after reading.
 - `exportPersonalMemory(headers)` serializes that same result with an attachment
   disposition, JSON content type, `nosniff` and `private, no-store`.
+- `wipe(scope)` deletes the structured profile row and bound profile notes for
+  the canonical workspace inside the same membership-locked transaction. Account
+  delete (`server/accounts/privacy.ts`) hooks this wipe; it is not full-account
+  erase.
 
 `GET /api/account/personal-memory/export` has no owner, workspace or memory-key
 input. URL parameters cannot select another account. The native
@@ -151,8 +155,10 @@ mutating memory tool result is present without a pending refresh. A later
 - **PG races:** native save/remove linearization and revocation races are covered
   by the existing personal-memory PostgreSQL suites; this Effect path fail-closes
   when refresh cannot apply rather than serving a dirty projection.
-- **Full account erase/restore:** export today is not full-account backup; deletion
-  and restore reconciliation remain separate P06 gates.
+- **Full account erase/restore:** export today is not full-account backup. Account
+  delete online wipe covers personal memory + browser sessions only; channel
+  identities, schedules, artifacts, history, user/workspace rows and backups are
+  not erased. Restore reconciliation remains a separate P06 gate.
 
 ### Code
 

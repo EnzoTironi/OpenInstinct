@@ -65,3 +65,33 @@ not implemented or implied by this flow.
 same-account path, purpose changes, two accounts, browser-session substitution,
 freshness/expiry/revocation and concurrent one-use completion. These are domain
 and HTTP proofs with synthetic identities, not live provider qualification.
+
+## Account privacy export/delete gates
+
+`privacy.ts` exposes Effect-safe `exportAccountPrivacy(headers)` and
+`deleteAccountOnlineData(headers)`. Both derive the owner from the live Better
+Auth browser session plus canonical workspace membership. The browser never
+supplies a user ID. Missing, expired or revoked credentials fail closed as
+`AccountPrivacyError` with `unauthenticated` (HTTP 401) or `unavailable`
+(HTTP 503).
+
+| Route                                 | Method | Behavior                                                   |
+| ------------------------------------- | ------ | ---------------------------------------------------------- |
+| `/api/account/export`                 | GET    | Partial privacy export (stored personal memory envelope)   |
+| `/api/account/personal-memory/export` | GET    | Existing personal-memory JSON download                     |
+| `/api/account/delete`                 | POST   | Online personal-memory wipe + browser session invalidation |
+
+### Limits (documented, not claimed complete)
+
+- **Export** includes structured profile and bound profile notes only. Conversation
+  history, artifacts, connected accounts, schedules, unbound memory documents,
+  channel identities, browser sessions and backups are excluded.
+- **Delete** wipes that same personal-memory surface and deletes Better Auth
+  `session` rows for the user. It does **not** erase channel identities,
+  schedules, artifacts, conversation history, the user/workspace rows, or
+  backups. Do not claim full account deletion or backup erasure.
+- Restore reconciliation and a deletion ledger remain separate P06 gates.
+
+Delete hooks `PersonalMemory.wipe` when that service is present in the runtime
+(registered from `server/runtime.ts`). Fixture proof:
+`server/accounts/privacy.test.ts` (fail-closed without auth; wipe never runs).
