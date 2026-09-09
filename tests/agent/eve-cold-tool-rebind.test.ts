@@ -195,6 +195,7 @@ async function endTurn(session: HarnessSession): Promise<HarnessSession> {
 
 // 0.52 fail-closed `rebindMissingCompiledDynamicToolCallbacks` requires transformed
 // durable descriptors; this unit fixture still stamps the 0.49 helper surface.
+// oxlint-disable-next-line vitest/no-disabled-tests -- 0.52 fail-closed rebind needs transformed durable descriptors this helper surface does not stamp.
 it.skip("restores a cold parked approval before its response policy is coordinated", async () => {
   const fixture = coldTurn();
   const parked = await endTurn(
@@ -289,6 +290,7 @@ it("does not restore obsolete interactive callbacks for a settled report turn", 
   ).toBeUndefined();
 });
 
+// oxlint-disable-next-line vitest/no-disabled-tests -- 0.52 fail-closed rebind needs transformed durable descriptors this helper surface does not stamp.
 it.skip("restores callbacks for an in-flight continuation without pending approvals", async () => {
   const fixture = coldTurn();
   expect(isHarnessBetweenTurns(fixture.session)).toBe(false);
