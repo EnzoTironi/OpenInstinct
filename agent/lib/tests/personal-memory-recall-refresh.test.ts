@@ -106,13 +106,15 @@ describe("personal memory recall-refresh", () => {
       channel: { kind: "eve" },
     });
     assert.ok(tools?.save_memory && tools.remove_memory);
+    const saveMemory = tools.save_memory;
+    const removeMemory = tools.remove_memory;
 
-    await tools.save_memory.execute(
+    await saveMemory.execute(
       // @ts-expect-error heterogeneous tool map
       { text: forgottenText },
       toolExecution(context, "profile__save_memory")
     );
-    await tools.save_memory.execute(
+    await saveMemory.execute(
       // @ts-expect-error heterogeneous tool map
       { text: keptText },
       toolExecution(context, "profile__save_memory")
@@ -131,7 +133,7 @@ describe("personal memory recall-refresh", () => {
     const { projection, phase } = await Effect.runPromise(
       executeMemoryMutationWithRecallRefresh({
         mutate: () =>
-          tools.remove_memory!.execute(
+          removeMemory.execute(
             // @ts-expect-error heterogeneous tool map
             { index: Number(index) },
             toolExecution(context, "profile__remove_memory")
@@ -160,8 +162,10 @@ describe("personal memory recall-refresh", () => {
       channel: { kind: "eve" },
     });
     assert.ok(tools?.save_memory && tools.remove_memory);
+    const saveMemory = tools.save_memory;
+    const removeMemory = tools.remove_memory;
 
-    await tools.save_memory.execute(
+    await saveMemory.execute(
       // @ts-expect-error heterogeneous tool map
       { text: forgottenText },
       toolExecution(context, "profile__save_memory")
@@ -179,7 +183,7 @@ describe("personal memory recall-refresh", () => {
       Effect.runPromise(
         executeMemoryMutationWithRecallRefresh({
           mutate: async () => {
-            await tools.remove_memory!.execute(
+            await removeMemory.execute(
               // @ts-expect-error heterogeneous tool map
               { index: Number(index) },
               toolExecution(context, "profile__remove_memory")
