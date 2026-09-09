@@ -3,12 +3,20 @@ import {
   type MemoryOperationContext,
   type MemoryToolsContext,
   type MemoryToolSet,
+  type MemoryTurnStartedContext,
 } from "eve/memory";
 import { fileMemory } from "eve/memory/file";
+import { Effect } from "effect";
 import { serverRuntime } from "../../server/runtime";
 import { createMemoryDocumentBackend } from "./memory-document-backend";
 import { authorizePersonalMemoryContext } from "./personal-memory-access";
 import { preserveProfileMemoryCancellation } from "./profile-memory";
+import {
+  executeMemoryMutationWithRecallRefresh,
+  isMutatingMemoryTool,
+  recallContextFromTools,
+  type RecalledProjection,
+} from "./personal-memory-recall-refresh";
 
 const fileFor = (context: MemoryOperationContext | MemoryToolsContext) =>
   fileMemory({
@@ -16,6 +24,13 @@ const fileFor = (context: MemoryOperationContext | MemoryToolsContext) =>
       authorizePersonalMemoryContext(context)
     ),
   });
+
+async function recallProjection(
+  context: MemoryTurnStartedContext
+): Promise<RecalledProjection> {
+  const recalled = await fileFor(context).recall["turn.started"](context);
+  return { messages: recalled?.messages ?? [] };
+}
 
 export const personalMemoryProvider = preserveProfileMemoryCancellation(
   defineMemoryProvider({
@@ -44,7 +59,28 @@ export const personalMemoryProvider = preserveProfileMemoryCancellation(
               const target = rebound?.[name];
               if (!target)
                 throw new Error("Native memory tool is unavailable.");
-              return target.execute(input, executionContext);
+
+              if (!isMutatingMemoryTool(name)) {
+                return target.execute(input, executionContext);
+              }
+
+              const recallContext = recallContextFromTools(
+                current,
+                executionContext
+              );
+              const prior = await recallProjection(recallContext);
+
+              // Order: Eve fileMemory mutate → refresh recalled projection →
+              // only then return success for the next model step.
+              const { mutationResult } = await Effect.runPromise(
+                executeMemoryMutationWithRecallRefresh({
+                  mutate: () => target.execute(input, executionContext),
+                  recall: (ctx) => fileFor(ctx).recall["turn.started"](ctx),
+                  context: recallContext,
+                  priorProjection: prior,
+                })
+              );
+              return mutationResult;
             },
           } satisfies MemoryToolSet[string],
         ])

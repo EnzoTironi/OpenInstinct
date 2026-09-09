@@ -8,7 +8,7 @@ patchedDependencies:
   '@linqapp/chat-sdk-adapter@0.5.1': 78b56cdd08c4250ad2680c094858b28d6d6935538d8e59e6dd578f106c77b9e7
   '@workflow/world-postgres@5.0.0-beta.39': 5b4d2fdce9240706380a85625fbbaf9bdee2524f897503e94267167654f2e4e4
   '@workflow/world@5.0.0-beta.32': b7062e525a86bcbc7ad9724d90ac6002ac71a3fb91c5ea89ea10cf2fa7bb3971
-  eve@0.49.0: dac916159c2cd6e03a167742f435fd876ee041d478ff1235521782cf8804c906
+  eve@0.49.0: da8c5908bf76268820ff426bf21ddf1abb030e4811746b1f10a43f22cef085de
 
 importers:
 
@@ -82,7 +82,7 @@ importers:
         version: 2.8.0
       '@vercel/connect':
         specifier: ^2.0.0
-        version: 2.0.0(10ea249449442c1b5b0a8670a314ef4f)
+        version: 2.0.0(8b75591d576986fe4f739114d0e185f6)
       '@vercel/oidc':
         specifier: 3.8.5
         version: 3.8.5
@@ -115,10 +115,10 @@ importers:
         version: 4.0.0-rc.112
       eve:
         specifier: ^0.49.0
-        version: 0.49.0(patch_hash=dac916159c2cd6e03a167742f435fd876ee041d478ff1235521782cf8804c906)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.49.0(patch_hash=da8c5908bf76268820ff426bf21ddf1abb030e4811746b1f10a43f22cef085de)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
       evlog:
         specifier: 2.27.1
-        version: 2.27.1(ai@7.0.83(zod@4.5.4))(eve@0.49.0(patch_hash=dac916159c2cd6e03a167742f435fd876ee041d478ff1235521782cf8804c906)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)))(express@5.2.1(supports-color@7.2.0))(hono@4.13.5)(next@16.3.3(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ofetch@1.5.1)(react@19.2.8)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
+        version: 2.27.1(ai@7.0.83(zod@4.5.4))(eve@0.49.0(patch_hash=da8c5908bf76268820ff426bf21ddf1abb030e4811746b1f10a43f22cef085de)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)))(express@5.2.1(supports-color@7.2.0))(hono@4.13.5)(next@16.3.3(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ofetch@1.5.1)(react@19.2.8)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
       lucide-react:
         specifier: 1.34.0
         version: 1.34.0(react@19.2.8)
@@ -10585,13 +10585,13 @@ snapshots:
     dependencies:
       execa: 5.1.1
 
-  '@vercel/connect@2.0.0(10ea249449442c1b5b0a8670a314ef4f)':
+  '@vercel/connect@2.0.0(8b75591d576986fe4f739114d0e185f6)':
     dependencies:
       '@vercel/oidc': 3.8.5
     optionalDependencies:
       ai: 7.0.83(zod@4.5.4)
       better-auth: 1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.3.3(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.11(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)))
-      eve: 0.49.0(patch_hash=dac916159c2cd6e03a167742f435fd876ee041d478ff1235521782cf8804c906)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
+      eve: 0.49.0(patch_hash=da8c5908bf76268820ff426bf21ddf1abb030e4811746b1f10a43f22cef085de)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
 
   '@vercel/container@3.0.0(@vercel/build-utils@14.5.0)':
     dependencies:
@@ -12042,7 +12042,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.49.0(patch_hash=dac916159c2cd6e03a167742f435fd876ee041d478ff1235521782cf8804c906)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)):
+  eve@0.49.0(patch_hash=da8c5908bf76268820ff426bf21ddf1abb030e4811746b1f10a43f22cef085de)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.83(zod@4.5.4)
       nitro: 3.0.260610-beta(@electric-sql/pglite@0.5.8)(@vercel/blob@2.8.0)(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
@@ -12103,10 +12103,10 @@ snapshots:
     dependencies:
       eventsource-parser: 3.1.1
 
-  evlog@2.27.1(ai@7.0.83(zod@4.5.4))(eve@0.49.0(patch_hash=dac916159c2cd6e03a167742f435fd876ee041d478ff1235521782cf8804c906)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)))(express@5.2.1(supports-color@7.2.0))(hono@4.13.5)(next@16.3.3(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ofetch@1.5.1)(react@19.2.8)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)):
+  evlog@2.27.1(ai@7.0.83(zod@4.5.4))(eve@0.49.0(patch_hash=da8c5908bf76268820ff426bf21ddf1abb030e4811746b1f10a43f22cef085de)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)))(express@5.2.1(supports-color@7.2.0))(hono@4.13.5)(next@16.3.3(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ofetch@1.5.1)(react@19.2.8)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)):
     optionalDependencies:
       ai: 7.0.83(zod@4.5.4)
-      eve: 0.49.0(patch_hash=dac916159c2cd6e03a167742f435fd876ee041d478ff1235521782cf8804c906)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
+      eve: 0.49.0(patch_hash=da8c5908bf76268820ff426bf21ddf1abb030e4811746b1f10a43f22cef085de)(@electric-sql/pglite@0.5.8)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.83(zod@4.5.4))(chokidar@4.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
       express: 5.2.1(supports-color@7.2.0)
       hono: 4.13.5
       next: 16.3.3(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
