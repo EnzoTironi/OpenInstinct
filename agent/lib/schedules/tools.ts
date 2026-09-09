@@ -6,7 +6,7 @@ import type {
   createScheduledAgentJob,
   listScheduledAgentJobs,
 } from "@db/services/scheduled-agent-jobs";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 
 export function scheduleOwner(context: ToolContext) {
   const auth = context.session.auth.current;

@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect";
 import { defineTool, toolOutput } from "eve/tools";
 import { ChannelTransport } from "../../server/channels/transport";
 import { serverRuntime } from "../../server/runtime";
-import { requireChannelPrincipal } from "./channel-session";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { taskReportDeliveryId } from "./task-report";
 
 const Message = Schema.Struct({

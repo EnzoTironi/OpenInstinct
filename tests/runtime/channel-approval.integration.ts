@@ -5,7 +5,7 @@ import { Config, Effect } from "effect";
 import type { SessionAuthContext } from "eve/context";
 import { test } from "vitest";
 import { authorizeApprovalResponse } from "../../agent/lib/approval-response";
-import { channelPrincipal } from "../../agent/lib/channel-session";
+import { channelPrincipal } from "../../server/channels/principal";
 import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";

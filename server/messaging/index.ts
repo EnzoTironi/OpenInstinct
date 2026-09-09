@@ -12,6 +12,10 @@ import {
   type EnqueueInput,
   IdentityId,
   invalidInput,
+  NativeInboxContentSchema,
+  NativeInboxHandoffSchema,
+  PrepareInboxHandoffSchema,
+  PayloadConflict,
   LeaseSchema,
   type Lease,
   type MessagingError,
@@ -91,6 +95,48 @@ const makeMessaging = Effect.gen(function* () {
       const value = yield* decodeInput(ClaimInputSchema)(input);
       return yield* inbox.claim(value.identityId, value.leaseSeconds);
     }, protect),
+    prepareInboxHandoff: Effect.fn("Messaging.prepareInboxHandoff")(
+      function* (input: typeof PrepareInboxHandoffSchema.Type) {
+        const value = yield* decodeInput(PrepareInboxHandoffSchema)(input);
+        const current = yield* inbox.checkLease(value.lease);
+        const content = Schema.encodeSync(
+          Schema.fromJsonString(NativeInboxContentSchema)
+        )(value.content);
+        const rows =
+          yield* sql`UPDATE channel_inbox SET native_input = jsonb_set(native_input, '{content}', ${content}::jsonb)
+          WHERE id = ${value.lease.id} AND identity_id = ${value.lease.identityId}
+            AND lease_token = ${value.lease.leaseToken}
+            AND lease_expires_at > clock_timestamp()
+            AND (native_input->'content' = 'null'::jsonb OR native_input->'content' = ${content}::jsonb)
+          RETURNING native_input AS input`;
+        if (!rows[0]) {
+          yield* inbox.checkLease(value.lease);
+          return yield* new PayloadConflict({ id: value.lease.id });
+        }
+        // The first preparation commits its bounded, single-chunk transcript intents.
+        // Identical replays do not recreate delivered or retained-away outbox entries.
+        if (current.nativeInput?.content === null) {
+          for (const [index, transcript] of value.transcripts.entries()) {
+            yield* outbox.insert({
+              identityId: value.lease.identityId,
+              key: `transcript:${value.lease.id}:${String(index)}:0`,
+              sourceMessageId: null,
+              payload: {
+                text: `I heard: ${transcript}\nIf this is incorrect, send a correction.`,
+              },
+            });
+          }
+        }
+        return yield* Schema.decodeUnknownEffect(
+          Schema.Struct({
+            ...NativeInboxHandoffSchema.fields,
+            content: NativeInboxContentSchema,
+          })
+        )(rows[0].input);
+      },
+      sql.withTransaction,
+      protect
+    ),
     claimOutbox: Effect.fn("Messaging.claimOutbox")(function* (
       input: ClaimInput
     ) {

@@ -1,46 +1,54 @@
-import { Effect } from "effect";
 import {
   defineMemoryProvider,
   type MemoryOperationContext,
   type MemoryToolsContext,
+  type MemoryToolSet,
 } from "eve/memory";
 import { fileMemory } from "eve/memory/file";
-import { PersonalMemory } from "../../server/personal-memory";
 import { serverRuntime } from "../../server/runtime";
-import { memoryDocumentBackend } from "./memory-document-backend";
-import { scopeFromPrincipal } from "./principal-scope";
+import { createMemoryDocumentBackend } from "./memory-document-backend";
+import { authorizePersonalMemoryContext } from "./personal-memory-access";
 import { preserveProfileMemoryCancellation } from "./profile-memory";
 
-const file = fileMemory({ backend: memoryDocumentBackend });
-
-const bind = (context: MemoryOperationContext | MemoryToolsContext) => {
-  const principal = context.session.auth.current;
-  if (principal?.principalType !== "user")
-    throw new Error("An authenticated personal memory owner is required.");
-  const scope = scopeFromPrincipal(principal);
-  return serverRuntime.runPromise(
-    Effect.flatMap(PersonalMemory, (memory) =>
-      memory.bind(scope, context.memory)
+const fileFor = (context: MemoryOperationContext | MemoryToolsContext) =>
+  fileMemory({
+    backend: createMemoryDocumentBackend(
+      authorizePersonalMemoryContext(context)
     ),
-    { signal: "abortSignal" in context ? context.abortSignal : undefined }
-  );
-};
+  });
 
 export const personalMemoryProvider = preserveProfileMemoryCancellation(
   defineMemoryProvider({
     recall: {
-      async "turn.started"(context) {
-        await bind(context);
-        return file.recall["turn.started"](context);
-      },
-      async "compaction.completed"(context) {
-        await bind(context);
-        return file.recall["compaction.completed"]?.(context);
-      },
+      "turn.started": (context) =>
+        fileFor(context).recall["turn.started"](context),
+      "compaction.completed": (context) =>
+        fileFor(context).recall["compaction.completed"]?.(context),
     },
     async tools(context) {
-      await bind(context);
-      return file.tools?.(context) ?? null;
+      await serverRuntime.runPromise(authorizePersonalMemoryContext(context));
+      const tools = await fileFor(context).tools?.(context);
+      if (!tools) return null;
+      return Object.fromEntries(
+        Object.entries(tools).map(([name, tool]) => [
+          name,
+          {
+            ...tool,
+            async execute(input, executionContext) {
+              const current = {
+                ...context,
+                session: executionContext.session,
+                abortSignal: executionContext.abortSignal,
+              };
+              const rebound = await fileFor(current).tools?.(current);
+              const target = rebound?.[name];
+              if (!target)
+                throw new Error("Native memory tool is unavailable.");
+              return target.execute(input, executionContext);
+            },
+          } satisfies MemoryToolSet[string],
+        ])
+      );
     },
   })
 );

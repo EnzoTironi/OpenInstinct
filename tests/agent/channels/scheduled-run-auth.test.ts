@@ -106,6 +106,8 @@ describe("scheduled run channel handoff", () => {
       .mockResolvedValue(workerSession());
     const reset = vi.fn<ChannelSource["reset"]>();
     const source: ChannelSource = {
+      getInputAcceptance: unexpectedRouteRequest,
+      recoverInputAcceptance: unexpectedRouteRequest,
       cancel: vi.fn<ChannelSource["cancel"]>(),
       clear: vi.fn<ChannelSource["clear"]>(),
       compact: vi.fn<ChannelSource["compact"]>(),
@@ -133,6 +135,7 @@ describe("scheduled run channel handoff", () => {
         },
       },
       {
+        attachSession: unexpectedRouteRequest,
         from,
         resolveSession: vi
           .fn<ChannelResolveSession>()
@@ -175,6 +178,8 @@ function unexpectedRouteRequest(): never {
 
 function workerSession(): Session {
   return {
+    getInputAcceptance: unexpectedRouteRequest,
+    recoverInputAcceptance: unexpectedRouteRequest,
     cancel: vi.fn<Session["cancel"]>(),
     clear: vi.fn<Session["clear"]>(),
     compact: vi.fn<Session["compact"]>(),

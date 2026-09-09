@@ -6,7 +6,7 @@ import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import { applicationOrigin } from "@shared/environment/origin";
 import { channelProviderSchema } from "@shared/identity/channel-auth";
-import { requireChannelPrincipal } from "../lib/channel-session";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { resolveModeValue } from "../lib/mode";
 import { PersonalMemoryError } from "../../server/personal-memory/access";
 

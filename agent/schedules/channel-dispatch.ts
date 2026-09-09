@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { defineSchedule, type ScheduleToFn } from "eve/schedules";
 import telegram from "@agent/channels/telegram";
 import kapso from "@agent/channels/kapso";
-import { channelPrincipal } from "@agent/lib/channel-session";
+import { channelPrincipal } from "../../server/channels/principal";
 import { Messaging } from "../../server/messaging";
 import { ChannelTransport } from "../../server/channels/transport";
 import { drainAuthPrompts, dispatchItem } from "../../server/channels/dispatch";

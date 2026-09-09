@@ -385,7 +385,7 @@ test("claims FIFO once per identity under concurrency and fences completion", ()
     })
   ));
 
-test("expired inbox lease becomes visible uncertain and never releases later input", () =>
+test("an input without native protocol evidence remains uncertain and blocks later input", () =>
   run((messaging, sql, identityId) =>
     Effect.gen(function* () {
       yield* messaging.accept({
@@ -405,7 +405,7 @@ test("expired inbox lease becomes visible uncertain and never releases later inp
         leaseSeconds: 30,
       });
       if (!claim) throw new Error("Expected a lease holder");
-      yield* sql`UPDATE channel_inbox SET lease_expires_at = clock_timestamp() - interval '1 second'
+      yield* sql`UPDATE channel_inbox SET native_input = NULL, lease_expires_at = clock_timestamp() - interval '1 second'
       WHERE id = ${claim.id}`;
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       expect(
@@ -704,5 +704,306 @@ test("independent identities can claim the same event key without blocking each 
         { concurrency: 2 }
       );
       expect(claims.every((claim) => claim !== null)).toBe(true);
+    })
+  ));
+
+test("prepared native input survives uncertain recovery with immutable content and a new lease", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      const first = yield* messaging.accept({
+        identityId,
+        eventId: "keyed-first",
+        sourceMessageId: "keyed-source",
+        payload: { text: "first" },
+      });
+      yield* messaging.accept({
+        identityId,
+        eventId: "keyed-second",
+        sourceMessageId: "later-source",
+        payload: { text: "second" },
+      });
+      const claim = yield* messaging.claimInbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      if (!claim) throw new Error("Expected initial claim");
+      const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
+      const content = [
+        { type: "text" as const, text: "Frozen extracted content" },
+      ];
+      const snapshots = yield* Effect.all(
+        Array.from({ length: 8 }, () =>
+          messaging.prepareInboxHandoff({ transcripts: [], lease, content })
+        ),
+        { concurrency: 4 }
+      );
+      expect(
+        snapshots.every(
+          (snapshot) =>
+            JSON.stringify(snapshot) === JSON.stringify(snapshots[0])
+        )
+      ).toBe(true);
+      expect(snapshots[0]).toMatchObject({
+        protocol: "eve-keyed-input-v1",
+        inputId: first.id,
+        channel: "telegram",
+        address: identityId,
+        content,
+      });
+      const owner = yield* sql<{
+        userId: string;
+      }>`SELECT user_id AS "userId" FROM channel_identity WHERE id = ${identityId}`;
+      const account = owner[0];
+      if (!account) throw new Error("Missing identity owner");
+      expect(snapshots[0]?.principalId).toBe(`better-auth:${account.userId}`);
+      expect(
+        yield* messaging
+          .prepareInboxHandoff({ transcripts: [], lease, content: "Changed" })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(PayloadConflict);
+      yield* messaging.markInboxUncertain({ lease, reason: "handoff_unknown" });
+      const claims = yield* Effect.all(
+        Array.from({ length: 8 }, () =>
+          messaging.claimInbox({ identityId, leaseSeconds: 30 })
+        ),
+        { concurrency: 4 }
+      );
+      const recovered = claims.filter((candidate) => candidate !== null);
+      expect(recovered).toHaveLength(1);
+      const next = recovered[0];
+      if (!next) throw new Error("Expected recovered claim");
+      expect(next.id).toBe(first.id);
+      expect(next.nativeInput).toEqual(snapshots[0]);
+      expect(next.leaseToken).not.toBe(lease.leaseToken);
+      expect(next.attempts).toBe(2);
+      expect(
+        yield* messaging
+          .prepareInboxHandoff({ transcripts: [], lease, content })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(LeaseLost);
+      yield* messaging.markAccepted({
+        lease: { identityId, id: next.id, leaseToken: next.leaseToken },
+        receipt: { status: "accepted", sessionId: "native-storage-receipt" },
+      });
+      expect(
+        (yield* messaging.claimInbox({ identityId, leaseSeconds: 30 }))?.key
+      ).toBe("keyed-second");
+    })
+  ));
+
+test("expired prepared input can be recovered but a revoked identity cannot prepare or retry", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      yield* messaging.accept({
+        identityId,
+        eventId: "expired-keyed",
+        sourceMessageId: "source",
+        payload: { text: "one" },
+      });
+      const claim = yield* messaging.claimInbox({
+        identityId,
+        leaseSeconds: 1,
+      });
+      if (!claim) throw new Error("Expected initial claim");
+      const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
+      yield* messaging.prepareInboxHandoff({
+        transcripts: [],
+        lease,
+        content: "one",
+      });
+      yield* Effect.sleep("1100 millis");
+      const recovered = yield* messaging.claimInbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      expect(recovered?.id).toBe(claim.id);
+      if (!recovered) throw new Error("Expected expired input recovery");
+      yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
+      expect(
+        yield* messaging
+          .prepareInboxHandoff({
+            transcripts: [],
+            lease: {
+              identityId,
+              id: recovered.id,
+              leaseToken: recovered.leaseToken,
+            },
+            content: "one",
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(IdentityInactive);
+      expect(
+        yield* messaging.claimInbox({ identityId, leaseSeconds: 30 })
+      ).toBeNull();
+    })
+  ));
+
+test("a lease expiring before media preparation retains its native key and fences the old worker", () =>
+  run((messaging, _sql, identityId) =>
+    Effect.gen(function* () {
+      const input = yield* messaging.accept({
+        identityId,
+        eventId: "early-crash",
+        sourceMessageId: "source",
+        payload: { text: "pending media" },
+      });
+      const first = yield* messaging.claimInbox({
+        identityId,
+        leaseSeconds: 1,
+      });
+      if (!first) throw new Error("Expected initial claim");
+      expect(first.nativeInput).toMatchObject({
+        inputId: input.id,
+        address: identityId,
+        protocol: "eve-keyed-input-v1",
+        content: null,
+      });
+      yield* Effect.sleep("1100 millis");
+      const next = yield* messaging.claimInbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      if (!next) throw new Error("Expected recovery before preparation");
+      expect(next.nativeInput).toEqual(first.nativeInput);
+      expect(next.leaseToken).not.toBe(first.leaseToken);
+      const staleLease = {
+        identityId,
+        id: first.id,
+        leaseToken: first.leaseToken,
+      };
+      expect(
+        yield* messaging
+          .prepareInboxHandoff({
+            transcripts: [],
+            lease: staleLease,
+            content: "stale extraction",
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(LeaseLost);
+      const prepared = yield* messaging.prepareInboxHandoff({
+        transcripts: [],
+        lease: { identityId, id: next.id, leaseToken: next.leaseToken },
+        content: "current extraction",
+      });
+      expect(prepared).toEqual({
+        ...first.nativeInput,
+        content: "current extraction",
+      });
+      expect(
+        yield* messaging
+          .prepareInboxHandoff({
+            transcripts: [],
+            lease: staleLease,
+            content: "late extraction",
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(LeaseLost);
+    })
+  ));
+
+test("the first prepared transcript intents commit together and never mix or resurrect on replay", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      const input = yield* messaging.accept({
+        identityId,
+        eventId: "transcript-race",
+        sourceMessageId: "voice",
+        payload: { text: "voice fixture" },
+      });
+      const claim = yield* messaging.claimInbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      if (!claim) throw new Error("Expected claim");
+      const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
+      const candidates = [
+        ["alpha one", "alpha two"],
+        ["beta one", "beta two"],
+      ];
+      yield* Effect.all(
+        candidates.map((transcripts) =>
+          messaging.prepareInboxHandoff({
+            lease,
+            content: "same immutable content",
+            transcripts,
+          })
+        ),
+        { concurrency: 2 }
+      );
+      const intents = yield* sql<{
+        key: string;
+        text: string;
+      }>`SELECT delivery_key AS key, payload->>'text' AS text FROM channel_outbox WHERE identity_id = ${identityId} ORDER BY sequence`;
+      expect(intents).toHaveLength(2);
+      expect(intents.map((item) => item.key)).toEqual([
+        `transcript:${input.id}:0:0`,
+        `transcript:${input.id}:1:0`,
+      ]);
+      expect(
+        candidates.some((candidate) =>
+          candidate.every(
+            (text, index) =>
+              intents[index]?.text ===
+              `I heard: ${text}\nIf this is incorrect, send a correction.`
+          )
+        )
+      ).toBe(true);
+      yield* sql`DELETE FROM channel_outbox WHERE identity_id = ${identityId}`;
+      yield* messaging.prepareInboxHandoff({
+        lease,
+        content: "same immutable content",
+        transcripts: ["late contradictory transcript"],
+      });
+      expect(
+        yield* sql`SELECT id FROM channel_outbox WHERE identity_id = ${identityId}`
+      ).toHaveLength(0);
+      expect(
+        yield* messaging
+          .prepareInboxHandoff({
+            lease,
+            content: "different content",
+            transcripts: [],
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(PayloadConflict);
+    })
+  ));
+
+test("a conflicting transcript intent rolls back both preparation and earlier intents", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      const input = yield* messaging.accept({
+        identityId,
+        eventId: "transcript-rollback",
+        sourceMessageId: "voice",
+        payload: { text: "voice fixture" },
+      });
+      yield* messaging.enqueue({
+        identityId,
+        deliveryKey: `transcript:${input.id}:1:0`,
+        payload: { text: "conflicting existing intent" },
+      });
+      const claim = yield* messaging.claimInbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      if (!claim) throw new Error("Expected claim");
+      const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
+      expect(
+        yield* messaging
+          .prepareInboxHandoff({
+            lease,
+            content: "prepared voice",
+            transcripts: ["first", "second"],
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(PayloadConflict);
+      expect(
+        (yield* messaging.checkInboxLease(lease)).nativeInput?.content
+      ).toBeNull();
+      const rows = yield* sql<{
+        key: string;
+      }>`SELECT delivery_key AS key FROM channel_outbox WHERE identity_id = ${identityId}`;
+      expect(rows).toEqual([{ key: `transcript:${input.id}:1:0` }]);
     })
   ));

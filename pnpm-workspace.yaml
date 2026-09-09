@@ -23,4 +23,6 @@ allowBuilds:
   sharp: true
 patchedDependencies:
   "@linqapp/chat-sdk-adapter@0.5.1": patches/@linqapp__chat-sdk-adapter@0.5.1.patch
+  "@workflow/world-postgres@5.0.0-beta.39": patches/@workflow__world-postgres@5.0.0-beta.39.patch
+  "@workflow/world@5.0.0-beta.32": patches/@workflow__world@5.0.0-beta.32.patch
   eve@0.49.0: patches/eve@0.49.0.patch

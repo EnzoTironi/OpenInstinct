@@ -176,6 +176,20 @@
       "when": 1788934594446,
       "tag": "0024_light_magma",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788939220471,
+      "tag": "0025_mighty_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788940141675,
+      "tag": "0026_cooing_thunderbolt",
+      "breakpoints": true
     }
   ]
 }

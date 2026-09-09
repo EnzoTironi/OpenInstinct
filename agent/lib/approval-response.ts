@@ -3,8 +3,8 @@ import type {
   ApprovalResponseDecision,
 } from "eve/tools/approval";
 import { isSessionOwned } from "@db/services/sessions";
-import { scopeFromPrincipal } from "./principal-scope";
-import { requireChannelPrincipal } from "./channel-session";
+import { scopeFromPrincipal } from "../../shared/identity/principal-scope";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { serverRuntime } from "../../server/runtime";
 
 export async function authorizeApprovalResponse(context: {

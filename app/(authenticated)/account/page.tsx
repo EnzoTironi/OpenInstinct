@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { serverRuntime } from "../../../server/runtime";
 import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 import { LinkedChannels } from "./linked-channels";
+import { PersonalMemorySection } from "./personal-memory";
 
 export default async function AccountPage() {
   const requestHeaders = await headers();
@@ -65,6 +66,7 @@ export default async function AccountPage() {
           </section>
         </>
       )}
+      <PersonalMemorySection />
     </main>
   );
 }

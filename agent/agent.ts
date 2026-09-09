@@ -3,8 +3,8 @@ import { Effect } from "effect";
 import { scheduledRunIdentity } from "@agent/lib/schedules/identity";
 import { isScheduledAgentRunLeaseActive } from "@db/services/scheduled-agent-run-leases";
 import { getGatewayModel } from "@db/services/settings";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
-import { requireChannelPrincipal } from "@agent/lib/channel-session";
+import { scopeFromPrincipal } from "../shared/identity/principal-scope";
+import { requireChannelPrincipal } from "../server/channels/principal";
 import { serverRuntime } from "../server/runtime";
 import { installationModel } from "./lib/installation-model";
 

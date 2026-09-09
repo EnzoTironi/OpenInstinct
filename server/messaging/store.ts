@@ -41,8 +41,9 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
   const table = sql(queue.table);
   const sourceMessageId =
     lane === "inbox" ? sql`source_message_id` : sql`NULL::text`;
+  const nativeInput = lane === "inbox" ? sql`native_input` : sql`NULL::jsonb`;
   const columns = sql`id, identity_id AS "identityId", ${sql(queue.key)} AS key,
-    ${sourceMessageId} AS "sourceMessageId", payload, status, attempts, lease_token AS "leaseToken",
+    ${sourceMessageId} AS "sourceMessageId", payload, ${nativeInput} AS "nativeInput", status, attempts, lease_token AS "leaseToken",
     lease_expires_at::text AS "leaseExpiresAt", ${sql(queue.result)} AS "resultId",
     last_error AS "lastError"`;
 
@@ -99,7 +100,9 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
   ) {
     const identities = yield* sql<{
       active: boolean;
-    }>`SELECT revoked_at IS NULL AS active
+      channel: string;
+      principalId: string;
+    }>`SELECT revoked_at IS NULL AS active, channel, 'better-auth:' || user_id AS "principalId"
       FROM channel_identity WHERE id = ${identityId} FOR UPDATE SKIP LOCKED`;
     if (!identities[0]) return null;
     yield* sql`UPDATE ${table} SET status = 'uncertain', last_error = 'lease_expired',
@@ -113,15 +116,26 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
       }
       return null;
     }
+    const recoverable =
+      lane === "inbox" ? sql`native_input IS NOT NULL` : sql`FALSE`;
     const blocked =
       yield* sql`SELECT id FROM ${table} WHERE identity_id = ${identityId}
-      AND status IN ('dispatching', 'uncertain') LIMIT 1`;
+      AND (status = 'dispatching' OR (status = 'uncertain' AND NOT (${recoverable}))) LIMIT 1`;
     if (blocked.length > 0) return null;
-    const rows = yield* sql`UPDATE ${table} SET status = 'dispatching',
+    const snapshot =
+      lane === "inbox"
+        ? sql`, native_input = COALESCE(native_input, jsonb_build_object(
+          'protocol', 'eve-keyed-input-v1', 'inputId', id::text,
+          'channel', ${identities[0].channel}::text, 'address', identity_id::text,
+          'principalId', ${identities[0].principalId}::text, 'content', NULL))`
+        : sql``;
+    const rows =
+      yield* sql`UPDATE ${table} SET status = 'dispatching'${snapshot},
         attempts = attempts + 1, lease_token = ${randomUUID()},
         lease_expires_at = clock_timestamp() + ${leaseSeconds} * interval '1 second'
       WHERE id = (SELECT id FROM ${table} WHERE identity_id = ${identityId}
-        AND status = 'queued' ORDER BY ${sql(queue.order)}, id
+        AND (status = 'queued' OR (status = 'uncertain' AND (${recoverable})))
+        ORDER BY ${sql(queue.order)}, id
         LIMIT 1 FOR UPDATE SKIP LOCKED)
       RETURNING ${columns}`;
     return rows[0]

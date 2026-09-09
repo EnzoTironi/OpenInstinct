@@ -1,7 +1,7 @@
 import { defineHook } from "eve/hooks";
 import { ensureScope } from "@db/services/scope";
 import { claimSession } from "@db/services/sessions";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "../../../../shared/identity/principal-scope";
 
 export default defineHook({
   events: {

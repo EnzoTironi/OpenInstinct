@@ -29,6 +29,7 @@ describe("root and worker capability boundaries", () => {
       "gmail.ts",
       "load_skill.ts",
       "messaging.ts",
+      "personal-memory.ts",
       "read_file.ts",
       "respond-to-approval.ts",
       "schedules.ts",

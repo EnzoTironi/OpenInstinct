@@ -7,7 +7,7 @@ import {
   type ConnectionPrincipal,
 } from "eve/connections";
 import type { ToolContext } from "eve/tools";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 import { serverRuntime } from "../../../server/runtime";
 import { getGoogleWorkspaceToken } from "../../../server/google-workspace";
 import { createGoogleWorkspaceChallenge } from "../../../server/google-workspace/challenge";

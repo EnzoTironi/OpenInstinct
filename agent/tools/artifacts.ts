@@ -9,7 +9,7 @@ import { serverRuntime } from "../../server/runtime";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
 import { approvalMessageSchema } from "../lib/approval-message";
 import { authorizeApprovalResponse } from "../lib/approval-response";
-import { requireChannelPrincipal } from "../lib/channel-session";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { resolveModeValue } from "../lib/mode";
 
 const toolArtifactId = z.fromJSONSchema(

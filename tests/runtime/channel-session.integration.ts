@@ -10,7 +10,7 @@ import { Kapso } from "../../server/channels/kapso";
 import {
   channelPrincipal,
   requireChannelPrincipal,
-} from "../../agent/lib/channel-session";
+} from "../../server/channels/principal";
 import { runtimeDatabase } from "./database";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 

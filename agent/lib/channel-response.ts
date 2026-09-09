@@ -11,7 +11,7 @@ import {
   channelConsentRevision,
   validateChannelConsent,
 } from "./channel-consent";
-import { channelPrincipal } from "./channel-session";
+import { channelPrincipal } from "../../server/channels/principal";
 
 type ResponseInput =
   (typeof internalCallbackBodies)["/internal/channel-input/respond"]["Type"];

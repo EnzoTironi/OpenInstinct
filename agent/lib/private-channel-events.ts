@@ -7,7 +7,7 @@ import type { ChannelEvents } from "eve/channels";
 import type { Identity } from "../../server/accounts";
 import { ChannelTransport } from "../../server/channels/transport";
 import { serverRuntime } from "../../server/runtime";
-import { requireChannelPrincipal } from "./channel-session";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 
 export function privateChannelEvents(channel: Identity["channel"]) {
   const terminal = (

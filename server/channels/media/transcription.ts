@@ -1,3 +1,4 @@
+import { ChannelTranscriptSchema } from "../../messaging/model";
 import { NodeServices } from "@effect/platform-node";
 import { createGateway, transcribe } from "ai";
 import { Config, Effect, FileSystem, Redacted, Schema, Stream } from "effect";
@@ -120,13 +121,9 @@ export const transcribeChannelAudio = Effect.fn("transcribeChannelAudio")(
         }),
       catch: () => new ChannelMediaError({ reason: "transcription_failed" }),
     });
-    return yield* Schema.decodeUnknownEffect(
-      Schema.String.check(
-        Schema.isTrimmed(),
-        Schema.isMinLength(1),
-        Schema.isMaxLength(3000)
-      )
-    )(result.text.trim()).pipe(
+    return yield* Schema.decodeUnknownEffect(ChannelTranscriptSchema)(
+      result.text.trim()
+    ).pipe(
       Effect.mapError(
         () => new ChannelMediaError({ reason: "transcription_failed" })
       )

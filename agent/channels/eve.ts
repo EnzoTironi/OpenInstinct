@@ -26,6 +26,7 @@ export default eveChannel({
 
       return {
         attributes: {
+          authSessionId: identity.sessionId,
           conversationChannel: "eve",
           workspaceId: scope.workspaceId,
         },
@@ -127,6 +128,7 @@ async function requestIdentityFromRequest(request: Request) {
   if (!session) return undefined;
   return {
     scope: accessScopeForUser(`better-auth:${session.user.id}`),
+    sessionId: session.session.id,
   };
 }
 

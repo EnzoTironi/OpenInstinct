@@ -1,6 +1,6 @@
 import type { SessionContext } from "eve/context";
 import { isSessionOwned } from "@db/services/sessions";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "../../../../shared/identity/principal-scope";
 
 export async function requireWorkerScope(
   context: Pick<SessionContext, "session">

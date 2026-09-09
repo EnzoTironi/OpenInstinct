@@ -1,6 +1,6 @@
 import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
 import { z } from "zod";
-import { requireChannelPrincipal } from "../lib/channel-session";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { serverRuntime } from "../../server/runtime";
 import { resolveModeValue } from "@agent/lib/mode";
 import { scheduledReportIdentity } from "@agent/lib/schedules/identity";

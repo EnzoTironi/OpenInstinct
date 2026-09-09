@@ -11,7 +11,7 @@ import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { channelChallengeSchema } from "../../shared/identity/channel-auth";
 import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
-import { channelPrincipal } from "../../agent/lib/channel-session";
+import { channelPrincipal } from "../../server/channels/principal";
 import { personalMemoryProvider } from "../../agent/lib/personal-memory-provider";
 
 const cookieHeader = (response: Response) =>

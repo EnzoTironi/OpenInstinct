@@ -1,9 +1,8 @@
 import { Effect } from "effect";
-import { PgClient } from "@effect/sql-pg";
 import { readAuthSession } from "@db/services/auth/session";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import { PersonalMemory } from "./index";
-import { PersonalMemoryError, requirePersonalMemoryMembership } from "./access";
+import { PersonalMemoryError, requirePersonalMemoryWebSession } from "./access";
 
 export const inspectPersonalMemory = Effect.fn("inspectPersonalMemory")(
   function* (headers: Headers) {
@@ -15,7 +14,7 @@ export const inspectPersonalMemory = Effect.fn("inspectPersonalMemory")(
     return snapshot;
   },
   Effect.catchTag(
-    ["AuthUnavailable", "SqlError"],
+    "AuthUnavailable",
     () => new PersonalMemoryError({ reason: "unavailable" })
   )
 );
@@ -40,15 +39,9 @@ const requirePersonalMemorySession = Effect.fn("requirePersonalMemorySession")(
     const session = yield* readAuthSession(headers);
     if (!session)
       return yield* new PersonalMemoryError({ reason: "unauthenticated" });
-    const scope = yield* requirePersonalMemoryMembership(
-      accessScopeForUser(`better-auth:${session.user.id}`)
+    return yield* requirePersonalMemoryWebSession(
+      accessScopeForUser(`better-auth:${session.user.id}`),
+      session.session.id
     );
-    const sql = yield* PgClient.PgClient;
-    const rows = yield* sql`SELECT id FROM public.session
-    WHERE id = ${session.session.id} AND "userId" = ${session.user.id}
-    AND "expiresAt" > clock_timestamp()`;
-    if (rows.length !== 1)
-      return yield* new PersonalMemoryError({ reason: "unauthenticated" });
-    return scope;
   }
 );

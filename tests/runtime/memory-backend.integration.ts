@@ -4,8 +4,10 @@ import { Effect } from "effect";
 import type { MemoryTurnStartedContext } from "eve/memory";
 import { fileMemory, MemoryDocumentConflictError } from "eve/memory/file";
 import { afterAll, expect, test } from "vitest";
-import { memoryDocumentBackend } from "../../agent/lib/memory-document-backend";
+import { createMemoryDocumentBackend } from "../../agent/lib/memory-document-backend";
 import { serverRuntime } from "../../server/runtime";
+
+const memoryDocumentBackend = createMemoryDocumentBackend(Effect.void);
 
 async function withDocument(body: (key: string) => Promise<void>) {
   await serverRuntime.runPromise(

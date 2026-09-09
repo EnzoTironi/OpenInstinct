@@ -7,7 +7,7 @@ import { Config, Effect } from "effect";
 import type { ChannelEvents } from "eve/channels";
 import { test } from "vitest";
 import { privateChannelEvents } from "../../agent/lib/private-channel-events";
-import { channelPrincipal } from "../../agent/lib/channel-session";
+import { channelPrincipal } from "../../server/channels/principal";
 import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
 

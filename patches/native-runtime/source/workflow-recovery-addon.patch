@@ -1,0 +1,309 @@
+diff --git a/.changeset/input-wake-recovery.md b/.changeset/input-wake-recovery.md
+new file mode 100644
+index 0000000..e1c5bbd
+--- /dev/null
++++ b/.changeset/input-wake-recovery.md
+@@ -0,0 +1,5 @@
++---
++"@workflow/core": patch
++---
++
++Expose recovery of an already accepted hook input by native receipt key, republishing its wake without reconstructing or resending the payload.
+diff --git a/packages/core/src/runtime.ts b/packages/core/src/runtime.ts
+index 4828ff7..91ec7f1 100644
+--- a/packages/core/src/runtime.ts
++++ b/packages/core/src/runtime.ts
+@@ -155,6 +155,7 @@ export {
+   type ResumedHook,
+   type ResumeHookOptions,
+   resumeHook,
++  recoverHookResume,
+   resumeWebhook,
+ } from './runtime/resume-hook.js';
+ export { snapshotResumeInput } from './runtime/resume-input.js';
+diff --git a/packages/core/src/runtime/resume-hook.ts b/packages/core/src/runtime/resume-hook.ts
+index 2067cb5..45b27ff 100644
+--- a/packages/core/src/runtime/resume-hook.ts
++++ b/packages/core/src/runtime/resume-hook.ts
+@@ -438,6 +438,46 @@ async function resumeKeyedHook(
+   return receipt;
+ }
+ 
++/**
++ * Republishes the wake for an input already durably accepted by this World.
++ * The receipt is always read from native storage; callers supply only its key.
++ * Missing receipts do not enqueue work. Terminal runs return their receipt
++ * without a wake. Queue failures remain errors even though acceptance survived.
++ */
++export async function recoverHookResume(input: {
++  readonly runId: string;
++  readonly inputId: string;
++  readonly scope?: string;
++}): Promise<HookResumeReceipt | undefined> {
++  if (!input.runId || !input.inputId || input.inputId.length > 256) {
++    throw new TypeError(
++      'Hook recovery requires runId and an inputId of 1–256 characters.'
++    );
++  }
++  const world = await getWorldLazy();
++  if (!world.events.getResume) {
++    throw new Error(
++      'This World does not support caller-stable hook acceptance.'
++    );
++  }
++  const receipt = await world.events.getResume(input.runId, input.inputId);
++  if (receipt === undefined) return undefined;
++  if (
++    receipt.runId !== input.runId ||
++    receipt.resumeId !== input.inputId ||
++    receipt.resumeScope !== input.scope
++  ) {
++    throw new WorkflowWorldError(
++      'Input receipt does not match its recovery scope.',
++      {
++        status: 422,
++      }
++    );
++  }
++  await wakeAcceptedHookResume(world, receipt);
++  return receipt;
++}
++
+ async function replayHookResume(
+   world: World,
+   tokenOrHook: string | Hook,
+@@ -461,7 +501,16 @@ async function replayHookResume(
+       { status: 422 }
+     );
+   }
+-  const run = await world.runs.get(claim.runId);
++  await wakeAcceptedHookResume(world, receipt);
++  return receipt;
++}
++
++/** Both content replay and payload-free recovery use the same native wake. */
++async function wakeAcceptedHookResume(
++  world: World,
++  receipt: HookResumeReceipt
++): Promise<void> {
++  const run = await world.runs.get(receipt.runId);
+   if (!isTerminalWorkflowRunStatus(run.status)) {
+     await wakeHookRun(world, run.runId, {
+       workflowName: run.workflowName,
+@@ -470,7 +519,6 @@ async function replayHookResume(
+       traceCarrier: run.executionContext?.traceCarrier,
+     });
+   }
+-  return receipt;
+ }
+ 
+ /**
+diff --git a/packages/world-postgres/test/core-acceptance-child.mjs b/packages/world-postgres/test/core-acceptance-child.mjs
+index 484f964..02cb83a 100644
+--- a/packages/world-postgres/test/core-acceptance-child.mjs
++++ b/packages/world-postgres/test/core-acceptance-child.mjs
+@@ -1,16 +1,22 @@
+ import { createWorld } from '../dist/index.js';
+-import { resumeHook, setWorld } from '../../core/dist/runtime.js';
++import {
++  resumeHook,
++  recoverHookResume,
++  setWorld,
++} from '../../core/dist/runtime.js';
+ process.env.PORT = '0';
+ process.once(
+   'message',
+-  async ({ connectionString, token, payload, options }) => {
++  async ({ connectionString, token, payload, options, recovery }) => {
+     const world = createWorld({
+       connectionString,
+       applicationManagedShutdown: true,
+     });
+     setWorld(world);
+     try {
+-      const receipt = await resumeHook(token, payload, undefined, options);
++      const receipt = recovery
++        ? await recoverHookResume(options)
++        : await resumeHook(token, payload, undefined, options);
+       process.send({ receipt });
+     } catch (error) {
+       process.send({ error: String(error) });
+diff --git a/packages/world-postgres/test/core-acceptance.test.ts b/packages/world-postgres/test/core-acceptance.test.ts
+index befa6d1..fc045be 100644
+--- a/packages/world-postgres/test/core-acceptance.test.ts
++++ b/packages/world-postgres/test/core-acceptance.test.ts
+@@ -12,7 +12,11 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
+ import { makeWorkerUtils } from 'graphile-worker';
+ import { Pool } from 'pg';
+ import { afterAll, beforeAll, expect, it } from 'vitest';
+-import { resumeHook, setWorld } from '../../core/dist/runtime.js';
++import {
++  resumeHook,
++  recoverHookResume,
++  setWorld,
++} from '../../core/dist/runtime.js';
+ import { createWorld } from '../dist/index.js';
+ 
+ let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
+@@ -48,7 +52,11 @@ afterAll(async () => {
+ });
+ it('binds the actual semantic payload, rejects cross-run input, and replays after closure', async () => {
+   const hook = await createAcceptanceFixture(world);
+-  const options = { runId: hook.runId, inputId: randomUUID(), scope: randomUUID() };
++  const options = {
++    runId: hook.runId,
++    inputId: randomUUID(),
++    scope: randomUUID(),
++  };
+   const first = await resumeHook(
+     hook.token,
+     { b: 2, a: 1 },
+@@ -86,18 +94,34 @@ it('binds the actual semantic payload, rejects cross-run input, and replays afte
+     await resumeHook(hook.token, { a: 1, b: 2 }, undefined, options)
+   ).toEqual(first);
+   expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(2);
+-  expect(await world.events.getResumeByScope!(options.scope, options.inputId)).toEqual(first);
+-  await expect(resumeHook(hook.token, { a: 1, b: 2 }, undefined, { ...options, scope: 'different' })).rejects.toThrow();
++  expect(
++    await world.events.getResumeByScope!(options.scope, options.inputId)
++  ).toEqual(first);
++  await expect(
++    resumeHook(hook.token, { a: 1, b: 2 }, undefined, {
++      ...options,
++      scope: 'different',
++    })
++  ).rejects.toThrow();
+ }, 30_000);
+ 
+-it('recovers a real core process killed after event commit and before queue publication', async () => {
++it('recovers without payload after a real core process dies between event commit and queue publication', async () => {
+   const hook = await createAcceptanceFixture(world);
+-  const options = { runId: hook.runId, inputId: randomUUID(), scope: randomUUID() };
++  const options = {
++    runId: hook.runId,
++    inputId: randomUUID(),
++    scope: randomUUID(),
++  };
+   const barrier = await pool.connect();
++  const producerName = `core-prewake-${randomUUID()}`;
++  const producerUrl = new URL(connectionString);
++  producerUrl.searchParams.set('application_name', producerName);
+   const child = fork(
+     fileURLToPath(new URL('./core-acceptance-child.mjs', import.meta.url)),
+     [],
+-    { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }
++    {
++      stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
++    }
+   );
+   const exited = once(child, 'exit');
+   let childMessage: unknown;
+@@ -110,7 +134,7 @@ it('recovers a real core process killed after event commit and before queue publ
+       'LOCK TABLE graphile_worker._private_jobs IN ACCESS EXCLUSIVE MODE'
+     );
+     child.send({
+-      connectionString,
++      connectionString: producerUrl.toString(),
+       token: hook.token,
+       payload: { text: 'persisted' },
+       options,
+@@ -134,20 +158,48 @@ it('recovers a real core process killed after event commit and before queue publ
+     expect(canonical).toBeDefined();
+     expect(queueBlocked).toBe(true);
+     expect(childMessage).toBeUndefined();
++    const publishers = await pool.query<{ pid: number }>(
++      "SELECT pid FROM pg_stat_activity WHERE application_name = $1 AND cardinality(pg_blocking_pids(pid)) > 0 AND query LIKE '%add_job%'",
++      [producerName]
++    );
++    expect(publishers.rows.length).toBeGreaterThan(0);
+     child.kill('SIGKILL');
+     expect((await exited)[1]).toBe('SIGKILL');
++    // A blocked PostgreSQL statement can outlive its dead TCP client.
++    // Terminate those exact backends before releasing the queue barrier.
++    const pids = publishers.rows.map((row) => row.pid);
++    await pool.query(
++      'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = ANY($1::int[])',
++      [pids]
++    );
++    while (
++      (
++        await pool.query(
++          'SELECT 1 FROM pg_stat_activity WHERE pid = ANY($1::int[])',
++          [pids]
++        )
++      ).rowCount
++    ) {
++      await new Promise((resolve) => setTimeout(resolve, 10));
++    }
+     await barrier.query('COMMIT');
++    const unpublished = await pool.query(
++      "SELECT 1 FROM graphile_worker._private_jobs WHERE convert_from(decode(payload->>'data', 'base64'), 'UTF8')::jsonb->>'runId' = $1",
++      [hook.runId]
++    );
++    expect(unpublished.rows).toHaveLength(0);
+     const retry = fork(
+       fileURLToPath(new URL('./core-acceptance-child.mjs', import.meta.url)),
+       [],
+-      { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }
++      {
++        stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
++      }
+     );
+     const retriedExit = once(retry, 'exit');
+     const response = once(retry, 'message');
+     retry.send({
+       connectionString,
+-      token: hook.token,
+-      payload: { text: 'persisted' },
++      recovery: true,
+       options,
+     });
+     try {
+@@ -158,11 +210,9 @@ it('recovers a real core process killed after event commit and before queue publ
+     }
+     expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(1);
+     const jobs = await pool.query(
+-      'SELECT payload FROM graphile_worker._private_jobs'
++      "SELECT convert_from(decode(payload->>'data', 'base64'), 'UTF8')::jsonb AS body FROM graphile_worker._private_jobs"
+     );
+-    expect(
+-      jobs.rows.some((row) => JSON.stringify(row.payload).includes(hook.runId))
+-    ).toBe(true);
++    expect(jobs.rows.some((row) => row.body.runId === hook.runId)).toBe(true);
+   } finally {
+     if (child.exitCode === null && child.signalCode === null)
+       child.kill('SIGKILL');
+@@ -170,3 +220,33 @@ it('recovers a real core process killed after event commit and before queue publ
+     barrier.release();
+   }
+ }, 30_000);
++
++it('recovery reads native proof, rejects wrong scopes, and does not wake terminal or absent inputs', async () => {
++  const hook = await createAcceptanceFixture(world);
++  const key = { runId: hook.runId, inputId: randomUUID(), scope: randomUUID() };
++  const receipt = await resumeHook(
++    hook.token,
++    { text: 'stored only' },
++    undefined,
++    key
++  );
++  await world.events.create(hook.runId, {
++    eventType: 'run_completed',
++    eventData: { output: new Uint8Array() },
++  });
++  const before = await pool.query(
++    'SELECT count(*)::int AS count FROM graphile_worker._private_jobs'
++  );
++  expect(await recoverHookResume(key)).toEqual(receipt);
++  expect(
++    await recoverHookResume({ ...key, inputId: randomUUID() })
++  ).toBeUndefined();
++  await expect(
++    recoverHookResume({ ...key, scope: randomUUID() })
++  ).rejects.toThrow('recovery scope');
++  const after = await pool.query(
++    'SELECT count(*)::int AS count FROM graphile_worker._private_jobs'
++  );
++  expect(after.rows).toEqual(before.rows);
++  expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(1);
++}, 30_000);

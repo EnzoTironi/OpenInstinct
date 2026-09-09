@@ -9,6 +9,7 @@ import { Kapso } from "./channels/kapso";
 import { ChannelTransport } from "./channels/transport";
 import { ChannelAuthPrompts } from "./channel-auth/prompts";
 import { MemoryDocuments } from "./memory/documents";
+import { PersonalMemory } from "./personal-memory";
 
 const database = PgClient.layerConfig({
   url: Config.redacted("DATABASE_URL"),
@@ -19,6 +20,7 @@ const infrastructure = Layer.mergeAll(
   ChannelAccounts.layer,
   Messaging.layer,
   MemoryDocuments.layer,
+  PersonalMemory.layer,
   Telegram.layer,
   Kapso.layer
 ).pipe(Layer.provideMerge(database));

@@ -1,12 +1,12 @@
 import { requirePersonalMemoryMembership } from "../../server/personal-memory/access";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { PgClient } from "@effect/sql-pg";
 import { Config, Effect, Schema } from "effect";
 import { test } from "vitest";
-import type { MemoryTurnStartedContext } from "eve/memory";
+import type { MemoryTurnStartedContext, MemoryToolsContext } from "eve/memory";
 import type { ToolContext } from "eve/tools";
 import { getAuth } from "../../db/services/auth";
 import { patchUserProfile } from "../../db/services/user-profile";
@@ -17,12 +17,14 @@ import { ChannelAccounts, type Identity } from "../../server/accounts";
 import { PersonalMemory } from "../../server/personal-memory";
 import { inspectPersonalMemory } from "../../server/personal-memory/export";
 import { serverRuntime } from "../../server/runtime";
-import { memoryDocumentBackend } from "../../agent/lib/memory-document-backend";
+import { createMemoryDocumentBackend } from "../../agent/lib/memory-document-backend";
 import { personalMemoryProvider } from "../../agent/lib/personal-memory-provider";
-import { channelPrincipal } from "../../agent/lib/channel-session";
+import { channelPrincipal } from "../../server/channels/principal";
 import { inspectStoredPersonalMemory } from "../../agent/tools/personal-memory";
 import { GET } from "../../app/api/account/personal-memory/export/route";
 import { runtimeDatabase } from "./database";
+
+const memoryDocumentBackend = createMemoryDocumentBackend(Effect.void);
 
 const cookies = (response: Response) =>
   response.headers
@@ -69,12 +71,15 @@ async function fromProcess(cookie: string) {
   )(output);
 }
 
-function memoryContext(identity: Identity): MemoryTurnStartedContext {
+function memoryContext(
+  identity: Identity
+): MemoryTurnStartedContext & Pick<MemoryToolsContext, "channel"> {
   const principal = channelPrincipal(identity);
   const scope = accessScopeForUser(principal.principalId);
   const id = randomUUID();
   return {
     abortSignal: new AbortController().signal,
+    channel: { kind: identity.channel },
     memory: {
       scope: {
         key: `personal-memory-test:${randomUUID()}`,
@@ -126,7 +131,7 @@ test("actual account auth, profile store, Eve provider, private tool and export 
   const origin = applicationOrigin();
   const users: Identity[] = [];
   const keys: string[] = [];
-  const login = async () => {
+  const login = async (senderId: string = randomUUID()) => {
     const request = (
       path: string,
       body: { channel: "telegram"; purpose: "login" } | { id: string },
@@ -152,7 +157,7 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     const sender = {
       channel: "telegram" as const,
       installationId,
-      senderId: randomUUID(),
+      senderId,
     };
     await serverRuntime.runPromise(
       accounts.confirmChallenge({ token, sender })
@@ -291,6 +296,172 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       (await GET(new Request(`${origin}/api/account/personal-memory/export`)))
         .status,
       401
+    );
+    const createNativeTools = personalMemoryProvider.tools;
+    assert.ok(createNativeTools);
+    const nativeTools = await createNativeTools(ownerContext);
+    const save = nativeTools?.save_memory;
+    const remove = nativeTools?.remove_memory;
+    assert.ok(save && remove);
+    await assert.rejects(async () =>
+      save.execute(
+        // @ts-expect-error The native heterogeneous tool map erases its input type.
+        { text: "Another account cannot use this bound tool" },
+        toolContext(otherContext)
+      )
+    );
+    const browserSession = await auth.api.getSession({ headers: ownerHeaders });
+    assert.ok(browserSession);
+    const webPrincipal = {
+      principalId: ownerScope.userId,
+      principalType: "user" as const,
+      authenticator: "authjs",
+      attributes: {
+        conversationChannel: "eve",
+        workspaceId: ownerScope.workspaceId,
+        authSessionId: browserSession.session.id,
+      },
+    };
+    const webContext = {
+      ...ownerContext,
+      session: {
+        ...ownerContext.session,
+        auth: { current: webPrincipal, initiator: webPrincipal },
+      },
+    };
+    assert.match(
+      (await personalMemoryProvider.recall["turn.started"](webContext))
+        ?.messages[0]?.content ?? "",
+      /Owner-only note/
+    );
+    const missingWebSession = {
+      ...webContext,
+      session: {
+        ...webContext.session,
+        auth: {
+          ...webContext.session.auth,
+          current: {
+            ...webPrincipal,
+            attributes: {
+              conversationChannel: "eve",
+              workspaceId: ownerScope.workspaceId,
+            },
+          },
+        },
+      },
+    };
+    await assert.rejects(
+      personalMemoryProvider.recall["turn.started"](missingWebSession)
+    );
+    const webTools = await createNativeTools(webContext);
+    assert.ok(webTools?.save_memory);
+    const secondLogin = await login(owner.identity.senderId);
+    const secondSession = await auth.api.getSession({
+      headers: new Headers({ cookie: secondLogin.cookie }),
+    });
+    assert.ok(secondSession);
+    // A different active session for the same account must not authorize this captured web principal.
+    const revokedWeb = await auth.handler(
+      new Request(`${origin}/api/auth/sign-out`, {
+        method: "POST",
+        headers: {
+          origin,
+          cookie: owner.cookie,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      })
+    );
+    assert.equal(revokedWeb.status, 200);
+    assert.equal(
+      (
+        await auth.api.getSession({
+          headers: new Headers({ cookie: secondLogin.cookie }),
+        })
+      )?.user.id,
+      owner.identity.userId
+    );
+    await assert.rejects(
+      personalMemoryProvider.recall["turn.started"](webContext)
+    );
+    await assert.rejects(async () =>
+      webTools.save_memory?.execute(
+        // @ts-expect-error Synthetic input exercises the real native save_memory tool.
+        { text: "Must not use another active browser session" },
+        toolContext(webContext)
+      )
+    );
+    const browserSecret = randomBytes(32).toString("base64url");
+    const link = await serverRuntime.runPromise(
+      accounts.issueChallenge({
+        channel: "telegram",
+        installationId,
+        browserSecret,
+        link: {
+          userId: owner.identity.userId,
+          sessionId: secondSession.session.id,
+        },
+      })
+    );
+    const linkedSender = {
+      channel: "telegram" as const,
+      installationId,
+      senderId: randomUUID(),
+    };
+    await serverRuntime.runPromise(
+      accounts.confirmChallenge({ token: link.token, sender: linkedSender })
+    );
+    await serverRuntime.runPromise(
+      accounts.consumeChallenge({
+        challengeId: link.challengeId,
+        browserSecret,
+        currentSessionId: secondSession.session.id,
+      })
+    );
+    users.push(
+      await serverRuntime.runPromise(accounts.getActiveIdentity(linkedSender))
+    );
+    const beforeRevocation = await memoryDocumentBackend.read({
+      key: ownerContext.memory.scope.key,
+      signal: ownerContext.abortSignal,
+    });
+    await serverRuntime.runPromise(
+      accounts.revokeIdentity({
+        identityId: owner.identity.id,
+        userId: owner.identity.userId,
+      })
+    );
+    // Revoking one channel preserves the account membership and the other linked channel.
+    assert.equal(
+      (await serverRuntime.runPromise(memory.inspect(ownerScope))).notes
+        .documents.length,
+      1
+    );
+    await assert.rejects(
+      personalMemoryProvider.recall["turn.started"](ownerContext)
+    );
+    await assert.rejects(createNativeTools(ownerContext));
+    await assert.rejects(async () =>
+      save.execute(
+        // The public heterogeneous memory-tool map erases each tool's input type.
+        // @ts-expect-error Synthetic input exercises the real native save_memory tool.
+        { text: "Must never be saved through a revoked channel" },
+        toolContext(ownerContext)
+      )
+    );
+    await assert.rejects(async () =>
+      remove.execute(
+        // @ts-expect-error Synthetic input exercises the real native remove_memory tool.
+        { index: 0 },
+        toolContext(ownerContext)
+      )
+    );
+    assert.deepEqual(
+      await memoryDocumentBackend.read({
+        key: ownerContext.memory.scope.key,
+        signal: ownerContext.abortSignal,
+      }),
+      beforeRevocation
     );
     await serverRuntime.runPromise(
       Effect.gen(function* () {

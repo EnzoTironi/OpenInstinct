@@ -135,12 +135,17 @@ const makeTransport = Effect.gen(function* () {
     const visibility = lane === "inbox" ? sql`i.revoked_at IS NULL` : sql`TRUE`;
     const cancelRevoked =
       lane === "outbox" ? sql`i.revoked_at IS NOT NULL` : sql`FALSE`;
+    const recoverable =
+      lane === "inbox"
+        ? sql`q.status = 'uncertain' AND q.native_input IS NOT NULL`
+        : sql`FALSE`;
     const rows = yield* sql`SELECT ${identityColumns}
       FROM channel_identity i
       JOIN LATERAL (
         SELECT min(${receivedAt}) AS oldest FROM ${table} q
         WHERE q.identity_id = i.id AND (
-          (q.status = 'dispatching' AND q.lease_expires_at <= clock_timestamp())
+          (${recoverable})
+          OR (q.status = 'dispatching' AND q.lease_expires_at <= clock_timestamp())
           OR (q.status = 'queued' AND (${cancelRevoked} OR NOT EXISTS (
             SELECT 1 FROM ${table} blocker WHERE blocker.identity_id = i.id AND (
               blocker.status = 'uncertain' OR

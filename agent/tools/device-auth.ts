@@ -4,7 +4,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { approvalMessageSchema } from "@agent/lib/approval-message";
 import { authorizeApprovalResponse } from "@agent/lib/approval-response";
-import { requireChannelPrincipal } from "@agent/lib/channel-session";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { resolveModeValue } from "@agent/lib/mode";
 import { applicationOrigin } from "@shared/environment/origin";
 import { NativeDeviceAuth } from "../../server/accounts/device";

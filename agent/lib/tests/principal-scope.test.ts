@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 
 describe("principal scope", () => {

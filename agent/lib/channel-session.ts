@@ -1,69 +1,20 @@
-import { Effect, Schedule, Schema } from "effect";
+import { Effect, Schema } from "effect";
 import type { ChannelReceiveContext, ChannelSendOptions } from "eve/channels";
 import type { Identity } from "../../server/accounts";
-import { Messaging, type Lease } from "../../server/messaging";
+import {
+  ChannelDispatchError,
+  channelPrincipal,
+  requireChannelPrincipal,
+} from "../../server/channels/principal";
+import { Artifacts } from "../../server/artifacts";
+import {
+  Messaging,
+  NativeInboxContentSchema,
+  type Lease,
+} from "../../server/messaging";
 import { ChannelTransport } from "../../server/channels/transport";
-import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { loadChannelContent } from "../../server/channels/media/content";
 import { mediaFailureMessage } from "../../server/channels/media/policy";
-
-class ChannelDispatchError extends Schema.TaggedError<ChannelDispatchError>()(
-  "ChannelDispatchError",
-  {
-    reason: Schema.Literals([
-      "unauthorized",
-      "handoff_unknown",
-      "unsupported_media",
-    ]),
-  }
-) {}
-
-export const channelPrincipal = (
-  identity: Identity,
-  sourceMessageId?: string
-) => {
-  const principalId = `better-auth:${identity.userId}`;
-  const attributes = {
-    channelIdentityId: identity.id,
-    conversationChannel: identity.channel,
-    conversationId: identity.id,
-    workspaceId: accessScopeForUser(principalId).workspaceId,
-  };
-  const principal = {
-    attributes,
-    authenticator: "verified-channel",
-    principalId,
-    principalType: "user",
-  };
-  if (!sourceMessageId) return principal;
-  return { ...principal, attributes: { ...attributes, sourceMessageId } };
-};
-
-export const requireChannelPrincipal = Effect.fn("requireChannelPrincipal")(
-  function* (channel: Identity["channel"], auth: ChannelSendOptions["auth"]) {
-    if (!auth)
-      return yield* new ChannelDispatchError({ reason: "unauthorized" });
-    const identityId = yield* Schema.decodeUnknownEffect(
-      Schema.String.check(Schema.isUUID())
-    )(auth.attributes.channelIdentityId).pipe(
-      Effect.mapError(
-        () => new ChannelDispatchError({ reason: "unauthorized" })
-      )
-    );
-    const transport = yield* ChannelTransport;
-    const identity = yield* transport.activeIdentity(identityId, channel);
-    const expected = channelPrincipal(identity);
-    if (
-      auth.principalType !== "user" ||
-      auth.principalId !== expected.principalId ||
-      auth.attributes.workspaceId !== expected.attributes.workspaceId ||
-      auth.attributes.conversationChannel !== channel ||
-      auth.attributes.conversationId !== identity.id
-    )
-      return yield* new ChannelDispatchError({ reason: "unauthorized" });
-    return identity;
-  }
-);
 
 export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
   function* (
@@ -77,87 +28,134 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
       return yield* new ChannelDispatchError({ reason: "unauthorized" });
     const messaging = yield* Messaging;
     const receipt = yield* messaging.checkInboxLease(lease);
-    const loaded = yield* loadChannelContent(
-      identity,
-      receipt.payload,
-      receipt.id
-    ).pipe(
-      Effect.catchTag("ChannelMediaError", (error) =>
-        Effect.gen(function* () {
-          yield* requireChannelPrincipal(channel, auth);
-          yield* messaging.checkInboxLease(lease);
-          const transport = yield* ChannelTransport;
-          yield* transport.enqueueText({
-            identityId: identity.id,
-            deliveryKey: `unsupported:${receipt.id}`,
-            text: mediaFailureMessage(error),
-          });
-          yield* messaging.markInboxFailed({
-            lease,
-            reason: "adapter_rejected",
-          });
-          return yield* new ChannelDispatchError({
-            reason: "unsupported_media",
-          });
-        })
-      )
-    );
-    // Media I/O may outlive a revocation. Recheck authority and the lease before use.
-    yield* requireChannelPrincipal(channel, auth);
-    yield* messaging.checkInboxLease(lease);
-    for (const [index, transcript] of loaded.transcripts.entries()) {
-      const transport = yield* ChannelTransport;
-      yield* transport.enqueueText({
-        identityId: identity.id,
-        deliveryKey: `transcript:${receipt.id}:${String(index)}`,
-        text: `I heard: ${transcript}\nIf this is incorrect, send a correction.`,
-      });
-    }
+    const snapshot = receipt.nativeInput;
     const principal = channelPrincipal(
       identity,
       receipt.sourceMessageId ?? undefined
     );
-    // A claimed durable payload is authoritative; cross-channel caller text is not.
-    yield* messaging.checkInboxLease(lease);
-    const session = yield* Effect.tryPromise({
-      try: () =>
-        context.from(identity.id).send(loaded.content, {
-          auth: principal,
-          turnPolicy: "queue",
-        }),
-      catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
-    }).pipe(
-      Effect.flatMap((candidate) =>
-        Effect.gen(function* () {
-          const owner = yield* Effect.tryPromise({
-            try: () => context.resolveSession(identity.id),
-            catch: () =>
-              new ChannelDispatchError({ reason: "handoff_unknown" }),
-          }).pipe(
-            Effect.repeat({
-              while: (resolved) => !resolved,
-              schedule: Schedule.spaced("100 millis"),
+    if (
+      !snapshot ||
+      snapshot.inputId !== receipt.id ||
+      snapshot.address !== identity.id ||
+      snapshot.channel !== channel ||
+      snapshot.principalId !== principal.principalId
+    )
+      return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
+    const address = context.from(snapshot.address);
+    const session = yield* Effect.gen(function* () {
+      // Native acceptance must be checked before media access: an accepted input may
+      // outlive its source artifact, and a missing artifact is not evidence of rejection.
+      const acceptedInput = yield* Effect.tryPromise({
+        try: () => address.getInputAcceptance(snapshot.inputId, principal),
+        catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
+      }).pipe(Effect.timeout("25 seconds"));
+      if (acceptedInput) {
+        if (
+          snapshot.content === null ||
+          acceptedInput.inputId !== snapshot.inputId
+        )
+          return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
+        yield* requireChannelPrincipal(channel, auth);
+        yield* messaging.checkInboxLease(lease);
+        const recovered = yield* Effect.tryPromise({
+          try: () =>
+            address.recoverInputAcceptance(snapshot.inputId, principal),
+          catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
+        }).pipe(Effect.timeout("25 seconds"));
+        if (
+          !recovered ||
+          recovered.inputId !== acceptedInput.inputId ||
+          recovered.sessionId !== acceptedInput.sessionId ||
+          recovered.eventId !== acceptedInput.eventId ||
+          recovered.payloadDigest !== acceptedInput.payloadDigest
+        )
+          return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
+        return context.attachSession(recovered.sessionId);
+      }
+      // Only a successful lookup returning absence permits preparation or another send.
+      yield* requireChannelPrincipal(channel, auth);
+      yield* messaging.checkInboxLease(lease);
+      let content = snapshot.content;
+      if (content === null) {
+        const loaded = yield* loadChannelContent(
+          identity,
+          receipt.payload,
+          receipt.id
+        ).pipe(
+          Effect.catchTag("ChannelMediaError", (error) =>
+            Effect.gen(function* () {
+              yield* requireChannelPrincipal(channel, auth);
+              yield* messaging.checkInboxLease(lease);
+              const transport = yield* ChannelTransport;
+              yield* transport.enqueueText({
+                identityId: identity.id,
+                deliveryKey: `unsupported:${receipt.id}`,
+                text: mediaFailureMessage(error),
+              });
+              yield* messaging.markInboxFailed({
+                lease,
+                reason: "adapter_rejected",
+              });
+              return yield* new ChannelDispatchError({
+                reason: "unsupported_media",
+              });
             })
-          );
-          if (owner.id !== candidate.id)
+          )
+        );
+        yield* requireChannelPrincipal(channel, auth);
+        yield* messaging.checkInboxLease(lease);
+        const prepared = yield* messaging.prepareInboxHandoff({
+          lease,
+          transcripts: loaded.transcripts,
+          content: yield* Schema.decodeUnknownEffect(NativeInboxContentSchema)(
+            loaded.content
+          ),
+        });
+        content = prepared.content;
+      } else if (receipt.payload.attachments?.length) {
+        const artifacts = yield* Artifacts;
+        for (const attachment of receipt.payload.attachments) {
+          const artifact = yield* artifacts.readForSource({
+            identityId: identity.id,
+            sourceInboxId: receipt.id,
+            mediaId: attachment.id,
+          });
+          if (!artifact)
             return yield* new ChannelDispatchError({
               reason: "handoff_unknown",
             });
-          return owner;
-        })
-      ),
-      // Cold send returns a candidate before alias ownership commits. Keep the lane
-      // leased until this exact candidate owns it; another owner is not acceptance proof.
-      Effect.timeout("25 seconds"),
+        }
+      }
+      yield* requireChannelPrincipal(channel, auth);
+      yield* messaging.checkInboxLease(lease);
+      const sent = yield* Effect.tryPromise({
+        try: () =>
+          address.send(
+            Schema.is(Schema.NonEmptyString)(content) ? content : [...content],
+            {
+              auth: principal,
+              inputId: snapshot.inputId,
+              turnPolicy: "queue",
+            }
+          ),
+        catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
+      }).pipe(Effect.timeout("25 seconds"));
+      if (
+        !sent.acceptedInput ||
+        sent.acceptedInput.inputId !== snapshot.inputId ||
+        sent.acceptedInput.sessionId !== sent.id
+      )
+        return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
+      return sent;
+    }).pipe(
       Effect.catchTag(
         "TimeoutError",
         () => new ChannelDispatchError({ reason: "handoff_unknown" })
       ),
-      Effect.tapError(() =>
-        messaging.markInboxUncertain({
-          lease,
-          reason: "handoff_unknown",
-        })
+      Effect.tapErrorTag("ChannelDispatchError", (error) =>
+        error.reason === "handoff_unknown"
+          ? messaging.markInboxUncertain({ lease, reason: "handoff_unknown" })
+          : Effect.void
       )
     );
     yield* messaging.markAccepted({

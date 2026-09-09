@@ -295,6 +295,16 @@ function workerSession(
   send = vi.fn<Session["send"]>()
 ): Session {
   return {
+    getInputAcceptance() {
+      throw new Error(
+        "Unexpected native acceptance lookup in scheduled-run regression."
+      );
+    },
+    recoverInputAcceptance() {
+      throw new Error(
+        "Unexpected native acceptance recovery in scheduled-run regression."
+      );
+    },
     cancel: vi.fn<Session["cancel"]>(),
     clear: vi.fn<Session["clear"]>(),
     compact: vi.fn<Session["compact"]>(),

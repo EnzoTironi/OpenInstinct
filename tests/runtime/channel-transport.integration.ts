@@ -208,6 +208,8 @@ test.each(["inbox", "outbox"] as const)(
           },
           reason: "handoff_unknown",
         });
+        if (lane === "inbox")
+          yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${lease.id}`;
         yield* claim({ identityId: expired, leaseSeconds: 30 });
         yield* claim({ identityId: busy, leaseSeconds: 30 });
         yield* sql`UPDATE ${table} SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE identity_id = ${expired} AND status = 'dispatching'`;
@@ -575,5 +577,79 @@ test("settled task reports retain the first atomic delivery across concurrent re
           })
           .pipe(Effect.flip)
       ).toBeInstanceOf(ChannelTransportError);
+    })
+  ));
+
+test("the dispatcher recovers native inputs before and after preparation while blocking unmarked inputs and output", () =>
+  run((transport, messaging, sql, identities) =>
+    Effect.gen(function* () {
+      const [preparedId, unpreparedId, outboundId, unmarkedId] = identities;
+      if (!preparedId || !unpreparedId || !outboundId || !unmarkedId)
+        throw new Error("Missing identities");
+      yield* Effect.forEach(
+        [preparedId, unpreparedId, unmarkedId],
+        (identityId) =>
+          Effect.gen(function* () {
+            yield* messaging.accept({
+              identityId,
+              eventId: "recovery-candidate",
+              sourceMessageId: "source",
+              payload: { text: "one" },
+            });
+            const claim = yield* messaging.claimInbox({
+              identityId,
+              leaseSeconds: 30,
+            });
+            if (!claim) throw new Error("Expected initial claim");
+            if (identityId === unmarkedId)
+              yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${claim.id}`;
+            const lease = {
+              identityId,
+              id: claim.id,
+              leaseToken: claim.leaseToken,
+            };
+            if (identityId === preparedId)
+              yield* messaging.prepareInboxHandoff({
+                transcripts: [],
+                lease,
+                content: "one",
+              });
+            yield* messaging.markInboxUncertain({
+              lease,
+              reason: "handoff_unknown",
+            });
+          })
+      );
+      yield* messaging.enqueue({
+        identityId: outboundId,
+        deliveryKey: "uncertain-send",
+        payload: { text: "reply" },
+      });
+      const outbound = yield* messaging.claimOutbox({
+        identityId: outboundId,
+        leaseSeconds: 30,
+      });
+      if (!outbound) throw new Error("Expected outbox claim");
+      yield* messaging.markOutboxUncertain({
+        lease: {
+          identityId: outboundId,
+          id: outbound.id,
+          leaseToken: outbound.leaseToken,
+        },
+        reason: "adapter_unavailable",
+      });
+      const candidates = yield* transport.inboxCandidates("telegram", 25);
+      expect(candidates.map((candidate) => candidate.id)).toContain(preparedId);
+      expect(candidates.map((candidate) => candidate.id)).toContain(
+        unpreparedId
+      );
+      expect(candidates.map((candidate) => candidate.id)).not.toContain(
+        unmarkedId
+      );
+      expect(
+        (yield* transport.outboxCandidates("telegram", 25)).map(
+          (candidate) => candidate.id
+        )
+      ).not.toContain(outboundId);
     })
   ));

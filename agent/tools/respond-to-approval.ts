@@ -3,7 +3,7 @@ import { defineTool } from "eve/tools";
 import { internalCallbackBodies } from "../../server/internal/callback-auth";
 import { serverRuntime } from "../../server/runtime";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
-import { requireChannelPrincipal } from "../lib/channel-session";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { postInternalRequest } from "../lib/internal-request";
 
 const callback = internalCallbackBodies["/internal/channel-input/respond"];

@@ -70,6 +70,7 @@ export const channelInbox = pgTable(
     sourceMessageId: text("source_message_id").notNull(),
     eventHash: text("event_hash").notNull(),
     payload: jsonb("payload").notNull(),
+    nativeInput: jsonb("native_input"),
     sequence: bigserial("sequence", { mode: "bigint" }).notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true })
       .defaultNow()
@@ -96,6 +97,14 @@ export const channelInbox = pgTable(
     check(
       "channel_inbox_payload_check",
       sql`jsonb_typeof(${table.payload}) = 'object' AND length(trim(${table.eventId})) > 0 AND ${table.eventHash} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      "channel_inbox_native_input_check",
+      sql`${table.nativeInput} IS NULL OR COALESCE(
+        jsonb_typeof(${table.nativeInput}) = 'object'
+        AND ${table.nativeInput}->>'protocol' = 'eve-keyed-input-v1'
+        AND ${table.nativeInput}->>'inputId' = ${table.id}::text
+        AND ${table.nativeInput}->>'address' = ${table.identityId}::text, false)`
     ),
     check("channel_inbox_attempts_check", sql`${table.attempts} >= 0`),
     check(

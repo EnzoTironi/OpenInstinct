@@ -8,19 +8,10 @@ has yet been observed; it does not mean the account has no saved notes.
 
 ## Composition
 
-Apply `composition.patch` at the application root after this source commit:
-
-- Add `PersonalMemory.layer` to the existing SQL infrastructure in
-  `server/runtime.ts`.
-- Import and render `PersonalMemorySection` in `/account`.
-- Register the new tool filename in the existing exact root-tool inventory.
-
-The coordinator owns the Drizzle schema and migration registration. `binding.sql`
-is the exact required table definition, not an independently registered migration.
-It was applied manually **only** to the existing `companion_runtime_test` database
-for this slice's real storage proof. The table therefore already exists there;
-coordinate migration adoption without inventing an applied migration record.
-No existing migration or schema file was changed by this worker.
+The application registers `PersonalMemory.layer` in `server/runtime.ts`, renders
+`PersonalMemorySection` in `/account`, and includes the inspection tool in the
+root tool inventory. `db/schema/memory.ts` defines the binding table; migration
+`0026_cooing_thunderbolt.sql` registers it in the normal application chain.
 
 `PersonalMemory.layer` requires `PgClient.PgClient`. Its methods are internal
 application operations; routes and tools must resolve authority first:
@@ -50,8 +41,13 @@ its hashing algorithm or accepts it from a client.
 `agent/lib/personal-memory-provider.ts` keeps the existing `fileMemory` provider,
 PostgreSQL backend, native save/remove tools and cancellation wrapper. Before
 recall/tool resolution it derives the canonical owner from `session.auth.current`,
-requires live membership, and checks the resolved value equals that workspace and
-the slot equals `profile`. Only then does it register the key. A primary-key plus
+requires current authority, and checks the resolved value equals that workspace
+and the slot equals `profile`. Only then does it register the key. Each native
+save/remove invocation resolves authority again from its actual execution context.
+Every document read or write holds the relevant channel identity, exact Better
+Auth session and membership locks in the same PostgreSQL transaction as storage
+access. Signing out the captured web session invalidates its tools even if another
+session for the same account remains active. A primary-key plus
 workspace/namespace/slot uniqueness constraint prevents reassigning an existing
 binding. Registration works before the first document is written, so there is no
 foreign key from the binding to `memory_document`.
@@ -108,5 +104,19 @@ the binding table was absent; a fresh-process test then exposed a construction
 cycle through the auth module. Keeping web-session validation at the export
 boundary removed that cycle. The corrected fresh-process proof passes.
 
-Independent review and final root integration are pending. This slice does not
-claim the remaining P06 correction/forget, deletion or restore acceptance gates.
+Independent review identified a write/revocation race in an earlier guard that
+checked authority outside the storage transaction. The retained baseline fails
+both channel revocation and exact web-session sign-out cases. The corrected
+implementation passes `personal-memory-revocation-race.integration.ts`: actual
+PostgreSQL locks force revocation to commit before a captured native tool attempts
+its write, which is rejected without modifying the document. Review of the
+transactional guard and shared principal helpers passed. Full checks and browser
+proof must be repeated after the pending native runtime package correction.
+
+An actual private-channel application input also observed and bound Eve's opaque
+profile key. That run then failed before the model call because of a schema
+compatibility error in the native package; it does not establish a successful
+model turn, recovery, or messenger delivery for the current package cohort.
+
+This slice does not claim the remaining P06 correction/forget, deletion or restore
+acceptance gates.

@@ -337,3 +337,90 @@ The [September 9 qualification](native-parallel-evidence.md) records the native
 worker, bounded question, one-report delivery and real browser checks, including
 the failed launch oracle and the distinction between graceful restart and
 automatic hard-crash recovery.
+
+## Native input and personal-memory integration (2026-09-09)
+
+The current development cohort adds a durable application input snapshot and
+native keyed acceptance lookup. Claiming an inbox lease records its stable input
+identity before media preparation; preparing it freezes the content and enqueues
+all transcription acknowledgements in the same PostgreSQL transaction. Concurrent
+preparation cannot mix transcript cohorts. A conflicting outbox intent rolls back
+both the earlier intents and the prepared content. Re-preparing accepted content
+does not recreate removed transcript intents. The focused messaging/channel suite
+passed 30 actual PostgreSQL tests, including the retained failing baseline for
+non-atomic transcript preparation.
+
+Personal-memory inspection/export now uses trusted Eve callback bindings, and
+native memory document operations retain live authority locks through storage I/O.
+Structured profile reads and mutations use the same transactional authorization
+rule. Partial field updates avoid restoring concurrently forgotten fields; an
+empty recalled profile retains its stable message identity so earlier profile
+content is replaced. Browser profile controls and native tools use those services.
+These controls do not establish full account deletion or restore reconciliation.
+
+The composed profile/memory/revocation suite passed ten PostgreSQL tests in three
+files. Channel revocation and exact web-session sign-out were tested against
+captured native tools with real transaction lock races. Independent review found
+and corrected the earlier post-check race. After integration, all six `pnpm check`
+tasks passed without cache, including TS7, lint, formatting, Knip and 1,038
+inherited regression tests. Inherited mocks remain regression evidence only.
+
+The current native package is **not yet qualified by a successful application
+model turn**. A fresh isolated database and actual Telegram-shaped HTTP input
+reached native acceptance and bound the profile key, but failed before model I/O:
+the bundled schema converter and external AI SDK disagreed about Zod's conversion
+context. The stored outgoing message was a runtime error notification, not the
+requested model response. This failure is retained and must be fixed at the
+package boundary before repeating the full build and browser/native proof.
+
+A second native input was committed before the process was killed with the
+application acknowledgement held by a real PostgreSQL lock. Its application
+receipt remained uncommitted. This establishes the targeted crash boundary only.
+Acceptance lookup alone does not prove that a native execution is woken if the
+process dies between its event commit and queue publication. A native recovery
+operation and fault proof are still required; no automatic recovery or successful
+post-restart response is claimed for this cohort. Previously recorded queue-lock
+and interrupted-step failures remain open unless separately closed by new proof.
+
+The subsequent Ripwire delta against `4b9e378` reports six blocking structural
+findings: growth and recent churn in the shared queue factory, recent churn in two
+integration-test helpers, and generated migration-journal growth. It also reports
+51 new-symbol findings, all generated migration snapshot structure. The queue
+factory grew from 161 to 175 lines and measured complexity from 17 to 20 to add
+inbox-only recovery metadata while retaining the existing outbox rules. No
+suppression ledger or baseline change was used. The quality gate is not green;
+passing compilation and tests does not change that result.
+
+
+The v3 native cohort pins application and vendored Zod to 4.5.4; the external AI
+SDK resolves that peer as well. In a separate fresh database, the actual
+application accepted a private-channel test input, bound its native profile key,
+and stored exactly the requested `pronto` model response. This closes the observed
+schema-conversion failure. Outgoing messenger credentials were absent; delivery
+was not qualified. All 3,774 installed Eve files were independently matched to the
+v3 archive. Complete source inputs and rebuilding instructions are checked in
+under `patches/native-runtime`.
+
+The composed v3 branch passed six uncached check tasks (1,038 regression tests),
+32 PostgreSQL tests in six files, and Eve/Next production compilation. Independent
+review confirmed that handoff recovery revalidates authority and lease, awaits
+native wake publication and requires the same four-field receipt. Native tests
+separately prove recovery after a commit before wake publication.
+
+The stronger application crash test still **failed**. After SIGKILL with the
+application acknowledgement blocked, the existing dispatcher automatically
+reclaimed the input after its real 150-second lease. It marked that same input
+accepted on attempt two, with the same canonical session and no additional user
+message. The required second model response never arrived within the test window:
+a Graphile job remained locked by the killed worker. No manual lock release was
+performed. The failure therefore leaves automatic interrupted execution recovery
+open even though accepted-input reconciliation succeeded. The test database and
+failure logs remain intact.
+
+On the same isolated application database, the browser completed a genuine Better
+Auth session using synthetic confirmation through the actual channel-account
+service. `/account` showed the memory binding produced by the model turn; the
+existing profile form saved synthetic fields, removed one while preserving the
+other, and the memory export link triggered a JSON download. These browser actions
+created no native conversation input during the crash test. They establish the
+local profile/control path, not full account erasure or provider delivery.

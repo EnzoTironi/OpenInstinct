@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Effect, Schema } from "effect";
+import { channelProviderSchema } from "../../shared/identity/channel-auth";
 
 export const IdentityId = Schema.String.check(Schema.isUUID());
 const reference = Schema.String.check(
@@ -104,12 +105,41 @@ const MessageStatus = Schema.Literals([
   "failed",
   "cancelled",
 ]);
+export const NativeInboxContentSchema = Schema.Union([
+  Schema.NonEmptyString,
+  Schema.Array(
+    Schema.Struct({ type: Schema.Literal("text"), text: Schema.NonEmptyString })
+  ).check(Schema.isMinLength(1)),
+]).annotate({ parseOptions: { onExcessProperty: "error" } });
+export const NativeInboxHandoffSchema = Schema.Struct({
+  protocol: Schema.Literal("eve-keyed-input-v1"),
+  inputId: IdentityId,
+  channel: channelProviderSchema,
+  address: IdentityId,
+  principalId: Schema.NonEmptyString,
+  content: Schema.NullOr(NativeInboxContentSchema),
+}).annotate({ parseOptions: { onExcessProperty: "error" } });
+export const ChannelTranscriptSchema = Schema.String.check(
+  Schema.isTrimmed(),
+  Schema.isMinLength(1),
+  Schema.isMaxLength(3000),
+  Schema.makeFilter((text) => text.isWellFormed())
+);
+export const PrepareInboxHandoffSchema = Schema.Struct({
+  lease: LeaseSchema,
+  content: NativeInboxContentSchema,
+  transcripts: Schema.Array(ChannelTranscriptSchema).check(
+    Schema.isMaxLength(10)
+  ),
+});
+
 const MessageReceiptSchema = Schema.Struct({
   id: IdentityId,
   identityId: IdentityId,
   key: reference,
   sourceMessageId: Schema.NullOr(reference),
   payload: MessagePayloadSchema,
+  nativeInput: Schema.NullOr(NativeInboxHandoffSchema),
   status: MessageStatus,
   attempts: Schema.Int,
   leaseToken: Schema.NullOr(IdentityId),
