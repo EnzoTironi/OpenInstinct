@@ -62,7 +62,7 @@ const run = <A, E>(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromUnknown(config)
       )
-    ) as Effect.Effect<A, E>
+    )
   );
 
 test("production-local client signs real HTTP requests and refuses redirects", async () => {

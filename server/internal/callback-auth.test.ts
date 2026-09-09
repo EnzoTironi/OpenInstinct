@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
-import { ConfigProvider, Effect, Layer, Schema } from "effect";
+import { ConfigProvider, Effect, Schema } from "effect";
 import { expect, test } from "vitest";
 import {
   readVerifiedInternalCallback,
@@ -24,7 +24,7 @@ const secretsLayer = (secretEncryptionKey: string) =>
 const run = <A, E>(
   effect: Effect.Effect<A, E, ResolvedInstallationSecrets>,
   config: Record<string, string> = configuration,
-  secrets: Layer.Layer<ResolvedInstallationSecrets> = secretsLayer(
+  secrets: ReturnType<typeof secretsLayer> = secretsLayer(
     configuration.SECRET_ENCRYPTION_KEY
   )
 ) =>
@@ -35,7 +35,7 @@ const run = <A, E>(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromUnknown(config)
       )
-    ) as Effect.Effect<A, E>
+    )
   );
 
 function request(
@@ -162,14 +162,20 @@ test("requires explicit valid secret and restricts cleartext destinations to loo
       secretsLayer("bad-key")
     )
   ).toMatchObject({ status: 503 });
-  for (const config of [
+  const remoteConfigs = [
     { ...configuration, BETTER_AUTH_URL: "http://remote.invalid" },
     { ...configuration, BETTER_AUTH_URL: "https://user:password@host.invalid" },
-  ]) {
-    expect(
-      await run(internalCallbackHeaders(route, body).pipe(Effect.flip), config)
-    ).toMatchObject({ status: 503 });
-  }
+  ];
+  await Promise.all(
+    remoteConfigs.map(async (config) => {
+      expect(
+        await run(
+          internalCallbackHeaders(route, body).pipe(Effect.flip),
+          config
+        )
+      ).toMatchObject({ status: 503 });
+    })
+  );
   expect(
     await run(internalCallbackOrigin, {
       ...configuration,
