@@ -1,0 +1,52 @@
+diff --git a/app/(authenticated)/account/page.tsx b/app/(authenticated)/account/page.tsx
+index d6525ca..0ab33c2 100644
+--- a/app/(authenticated)/account/page.tsx
++++ b/app/(authenticated)/account/page.tsx
+@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
+ import { serverRuntime } from "../../../server/runtime";
+ import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
+ import { LinkedChannels } from "./linked-channels";
++import { PersonalMemorySection } from "./personal-memory";
+ 
+ export default async function AccountPage() {
+   const requestHeaders = await headers();
+@@ -65,6 +66,7 @@ export default async function AccountPage() {
+           </section>
+         </>
+       )}
++      <PersonalMemorySection />
+     </main>
+   );
+ }
+diff --git a/server/runtime.ts b/server/runtime.ts
+index e417bfe..cf4afdf 100644
+--- a/server/runtime.ts
++++ b/server/runtime.ts
+@@ -9,6 +9,7 @@ import { Kapso } from "./channels/kapso";
+ import { ChannelTransport } from "./channels/transport";
+ import { ChannelAuthPrompts } from "./channel-auth/prompts";
+ import { MemoryDocuments } from "./memory/documents";
++import { PersonalMemory } from "./personal-memory";
+ 
+ const database = PgClient.layerConfig({
+   url: Config.redacted("DATABASE_URL"),
+@@ -19,6 +20,7 @@ const infrastructure = Layer.mergeAll(
+   ChannelAccounts.layer,
+   Messaging.layer,
+   MemoryDocuments.layer,
++  PersonalMemory.layer,
+   Telegram.layer,
+   Kapso.layer
+ ).pipe(Layer.provideMerge(database));
+diff --git a/tests/agent-tool-boundaries.test.ts b/tests/agent-tool-boundaries.test.ts
+index d5ea1a0..fc18bca 100644
+--- a/tests/agent-tool-boundaries.test.ts
++++ b/tests/agent-tool-boundaries.test.ts
+@@ -29,6 +29,7 @@ describe("root and worker capability boundaries", () => {
+       "gmail.ts",
+       "load_skill.ts",
+       "messaging.ts",
++      "personal-memory.ts",
+       "read_file.ts",
+       "respond-to-approval.ts",
+       "schedules.ts",
