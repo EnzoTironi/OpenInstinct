@@ -87,6 +87,53 @@ export const LeaseSchema = Schema.Struct({
 });
 export type Lease = typeof LeaseSchema.Type;
 
+const actorPrincipal = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(256),
+  Schema.isTrimmed()
+);
+const resolutionNote = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(200),
+  Schema.isTrimmed()
+);
+const providerMessageId = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(512),
+  Schema.isTrimmed()
+);
+
+export const OutboxResolutionDecisionSchema = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("mark_delivered"),
+    providerMessageId,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("cancel"),
+    reason: Schema.Literals([
+      "operator_cancelled",
+      "duplicate_confirmed",
+      "abandoned",
+    ]),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("authorize_retry"),
+    acknowledgment: Schema.Literal("duplicate_delivery_risk_accepted"),
+  }),
+]);
+export type OutboxResolutionDecision =
+  typeof OutboxResolutionDecisionSchema.Type;
+
+export const ResolveOutboxUncertainSchema = Schema.Struct({
+  identityId: IdentityId,
+  id: IdentityId,
+  decision: OutboxResolutionDecisionSchema,
+  actorPrincipalId: actorPrincipal,
+  note: Schema.optionalKey(resolutionNote),
+});
+export type ResolveOutboxUncertainInput =
+  typeof ResolveOutboxUncertainSchema.Type;
+
 export const DeliveryFailureSchema = Schema.Literals([
   "adapter_rejected",
   "adapter_unavailable",
@@ -170,6 +217,17 @@ export class PayloadConflict extends Schema.TaggedError<PayloadConflict>()(
 export class LeaseLost extends Schema.TaggedError<LeaseLost>()("LeaseLost", {
   id: IdentityId,
 }) {}
+export class OutboxResolutionRejected extends Schema.TaggedError<OutboxResolutionRejected>()(
+  "OutboxResolutionRejected",
+  {
+    id: IdentityId,
+    reason: Schema.Literals([
+      "not_uncertain",
+      "conflict",
+      "identity_inactive",
+    ]),
+  }
+) {}
 export class MessagingStorageError extends Schema.TaggedError<MessagingStorageError>()(
   "MessagingStorageError",
   { message: Schema.String }
@@ -180,6 +238,7 @@ export type MessagingError =
   | IdentityInactive
   | PayloadConflict
   | LeaseLost
+  | OutboxResolutionRejected
   | MessagingStorageError;
 
 export const decodeInput = <S extends Schema.Constraint>(schema: S) =>

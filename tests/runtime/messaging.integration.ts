@@ -6,6 +6,7 @@ import {
   IdentityInactive,
   InvalidMessage,
   LeaseLost,
+  OutboxResolutionRejected,
   PayloadConflict,
   Messaging,
   type Lease,
@@ -1005,5 +1006,251 @@ test("a conflicting transcript intent rolls back both preparation and earlier in
         key: string;
       }>`SELECT delivery_key AS key FROM channel_outbox WHERE identity_id = ${identityId}`;
       expect(rows).toEqual([{ key: `transcript:${input.id}:1:0` }]);
+    })
+  ));
+
+
+test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate-risk retry with audit", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      const actor = "better-auth:operator-proof";
+      const makeUncertain = Effect.fn("messaging.makeUncertain")(function* (
+        deliveryKey: string,
+        text: string
+      ) {
+        yield* messaging.enqueue({
+          identityId,
+          deliveryKey,
+          payload: { text },
+        });
+        const claim = yield* messaging.claimOutbox({
+          identityId,
+          leaseSeconds: 30,
+        });
+        if (!claim) throw new Error(`Expected claim for ${deliveryKey}`);
+        yield* messaging.markOutboxUncertain({
+          lease: {
+            identityId,
+            id: claim.id,
+            leaseToken: claim.leaseToken,
+          },
+          reason: "handoff_unknown",
+        });
+        return claim.id;
+      });
+
+      const deliveredId = yield* makeUncertain("delivered", "one");
+      expect(
+        yield* messaging.claimOutbox({ identityId, leaseSeconds: 30 })
+      ).toBeNull();
+      const delivered = yield* messaging.resolveOutboxUncertain({
+        identityId,
+        id: deliveredId,
+        actorPrincipalId: actor,
+        note: "provider lookup recovered receipt",
+        decision: {
+          kind: "mark_delivered",
+          providerMessageId: "tg:1001",
+        },
+      });
+      expect(delivered).toMatchObject({
+        id: deliveredId,
+        status: "sent",
+        resultId: "tg:1001",
+        lastError: null,
+      });
+      expect(
+        (
+          yield* messaging.resolveOutboxUncertain({
+            identityId,
+            id: deliveredId,
+            actorPrincipalId: actor,
+            decision: {
+              kind: "mark_delivered",
+              providerMessageId: "tg:1001",
+            },
+          })
+        ).status
+      ).toBe("sent");
+      expect(
+        yield* messaging
+          .resolveOutboxUncertain({
+            identityId,
+            id: deliveredId,
+            actorPrincipalId: actor,
+            decision: {
+              kind: "mark_delivered",
+              providerMessageId: "tg:other",
+            },
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(OutboxResolutionRejected);
+
+      const cancelledId = yield* makeUncertain("cancelled", "two");
+      const cancelled = yield* messaging.resolveOutboxUncertain({
+        identityId,
+        id: cancelledId,
+        actorPrincipalId: actor,
+        decision: { kind: "cancel", reason: "abandoned" },
+      });
+      expect(cancelled).toMatchObject({
+        id: cancelledId,
+        status: "cancelled",
+        lastError: "abandoned",
+      });
+
+      const retryId = yield* makeUncertain("retry", "three");
+      const retried = yield* messaging.resolveOutboxUncertain({
+        identityId,
+        id: retryId,
+        actorPrincipalId: actor,
+        decision: {
+          kind: "authorize_retry",
+          acknowledgment: "duplicate_delivery_risk_accepted",
+        },
+      });
+      expect(retried).toMatchObject({
+        id: retryId,
+        status: "queued",
+        lastError: "duplicate_retry_authorized",
+      });
+      expect(
+        yield* messaging
+          .resolveOutboxUncertain({
+            identityId,
+            id: retryId,
+            actorPrincipalId: actor,
+            // @ts-expect-error Exercise runtime rejection of a missing acknowledgment.
+            decision: { kind: "authorize_retry" },
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(InvalidMessage);
+
+      const reclaim = yield* messaging.claimOutbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      expect(reclaim?.id).toBe(retryId);
+      expect(reclaim?.attempts).toBe(2);
+
+      const audits = yield* sql<{
+        decision: string;
+        detail: string;
+        priorError: string | null;
+        actor: string;
+        note: string | null;
+      }>`SELECT decision, detail, prior_error AS "priorError",
+          actor_principal_id AS actor, note
+        FROM channel_outbox_resolution
+        WHERE identity_id = ${identityId}
+        ORDER BY created_at, id`;
+      expect(audits).toEqual([
+        {
+          decision: "mark_delivered",
+          detail: "tg:1001",
+          priorError: "handoff_unknown",
+          actor,
+          note: "provider lookup recovered receipt",
+        },
+        {
+          decision: "cancel",
+          detail: "abandoned",
+          priorError: "handoff_unknown",
+          actor,
+          note: null,
+        },
+        {
+          decision: "authorize_retry",
+          detail: "duplicate_delivery_risk_accepted",
+          priorError: "handoff_unknown",
+          actor,
+          note: null,
+        },
+      ]);
+    })
+  ));
+
+test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery or retry", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      const actor = "better-auth:operator-proof";
+      yield* messaging.enqueue({
+        identityId,
+        deliveryKey: "queued-only",
+        payload: { text: "still queued" },
+      });
+      const queued = yield* sql<{ id: string }>`
+        SELECT id FROM channel_outbox
+        WHERE identity_id = ${identityId} AND delivery_key = 'queued-only'`;
+      const queuedId = queued[0]?.id;
+      if (!queuedId) throw new Error("Expected queued outbox row");
+      expect(
+        yield* messaging
+          .resolveOutboxUncertain({
+            identityId,
+            id: queuedId,
+            actorPrincipalId: actor,
+            decision: { kind: "cancel", reason: "abandoned" },
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(OutboxResolutionRejected);
+
+      // Clear the queued blocker so the next claim can create uncertainty.
+      yield* sql`UPDATE channel_outbox SET status = 'cancelled',
+        last_error = 'test_cleanup' WHERE id = ${queuedId}`;
+
+      yield* messaging.enqueue({
+        identityId,
+        deliveryKey: "stuck",
+        payload: { text: "stuck" },
+      });
+      const claim = yield* messaging.claimOutbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      if (!claim) throw new Error("Expected claim");
+      yield* messaging.markOutboxUncertain({
+        lease: {
+          identityId,
+          id: claim.id,
+          leaseToken: claim.leaseToken,
+        },
+        reason: "lease_expired",
+      });
+      yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp()
+        WHERE id = ${identityId}`;
+      expect(
+        yield* messaging
+          .resolveOutboxUncertain({
+            identityId,
+            id: claim.id,
+            actorPrincipalId: actor,
+            decision: {
+              kind: "authorize_retry",
+              acknowledgment: "duplicate_delivery_risk_accepted",
+            },
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(IdentityInactive);
+      expect(
+        yield* messaging
+          .resolveOutboxUncertain({
+            identityId,
+            id: claim.id,
+            actorPrincipalId: actor,
+            decision: {
+              kind: "mark_delivered",
+              providerMessageId: "tg:revoked",
+            },
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(IdentityInactive);
+      const cancelled = yield* messaging.resolveOutboxUncertain({
+        identityId,
+        id: claim.id,
+        actorPrincipalId: actor,
+        decision: { kind: "cancel", reason: "operator_cancelled" },
+      });
+      expect(cancelled.status).toBe("cancelled");
     })
   ));

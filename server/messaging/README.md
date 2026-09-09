@@ -29,6 +29,12 @@ can still see unresolved work; the caller remains responsible for read access.
   ambiguous handoffs. Reasons are categorical and never contain raw errors.
 - `markInboxFailed({ lease, reason: "adapter_rejected" })` and its outbox
   counterpart are for confirmed terminal rejection with no external effect.
+- `resolveOutboxUncertain({ identityId, id, decision, actorPrincipalId, note? })`
+  reconciles one uncertain outbox row with an audit record:
+  `mark_delivered` (requires `providerMessageId`), `cancel` (categorical reason),
+  or `authorize_retry` (requires `acknowledgment: "duplicate_delivery_risk_accepted"`).
+  Delivery and retry require an active identity; cancel may clear a revoked
+  identity's stuck uncertain row. Matching terminal replays are idempotent.
 - `inspectInbox(identityId)` / `inspectOutbox(identityId)` return all status
   counts and up to 100 oldest uncertain receipts for account/operator views.
 
@@ -44,8 +50,12 @@ preserving attachment order. Replay with a changed digest raises `PayloadConflic
 
 Each lane permits one dispatching item per identity. Claims turn expired leases
 into `uncertain`; both dispatching and uncertain items block subsequent claims.
-Nothing automatically resets an uncertain item to queued. Reconciliation and
-explicit resolution are intentionally outside this increment.
+Nothing automatically resets an uncertain item to queued. Use
+`resolveOutboxUncertain` for audited reconciliation: mark delivered when a
+provider receipt is recovered, cancel when the intent is abandoned, or authorize
+a duplicate-risk retry when an operator accepts that the provider may deliver
+twice. Each resolution inserts into `channel_outbox_resolution` before mutating
+the outbox row.
 
 For a revoked identity, an outbox claim cancels queued output and returns null.
 Completion and preflight checks reject revoked identities. Revocation after the
