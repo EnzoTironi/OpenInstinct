@@ -82,7 +82,7 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
             eventId: randomUUID(),
           });
         }).pipe(
-          Effect.provide(unavailableLive),
+          Effect.provide(Layer.fresh(unavailableLive)),
           Effect.matchEffect({
             onSuccess: () =>
               Effect.sync(() => assert.fail("Expected crypto_unavailable")),
