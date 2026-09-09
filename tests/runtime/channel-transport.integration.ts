@@ -4,6 +4,7 @@ import { ConfigProvider, Effect, Layer } from "effect";
 import { expect, test } from "vitest";
 import { ChannelAccounts } from "../../server/accounts";
 import { Kapso } from "../../server/channels/kapso";
+import { ProviderRetryable } from "../../server/channels/provider-errors";
 import { Telegram } from "../../server/channels/telegram";
 import {
   ChannelTransport,
@@ -14,6 +15,8 @@ import { Messaging, PayloadConflict } from "../../server/messaging";
 
 import { runtimeDatabase } from "./database";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
+
+const unusedAdapterMethod = () => Effect.die("unused");
 
 const dependencies = Layer.mergeAll(
   Messaging.layer,
@@ -653,3 +656,109 @@ test("the dispatcher recovers native inputs before and after preparation while b
       ).not.toContain(outboundId);
     })
   ));
+
+test("HTTP 429 schedules retry_after deferral instead of terminal failure", () => {
+  const rateLimitedTelegramService = {
+    parse: unusedAdapterMethod,
+    downloadMedia: unusedAdapterMethod,
+    sendLoginConfirmation: unusedAdapterMethod,
+    answerCallbackQuery: unusedAdapterMethod,
+    sendText: () =>
+      Effect.fail(
+        new ProviderRetryable({
+          provider: "telegram",
+          status: 429,
+          retryAfterSeconds: 12,
+        })
+      ),
+  } satisfies Telegram["Service"];
+  const rateLimitedTelegram = Layer.succeed(
+    Telegram,
+    rateLimitedTelegramService
+  );
+  const idleKapsoService = {
+    parse: unusedAdapterMethod,
+    downloadMedia: unusedAdapterMethod,
+    sendText: unusedAdapterMethod,
+  } satisfies Kapso["Service"];
+  const idleKapso = Layer.succeed(Kapso, idleKapsoService);
+  const localDependencies = Layer.mergeAll(
+    Messaging.layer,
+    ChannelAccounts.layer,
+    rateLimitedTelegram,
+    idleKapso
+  ).pipe(Layer.provideMerge(runtimeDatabase));
+  const localServices = ChannelTransport.layer.pipe(
+    Layer.provideMerge(localDependencies)
+  );
+  const localRun = (body: Parameters<typeof fixture>[0]) =>
+    Effect.runPromise(
+      fixture(body).pipe(Effect.scoped, Effect.provide(localServices))
+    );
+  return localRun((transport, messaging, sql, identities) =>
+    Effect.gen(function* () {
+      const identityId = identities[0];
+      if (!identityId) throw new Error("Missing fixture");
+      yield* sql`UPDATE channel_identity SET installation_id = '123456'
+        WHERE id = ${identityId}`;
+      const receipt = yield* messaging.enqueue({
+        identityId,
+        deliveryKey: "rate-limit-one",
+        payload: { text: "temporary throttle" },
+      });
+      const follower = yield* messaging.enqueue({
+        identityId,
+        deliveryKey: "rate-limit-two",
+        payload: { text: "must wait behind deferred head" },
+      });
+      expect(
+        yield* transport.drainOutbox(identityId).pipe(
+          Effect.provideService(
+            ConfigProvider.ConfigProvider,
+            ConfigProvider.fromUnknown({
+              TELEGRAM_BOT_ID: "123456",
+              TELEGRAM_BOT_USERNAME: "transport_bot",
+            })
+          )
+        )
+      ).toEqual({
+        state: "deferred",
+        sent: 0,
+        failed: 0,
+        uncertain: 0,
+      });
+      const rows = yield* sql<{
+        id: string;
+        status: string;
+        last_error: string | null;
+        ready: boolean;
+      }>`SELECT id, status, last_error,
+        (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp()) AS ready
+        FROM channel_outbox WHERE identity_id = ${identityId}
+        ORDER BY sequence`;
+      expect(rows[0]).toMatchObject({
+        id: receipt.id,
+        status: "queued",
+        last_error: "adapter_rate_limited",
+        ready: false,
+      });
+      expect(rows[1]).toMatchObject({
+        id: follower.id,
+        status: "queued",
+        last_error: null,
+      });
+      expect(
+        yield* messaging.claimOutbox({ identityId, leaseSeconds: 30 })
+      ).toBeNull();
+      yield* sql`UPDATE channel_outbox
+        SET lease_expires_at = clock_timestamp() - interval '1 second'
+        WHERE id = ${receipt.id}`;
+      const claim = yield* messaging.claimOutbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      expect(claim?.id).toBe(receipt.id);
+      expect(claim?.key).toBe("rate-limit-one");
+    })
+  );
+});

@@ -103,7 +103,7 @@ const providerMessageId = Schema.String.check(
   Schema.isTrimmed()
 );
 
-export const OutboxResolutionDecisionSchema = Schema.Union([
+const OutboxResolutionDecisionSchema = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("mark_delivered"),
     providerMessageId,
@@ -137,6 +137,7 @@ export type ResolveOutboxUncertainInput =
 export const DeliveryFailureSchema = Schema.Literals([
   "adapter_rejected",
   "adapter_unavailable",
+  "adapter_rate_limited",
   "handoff_unknown",
   "lease_expired",
   "identity_revoked",
@@ -221,11 +222,7 @@ export class OutboxResolutionRejected extends Schema.TaggedError<OutboxResolutio
   "OutboxResolutionRejected",
   {
     id: IdentityId,
-    reason: Schema.Literals([
-      "not_uncertain",
-      "conflict",
-      "identity_inactive",
-    ]),
+    reason: Schema.Literals(["not_uncertain", "conflict", "identity_inactive"]),
   }
 ) {}
 export class MessagingStorageError extends Schema.TaggedError<MessagingStorageError>()(

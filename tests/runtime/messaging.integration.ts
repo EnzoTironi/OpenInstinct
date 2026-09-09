@@ -1009,7 +1009,6 @@ test("a conflicting transcript intent rolls back both preparation and earlier in
     })
   ));
 
-
 test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate-risk retry with audit", () =>
   run((messaging, sql, identityId) =>
     Effect.gen(function* () {
@@ -1060,17 +1059,15 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
         lastError: null,
       });
       expect(
-        (
-          yield* messaging.resolveOutboxUncertain({
-            identityId,
-            id: deliveredId,
-            actorPrincipalId: actor,
-            decision: {
-              kind: "mark_delivered",
-              providerMessageId: "tg:1001",
-            },
-          })
-        ).status
+        (yield* messaging.resolveOutboxUncertain({
+          identityId,
+          id: deliveredId,
+          actorPrincipalId: actor,
+          decision: {
+            kind: "mark_delivered",
+            providerMessageId: "tg:1001",
+          },
+        })).status
       ).toBe("sent");
       expect(
         yield* messaging

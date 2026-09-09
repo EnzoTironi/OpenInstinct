@@ -311,6 +311,13 @@ provider I/O atomic with revocation.
 Native Telegram/Kapso schedule tools resolve the authenticated channel owner.
 The existing Eve schedule loop invokes the agent and stores report chunks in the
 durable outbox with a transactionally recorded report/output association.
+
+HTTP 429 from a channel provider is a retryable rejection: the outbox keeps the
+same delivery identity, records `adapter_rate_limited`, and becomes claimable
+again after the provider `Retry-After` / `retry_after` delay (bounded). Permanent
+4xx responses still fail the intent; ambiguous transport or 5xx outcomes remain
+uncertain.
+
 The reminders page distinguishes queued, sent, failed, cancelled and uncertain
 delivery. Eve/Linq operations retain their existing dispatch path and do not
 initialize native authority services. No second scheduler was added.

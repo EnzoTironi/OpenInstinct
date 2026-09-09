@@ -132,6 +132,7 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
           'channel', ${identities[0].channel}::text, 'address', identity_id::text,
           'principalId', ${identities[0].principalId}::text, 'content', NULL))`
         : sql``;
+    // lease_expires_at on queued rows is a not-before time for rate-limit deferral.
     const rows =
       yield* sql`UPDATE ${table} SET status = 'dispatching'${snapshot},
         attempts = attempts + 1, lease_token = ${randomUUID()},
@@ -140,6 +141,7 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
         AND (status = 'queued' OR (status = 'uncertain' AND (${recoverable})))
         ORDER BY ${sql(queue.order)}, id
         LIMIT 1 FOR UPDATE SKIP LOCKED)
+        AND (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp())
       RETURNING ${columns}`;
     return rows[0]
       ? yield* Schema.decodeUnknownEffect(MessageClaimSchema)(rows[0])
@@ -186,7 +188,6 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
     if (!rows[0]) return yield* new LeaseLost({ id: lease.id });
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
-
 
   const resolveUncertain = Effect.fn("Messaging.resolveUncertain")(function* (
     input: ResolveOutboxUncertainInput
@@ -334,6 +335,22 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
 
+  const scheduleRetry = Effect.fn("Messaging.scheduleRetry")(function* (
+    lease: Lease,
+    retryAfterSeconds: number
+  ) {
+    yield* requireLease(lease);
+    const seconds = Math.min(Math.max(Math.floor(retryAfterSeconds), 1), 3_600);
+    const rows =
+      yield* sql`UPDATE ${table} SET status = 'queued', last_error = 'adapter_rate_limited',
+      lease_token = NULL,
+      lease_expires_at = clock_timestamp() + ${seconds} * interval '1 second'
+      WHERE id = ${lease.id} AND lease_token = ${lease.leaseToken}
+        AND lease_expires_at > clock_timestamp() RETURNING ${columns}`;
+    if (!rows[0]) return yield* new LeaseLost({ id: lease.id });
+    return yield* decodeReceipt(rows[0]);
+  }, sql.withTransaction);
+
   const inspect = Effect.fn("Messaging.inspect")(function* (
     identityId: string
   ) {
@@ -358,6 +375,7 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
     complete,
     stop,
     resolveUncertain,
+    scheduleRetry,
     inspect,
     checkLease: (lease: Lease) => sql.withTransaction(requireLease(lease)),
   };

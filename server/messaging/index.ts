@@ -54,6 +54,12 @@ const rejected = Schema.Struct({
   lease: LeaseSchema,
   reason: Schema.Literal("adapter_rejected"),
 });
+const scheduleRetryInput = Schema.Struct({
+  lease: LeaseSchema,
+  retryAfterSeconds: Schema.Int.check(
+    Schema.isBetween({ minimum: 1, maximum: 3_600 })
+  ),
+});
 
 function protect<A, R>(
   operation: Effect.Effect<A, MessagingError | SqlError | Schema.SchemaError, R>
@@ -196,6 +202,13 @@ const makeMessaging = Effect.gen(function* () {
       },
       protect
     ),
+    // Rate-limited sends are definite rejections; re-queue after the provider delay.
+    scheduleOutboxRetry: Effect.fn("Messaging.scheduleOutboxRetry")(function* (
+      input: typeof scheduleRetryInput.Type
+    ) {
+      const value = yield* decodeInput(scheduleRetryInput)(input);
+      return yield* outbox.scheduleRetry(value.lease, value.retryAfterSeconds);
+    }, protect),
     checkInboxLease: Effect.fn("Messaging.checkInboxLease")(function* (
       input: Lease
     ) {
