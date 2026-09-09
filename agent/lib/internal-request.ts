@@ -1,4 +1,5 @@
 import { getVercelOidcToken } from "@vercel/oidc";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { Config, ConfigProvider, Effect, Option, Schema } from "effect";
 import {
   InternalCallbackRejected,
@@ -57,6 +58,7 @@ export function postInternalRequest<Route extends InternalCallbackRoute>(
 ) {
   return Effect.runPromise(
     postInternalRequestEffect(route, body).pipe(
+      Effect.provide(ResolvedInstallationSecrets.layer),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromEnv()

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { get, put } from "@vercel/blob";
+import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import { z } from "zod";
 import {
   betterAuthSecretSchema,
@@ -105,4 +106,49 @@ function installationSecretsPathname() {
     .digest("hex")
     .slice(0, 32);
   return `openinstinct/system/${scope}/installation-secrets.v1.json`;
+}
+
+class InstallationSecretsUnavailable extends Schema.TaggedError<InstallationSecretsUnavailable>()(
+  "InstallationSecretsUnavailable",
+  {}
+) {}
+
+/**
+ * One resolved installation-secrets config for Effect services.
+ * Always sourced through getInstallationSecrets (explicit env or Blob provision).
+ */
+export class ResolvedInstallationSecrets extends Context.Service<
+  ResolvedInstallationSecrets,
+  {
+    readonly betterAuthSecret: Redacted.Redacted;
+    readonly secretEncryptionKey: Redacted.Redacted;
+  }
+>()("companion/ResolvedInstallationSecrets") {
+  static readonly layer = Layer.effect(
+    ResolvedInstallationSecrets,
+    Effect.gen(function* () {
+      const secrets = yield* Effect.tryPromise({
+        try: () => getInstallationSecrets(),
+        catch: () => new InstallationSecretsUnavailable(),
+      });
+      return ResolvedInstallationSecrets.of({
+        betterAuthSecret: Redacted.make(secrets.betterAuthSecret),
+        secretEncryptionKey: Redacted.make(secrets.secretEncryptionKey),
+      });
+    })
+  );
+
+  /** Explicit fixture for tests — does not read env or Blob. */
+  static layerFromResolved(secrets: {
+    readonly betterAuthSecret: string;
+    readonly secretEncryptionKey: string;
+  }) {
+    return Layer.succeed(
+      ResolvedInstallationSecrets,
+      ResolvedInstallationSecrets.of({
+        betterAuthSecret: Redacted.make(secrets.betterAuthSecret),
+        secretEncryptionKey: Redacted.make(secrets.secretEncryptionKey),
+      })
+    );
+  }
 }

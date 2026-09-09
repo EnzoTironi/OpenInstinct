@@ -4,8 +4,9 @@ import {
   channelChallengeRequestSchema,
 } from "../../shared/identity/channel-auth";
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { PgClient } from "@effect/sql-pg";
-import { Config, Context, Effect, Layer, Redacted, Schema } from "effect";
+import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import { ChannelAccountError, ChannelAccounts } from "./index";
 
@@ -49,7 +50,7 @@ const Device = Schema.Struct({
   browserBoundAt: Schema.NullOr(Schema.String),
   confirmedAt: Schema.NullOr(Schema.String),
 });
-type Failure = ChannelAccountError | SqlError | Config.ConfigError;
+type Failure = ChannelAccountError | SqlError;
 const invalid = () => new ChannelAccountError({ reason: "invalid_challenge" });
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -88,6 +89,7 @@ export class NativeDeviceAuth extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
       const accounts = yield* ChannelAccounts;
+      const installation = yield* ResolvedInstallationSecrets;
       const transaction = <A, E>(operation: Effect.Effect<A, E>) =>
         sql.withTransaction(
           Effect.gen(function* () {
@@ -158,7 +160,7 @@ export class NativeDeviceAuth extends Context.Service<
         input: typeof Issue.Type
       ) {
         const request = yield* decode(Issue, input);
-        const key = yield* Config.redacted("BETTER_AUTH_SECRET");
+        const key = installation.betterAuthSecret;
         if (Redacted.value(key).length < 32) return yield* invalid();
         return yield* transaction(
           Effect.gen(function* () {

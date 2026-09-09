@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { getVercelOidcToken } from "@vercel/oidc";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { ConfigProvider, Effect, Schema } from "effect";
 import { afterEach, expect, test, vi } from "vitest";
 import { readVerifiedInternalCallback } from "../../../server/internal/callback-auth";
@@ -49,16 +50,14 @@ test("preserves the Vercel deployment destination and both OIDC headers", async 
   expect(headers.has("x-internal-callback-signature")).toBe(false);
 });
 
-const configuration = {
-  SECRET_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
-};
 const route = "/internal/scheduled-run/report";
 const run = <A, E>(
-  effect: Effect.Effect<A, E>,
+  effect: Effect.Effect<A, E, ResolvedInstallationSecrets>,
   config: Record<string, string>
 ) =>
   Effect.runPromise(
     effect.pipe(
+      Effect.provide(ResolvedInstallationSecrets.layer),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromUnknown(config)
@@ -97,10 +96,7 @@ test("production-local client signs real HTTP requests and refuses redirects", a
             ? "/internal/scheduled-run/respond"
             : route
         ),
-        {
-          ...configuration,
-          BETTER_AUTH_URL: origin,
-        }
+        { BETTER_AUTH_URL: origin }
       ).then(
         (raw) => {
           outgoing.writeHead(
@@ -123,7 +119,6 @@ test("production-local client signs real HTTP requests and refuses redirects", a
   )(server.address());
   origin = `http://127.0.0.1:${String(address.port)}`;
   vi.stubEnv("BETTER_AUTH_URL", origin);
-  vi.stubEnv("SECRET_ENCRYPTION_KEY", configuration.SECRET_ENCRYPTION_KEY);
   vi.stubEnv("VERCEL_ENV", undefined);
   try {
     const input = { runId: randomUUID() };

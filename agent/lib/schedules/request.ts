@@ -1,3 +1,4 @@
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { ConfigProvider, Effect } from "effect";
 import { postInternalRequestEffect } from "../internal-request";
 import { InternalCallbackRejected } from "../../../server/internal/callback-auth";
@@ -13,6 +14,7 @@ export function postScheduledReport(runId: string) {
         return yield* new InternalCallbackRejected({ status: 503 });
       return undefined;
     }).pipe(
+      Effect.provide(ResolvedInstallationSecrets.layer),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromEnv()

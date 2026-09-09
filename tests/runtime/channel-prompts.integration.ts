@@ -2,7 +2,8 @@ import { accessScopeForUser } from "../../shared/identity/access-scope";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
-import { ConfigProvider, Effect, Layer } from "effect";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
+import { Effect, Layer } from "effect";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import { test } from "vitest";
 import {
@@ -37,8 +38,15 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
   const accountsLayer = ChannelAccounts.layer.pipe(
     Layer.provideMerge(runtimeDatabase)
   );
-  const live = ChannelAuthPrompts.layer.pipe(Layer.provideMerge(accountsLayer));
   const testKey = randomBytes(32).toString("base64url");
+  const secrets = ResolvedInstallationSecrets.layerFromResolved({
+    betterAuthSecret: testKey,
+    secretEncryptionKey: randomBytes(32).toString("base64"),
+  });
+  const live = ChannelAuthPrompts.layer.pipe(
+    Layer.provideMerge(secrets),
+    Layer.provideMerge(accountsLayer)
+  );
   await Effect.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
@@ -57,20 +65,33 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
       });
       try {
         const unavailableKey = yield* issue;
-        yield* rejected(
-          prompts
-            .prepare({
-              token: unavailableKey.token,
-              sender,
-              eventId: randomUUID(),
+        const unavailableLive = ChannelAuthPrompts.layer.pipe(
+          Layer.provideMerge(
+            ResolvedInstallationSecrets.layerFromResolved({
+              betterAuthSecret: "short",
+              secretEncryptionKey: randomBytes(32).toString("base64"),
             })
-            .pipe(
-              Effect.provideService(
-                ConfigProvider.ConfigProvider,
-                ConfigProvider.fromUnknown({})
-              )
-            ),
-          "crypto_unavailable"
+          ),
+          Layer.provideMerge(accountsLayer)
+        );
+        yield* Effect.gen(function* () {
+          const shortPrompts = yield* ChannelAuthPrompts;
+          yield* shortPrompts.prepare({
+            token: unavailableKey.token,
+            sender,
+            eventId: randomUUID(),
+          });
+        }).pipe(
+          Effect.provide(Layer.fresh(unavailableLive)),
+          Effect.matchEffect({
+            onSuccess: () =>
+              Effect.sync(() => assert.fail("Expected crypto_unavailable")),
+            onFailure: (failure) =>
+              Effect.sync(() => {
+                assert.ok(failure instanceof ChannelAuthPromptError);
+                assert.equal(failure.reason, "crypto_unavailable");
+              }),
+          })
         );
         const unqueued =
           yield* sql`SELECT challenge_id FROM public.channel_auth_prompt WHERE challenge_id = ${unavailableKey.challengeId}`;
@@ -308,18 +329,18 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;
         yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
       }
-    }).pipe(
-      Effect.provideService(
-        ConfigProvider.ConfigProvider,
-        ConfigProvider.fromUnknown({ BETTER_AUTH_SECRET: testKey })
-      ),
-      Effect.provide(live)
-    )
+    }).pipe(Effect.provide(live))
   );
 });
 
 test("prompt preparation delegates revoked link rejection to account preview", async () => {
   const live = ChannelAuthPrompts.layer.pipe(
+    Layer.provideMerge(
+      ResolvedInstallationSecrets.layerFromResolved({
+        betterAuthSecret: randomBytes(32).toString("base64url"),
+        secretEncryptionKey: randomBytes(32).toString("base64"),
+      })
+    ),
     Layer.provideMerge(
       ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase))
     )
@@ -374,14 +395,6 @@ test("prompt preparation delegates revoked link rejection to account preview", a
         yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
         yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
       }
-    }).pipe(
-      Effect.provideService(
-        ConfigProvider.ConfigProvider,
-        ConfigProvider.fromUnknown({
-          BETTER_AUTH_SECRET: randomBytes(32).toString("base64url"),
-        })
-      ),
-      Effect.provide(live)
-    )
+    }).pipe(Effect.provide(live))
   );
 });

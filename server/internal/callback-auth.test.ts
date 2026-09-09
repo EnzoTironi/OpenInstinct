@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { ConfigProvider, Effect, Schema } from "effect";
 import { expect, test } from "vitest";
 import {
@@ -12,14 +13,24 @@ const configuration = {
   BETTER_AUTH_URL: "http://127.0.0.1:3000",
   SECRET_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
 };
+const unusedBetterAuthSecret = randomBytes(32).toString("base64");
 const route = "/internal/scheduled-run/report";
 const body = JSON.stringify({ runId: randomUUID() });
+const secretsLayer = (secretEncryptionKey: string) =>
+  ResolvedInstallationSecrets.layerFromResolved({
+    betterAuthSecret: unusedBetterAuthSecret,
+    secretEncryptionKey,
+  });
 const run = <A, E>(
-  effect: Effect.Effect<A, E>,
-  config: Record<string, string> = configuration
+  effect: Effect.Effect<A, E, ResolvedInstallationSecrets>,
+  config: Record<string, string> = configuration,
+  secrets: ReturnType<typeof secretsLayer> = secretsLayer(
+    configuration.SECRET_ENCRYPTION_KEY
+  )
 ) =>
   Effect.runPromise(
     effect.pipe(
+      Effect.provide(secrets),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromUnknown(config)
@@ -100,10 +111,8 @@ test("rejects a signature transplanted between routes, audiences or installation
   expect(
     await run(
       readVerifiedInternalCallback(request(headers), route).pipe(Effect.flip),
-      {
-        ...configuration,
-        SECRET_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
-      }
+      configuration,
+      secretsLayer(randomBytes(32).toString("base64"))
     )
   ).toMatchObject({ status: 401 });
 });
@@ -146,14 +155,19 @@ test("rejects correctly signed expired and far-future requests", async () => {
 });
 
 test("requires explicit valid secret and restricts cleartext destinations to loopback", async () => {
-  const configs = [
-    { BETTER_AUTH_URL: configuration.BETTER_AUTH_URL },
-    { ...configuration, SECRET_ENCRYPTION_KEY: "bad-key" },
+  expect(
+    await run(
+      internalCallbackHeaders(route, body).pipe(Effect.flip),
+      configuration,
+      secretsLayer("bad-key")
+    )
+  ).toMatchObject({ status: 503 });
+  const remoteConfigs = [
     { ...configuration, BETTER_AUTH_URL: "http://remote.invalid" },
     { ...configuration, BETTER_AUTH_URL: "https://user:password@host.invalid" },
   ];
   await Promise.all(
-    configs.map(async (config) => {
+    remoteConfigs.map(async (config) => {
       expect(
         await run(
           internalCallbackHeaders(route, body).pipe(Effect.flip),
