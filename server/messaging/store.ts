@@ -189,7 +189,6 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
 
-
   const resolveUncertain = Effect.fn("Messaging.resolveUncertain")(function* (
     input: ResolveOutboxUncertainInput
   ) {
