@@ -11,9 +11,7 @@ const denialMessage = {
   unavailable: "Live authority could not be verified.",
 } as const;
 
-export async function assertLiveWorkerAuthority(
-  principal: SessionAuthContext
-) {
+export async function assertLiveWorkerAuthority(principal: SessionAuthContext) {
   await serverRuntime.runPromise(
     Effect.gen(function* () {
       const access = yield* BrowserWorkerAccess;

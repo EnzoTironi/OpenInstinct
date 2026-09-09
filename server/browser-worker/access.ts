@@ -52,19 +52,19 @@ export const requireBrowserWorkerChannelIdentity = Effect.fn(
   return scope;
 });
 
-export const requireBrowserWorkerLease = Effect.fn(
-  "requireBrowserWorkerLease"
-)(function* (scope: AccessScope, runId: string, leaseToken: string) {
-  yield* requireBrowserWorkerMembership(scope);
-  const sql = yield* PgClient.PgClient;
-  const rows = yield* sql`SELECT id FROM scheduled_agent_runs
+export const requireBrowserWorkerLease = Effect.fn("requireBrowserWorkerLease")(
+  function* (scope: AccessScope, runId: string, leaseToken: string) {
+    yield* requireBrowserWorkerMembership(scope);
+    const sql = yield* PgClient.PgClient;
+    const rows = yield* sql`SELECT id FROM scheduled_agent_runs
     WHERE id = ${runId} AND status = 'running'
       AND lease_token = ${leaseToken}
       AND lease_expires_at > clock_timestamp() FOR SHARE`;
-  if (rows.length !== 1)
-    return yield* new BrowserWorkerAccessError({ reason: "lease_inactive" });
-  return scope;
-});
+    if (rows.length !== 1)
+      return yield* new BrowserWorkerAccessError({ reason: "lease_inactive" });
+    return scope;
+  }
+);
 
 export const requireBrowserWorkerScheduleActive = Effect.fn(
   "requireBrowserWorkerScheduleActive"

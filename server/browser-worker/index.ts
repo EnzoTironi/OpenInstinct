@@ -1,10 +1,8 @@
+import { PgClient } from "@effect/sql-pg";
 import { Context, Effect, Layer, Schema } from "effect";
 import type { SessionAuthContext } from "eve/context";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
-import {
-  accessScopeForUser,
-  type AccessScope,
-} from "../../shared/identity/access-scope";
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { scopeFromPrincipal } from "../../shared/identity/principal-scope";
 import {
   BrowserWorkerAccessError,
@@ -25,8 +23,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       });
     const scope = yield* Effect.try({
       try: () => scopeFromPrincipal(principal),
-      catch: () =>
-        new BrowserWorkerAccessError({ reason: "unauthenticated" }),
+      catch: () => new BrowserWorkerAccessError({ reason: "unauthenticated" }),
     });
     const canonical = accessScopeForUser(scope.userId);
     if (canonical.workspaceId !== scope.workspaceId)
@@ -96,15 +93,22 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
   )
 );
 
+const makeBrowserWorkerAccess = Effect.gen(function* () {
+  const sql = yield* PgClient.PgClient;
+  return {
+    authorize: (principal: SessionAuthContext) =>
+      authorize(principal).pipe(Effect.provideService(PgClient.PgClient, sql)),
+  };
+});
+
 export class BrowserWorkerAccess extends Context.Service<
   BrowserWorkerAccess,
-  {
-    readonly authorize: (
-      principal: SessionAuthContext
-    ) => Effect.Effect<AccessScope, BrowserWorkerAccessError>;
-  }
+  Effect.Success<typeof makeBrowserWorkerAccess>
 >()("companion/BrowserWorkerAccess") {
-  static readonly layer = Layer.succeed(BrowserWorkerAccess, { authorize });
+  static readonly layer = Layer.effect(
+    BrowserWorkerAccess,
+    makeBrowserWorkerAccess
+  );
 }
 
 export { BrowserWorkerAccessError } from "./access";
