@@ -99,7 +99,31 @@ const makePersonalMemory = Effect.gen(function* () {
     )
   );
 
-  return { bind, inspect };
+  const wipe = Effect.fn("PersonalMemory.wipe")(
+    function* (scope: AccessScope) {
+      yield* requirePersonalMemoryMembership(scope);
+      // Bound profile documents only — unbound keys are intentionally out of coverage.
+      yield* sql`DELETE FROM memory_document d
+        USING personal_memory_binding b
+        WHERE d.key = b.key
+          AND b.workspace_id = ${scope.workspaceId}
+          AND b.slot = 'profile'`;
+      yield* sql`DELETE FROM personal_memory_binding
+        WHERE workspace_id = ${scope.workspaceId} AND slot = 'profile'`;
+      yield* sql`DELETE FROM user_profiles WHERE workspace_id = ${scope.workspaceId}`;
+      yield* requirePersonalMemoryMembership(scope);
+      return {
+        wiped: ["structured-profile", "bound-profile-notes"] as const,
+      };
+    },
+    sql.withTransaction,
+    Effect.catchTag(
+      "SqlError",
+      () => new PersonalMemoryError({ reason: "unavailable" })
+    )
+  );
+
+  return { bind, inspect, wipe };
 });
 
 export class PersonalMemory extends Context.Service<
