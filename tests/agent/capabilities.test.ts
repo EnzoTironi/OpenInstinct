@@ -1,3 +1,4 @@
+import { Predicate } from "effect";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import type { DynamicResolveContext } from "eve/tools";
 import { describe, expect, it } from "vitest";
@@ -69,9 +70,7 @@ async function authoredCapabilities(authenticator: string) {
     groupedTools.map(async (definition) => {
       const resolve = definition.events["turn.started"];
       const resolved = resolve ? await resolve({}, context) : null;
-      return resolved &&
-        typeof resolved === "object" &&
-        !Object.hasOwn(resolved, "execute")
+      return Predicate.isObject(resolved) && !("execute" in resolved)
         ? Object.keys(resolved)
         : [];
     })

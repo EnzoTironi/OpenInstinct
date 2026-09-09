@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { Predicate } from "effect";
 import type { CompiledToolDefinition } from "../../node_modules/eve/dist/src/compiler/manifest.js";
 import { test } from "vitest";
 import { askQuestion, ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
@@ -53,8 +54,7 @@ test("native question resolution retains a non-serializable authored refinement"
     });
     assert.equal(
       "value" in allowed &&
-        typeof allowed.value === "object" &&
-        allowed.value !== null &&
+        Predicate.isObject(allowed.value) &&
         "prompt" in allowed.value &&
         allowed.value.prompt,
       "allowed"
