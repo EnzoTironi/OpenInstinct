@@ -108,7 +108,7 @@ function installationSecretsPathname() {
   return `openinstinct/system/${scope}/installation-secrets.v1.json`;
 }
 
-export class InstallationSecretsUnavailable extends Schema.TaggedError<InstallationSecretsUnavailable>()(
+class InstallationSecretsUnavailable extends Schema.TaggedError<InstallationSecretsUnavailable>()(
   "InstallationSecretsUnavailable",
   {}
 ) {}
