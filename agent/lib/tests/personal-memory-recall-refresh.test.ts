@@ -146,9 +146,7 @@ describe("personal memory recall-refresh", () => {
       requireCleanProjectionForNextModelStep(phase)
     );
     expect(forNextModelStep).toEqual(projection);
-    expect(projectionContainsNote(forNextModelStep, forgottenText)).toBe(
-      false
-    );
+    expect(projectionContainsNote(forNextModelStep, forgottenText)).toBe(false);
     expect(projectionContainsNote(forNextModelStep, keptText)).toBe(true);
     expect(forNextModelStep.messages[0]?.id).toBe("file-memory-document");
   });
