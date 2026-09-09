@@ -185,4 +185,77 @@ describe("webhook byte and authentication boundaries", () => {
       )
     ).toMatchObject({ status: 401 });
   });
+  it("rejects a wrong Kapso HMAC signature after reading the body", async () => {
+    const body = '{ "message": { "text": "Olá" } }';
+    const request = new Request("https://test.invalid/channels/kapso", {
+      method: "POST",
+      body,
+      headers: {
+        "x-webhook-signature": createHmac("sha256", "other-secret")
+          .update(body)
+          .digest("hex"),
+      },
+    });
+    const result = await Effect.runPromise(
+      readVerifiedWebhook(request, "kapso", testSecret).pipe(Effect.flip)
+    );
+    expect(result.status).toBe(401);
+    expect(request.bodyUsed).toBe(true);
+  });
+
+  it("rejects a length-mismatched Kapso HMAC signature", async () => {
+    const body = "{}";
+    const signature = createHmac("sha256", Redacted.value(testSecret))
+      .update(body)
+      .digest("hex");
+    const request = new Request("https://test.invalid/channels/kapso", {
+      method: "POST",
+      body,
+      headers: { "x-webhook-signature": `${signature}00` },
+    });
+    expect(
+      await Effect.runPromise(
+        readVerifiedWebhook(request, "kapso", testSecret).pipe(Effect.flip)
+      )
+    ).toMatchObject({ status: 401 });
+  });
+
+  it("accepts Kapso HMAC auth for a private inbound JSON body", async () => {
+    const body = JSON.stringify({
+      phone_number_id: "123456789",
+      message: {
+        id: "wamid.hello",
+        timestamp: "1800000000",
+        type: "text",
+        from: "15550002222",
+        text: { body: "hello private" },
+        kapso: {
+          direction: "inbound",
+          status: "received",
+          origin: "cloud_api",
+        },
+      },
+      conversation: {
+        phone_number_id: "123456789",
+        phone_number: "+15550002222",
+      },
+    });
+    const signature = createHmac("sha256", Redacted.value(testSecret))
+      .update(body)
+      .digest("hex");
+    const request = new Request("https://test.invalid/channels/kapso", {
+      method: "POST",
+      body,
+      headers: { "x-webhook-signature": signature },
+    });
+    expect(
+      await Effect.runPromise(readVerifiedWebhook(request, "kapso", testSecret))
+    ).toMatchObject({
+      phone_number_id: "123456789",
+      message: {
+        text: { body: "hello private" },
+        kapso: { direction: "inbound" },
+      },
+    });
+  });
 });
