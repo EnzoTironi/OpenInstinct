@@ -6,7 +6,7 @@ switch Eve to the upstream `pkg.eve.dev` `0.52.2+main.59ec96cc99f65a80` pin.
 ## Active patchedDependencies (see `pnpm-workspace.yaml`)
 
 - `@linqapp/chat-sdk-adapter@0.5.1` — native `replyToMessageId` delivery.
-- `eve@0.49.0` — Companion Eve recovery / native-runtime cohort patch.
+- `eve@0.49.0` — Companion Eve recovery / native-runtime cohort patch, plus P06 mid-turn fileMemory recall-refresh before the next model step (fail closed).
 - `@workflow/world@5.0.0-beta.32` — workflow recovery / acceptance cohort.
 - `@workflow/world-postgres@5.0.0-beta.39` — PGWorld renewable worker leases,
   generation fencing, and owner-aware Graphile completion (SIGKILL reclaim).

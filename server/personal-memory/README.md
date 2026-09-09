@@ -118,5 +118,37 @@ profile key. That run then failed before the model call because of a schema
 compatibility error in the native package; it does not establish a successful
 model turn, recovery, or messenger delivery for the current package cohort.
 
+## Native recall-refresh (P06)
+
+After Eve `fileMemory` `save_memory` / `remove_memory` persists a profile document,
+the recalled projection is refreshed **before** the next model step. There is no
+second memory engine: storage and recall stay on Eve `fileMemory` plus the existing
+PostgreSQL document backend.
+
+### Order
+
+1. **Storage** — Eve `fileMemory` mutates the scoped document (CAS write).
+2. **Refresh** — the same provider `recall["turn.started"]` reads the document and
+   builds the keyed `file-memory-document` projection.
+3. **Next model step** — the harness applies that refresh (stable id supersession)
+   before the following model call. A dirty fence refuses to treat the pre-mutation
+   projection as authoritative.
+
+### Fail closed
+
+If the process crashes or errors after storage and before refresh is applied to the
+session projection, the mutation is not treated as model-visible success for the
+next step: either the tool fails (refresh error) or the step fails closed when a
+mutating memory tool result is present without a pending refresh. A later
+`turn.started` recall still reads storage truth.
+
+### Code
+
+- `agent/lib/personal-memory-recall-refresh.ts` — Effect-native order helpers.
+- `agent/lib/personal-memory-provider.ts` — wraps mutating tools with refresh.
+- Companion Eve patch — enqueues/applies mid-turn recall refresh in the tool loop.
+
+Evidence: `agent/lib/tests/personal-memory-recall-refresh.test.ts`.
+
 This slice does not claim the remaining P06 correction/forget, deletion or restore
 acceptance gates.
