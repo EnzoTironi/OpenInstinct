@@ -21,8 +21,10 @@ import {
   type InboundEvent,
 } from "./inbound";
 import {
+  boundRetryAfterSeconds,
   ProviderInputError,
   ProviderRejected,
+  ProviderRetryable,
   ProviderUncertain,
   requestProviderJson,
 } from "./provider-errors";
@@ -188,8 +190,46 @@ const response = Schema.Union([
       chat: Schema.Struct({ id: positiveId, type: Schema.Literal("private") }),
     }),
   }),
-  Schema.Struct({ ok: Schema.Literal(false), error_code: Schema.Int }),
+  Schema.Struct({
+    ok: Schema.Literal(false),
+    error_code: Schema.Int,
+    parameters: Schema.optionalKey(
+      Schema.Struct({
+        retry_after: Schema.optionalKey(Schema.Number),
+      })
+    ),
+  }),
 ]);
+
+/** Maps Telegram application-level send failures after a 2xx HTTP envelope. */
+export const telegramSendFailure = (failure: {
+  error_code: number;
+  parameters?: { retry_after?: number };
+}): ProviderRetryable | ProviderRejected | ProviderUncertain => {
+  if (failure.error_code === 429) {
+    return new ProviderRetryable({
+      provider: "telegram",
+      status: 429,
+      retryAfterSeconds: boundRetryAfterSeconds(
+        failure.parameters?.retry_after
+      ),
+    });
+  }
+  if (
+    failure.error_code >= 400 &&
+    failure.error_code < 500 &&
+    failure.error_code !== 408
+  ) {
+    return new ProviderRejected({
+      provider: "telegram",
+      status: failure.error_code,
+    });
+  }
+  return new ProviderUncertain({
+    provider: "telegram",
+    reason: "server_error",
+  });
+};
 
 const downloadableFile = Schema.Struct({
   ok: Schema.Literal(true),
@@ -294,20 +334,7 @@ const makeTelegram = Effect.gen(function* () {
       )
     );
     if (!result.ok) {
-      if (
-        result.error_code >= 400 &&
-        result.error_code < 500 &&
-        result.error_code !== 408
-      ) {
-        return yield* new ProviderRejected({
-          provider: "telegram",
-          status: result.error_code,
-        });
-      }
-      return yield* new ProviderUncertain({
-        provider: "telegram",
-        reason: "server_error",
-      });
+      return yield* telegramSendFailure(result);
     }
     if (String(result.result.chat.id) !== input.targetId) {
       return yield* new ProviderUncertain({

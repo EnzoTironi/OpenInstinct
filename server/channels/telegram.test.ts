@@ -1,7 +1,13 @@
 import { Effect, type Schema } from "effect";
-import { expect, test } from "vitest";
-import { ProviderInputError } from "./provider-errors";
-import { parseTelegramUpdate } from "./telegram";
+import { describe, expect, it, test } from "vitest";
+import {
+  DEFAULT_RETRY_AFTER_SECONDS,
+  ProviderInputError,
+  ProviderRejected,
+  ProviderRetryable,
+  ProviderUncertain,
+} from "./provider-errors";
+import { parseTelegramUpdate, telegramSendFailure } from "./telegram";
 
 const now = 1_800_000_000_000;
 const installation = { botId: "123456", botUsername: "CompanionBot" };
@@ -187,4 +193,42 @@ test("rejects stale/future events and malformed login commands without effects",
       message: { ...baseMessage, date: now / 1000 - 86_400, text: "delayed" },
     })
   ).toHaveLength(1);
+});
+
+describe("telegram private send failure classification", () => {
+  it("promotes application-level 429 + retry_after to ProviderRetryable", () => {
+    const error = telegramSendFailure({
+      error_code: 429,
+      parameters: { retry_after: 14 },
+    });
+    expect(error).toBeInstanceOf(ProviderRetryable);
+    expect(error).toMatchObject({
+      provider: "telegram",
+      status: 429,
+      retryAfterSeconds: 14,
+    });
+  });
+
+  it("defaults retry_after when Telegram omits parameters on 429", () => {
+    const error = telegramSendFailure({ error_code: 429 });
+    expect(error).toBeInstanceOf(ProviderRetryable);
+    expect(error).toMatchObject({
+      retryAfterSeconds: DEFAULT_RETRY_AFTER_SECONDS,
+    });
+  });
+
+  it("keeps permanent 4xx as ProviderRejected", () => {
+    const error = telegramSendFailure({ error_code: 403 });
+    expect(error).toBeInstanceOf(ProviderRejected);
+    expect(error).toMatchObject({ status: 403 });
+  });
+
+  it("keeps ambiguous non-4xx as ProviderUncertain", () => {
+    expect(telegramSendFailure({ error_code: 500 })).toBeInstanceOf(
+      ProviderUncertain
+    );
+    expect(telegramSendFailure({ error_code: 408 })).toBeInstanceOf(
+      ProviderUncertain
+    );
+  });
 });

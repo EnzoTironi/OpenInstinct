@@ -124,4 +124,65 @@ describe("webhook byte and authentication boundaries", () => {
       )
     ).toMatchObject({ status: 400 });
   });
+
+  it("accepts Telegram secret-token auth for a private chat JSON body", async () => {
+    const body = JSON.stringify({
+      update_id: 42,
+      message: {
+        message_id: 7,
+        date: 1_800_000_000,
+        from: { id: 789012, is_bot: false },
+        chat: { id: 789012, type: "private" },
+        text: "hello private",
+      },
+    });
+    const request = new Request("https://test.invalid/channels/telegram", {
+      method: "POST",
+      body,
+      headers: {
+        "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
+      },
+    });
+    expect(
+      await Effect.runPromise(
+        readVerifiedWebhook(request, "telegram", testSecret)
+      )
+    ).toMatchObject({
+      update_id: 42,
+      message: {
+        chat: { type: "private" },
+        text: "hello private",
+      },
+    });
+  });
+
+  it("rejects a wrong Telegram secret-token before reading the body", async () => {
+    const request = new Request("https://test.invalid/channels/telegram", {
+      method: "POST",
+      body: '{"update_id":1}',
+      headers: {
+        "x-telegram-bot-api-secret-token": "not-the-configured-secret",
+      },
+    });
+    const result = await Effect.runPromise(
+      readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
+    );
+    expect(result.status).toBe(401);
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it("rejects a length-mismatched Telegram secret-token", async () => {
+    const request = new Request("https://test.invalid/channels/telegram", {
+      method: "POST",
+      body: "{}",
+      headers: {
+        "x-telegram-bot-api-secret-token": `${Redacted.value(testSecret)}x`,
+      },
+    });
+    expect(
+      await Effect.runPromise(
+        readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
+      )
+    ).toMatchObject({ status: 401 });
+  });
 });
