@@ -221,11 +221,7 @@ export class OutboxResolutionRejected extends Schema.TaggedError<OutboxResolutio
   "OutboxResolutionRejected",
   {
     id: IdentityId,
-    reason: Schema.Literals([
-      "not_uncertain",
-      "conflict",
-      "identity_inactive",
-    ]),
+    reason: Schema.Literals(["not_uncertain", "conflict", "identity_inactive"]),
   }
 ) {}
 export class MessagingStorageError extends Schema.TaggedError<MessagingStorageError>()(
