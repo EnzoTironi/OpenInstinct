@@ -11,7 +11,6 @@ import { installationModel } from "./lib/installation-model";
 export default defineAgent({
   defaultTools: false,
   experimental: {
-    tasks: true,
     workflow: {
       world: "@workflow/world-postgres",
     },

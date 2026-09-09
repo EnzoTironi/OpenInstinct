@@ -391,7 +391,6 @@ inbox-only recovery metadata while retaining the existing outbox rules. No
 suppression ledger or baseline change was used. The quality gate is not green;
 passing compilation and tests does not change that result.
 
-
 The v3 native cohort pins application and vendored Zod to 4.5.4; the external AI
 SDK resolves that peer as well. In a separate fresh database, the actual
 application accepted a private-channel test input, bound its native profile key,
@@ -446,8 +445,6 @@ Bundled Eve/Nitro cannot resolve `graphile-worker/dist/sql/completeJob.js` via
 `createRequire(import.meta.url)`; owner-aware completeJob install soft-fails and falls
 back to cwd resolution. SIGKILL reclaim does not depend on that monkey-patch. Groups
 remain paused. Manual Graphile unlock is not part of the qualified path.
-
-
 
 On the same isolated application database, the browser completed a genuine Better
 Auth session using synthetic confirmation through the actual channel-account
