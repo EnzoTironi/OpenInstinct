@@ -1,0 +1,974 @@
+diff --git a/packages/world-postgres/src/config.ts b/packages/world-postgres/src/config.ts
+index 057a11f..6acffec 100644
+--- a/packages/world-postgres/src/config.ts
++++ b/packages/world-postgres/src/config.ts
+@@ -1,4 +1,5 @@
+ import type { Pool } from 'pg';
++import type { WorkerLeaseTiming } from './worker-lease.js';
+ 
+ type PgConnectionConfig =
+   | { connectionString: string; maxPoolSize?: number; pool?: undefined }
+@@ -24,4 +25,11 @@ export type PostgresWorldConfig = PgConnectionConfig & {
+    * Default is 10ms. Set to 0 for immediate flushing.
+    */
+   streamFlushIntervalMs?: number;
++  /**
++   * Renewable Graphile worker lease timing. Uses the PostgreSQL clock for
++   * expiry. Expired generations are retired irrevocably before
++   * force_unlock_workers. Omitting these keeps the defaults (30s lease,
++   * 10s heartbeat, 5s reclaim scan).
++   */
++  workerLease?: Partial<WorkerLeaseTiming>;
+ };
+diff --git a/packages/world-postgres/src/drizzle/migrations/0022_worker_leases.sql b/packages/world-postgres/src/drizzle/migrations/0022_worker_leases.sql
+new file mode 100644
+index 0000000..e56ee94
+--- /dev/null
++++ b/packages/world-postgres/src/drizzle/migrations/0022_worker_leases.sql
+@@ -0,0 +1,12 @@
++CREATE TABLE IF NOT EXISTS "workflow"."worker_leases" (
++  "worker_id" text PRIMARY KEY,
++  "generation" bigint NOT NULL,
++  "lease_until" timestamptz NOT NULL,
++  "retired" boolean NOT NULL DEFAULT false,
++  "created_at" timestamptz NOT NULL DEFAULT now(),
++  "updated_at" timestamptz NOT NULL DEFAULT now()
++);
++--> statement-breakpoint
++CREATE INDEX IF NOT EXISTS "worker_leases_active_expiry_idx"
++  ON "workflow"."worker_leases" ("lease_until")
++  WHERE NOT "retired";
+diff --git a/packages/world-postgres/src/drizzle/migrations/meta/_journal.json b/packages/world-postgres/src/drizzle/migrations/meta/_journal.json
+index 3dbaaab..b994287 100644
+--- a/packages/world-postgres/src/drizzle/migrations/meta/_journal.json
++++ b/packages/world-postgres/src/drizzle/migrations/meta/_journal.json
+@@ -155,6 +155,13 @@
+       "when": 1786060800002,
+       "tag": "0021_add_hook_resume_scope",
+       "breakpoints": true
++    },
++    {
++      "idx": 22,
++      "version": "7",
++      "when": 1788945600000,
++      "tag": "0022_worker_leases",
++      "breakpoints": true
+     }
+   ]
+ }
+diff --git a/packages/world-postgres/src/index.ts b/packages/world-postgres/src/index.ts
+index 336daad..091b649 100644
+--- a/packages/world-postgres/src/index.ts
++++ b/packages/world-postgres/src/index.ts
+@@ -15,19 +15,50 @@ import {
+   createStepsStorage,
+ } from './storage.js';
+ import { createStreamer } from './streamer.js';
++import {
++  assertWorkerLeaseIfPresent,
++  resolveWorkerLeaseTiming,
++} from './worker-lease.js';
+ 
+ function createStorage(
+   drizzle: Drizzle,
+-  runStatusListener: RunStatusListener
++  runStatusListener: RunStatusListener,
++  pool: Pool
+ ): Storage {
+   return {
+-    runs: createRunsStorage(drizzle, runStatusListener),
+-    events: createEventsStorage(drizzle),
+-    hooks: createHooksStorage(drizzle),
+-    steps: createStepsStorage(drizzle),
++    runs: fenceMutations(createRunsStorage(drizzle, runStatusListener), pool),
++    events: fenceMutations(createEventsStorage(drizzle), pool),
++    hooks: fenceMutations(createHooksStorage(drizzle), pool),
++    steps: fenceMutations(createStepsStorage(drizzle), pool),
+   };
+ }
+ 
++const READ_METHODS = new Set([
++  'get',
++  'list',
++  'getResume',
++  'getResumeByScope',
++  'waitForTerminalStatus',
++]);
++
++function fenceMutations<T extends object>(target: T, pool: Pool): T {
++  return new Proxy(target, {
++    get(obj, prop, receiver) {
++      const value = Reflect.get(obj, prop, receiver);
++      if (typeof value !== 'function' || typeof prop !== 'string') {
++        return value;
++      }
++      if (READ_METHODS.has(prop) || prop.startsWith('get') || prop === 'list') {
++        return value.bind(obj);
++      }
++      return async (...args: unknown[]) => {
++        await assertWorkerLeaseIfPresent(pool);
++        return value.apply(obj, args);
++      };
++    },
++  });
++}
++
+ function getDefaultMaxPoolSize(): number | undefined {
+   const parsed = parseInt(
+     process.env.WORKFLOW_POSTGRES_MAX_POOL_SIZE || '',
+@@ -45,6 +76,38 @@ function getDefaultConnectionString(): string {
+   );
+ }
+ 
++
++function fenceStreamer(
++  streamer: ReturnType<typeof createStreamer>,
++  pool: Pool
++): ReturnType<typeof createStreamer> {
++  const write = streamer.streams.write.bind(streamer.streams);
++  const writeMulti = streamer.streams.writeMulti?.bind(streamer.streams);
++  const closeStream = streamer.streams.close.bind(streamer.streams);
++  return {
++    ...streamer,
++    streams: {
++      ...streamer.streams,
++      async write(...args: Parameters<typeof write>) {
++        await assertWorkerLeaseIfPresent(pool);
++        return write(...args);
++      },
++      ...(writeMulti && {
++        async writeMulti(
++          ...args: Parameters<NonNullable<typeof writeMulti>>
++        ) {
++          await assertWorkerLeaseIfPresent(pool);
++          return writeMulti(...args);
++        },
++      }),
++      async close(...args: Parameters<typeof closeStream>) {
++        await assertWorkerLeaseIfPresent(pool);
++        return closeStream(...args);
++      },
++    },
++  };
++}
++
+ export function createWorld(
+   config: PostgresWorldConfig = {
+     connectionString: getDefaultConnectionString(),
+@@ -65,12 +128,13 @@ export function createWorld(
+     });
+ 
+   const drizzle = createClient(pool);
+-  const queue = createQueue(config, pool);
++  const leaseTiming = resolveWorkerLeaseTiming(config.workerLease);
++  const queue = createQueue({ ...config, workerLease: leaseTiming }, pool);
+   // Opens its `LISTEN` connection lazily, on the first `waitForTerminalStatus`
+   // call, so a deployment that never awaits a run never pays for it.
+   const runStatusListener = createRunStatusListener(pool);
+-  const storage = createStorage(drizzle, runStatusListener);
+-  const streamer = createStreamer(pool, drizzle);
++  const storage = createStorage(drizzle, runStatusListener, pool);
++  const streamer = fenceStreamer(createStreamer(pool, drizzle), pool);
+ 
+   return {
+     specVersion: mintedSpecVersion(),
+@@ -106,3 +170,15 @@ export function createWorld(
+ // Re-export schema for users who want to extend or inspect the database schema
+ export type { PostgresWorldConfig } from './config.js';
+ export * from './drizzle/schema.js';
++
++export {
++  DEFAULT_WORKER_LEASE_TIMING,
++  WorkerLeaseFencedError,
++  assertWorkerLeaseIfPresent,
++  getWorkerLeaseContext,
++  installOwnerAwareGraphileCompletion,
++  reclaimExpiredWorkerLeases,
++  registerWorkerLease,
++  renewWorkerLease,
++  runWithWorkerLease,
++} from './worker-lease.js';
+diff --git a/packages/world-postgres/src/queue.ts b/packages/world-postgres/src/queue.ts
+index 3865512..1d07a43 100644
+--- a/packages/world-postgres/src/queue.ts
++++ b/packages/world-postgres/src/queue.ts
+@@ -32,6 +32,22 @@ import { monotonicFactory } from 'ulid';
+ import { z } from 'zod/v4';
+ import type { PostgresWorldConfig } from './config.js';
+ import { MessageData } from './message.js';
++import {
++  WORKER_LEASE_HEADERS,
++  type WorkerLeaseIdentity,
++  type WorkerLeaseTiming,
++  DEFAULT_WORKER_LEASE_TIMING,
++  installOwnerAwareGraphileCompletion,
++  loadWorkerLease,
++  reclaimExpiredWorkerLeases,
++  registerWorkerLease,
++  renewWorkerLease,
++  resolveWorkerLeaseTiming,
++  runWithWorkerLease,
++  WorkerLeaseFencedError,
++} from './worker-lease.js';
++
++installOwnerAwareGraphileCompletion();
+ 
+ function createGraphileLogger() {
+   const isJsonMode = () => process.env.WORKFLOW_JSON_MODE === '1';
+@@ -58,7 +74,9 @@ const MAX_GRAPHILE_JOB_ATTEMPTS = 49;
+ const GraphileHelpers = z.object({
+   abortSignal: z.instanceof(AbortSignal).optional(),
+   job: z.object({
++    id: z.union([z.string(), z.number()]).optional(),
+     attempts: z.number().int().positive(),
++    locked_by: z.string().nullable().optional(),
+   }),
+ });
+ 
+@@ -89,6 +107,12 @@ export function createQueue(
+ ): PostgresQueue {
+   const port = process.env.PORT ? Number(process.env.PORT) : undefined;
+   const localWorld = createWorld({ dataDir: undefined, port });
++  const leaseTiming: WorkerLeaseTiming = resolveWorkerLeaseTiming(
++    config.workerLease ?? DEFAULT_WORKER_LEASE_TIMING
++  );
++  const workerGenerations = new Map<string, number>();
++  const heartbeatTimers = new Map<string, ReturnType<typeof setInterval>>();
++  let reclaimTimer: ReturnType<typeof setInterval> | null = null;
+ 
+   // JSON transport that preserves Uint8Array values via a tagged
+   // envelope ({ __type: 'Uint8Array', data: '<base64>' }).  Required
+@@ -130,7 +154,34 @@ export function createQueue(
+     return `${jobPrefix}flows`;
+   }
+ 
+-  const createQueueHandler = localWorld.createQueueHandler;
++  const createQueueHandler: Queue['createQueueHandler'] = (prefix, handler) => {
++    const inner = localWorld.createQueueHandler(prefix, async (body, meta) => {
++      // Lease headers are validated against PostgreSQL; clients cannot mint ownership.
++      return handler(body, meta);
++    });
++    return async (req) => {
++      const workerId = req.headers.get(WORKER_LEASE_HEADERS.workerId);
++      const generationHeader = req.headers.get(WORKER_LEASE_HEADERS.generation);
++      if (!workerId || !generationHeader) {
++        return inner(req);
++      }
++      const generation = Number(generationHeader);
++      if (!Number.isFinite(generation)) {
++        return Response.json(
++          { error: 'Invalid worker lease generation' },
++          { status: 409 }
++        );
++      }
++      const identity = await loadWorkerLease(pool, workerId, generation);
++      if (!identity) {
++        return Response.json(
++          { error: 'Worker lease generation is no longer valid.' },
++          { status: 409 }
++        );
++      }
++      return runWithWorkerLease(identity, () => inner(req));
++    };
++  };
+ 
+   const getDeploymentId: Queue['getDeploymentId'] = async () => {
+     return 'postgres';
+@@ -333,6 +384,8 @@ export function createQueue(
+     body,
+     headers: extraHeaders,
+     abortSignal,
++    lease,
++    jobId,
+   }: {
+     queueName: ValidQueueName;
+     messageId: MessageId;
+@@ -340,6 +393,8 @@ export function createQueue(
+     body: Uint8Array;
+     headers?: Record<string, string>;
+     abortSignal?: AbortSignal;
++    lease?: WorkerLeaseIdentity;
++    jobId?: string | number;
+   }): Promise<HttpExecutionResult> {
+     const headers: Record<string, string> = {
+       ...extraHeaders,
+@@ -347,6 +402,13 @@ export function createQueue(
+       'x-vqs-queue-name': queueName,
+       'x-vqs-message-id': messageId,
+       'x-vqs-message-attempt': String(attempt),
++      ...(lease && {
++        [WORKER_LEASE_HEADERS.workerId]: lease.workerId,
++        [WORKER_LEASE_HEADERS.generation]: String(lease.generation),
++      }),
++      ...(jobId != null && {
++        [WORKER_LEASE_HEADERS.jobId]: String(jobId),
++      }),
+     };
+     const baseUrl = await getExecutionBaseUrl();
+     if (!baseUrl) {
+@@ -531,7 +593,32 @@ export function createQueue(
+         workflowInvoke.success && !workflowInvoke.data.stepId
+           ? `workflow:${workflowInvoke.data.runId}`
+           : undefined;
++      const workerId =
++        graphileHelpers.success && graphileHelpers.data.job.locked_by
++          ? graphileHelpers.data.job.locked_by
++          : undefined;
++      const jobId = graphileHelpers.success
++        ? graphileHelpers.data.job.id
++        : undefined;
++      const leaseGeneration = workerId
++        ? workerGenerations.get(workerId)
++        : undefined;
++      const lease =
++        workerId && leaseGeneration !== undefined
++          ? { workerId, generation: leaseGeneration }
++          : undefined;
++
+       const executeTask = async (): Promise<'completed' | 'rescheduled'> => {
++        if (lease) {
++          const stillActive = await loadWorkerLease(
++            pool,
++            lease.workerId,
++            lease.generation
++          );
++          if (!stillActive) {
++            throw new WorkerLeaseFencedError();
++          }
++        }
+         const result = await executeMessageOverHttp({
+           queueName,
+           messageId: messageData.messageId,
+@@ -541,6 +628,8 @@ export function createQueue(
+           abortSignal: graphileHelpers.success
+             ? graphileHelpers.data.abortSignal
+             : undefined,
++          lease,
++          jobId,
+         });
+ 
+         if (result.type === 'completed') {
+@@ -629,6 +718,60 @@ export function createQueue(
+     const workflowPrefix = getQueueTopicPrefix('workflow', namespace);
+     taskList[getJobQueueName()] = createTaskHandler(workflowPrefix);
+ 
++    const leasePlugin = {
++      name: 'WorkflowWorkerLeasePlugin',
++      worker: {
++        hooks: {
++          // PluginHook prepends the compiled WorkerPluginContext.
++          async startWorker(
++            _ctx: unknown,
++            event: { worker: { workerId: string } }
++          ) {
++            const identity = await registerWorkerLease(
++              pool,
++              event.worker.workerId,
++              leaseTiming.leaseMs
++            );
++            workerGenerations.set(identity.workerId, identity.generation);
++            const timer = setInterval(() => {
++              void renewWorkerLease(pool, identity, leaseTiming.leaseMs).then(
++                (ok) => {
++                  if (!ok) {
++                    clearInterval(timer);
++                    heartbeatTimers.delete(identity.workerId);
++                    workerGenerations.delete(identity.workerId);
++                  }
++                }
++              );
++            }, leaseTiming.heartbeatMs);
++            // Do not keep the event loop alive solely for heartbeats.
++            timer.unref?.();
++            heartbeatTimers.set(identity.workerId, timer);
++          },
++          async stopWorker(
++            _ctx: unknown,
++            event: { worker: { workerId: string } }
++          ) {
++            const timer = heartbeatTimers.get(event.worker.workerId);
++            if (timer) {
++              clearInterval(timer);
++              heartbeatTimers.delete(event.worker.workerId);
++            }
++            workerGenerations.delete(event.worker.workerId);
++          },
++        },
++      },
++    };
++
++    if (!reclaimTimer) {
++      reclaimTimer = setInterval(() => {
++        void reclaimExpiredWorkerLeases(pool).catch(() => {});
++      }, leaseTiming.reclaimIntervalMs);
++      reclaimTimer.unref?.();
++      // Opportunistic first scan so SIGKILL recovery does not wait a full interval.
++      void reclaimExpiredWorkerLeases(pool).catch(() => {});
++    }
++
+     runner = await run({
+       pgPool: pool,
+       // Default of 50 is high enough to avoid worker-pool exhaustion in
+@@ -647,6 +790,9 @@ export function createQueue(
+       }),
+       pollInterval: 500, // 500ms = 0.5s (graphile-worker uses LISTEN/NOTIFY when available)
+       taskList,
++      preset: {
++        plugins: [leasePlugin],
++      },
+     });
+   }
+ 
+@@ -657,6 +803,15 @@ export function createQueue(
+     start,
+     async close() {
+       closing = true;
++      if (reclaimTimer) {
++        clearInterval(reclaimTimer);
++        reclaimTimer = null;
++      }
++      for (const timer of heartbeatTimers.values()) {
++        clearInterval(timer);
++      }
++      heartbeatTimers.clear();
++      workerGenerations.clear();
+       if (runnerStart) {
+         runnerStart.controller.abort();
+         await runnerStart.promise;
+diff --git a/packages/world-postgres/src/worker-lease.ts b/packages/world-postgres/src/worker-lease.ts
+new file mode 100644
+index 0000000..1d1cb78
+--- /dev/null
++++ b/packages/world-postgres/src/worker-lease.ts
+@@ -0,0 +1,310 @@
++import { AsyncLocalStorage } from 'node:async_hooks';
++import { createRequire } from 'node:module';
++import { WorkflowWorldError } from '@workflow/errors';
++import type { Pool, PoolClient } from 'pg';
++
++export type WorkerLeaseTiming = {
++  /** How long a lease remains valid without renewal (PostgreSQL clock). */
++  leaseMs: number;
++  /** How often a healthy worker renews its lease and Graphile lock timestamps. */
++  heartbeatMs: number;
++  /** How often the world scans for expired leases to reclaim. */
++  reclaimIntervalMs: number;
++};
++
++export const DEFAULT_WORKER_LEASE_TIMING: WorkerLeaseTiming = {
++  leaseMs: 30_000,
++  heartbeatMs: 10_000,
++  reclaimIntervalMs: 5_000,
++};
++
++export type WorkerLeaseIdentity = {
++  readonly workerId: string;
++  readonly generation: number;
++};
++
++const leaseContext = new AsyncLocalStorage<WorkerLeaseIdentity>();
++
++/** Headers bind an HTTP execution to a Graphile worker generation. */
++export const WORKER_LEASE_HEADERS = {
++  workerId: 'x-workflow-worker-id',
++  generation: 'x-workflow-worker-generation',
++  jobId: 'x-workflow-job-id',
++} as const;
++
++export function getWorkerLeaseContext(): WorkerLeaseIdentity | undefined {
++  return leaseContext.getStore();
++}
++
++export function runWithWorkerLease<T>(
++  identity: WorkerLeaseIdentity,
++  fn: () => T
++): T {
++  return leaseContext.run(identity, fn);
++}
++
++export function resolveWorkerLeaseTiming(
++  partial?: Partial<WorkerLeaseTiming>
++): WorkerLeaseTiming {
++  const timing = {
++    leaseMs: partial?.leaseMs ?? DEFAULT_WORKER_LEASE_TIMING.leaseMs,
++    heartbeatMs: partial?.heartbeatMs ?? DEFAULT_WORKER_LEASE_TIMING.heartbeatMs,
++    reclaimIntervalMs:
++      partial?.reclaimIntervalMs ??
++      DEFAULT_WORKER_LEASE_TIMING.reclaimIntervalMs,
++  };
++  if (
++    !(
++      Number.isFinite(timing.leaseMs) &&
++      timing.leaseMs >= 1_000 &&
++      Number.isFinite(timing.heartbeatMs) &&
++      timing.heartbeatMs >= 100 &&
++      timing.heartbeatMs < timing.leaseMs &&
++      Number.isFinite(timing.reclaimIntervalMs) &&
++      timing.reclaimIntervalMs >= 100
++    )
++  ) {
++    throw new TypeError(
++      'Worker lease timing requires leaseMs >= 1000, 100 <= heartbeatMs < leaseMs, and reclaimIntervalMs >= 100.'
++    );
++  }
++  return timing;
++}
++
++type Queryable = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
++
++export class WorkerLeaseFencedError extends WorkflowWorldError {
++  constructor(message = 'Worker lease generation is no longer valid.') {
++    super(message, { status: 409 });
++    this.name = 'WorkerLeaseFencedError';
++  }
++}
++
++/**
++ * Register a new worker generation before Graphile can claim jobs.
++ * Retired worker IDs are never reused.
++ */
++export async function registerWorkerLease(
++  db: Queryable,
++  workerId: string,
++  leaseMs: number
++): Promise<WorkerLeaseIdentity> {
++  const existing = await db.query<{
++    generation: string;
++    retired: boolean;
++  }>(
++    `SELECT generation::text, retired FROM workflow.worker_leases WHERE worker_id = $1`,
++    [workerId]
++  );
++  if (existing.rows[0]?.retired) {
++    throw new WorkerLeaseFencedError(
++      `Worker identity ${workerId} was retired and cannot be reused.`
++    );
++  }
++  if (existing.rows[0]) {
++    const renewed = await renewWorkerLease(
++      db,
++      { workerId, generation: Number(existing.rows[0].generation) },
++      leaseMs
++    );
++    if (!renewed) {
++      throw new WorkerLeaseFencedError(
++        `Worker identity ${workerId} could not renew its existing lease.`
++      );
++    }
++    return { workerId, generation: Number(existing.rows[0].generation) };
++  }
++
++  const inserted = await db.query<{ generation: string }>(
++    `INSERT INTO workflow.worker_leases (worker_id, generation, lease_until, retired)
++     VALUES ($1, 1, now() + ($2::text || ' milliseconds')::interval, false)
++     RETURNING generation::text`,
++    [workerId, String(leaseMs)]
++  );
++  return { workerId, generation: Number(inserted.rows[0].generation) };
++}
++
++/** Renew only while the exact generation is still active under the PG clock. */
++export async function renewWorkerLease(
++  db: Queryable,
++  identity: WorkerLeaseIdentity,
++  leaseMs: number
++): Promise<boolean> {
++  const result = await db.query(
++    `UPDATE workflow.worker_leases
++     SET lease_until = now() + ($3::text || ' milliseconds')::interval,
++         updated_at = now()
++     WHERE worker_id = $1
++       AND generation = $2
++       AND NOT retired
++       AND lease_until >= now()
++     RETURNING generation`,
++    [identity.workerId, identity.generation, String(leaseMs)]
++  );
++  if (!result.rowCount) {
++    return false;
++  }
++  // Keep Graphile's lock timestamps fresh so the hardcoded 4h scanner cannot
++  // unlock a healthy long-running job that is still heartbeating.
++  await db.query(
++    `UPDATE graphile_worker._private_jobs
++     SET locked_at = now()
++     WHERE locked_by = $1`,
++    [identity.workerId]
++  );
++  await db.query(
++    `UPDATE graphile_worker._private_job_queues
++     SET locked_at = now()
++     WHERE locked_by = $1`,
++    [identity.workerId]
++  );
++  return true;
++}
++
++/**
++ * Irrevocably retire expired generations, then release their Graphile locks.
++ * Expiry always happens before unlock so a SIGSTOP'd owner cannot complete.
++ */
++export async function reclaimExpiredWorkerLeases(
++  pool: Pool
++): Promise<string[]> {
++  const client = await pool.connect();
++  try {
++    await client.query('BEGIN');
++    const expired = await client.query<{ worker_id: string }>(
++      `UPDATE workflow.worker_leases
++       SET retired = true,
++           generation = generation + 1,
++           updated_at = now()
++       WHERE NOT retired
++         AND lease_until < now()
++       RETURNING worker_id`
++    );
++    const workerIds = expired.rows.map((row) => row.worker_id);
++    if (workerIds.length > 0) {
++      await client.query(
++        `SELECT graphile_worker.force_unlock_workers($1::text[])`,
++        [workerIds]
++      );
++    }
++    await client.query('COMMIT');
++    return workerIds;
++  } catch (error) {
++    await client.query('ROLLBACK');
++    throw error;
++  } finally {
++    client.release();
++  }
++}
++
++/** No-op when no lease context is bound (non-worker callers). */
++export async function assertWorkerLeaseIfPresent(
++  db: Queryable
++): Promise<void> {
++  const identity = getWorkerLeaseContext();
++  if (!identity) {
++    return;
++  }
++  const result = await db.query(
++    `SELECT 1
++     FROM workflow.worker_leases
++     WHERE worker_id = $1
++       AND generation = $2
++       AND NOT retired
++       AND lease_until >= now()`,
++    [identity.workerId, identity.generation]
++  );
++  if (!result.rowCount) {
++    throw new WorkerLeaseFencedError();
++  }
++}
++
++export async function loadWorkerLease(
++  db: Queryable,
++  workerId: string,
++  generation: number
++): Promise<WorkerLeaseIdentity | undefined> {
++  const result = await db.query(
++    `SELECT 1
++     FROM workflow.worker_leases
++     WHERE worker_id = $1
++       AND generation = $2
++       AND NOT retired
++       AND lease_until >= now()`,
++    [workerId, generation]
++  );
++  if (!result.rowCount) {
++    return undefined;
++  }
++  return { workerId, generation };
++}
++
++/**
++ * Graphile Worker's completeJob deletes by job id only. Replace it with an
++ * owner-aware delete matching failJob, so a stale SIGSTOP'd owner cannot remove
++ * a job another worker holds.
++ */
++export function installOwnerAwareGraphileCompletion(): void {
++  const require = createRequire(import.meta.url);
++  const mod = require('graphile-worker/dist/sql/completeJob.js') as {
++    completeJob: (
++      compiledSharedOptions: any,
++      withPgClient: any,
++      workerId: string,
++      job: { id: string | number; job_queue_id?: number | null }
++    ) => Promise<void>;
++  };
++  if ((mod.completeJob as any).__workflowOwnerAware) {
++    return;
++  }
++  const original = mod.completeJob;
++  async function completeJob(
++    compiledSharedOptions: any,
++    withPgClient: any,
++    workerId: string,
++    job: { id: string | number; job_queue_id?: number | null }
++  ): Promise<void> {
++    const {
++      escapedWorkerSchema,
++      workerSchema,
++      resolvedPreset: {
++        worker: { preparedStatements },
++      },
++    } = compiledSharedOptions;
++    if (job.job_queue_id != null) {
++      await withPgClient.withRetries((client: PoolClient) =>
++        client.query({
++          text: `\
++with j as (
++delete from ${escapedWorkerSchema}._private_jobs as jobs
++where id = $1::bigint and locked_by = $2::text
++returning *
++)
++update ${escapedWorkerSchema}._private_job_queues as job_queues
++set locked_by = null, locked_at = null
++from j
++where job_queues.id = j.job_queue_id and job_queues.locked_by = $2::text;`,
++          values: [job.id, workerId],
++          name: !preparedStatements
++            ? undefined
++            : `complete_job_q_owned/${workerSchema}`,
++        })
++      );
++      return;
++    }
++    await withPgClient.withRetries((client: PoolClient) =>
++      client.query({
++        text: `\
++delete from ${escapedWorkerSchema}._private_jobs as jobs
++where id = $1::bigint and locked_by = $2::text`,
++        values: [job.id, workerId],
++        name: !preparedStatements
++          ? undefined
++          : `complete_job_owned/${workerSchema}`,
++      })
++    );
++  }
++  (completeJob as any).__workflowOwnerAware = true;
++  (completeJob as any).__workflowOriginalCompleteJob = original;
++  mod.completeJob = completeJob;
++}
+diff --git a/packages/world-postgres/test/worker-lease.test.ts b/packages/world-postgres/test/worker-lease.test.ts
+new file mode 100644
+index 0000000..9c74294
+--- /dev/null
++++ b/packages/world-postgres/test/worker-lease.test.ts
+@@ -0,0 +1,215 @@
++import { randomUUID } from 'node:crypto';
++import { fileURLToPath } from 'node:url';
++import { setTimeout as sleep } from 'node:timers/promises';
++import { PostgreSqlContainer } from '@testcontainers/postgresql';
++import { drizzle } from 'drizzle-orm/node-postgres';
++import { migrate } from 'drizzle-orm/node-postgres/migrator';
++import { makeWorkerUtils } from 'graphile-worker';
++import { Pool } from 'pg';
++import { afterAll, beforeAll, describe, expect, it } from 'vitest';
++import {
++  createWorld,
++  installOwnerAwareGraphileCompletion,
++  reclaimExpiredWorkerLeases,
++  registerWorkerLease,
++  renewWorkerLease,
++  runWithWorkerLease,
++  WorkerLeaseFencedError,
++} from '../dist/index.js';
++import { assertWorkerLeaseIfPresent } from '../dist/worker-lease.js';
++
++installOwnerAwareGraphileCompletion();
++
++function workerId(label: string) {
++  // Graphile requires worker ids with length >= 10.
++  return `worker-${label}-${randomUUID().replaceAll('-', '')}`;
++}
++
++describe('PGWorld worker lease fencing (real PostgreSQL)', () => {
++  let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
++  let pool: Pool;
++
++  beforeAll(async () => {
++    container = await new PostgreSqlContainer('postgres:15-alpine').start();
++    pool = new Pool({ connectionString: container.getConnectionUri() });
++    const config = {
++      migrationsFolder: fileURLToPath(
++        new URL('../src/drizzle/migrations', import.meta.url)
++      ),
++      migrationsTable: 'workflow_migrations',
++      migrationsSchema: 'workflow_drizzle',
++    };
++    await migrate(drizzle(pool), config);
++    const utils = await makeWorkerUtils({ pgPool: pool });
++    await utils.migrate();
++    await utils.release();
++  }, 120_000);
++
++  afterAll(async () => {
++    await pool?.end();
++    await container?.stop();
++  });
++
++  async function plantLockedJob(owner: string) {
++    const utils = await makeWorkerUtils({ pgPool: pool });
++    try {
++      const job = await utils.addJob('workflow_lease_probe', { ok: true });
++      await pool.query(
++        `UPDATE graphile_worker._private_jobs
++         SET locked_at = now(), locked_by = $2
++         WHERE id = $1`,
++        [job.id, owner]
++      );
++      return job.id;
++    } finally {
++      await utils.release();
++    }
++  }
++
++  it('reclaims abandoned Graphile work for a dead lock owner after irrevocable generation expiry', async () => {
++    const dead = workerId('dead');
++    const identity = await registerWorkerLease(pool, dead, 1_000);
++    const jobId = await plantLockedJob(dead);
++
++    await pool.query(
++      `UPDATE workflow.worker_leases
++       SET lease_until = now() - interval '1 millisecond'
++       WHERE worker_id = $1 AND generation = $2`,
++      [dead, identity.generation]
++    );
++
++    const reclaimed = await reclaimExpiredWorkerLeases(pool);
++    expect(reclaimed).toContain(dead);
++
++    const lease = await pool.query<{ generation: string; retired: boolean }>(
++      `SELECT generation::text, retired FROM workflow.worker_leases WHERE worker_id = $1`,
++      [dead]
++    );
++    expect(lease.rows[0]?.retired).toBe(true);
++    expect(Number(lease.rows[0]?.generation)).toBe(identity.generation + 1);
++
++    const unlocked = await pool.query(
++      `SELECT locked_by FROM graphile_worker._private_jobs WHERE id = $1`,
++      [jobId]
++    );
++    expect(unlocked.rows[0]?.locked_by).toBeNull();
++
++    // Bounded recovery path is reclaim+unlock; wake publication is not claimed.
++    expect(await renewWorkerLease(pool, identity, 1_000)).toBe(false);
++    await expect(
++      runWithWorkerLease(identity, () => assertWorkerLeaseIfPresent(pool))
++    ).rejects.toBeInstanceOf(WorkerLeaseFencedError);
++  }, 60_000);
++
++  it('keeps a healthy heartbeating lock; reclaim does not false-unlock it', async () => {
++    const live = workerId('live');
++    const identity = await registerWorkerLease(pool, live, 3_000);
++    await plantLockedJob(live);
++
++    for (let i = 0; i < 3; i++) {
++      await sleep(800);
++      expect(await renewWorkerLease(pool, identity, 3_000)).toBe(true);
++    }
++
++    const reclaimed = await reclaimExpiredWorkerLeases(pool);
++    expect(reclaimed).not.toContain(live);
++
++    const still = await pool.query(
++      `SELECT locked_by FROM graphile_worker._private_jobs WHERE locked_by = $1`,
++      [live]
++    );
++    expect(still.rows.length).toBeGreaterThan(0);
++  }, 60_000);
++
++  it('stale complete/fail from an old owner cannot delete or release the current owner', async () => {
++    const oldOwner = workerId('old');
++    const newOwner = workerId('new');
++    await registerWorkerLease(pool, oldOwner, 1_000);
++    await registerWorkerLease(pool, newOwner, 30_000);
++    const jobId = await plantLockedJob(newOwner);
++
++    const staleComplete = await pool.query(
++      `DELETE FROM graphile_worker._private_jobs
++       WHERE id = $1 AND locked_by = $2
++       RETURNING id`,
++      [jobId, oldOwner]
++    );
++    expect(staleComplete.rows).toHaveLength(0);
++
++    const afterComplete = await pool.query(
++      `SELECT locked_by FROM graphile_worker._private_jobs WHERE id = $1`,
++      [jobId]
++    );
++    expect(afterComplete.rows).toHaveLength(1);
++    expect(afterComplete.rows[0].locked_by).toBe(newOwner);
++
++    const staleFail = await pool.query(
++      `UPDATE graphile_worker._private_jobs
++       SET locked_by = null, locked_at = null, last_error = 'stale'
++       WHERE id = $1 AND locked_by = $2
++       RETURNING id`,
++      [jobId, oldOwner]
++    );
++    expect(staleFail.rows).toHaveLength(0);
++
++    const afterFail = await pool.query(
++      `SELECT locked_by FROM graphile_worker._private_jobs WHERE id = $1`,
++      [jobId]
++    );
++    expect(afterFail.rows[0].locked_by).toBe(newOwner);
++
++    const ownerComplete = await pool.query(
++      `DELETE FROM graphile_worker._private_jobs
++       WHERE id = $1 AND locked_by = $2
++       RETURNING id`,
++      [jobId, newOwner]
++    );
++    expect(ownerComplete.rows).toHaveLength(1);
++  }, 60_000);
++
++  it('world reclaim loop unlocks abandoned work without manual forceUnlock', async () => {
++    const dead = workerId('orphan');
++    await registerWorkerLease(pool, dead, 500);
++    await pool.query(
++      `UPDATE workflow.worker_leases
++       SET lease_until = now() - interval '1 second'
++       WHERE worker_id = $1`,
++      [dead]
++    );
++    await plantLockedJob(dead);
++
++    const world = createWorld({
++      pool,
++      applicationManagedShutdown: true,
++      queueConcurrency: 1,
++      workerLease: {
++        leaseMs: 2_000,
++        heartbeatMs: 500,
++        reclaimIntervalMs: 400,
++      },
++    });
++    await world.start();
++    try {
++      let unlocked = false;
++      for (let i = 0; i < 25; i++) {
++        const rows = await pool.query(
++          `SELECT 1 FROM graphile_worker._private_jobs WHERE locked_by = $1`,
++          [dead]
++        );
++        if (rows.rows.length === 0) {
++          unlocked = true;
++          break;
++        }
++        await sleep(250);
++      }
++      expect(unlocked).toBe(true);
++      const lease = await pool.query(
++        `SELECT retired FROM workflow.worker_leases WHERE worker_id = $1`,
++        [dead]
++      );
++      expect(lease.rows[0]?.retired).toBe(true);
++    } finally {
++      await world.close();
++    }
++  }, 90_000);
++});

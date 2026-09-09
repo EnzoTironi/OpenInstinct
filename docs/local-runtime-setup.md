@@ -1,6 +1,6 @@
 # Local runtime setup and evidence
 
-Status: September 8, 2026. This branch is an implementation increment, not a completed companion release.
+Status: September 9, 2026. This branch is an implementation increment, not a completed companion release.
 
 Use Node 24 and the pinned pnpm version. Keep secrets in `.env.local`, which Git ignores, and restrict the file to its owner (`chmod 600 .env.local`). Do not paste credentials into tracked examples, test fixtures, review descriptions, or logs.
 
@@ -416,6 +416,24 @@ a Graphile job remained locked by the killed worker. No manual lock release was
 performed. The failure therefore leaves automatic interrupted execution recovery
 open even though accepted-input reconciliation succeeded. The test database and
 failure logs remain intact.
+
+## Graphile worker lease fencing (2026-09-09)
+
+Native `@workflow/world-postgres` now includes renewable worker leases with generation
+fencing and owner-aware Graphile completion. Expired generations are retired on the
+PostgreSQL clock **before** `force_unlock_workers`, so a SIGKILL'd worker cannot leave
+jobs locked for the previous multi-hour Graphile default, and a SIGSTOP'd stale owner
+cannot complete/fail a job another worker holds. Healthy heartbeats refresh both the
+lease and Graphile `locked_at` so long jobs are not falsely unlocked.
+
+Package proofs (real PostgreSQL, 4 tests) cover stale dead-worker reclaim, healthy
+heartbeat retention, stale complete/fail rejection, and automatic world reclaim without
+manual unlock. This lands fencing for abandoned Graphile work; it is **not** yet a full
+application SIGKILL second-model-reply qualification. Accepted-input wake recovery and
+this lock reclaim are separate properties—wake publication alone does not prove resumed
+model execution. Groups remain paused. Manual Graphile unlock is not part of the
+qualified path.
+
 
 On the same isolated application database, the browser completed a genuine Better
 Auth session using synthetic confirmation through the actual channel-account

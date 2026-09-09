@@ -20,6 +20,24 @@ No converter mutation, missing-array default or application workaround is includ
 The native HTTP/model test now pins exactly this Zod/AI cohort. Prior source acceptance fixtures
 used Zod 4.3.6; they did not qualify the application's failing 4.4.3 converter combination.
 
+## Worker lease fencing (v4 increment)
+
+PGWorld now maintains renewable worker leases on the PostgreSQL clock:
+
+1. Each Graphile worker registers a generation before claiming jobs and heartbeats `lease_until`.
+2. Reclaim retires the generation irrevocably **before** `graphile_worker.force_unlock_workers`.
+3. Leased HTTP executions bind `worker_id`/`generation`; storage/stream mutations and the next
+   execution boundary refuse a retired generation.
+4. Graphile `completeJob` is owner-aware (`locked_by` match), matching `failJob`, so a SIGSTOP'd
+   stale owner cannot delete or release a reassigned job.
+
+Public options: `workerLease: { leaseMs, heartbeatMs, reclaimIntervalMs }` (defaults 30s / 10s / 5s).
+Fencing does **not** undo external I/O already issued; it bounds overlapping durable mutation and
+abandoned-lock recovery. Accepted-input wake recovery alone is not resumed model execution.
+
+Source addon: `source/workflow-lease-fencing-addon.patch` (apply after the recovery workflow sources).
+Isolated proof: `packages/world-postgres/test/worker-lease.test.ts` (4 real PostgreSQL cases).
+
 ## Recovery contract
 
 ChannelSource, ChannelAddress and Session expose:
@@ -53,6 +71,7 @@ warm/cold reply assertions remain necessary and separate from this native proof.
 - `source/eve.patch`: complete source against Eve 78fa9046b8ad377b7fdca2c6d18cd3c10afcfc77.
 - `source/workflow.patch`: complete source against Workflow 2d753279d548e577a08035adeec4605c716379ef.
 - `source/*-recovery-addon.patch`: exact independently reviewed deltas over 4a95477 and 6278780.
+- `source/workflow-lease-fencing-addon.patch`: lease/generation fencing over the recovery workflow tree.
 - `rebuild-from-source.sh`: the v2 source-only procedure, unchanged. It installs TS7 7.0.2 from
   registry (or uses TS7_COMPILER), builds Workflow first, and only then supplies newly generated
   archives to a fresh Eve checkout. No preexisting tarball or installed root is required.

@@ -7,7 +7,8 @@ Usage: rebuild-from-source.sh EVE_SOURCE WORKFLOW_SOURCE NEW_OUTPUT
 
 Build the patched native packages in fresh source checkouts, without input tarballs.
 Requires bash, git, Node 24+, npm, and registry access. Sources must already have
-our full source patches applied (or be checked out at the composition commits).
+our full source patches applied (or be checked out at the composition commits),
+including workflow-lease-fencing-addon.patch after the recovery workflow patch when present.
 NEW_OUTPUT must not exist. Both source trees must have no node_modules or prior
 .acceptance-packages. This script installs dependencies and writes build output
 and an updated Eve lockfile only in those disposable source trees.

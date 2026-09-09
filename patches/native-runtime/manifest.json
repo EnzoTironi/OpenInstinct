@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "purpose": "Payload-free accepted-input wake recovery; Zod cohort aligned with external AI SDK",
+  "version": 4,
+  "purpose": "Payload-free accepted-input wake recovery; Zod cohort aligned with external AI SDK; PGWorld renewable worker lease + generation fencing + owner-aware Graphile completion",
   "rootPatchBaseline": "6310f4f",
   "sourceBases": {
     "eve": "78fa9046b8ad377b7fdca2c6d18cd3c10afcfc77",
@@ -18,13 +18,14 @@
     "eve": "0.49.0 + complete patch",
     "workflowCore": "5.0.0-beta.47 + embedded recovery patch",
     "workflowWorld": "5.0.0-beta.32 + existing acceptance patch",
-    "workflowPostgres": "5.0.0-beta.39 + existing acceptance patch",
+    "workflowPostgres": "5.0.0-beta.39 + acceptance + lease fencing patch",
     "eveVendoredZod": "4.5.4",
     "requiredApplicationZod": "4.5.4",
     "testedApplicationAi": "7.0.83",
     "externalAiSdkZodPeerMustResolve": "4.5.4",
     "converterMonkeypatch": false,
-    "newDatabaseMigrations": false
+    "newDatabaseMigrations": true,
+    "workerLeaseFencing": true
   },
   "validation": {
     "node": "24.18.1",
@@ -37,7 +38,9 @@
     "requiresBootstrapTarballs": false,
     "independentReview": "No behavioral blocker reported for the exact source delta; reviewer did not run suites",
     "quality": "not green; see QUALITY.md",
-    "rootActualApplicationModelProof": "root-owned pending integration"
+    "rootActualApplicationModelProof": "root-owned pending integration",
+    "workflowLeaseFencingTests": 4,
+    "workflowLeaseFencingNote": "Real PostgreSQL proofs: stale dead-worker reclaim after irrevocable generation expiry; healthy heartbeat not false-unlocked; stale complete/fail cannot delete/release current owner; world reclaim loop unlocks abandoned work without manual forceUnlock. Does not claim full Companion SIGKILL second-reply app proof."
   },
   "packages": {
     "eve-0.49.0.tgz": {
@@ -63,6 +66,7 @@
     "source/eve-recovery-addon.patch": "f2a09ad8fbfa1076b472b564fbfa640dc476faa5e1cfb1683e13e74e085ef156",
     "source/eve.patch": "18ba5073396a7f9fcb152b911ec9be38dc1daea570708d04272eacbf7c832c89",
     "source/workflow-recovery-addon.patch": "27b9a4d56bf113921bdcfaba0a9a948e9601b1c61a5dd9d6c60257d2c9e84bcc",
-    "source/workflow.patch": "b6db86e2ceb6e78d36d67e41cd2b24d1f2d97a624cc8b3d72155de3e4219ad17"
+    "source/workflow.patch": "b6db86e2ceb6e78d36d67e41cd2b24d1f2d97a624cc8b3d72155de3e4219ad17",
+    "source/workflow-lease-fencing-addon.patch": "228c1ab51951bed9926ce92d4b6e9d2388efe2f3dc7548fd3af97c89d4994706"
   }
 }
