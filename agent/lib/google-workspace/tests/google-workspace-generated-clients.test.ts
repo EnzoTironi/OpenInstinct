@@ -8,8 +8,9 @@ import { createCalendarEvent } from "@agent/lib/google-workspace/calendar";
 import { googleApiFailure } from "@agent/lib/google-workspace/client";
 import { searchGoogleContacts } from "@agent/lib/google-workspace/contacts";
 import {
+  gmailSendIdempotencyKey,
+  gmailSendIdempotencyQuery,
   gmailSendMessageId,
-  gmailSendMessageIdQuery,
   sendGmail,
 } from "@agent/lib/google-workspace/gmail";
 
@@ -76,12 +77,14 @@ describe("generated Google Workspace clients", () => {
       to: ["person@example.com"],
     });
 
+    const idempotencyKey = gmailSendIdempotencyKey(ctx);
     const messageId = gmailSendMessageId(ctx);
     const raw = Buffer.from(
       [
         "To: person@example.com",
         "Subject: Status",
         `Message-ID: ${messageId}`,
+        `X-OpenInstinct-Idempotency-Key: ${idempotencyKey}`,
         "MIME-Version: 1.0",
         'Content-Type: text/plain; charset="UTF-8"',
         "Content-Transfer-Encoding: 8bit",
@@ -91,7 +94,7 @@ describe("generated Google Workspace clients", () => {
     expect(list).toHaveBeenCalledWith(
       {
         maxResults: 1,
-        q: gmailSendMessageIdQuery(messageId),
+        q: gmailSendIdempotencyQuery(idempotencyKey),
         userId: "me",
       },
       { signal: ctx.abortSignal }
@@ -102,10 +105,10 @@ describe("generated Google Workspace clients", () => {
     );
   });
 
-  it("replays an identical Gmail send by recovering the Message-ID without resending", async () => {
+  it("replays an identical Gmail send by recovering the idempotency key without resending", async () => {
     const ctx = toolContext();
     const client = GmailApi.gmail({ version: "v1" });
-    const messageId = gmailSendMessageId(ctx);
+    const idempotencyKey = gmailSendIdempotencyKey(ctx);
     const list = vi
       .fn<
         (
@@ -126,7 +129,7 @@ describe("generated Google Workspace clients", () => {
       });
     const send = vi.fn<() => never>(() => {
       throw new Error(
-        "Gmail send must not run when Message-ID already exists."
+        "Gmail send must not run when idempotency key already exists."
       );
     });
     Object.defineProperty(client.users.messages, "list", {
@@ -156,7 +159,7 @@ describe("generated Google Workspace clients", () => {
     expect(list).toHaveBeenCalledWith(
       {
         maxResults: 1,
-        q: gmailSendMessageIdQuery(messageId),
+        q: gmailSendIdempotencyQuery(idempotencyKey),
         userId: "me",
       },
       { signal: ctx.abortSignal }
@@ -168,10 +171,10 @@ describe("generated Google Workspace clients", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("reconciles an uncertain Gmail send via Message-ID lookup instead of failing closed on a landed mail", async () => {
+  it("reconciles an uncertain Gmail send via idempotency-key lookup instead of failing closed on a landed mail", async () => {
     const ctx = toolContext();
     const client = GmailApi.gmail({ version: "v1" });
-    const messageId = gmailSendMessageId(ctx);
+    const idempotencyKey = gmailSendIdempotencyKey(ctx);
     const list = vi
       .fn<
         (
@@ -224,7 +227,7 @@ describe("generated Google Workspace clients", () => {
       2,
       {
         maxResults: 1,
-        q: gmailSendMessageIdQuery(messageId),
+        q: gmailSendIdempotencyQuery(idempotencyKey),
         userId: "me",
       },
       { signal: ctx.abortSignal }
@@ -235,7 +238,7 @@ describe("generated Google Workspace clients", () => {
     );
   });
 
-  it("fails closed on definite Gmail client errors without claiming Message-ID success", async () => {
+  it("fails closed on definite Gmail client errors without claiming idempotency success", async () => {
     const ctx = toolContext();
     const client = GmailApi.gmail({ version: "v1" });
     const list = vi

@@ -54,27 +54,31 @@ Layer fixtures for `BrowserWorkerAccess` and `ResolvedInstallationSecrets`. They
 concurrent provider races, and end-to-end Eve suspension/resumption require configured
 Google credentials and a real IdP redirect — left unqualified here.
 
-### Gmail send intent (Message-ID / outbox semantics)
+### Gmail send intent (idempotency / outbox semantics)
 
-`sendGmail` stamps a stable RFC822 `Message-ID` derived from
-`session.id:callId` (`<openinstinct-{sha256.slice(0,48)}@local>`). Because Gmail's
-`users.messages.send` does **not** treat that header as an idempotency key, the
-send path applies outbox-style reconciliation:
+`sendGmail` derives a stable idempotency key from `session.id:callId`
+(`openinstinct-send-{sha256.slice(0,40)}`) and stamps it as
+`X-OpenInstinct-Idempotency-Key`. It still sets an RFC822 `Message-ID` for
+correlation, but **live Gmail `users.messages.send` rewrites Message-ID** to a
+`@mail.gmail.com` value, so `rfc822msgid:` cannot reconcile retries.
 
-1. **Pre-dispatch lookup** via `rfc822msgid:` for the exact Message-ID; if a
+Outbox-style reconciliation therefore uses the custom header (preserved on send
+and indexed as searchable text):
+
+1. **Pre-dispatch lookup** via quoted key search (`"openinstinct-send-…"`); if a
    message already exists, return it and skip send (Eve step replay / identical
    retry).
 2. **Uncertain-outcome reconcile** after send failures with no status, HTTP 5xx,
-   or 429: look up the Message-ID again before propagating the error. Definite
-   client 4xx failures (except 429) fail closed without claiming success unless
-   the pre-dispatch lookup already found the mail.
+   or 429: look up the idempotency key again before propagating the error.
+   Definite client 4xx failures (except 429) fail closed without claiming success
+   unless the pre-dispatch lookup already found the mail.
 
 Focused Gmail send tests in
 `agent/lib/google-workspace/tests/google-workspace-generated-clients.test.ts`
-are **SDK fixture** mocks (list/get/send). They prove Message-ID stability,
-replay-without-resend, uncertain recovery, and fail-closed 4xx behavior. They
-do **not** claim live Gmail provider delivery, quota, or concurrent-race
-qualification — those require a live Google grant and remain unqualified.
+are **SDK fixture** mocks (list/get/send). They prove key stability,
+replay-without-resend, uncertain recovery, and fail-closed 4xx behavior. Live
+Gmail API proof (Message-ID rewrite + X-header skip) is recorded separately under
+`/tmp/companion-gmail-live-qual/` when a live Google grant is available.
 
 Run the focused real PostgreSQL membership check with the initialized runtime-test
 schema (the check refuses any database except `companion_runtime_test`):
