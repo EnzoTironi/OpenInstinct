@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as SessionService from "@db/services/sessions";
 import { accessScopeForUser } from "@shared/identity/access-scope";
+import type { SessionAuthContext } from "eve/context";
+import * as LiveAuthority from "@agent/subagents/browser-agent/lib/live-authority";
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
 
 const isSessionOwnedMock = vi.spyOn(SessionService, "isSessionOwned");
+const assertLiveWorkerAuthorityMock = vi.spyOn(
+  LiveAuthority,
+  "assertLiveWorkerAuthority"
+);
 
 beforeEach(() => {
   vi.clearAllMocks();
   isSessionOwnedMock.mockResolvedValue(true);
+  assertLiveWorkerAuthorityMock.mockResolvedValue(undefined);
 });
 
 describe("worker access", () => {
@@ -30,6 +37,9 @@ describe("worker access", () => {
       accessScopeForUser(principal.principalId),
       "root-session"
     );
+    expect(assertLiveWorkerAuthorityMock).toHaveBeenCalledExactlyOnceWith(
+      principal
+    );
   });
 
   it("rejects direct use and unowned worker lineage", async () => {
@@ -44,13 +54,75 @@ describe("worker access", () => {
     await expect(requireWorkerScope({ session })).rejects.toThrow(
       "does not own this worker session"
     );
+    expect(assertLiveWorkerAuthorityMock).not.toHaveBeenCalled();
+  });
+
+  it("denies sensitive vault access after channel revoke even when ownership remains", async () => {
+    const principal = principalFor("better-auth:alice", {
+      authenticator: "verified-channel",
+      attributes: {
+        channelIdentityId: "11111111-1111-4111-8111-111111111111",
+        conversationChannel: "telegram",
+        conversationId: "11111111-1111-4111-8111-111111111111",
+        workspaceId: accessScopeForUser("better-auth:alice").workspaceId,
+      },
+    });
+    assertLiveWorkerAuthorityMock.mockRejectedValueOnce(
+      new Error("The caller's channel authority has been revoked.")
+    );
+
+    await expect(
+      requireWorkerScope({
+        session: workerSession({ current: principal, initiator: principal }),
+      })
+    ).rejects.toThrow("channel authority has been revoked");
+    expect(isSessionOwnedMock).toHaveBeenCalled();
+    expect(assertLiveWorkerAuthorityMock).toHaveBeenCalledExactlyOnceWith(
+      principal
+    );
+  });
+
+  it("denies sensitive vault access after schedule pause even when ownership remains", async () => {
+    const principal = principalFor("better-auth:alice", {
+      authenticator: "scheduled-worker",
+      attributes: {
+        channelIdentityId: "11111111-1111-4111-8111-111111111111",
+        conversationChannel: "telegram",
+        conversationId: "11111111-1111-4111-8111-111111111111",
+        scheduleId: "22222222-2222-4222-8222-222222222222",
+        scheduledRunId: "33333333-3333-4333-8333-333333333333",
+        scheduledRunLeaseToken: "44444444-4444-4444-8444-444444444444",
+        workspaceId: accessScopeForUser("better-auth:alice").workspaceId,
+      },
+    });
+    assertLiveWorkerAuthorityMock.mockRejectedValueOnce(
+      new Error("The scheduled job is no longer active.")
+    );
+
+    await expect(
+      requireWorkerScope({
+        session: workerSession({ current: null, initiator: principal }),
+      })
+    ).rejects.toThrow("scheduled job is no longer active");
+    expect(assertLiveWorkerAuthorityMock).toHaveBeenCalledExactlyOnceWith(
+      principal
+    );
   });
 });
 
-function principalFor(userId: string) {
+function principalFor(
+  userId: string,
+  overrides: {
+    authenticator?: string;
+    attributes?: SessionAuthContext["attributes"];
+  } = {}
+) {
   return {
-    attributes: { workspaceId: accessScopeForUser(userId).workspaceId },
-    authenticator: "test",
+    attributes: {
+      workspaceId: accessScopeForUser(userId).workspaceId,
+      ...overrides.attributes,
+    },
+    authenticator: overrides.authenticator ?? "test",
     principalId: userId,
     principalType: "user",
   } as const;
