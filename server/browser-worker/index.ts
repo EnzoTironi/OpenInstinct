@@ -110,5 +110,3 @@ export class BrowserWorkerAccess extends Context.Service<
     makeBrowserWorkerAccess
   );
 }
-
-export { BrowserWorkerAccessError } from "./access";
