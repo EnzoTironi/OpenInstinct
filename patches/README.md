@@ -4,6 +4,21 @@ This Companion branch uses the upstream Merit-Systems `pkg.eve.dev`
 `0.52.2+main.59ec96cc99f65a80` Eve pin with a **single** Effect-safe Companion
 Eve patch (not a second queue engine).
 
+## Root pin table (fencing cohort)
+
+| Pin                                      | Source of truth                                                            | Active artifact                                                                            |
+| ---------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Eve `0.52.2+main.59ec96cc99f65a80`       | `package.json` → `eve` URL `https://pkg.eve.dev/59ec96cc99f65a80…/eve.tgz` | `patches/eve@0.52.2+main.59ec96cc99f65a80.patch` (wired as `eve` in `pnpm-workspace.yaml`) |
+| `@workflow/world@5.0.0-beta.32`          | lockfile + patchedDependencies                                             | `patches/@workflow__world@5.0.0-beta.32.patch`                                             |
+| `@workflow/world-postgres@5.0.0-beta.39` | `package.json` + patchedDependencies                                       | `patches/@workflow__world-postgres@5.0.0-beta.39.patch` (lease fencing)                    |
+| `@linqapp/chat-sdk-adapter@0.5.1`        | `package.json` + patchedDependencies                                       | `patches/@linqapp__chat-sdk-adapter@0.5.1.patch`                                           |
+
+Lockfile `patchedDependencies` hashes must match `sha256` of those patch files. App migrations run before workflow world setup: `pnpm db:migrate` then `pnpm workflow:migrate`.
+
+## No manual Graphile unlock
+
+After Eve 0.52 + Graphile fencing, the qualified SIGKILL path reclaims orphaned jobs via renewable worker leases / generation fencing. **Do not** call Graphile `forceUnlockWorkers` / manual unlock in the qualified recovery path; proofs record `manualUnlock: false`. See `docs/local-runtime-setup.md` (Graphile worker lease fencing).
+
 ## Active patchedDependencies (see `pnpm-workspace.yaml`)
 
 - `@linqapp/chat-sdk-adapter@0.5.1` — native `replyToMessageId` delivery.
