@@ -1,18 +1,23 @@
 import { symmetricDecodeJWT, symmetricEncodeJWT } from "better-auth/crypto";
-import { Effect, Schema } from "effect";
-import { getInstallationSecrets } from "@db/services/installation-secrets";
+import { Effect, Redacted, Schema } from "effect";
+import type { SessionAuthContext } from "eve/context";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { applicationOrigin } from "@shared/environment/origin";
-import type { AccessScope } from "@shared/identity/access-scope";
-import {
-  GoogleWorkspaceError,
-  requireGoogleWorkspaceMembership,
-} from "./index";
+import { BrowserWorkerAccess } from "../browser-worker";
+import type { BrowserWorkerAccessError } from "../browser-worker/access";
+import { GoogleWorkspaceError, googleWorkspaceUserId } from "./index";
 
 const purpose = "companion-google-workspace-link";
 const flowSchema = Schema.Struct({
   userId: Schema.NonEmptyString,
   callbackURL: Schema.String,
 });
+
+function denyWithoutLiveAuthority(error: BrowserWorkerAccessError) {
+  return new GoogleWorkspaceError({
+    reason: error.reason === "unavailable" ? "unavailable" : "unauthenticated",
+  });
+}
 
 export const validateGoogleCallback = Effect.fn("validateGoogleCallback")(
   function* (callbackURL: string, origin: string) {
@@ -35,19 +40,28 @@ export const validateGoogleCallback = Effect.fn("validateGoogleCallback")(
   }
 );
 
+/**
+ * Issues a native Google consent handoff only when the caller still has live
+ * delegated authority (channel/web/schedule), not workspace ownership alone.
+ */
 export const createGoogleWorkspaceChallenge = Effect.fn(
   "createGoogleWorkspaceChallenge"
-)(function* (scope: AccessScope, callbackUrl: string) {
-  const userId = yield* requireGoogleWorkspaceMembership(scope);
+)(function* (principal: SessionAuthContext, callbackUrl: string) {
+  const access = yield* BrowserWorkerAccess;
+  const scope = yield* access
+    .authorize(principal)
+    .pipe(Effect.mapError(denyWithoutLiveAuthority));
+  const userId = yield* googleWorkspaceUserId(scope);
   const callbackURL = yield* validateGoogleCallback(
     callbackUrl,
     applicationOrigin()
   );
+  const secrets = yield* ResolvedInstallationSecrets;
   const flow = yield* Effect.tryPromise({
-    try: async () =>
+    try: () =>
       symmetricEncodeJWT(
         { userId, callbackURL },
-        (await getInstallationSecrets()).betterAuthSecret,
+        Redacted.value(secrets.betterAuthSecret),
         purpose,
         600
       ),
@@ -61,11 +75,12 @@ export const createGoogleWorkspaceChallenge = Effect.fn(
 export const readGoogleWorkspaceChallenge = Effect.fn(
   "readGoogleWorkspaceChallenge"
 )(function* (flow: string, userId: string) {
+  const secrets = yield* ResolvedInstallationSecrets;
   const payload = yield* Effect.tryPromise({
-    try: async () =>
+    try: () =>
       symmetricDecodeJWT<unknown>(
         flow,
-        (await getInstallationSecrets()).betterAuthSecret,
+        Redacted.value(secrets.betterAuthSecret),
         purpose
       ),
     catch: () => new GoogleWorkspaceError({ reason: "invalid_callback" }),

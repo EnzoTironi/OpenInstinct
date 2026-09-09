@@ -1,20 +1,34 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
-import { Effect, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime } from "effect";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { runtimeDatabase } from "../../tests/runtime/database";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { applicationOrigin } from "../../shared/environment/origin";
+import type { SessionAuthContext } from "eve/context";
+import { BrowserWorkerAccess } from "../browser-worker";
 import {
   createGoogleWorkspaceChallenge,
   readGoogleWorkspaceChallenge,
 } from "./challenge";
 import { requireGoogleWorkspaceMembership } from "./index";
 
-const runtime = ManagedRuntime.make(runtimeDatabase);
 const userId = `google-membership-${randomUUID()}`;
 const scope = accessScopeForUser(`better-auth:${userId}`);
+const principal: SessionAuthContext = {
+  attributes: { workspaceId: scope.workspaceId },
+  authenticator: "test",
+  principalId: scope.userId,
+  principalType: "user",
+};
 const callback = `${applicationOrigin()}/eve/v1/connections/google-workspace/callback/attempt/token`;
+const runtime = ManagedRuntime.make(
+  Layer.mergeAll(
+    BrowserWorkerAccess.layer,
+    ResolvedInstallationSecrets.layer
+  ).pipe(Layer.provideMerge(runtimeDatabase))
+);
 try {
   await runtime.runPromise(
     Effect.gen(function* () {
@@ -24,12 +38,14 @@ try {
     })
   );
   const challenge = new URL(
-    await runtime.runPromise(createGoogleWorkspaceChallenge(scope, callback))
+    await runtime.runPromise(
+      createGoogleWorkspaceChallenge(principal, callback)
+    )
   );
   const flow = challenge.searchParams.get("flow");
   assert.ok(flow);
   assert.equal(
-    await Effect.runPromise(readGoogleWorkspaceChallenge(flow, userId)),
+    await runtime.runPromise(readGoogleWorkspaceChallenge(flow, userId)),
     callback
   );
   await runtime.runPromise(
@@ -43,7 +59,7 @@ try {
     { reason: "unauthenticated" }
   );
   await assert.rejects(
-    runtime.runPromise(createGoogleWorkspaceChallenge(scope, callback)),
+    runtime.runPromise(createGoogleWorkspaceChallenge(principal, callback)),
     { reason: "unauthenticated" }
   );
   process.stdout.write(
