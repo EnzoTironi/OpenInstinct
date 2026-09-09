@@ -32,9 +32,9 @@ describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
         },
       }
     );
-    if (!tools || !("react_to_message" in tools))
+    if (!tools || typeof tools !== "object" || !Object.hasOwn(tools, "react_to_message"))
       throw new Error("Reaction tool is required.");
-    const reaction = tools.react_to_message;
+    const reaction = (tools as Record<string, { inputSchema?: unknown }>).react_to_message;
     if (!Predicate.isObject(reaction) || !("inputSchema" in reaction))
       throw new Error("Reaction schema is required.");
     const original = reaction.inputSchema;

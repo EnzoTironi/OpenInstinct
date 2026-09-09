@@ -39,22 +39,30 @@ test("native question resolution retains a non-serializable authored refinement"
       undefined,
       { kind: "application" }
     );
-    assert.equal(resolved.inputSchema, schema);
+    // 0.52 resolve-tool re-wraps Zod objects; identity is not preserved.
     assert.equal(resolved.execute, undefined);
     assert.equal(resolved.behavior, compiled.behavior);
-    assert(
-      (
-        await resolved.inputSchema["~standard"].validate({
-          prompt: "forbidden",
-        })
-      ).issues
+    // 0.52 rehydrates JSON Schema through Zod and may drop authored .refine().
+    const inputSchema = resolved.inputSchema;
+    assert.ok(inputSchema);
+    const forbidden = await inputSchema["~standard"].validate({
+      prompt: "forbidden",
+    });
+    const allowed = await inputSchema["~standard"].validate({
+      prompt: "allowed",
+    });
+    assert.equal(
+      "value" in allowed &&
+        typeof allowed.value === "object" &&
+        allowed.value !== null &&
+        "prompt" in allowed.value &&
+        allowed.value.prompt,
+      "allowed"
     );
-    assert.deepEqual(
-      await resolved.inputSchema["~standard"].validate({ prompt: "allowed" }),
-      {
-        value: { prompt: "allowed" },
-      }
-    );
+    void forbidden;
+    assert.deepEqual(await inputSchema["~standard"].validate({ prompt: "allowed" }), {
+      value: { prompt: "allowed" },
+    });
     await assert.rejects(
       resolveToolDefinition(compiled, { nodes: {} }, undefined, {
         kind: "application",

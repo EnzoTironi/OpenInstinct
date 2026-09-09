@@ -259,15 +259,24 @@ describe("schedule tools", () => {
       "send_message",
     ]);
     const reportSend =
-      reportMessaging && !("execute" in reportMessaging)
+      reportMessaging &&
+      typeof reportMessaging === "object" &&
+      !Object.hasOwn(reportMessaging, "execute") &&
+      "send_message" in reportMessaging
         ? reportMessaging.send_message
         : undefined;
     const interactiveSend =
-      interactiveMessaging && !("execute" in interactiveMessaging)
+      interactiveMessaging &&
+      typeof interactiveMessaging === "object" &&
+      !Object.hasOwn(interactiveMessaging, "execute") &&
+      "send_message" in interactiveMessaging
         ? interactiveMessaging.send_message
         : undefined;
     const debugSend =
-      debugMessaging && !("execute" in debugMessaging)
+      debugMessaging &&
+      typeof debugMessaging === "object" &&
+      !Object.hasOwn(debugMessaging, "execute") &&
+      "send_message" in debugMessaging
         ? debugMessaging.send_message
         : undefined;
     const reply = {
