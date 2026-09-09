@@ -42,4 +42,3 @@ Companion-side 0.52 public-shape notes (this branch):
 - Two `eve-cold-tool-rebind` unit fixtures are skipped: 0.52 fail-closed
   rebind requires transformed durable descriptors this helper surface does not
   stamp. Recovery APIs (`recoverInputAcceptance`, restore-turn) remain present.
-

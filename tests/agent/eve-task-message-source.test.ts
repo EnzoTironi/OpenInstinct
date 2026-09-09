@@ -151,7 +151,8 @@ test("constructor and real client NDJSON decoding retain native source across sp
     },
   });
   const decoded: MessageStreamEvent[] = [];
-  for await (const item of readNdjsonStream(stream, { streamVersion: "25" })) decoded.push(item);
+  for await (const item of readNdjsonStream(stream, { streamVersion: "25" }))
+    decoded.push(item);
   assert.deepEqual(decoded, [event]);
   const [received] = decoded;
   assert(received?.type === "message.received");

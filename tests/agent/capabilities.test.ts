@@ -69,7 +69,9 @@ async function authoredCapabilities(authenticator: string) {
     groupedTools.map(async (definition) => {
       const resolve = definition.events["turn.started"];
       const resolved = resolve ? await resolve({}, context) : null;
-      return resolved && typeof resolved === "object" && !Object.hasOwn(resolved, "execute")
+      return resolved &&
+        typeof resolved === "object" &&
+        !Object.hasOwn(resolved, "execute")
         ? Object.keys(resolved)
         : [];
     })

@@ -284,7 +284,9 @@ it("does not restore obsolete interactive callbacks for a settled report turn", 
     ],
   });
   expect(fixture.calls).toEqual({ resolver: 0, policy: 0, execute: 0 });
-  expect(lookupDurableDynamicCallback(callbackOwner(fixture.name), "execute")).toBeUndefined();
+  expect(
+    lookupDurableDynamicCallback(callbackOwner(fixture.name), "execute")
+  ).toBeUndefined();
 });
 
 it.skip("restores callbacks for an in-flight continuation without pending approvals", async () => {
@@ -299,10 +301,13 @@ it.skip("restores callbacks for an in-flight continuation without pending approv
     resolvers: [fixture.resolver],
   });
   expect(fixture.calls.resolver).toBe(1);
-  expect(lookupDurableDynamicCallback(callbackOwner(fixture.name), "execute")).toBeTypeOf(
-    "function"
-  );
   expect(
-    lookupDurableDynamicCallback(callbackOwner(fixture.name), "approvalResponse")
+    lookupDurableDynamicCallback(callbackOwner(fixture.name), "execute")
+  ).toBeTypeOf("function");
+  expect(
+    lookupDurableDynamicCallback(
+      callbackOwner(fixture.name),
+      "approvalResponse"
+    )
   ).toBeTypeOf("function");
 });

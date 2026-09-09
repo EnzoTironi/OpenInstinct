@@ -60,9 +60,12 @@ test("native question resolution retains a non-serializable authored refinement"
       "allowed"
     );
     void forbidden;
-    assert.deepEqual(await inputSchema["~standard"].validate({ prompt: "allowed" }), {
-      value: { prompt: "allowed" },
-    });
+    assert.deepEqual(
+      await inputSchema["~standard"].validate({ prompt: "allowed" }),
+      {
+        value: { prompt: "allowed" },
+      }
+    );
     await assert.rejects(
       resolveToolDefinition(compiled, { nodes: {} }, undefined, {
         kind: "application",
