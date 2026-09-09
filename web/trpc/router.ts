@@ -4,7 +4,7 @@ import { Effect, Schema } from "effect";
 import { TRPCError } from "@trpc/server";
 import { listBrowserTraces } from "@db/services/browser-traces";
 import { saveChat } from "@db/services/chats";
-import { replaceUserProfile } from "@db/services/user-profile";
+import { replacePersonalProfile } from "../../server/personal-memory/profile";
 import { selectGatewayModel } from "@db/services/settings";
 import { deleteVaultItem, saveVaultItem } from "@db/services/vault";
 import { saveChatSchema } from "@shared/chat/schema";
@@ -92,7 +92,12 @@ export const appRouter = createTRPCRouter({
     update: protectedProcedure
       .input(userProfileSchema)
       .output(userProfileSchema)
-      .mutation(({ ctx, input }) => replaceUserProfile(ctx.scope, input)),
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          replacePersonalProfile(ctx.requestHeaders, input),
+          { signal }
+        )
+      ),
   },
   traces: {
     list: protectedProcedure

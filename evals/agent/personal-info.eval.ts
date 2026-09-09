@@ -7,6 +7,8 @@ import {
   requireDeliveredText,
 } from "@evals/agent/shared";
 import { accessScopeForUser } from "@shared/identity/access-scope";
+import { ensureScope } from "@db/services/scope";
+import { serverRuntime } from "../../server/runtime";
 
 const firstNameCanary = "Evalina";
 const lastNameCanary = "Canary";
@@ -113,9 +115,12 @@ export default [
       const isolatedScope = accessScopeForUser(
         "better-auth:isolated-agent-eval"
       );
-      await patchUserProfile(isolatedScope, {
-        firstName: isolatedFirstNameCanary,
-      });
+      await ensureScope(isolatedScope);
+      await serverRuntime.runPromise(
+        patchUserProfile(isolatedScope, {
+          firstName: isolatedFirstNameCanary,
+        })
+      );
 
       const turn = await t.send(
         "What first name do you currently have saved in my personal information? If none is saved, say that plainly."

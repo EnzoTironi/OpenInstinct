@@ -1,4 +1,5 @@
 import { Effect, Result } from "effect";
+import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { inspectPersonalMemory } from "../../../server/personal-memory/export";
@@ -56,7 +57,19 @@ export async function PersonalMemorySection() {
           No profile details saved.
         </p>
       )}
+      <Link
+        href="/personal-info"
+        className={buttonVariants({ variant: "outline" })}
+      >
+        Edit or clear profile details
+      </Link>
       <h3 className="type-supporting-body font-medium">Assistant notes</h3>
+      <p className="type-supporting-body text-muted-foreground">
+        To correct or forget a saved fact, tell your assistant in your private
+        conversation which fact to change or remove from saved memory. Your
+        assistant can update both profile details and notes. Earlier
+        conversations and downloaded copies remain separate.
+      </p>
       {snapshot.notes.status === "unresolved" ? (
         <p className="type-supporting-body text-muted-foreground">
           Notes have not been located for this account yet. Continue a

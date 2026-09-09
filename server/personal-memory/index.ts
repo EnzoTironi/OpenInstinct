@@ -51,10 +51,11 @@ const makePersonalMemory = Effect.gen(function* () {
   const inspect = Effect.fn("PersonalMemory.inspect")(
     function* (scope: AccessScope) {
       yield* requirePersonalMemoryMembership(scope);
-      const profile = yield* Effect.tryPromise({
-        try: () => readUserProfile(scope),
-        catch: () => new PersonalMemoryError({ reason: "unavailable" }),
-      });
+      const profile = yield* readUserProfile(scope).pipe(
+        Effect.mapError(
+          () => new PersonalMemoryError({ reason: "unavailable" })
+        )
+      );
       const bindings = yield* sql`SELECT key FROM personal_memory_binding
         WHERE workspace_id = ${scope.workspaceId} AND slot = 'profile'`;
       const rows =

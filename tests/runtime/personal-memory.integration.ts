@@ -188,14 +188,18 @@ test("actual account auth, profile store, Eve provider, private tool and export 
         .notes.status,
       "unresolved"
     );
-    await patchUserProfile(ownerScope, {
-      firstName: "Personal-memory owner",
-      city: "Owner-only city",
-    });
-    await patchUserProfile(otherScope, {
-      firstName: "Second owner",
-      city: "Foreign-only city",
-    });
+    await serverRuntime.runPromise(
+      patchUserProfile(ownerScope, {
+        firstName: "Personal-memory owner",
+        city: "Owner-only city",
+      })
+    );
+    await serverRuntime.runPromise(
+      patchUserProfile(otherScope, {
+        firstName: "Second owner",
+        city: "Foreign-only city",
+      })
+    );
     const ownerContext = memoryContext(owner.identity);
     const otherContext = memoryContext(other.identity);
     await Promise.all(
