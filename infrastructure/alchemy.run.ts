@@ -1,6 +1,7 @@
 import * as Alchemy from "alchemy";
 import * as Docker from "alchemy/Docker";
 import * as Provider from "alchemy/Provider";
+import { Stack } from "alchemy/Stack";
 import { Config, Effect, Layer } from "effect";
 
 const providers = Layer.effect(
@@ -17,6 +18,12 @@ const providers = Layer.effect(
   Layer.provideMerge(Docker.DockerLive)
 );
 
+/**
+ * Alchemy stages already isolate stack state and Docker physical names
+ * (container + volume) per `--stage`. This program additionally derives a
+ * Postgres database name from the stage so app env files can target
+ * `open_instinct_<stage>` explicitly.
+ */
 export default Alchemy.Stack(
   "CompanionLocal",
   {
@@ -24,6 +31,9 @@ export default Alchemy.Stack(
     state: Alchemy.localState(),
   },
   Effect.gen(function* () {
+    const stack = yield* Stack;
+    const stage = stack.stage;
+    const database = `open_instinct_${stage.replaceAll("-", "_")}`;
     const password = yield* Config.redacted("COMPANION_POSTGRES_PASSWORD");
     const image = yield* Docker.RemoteImage("PostgresImage", {
       name: "postgres",
@@ -34,7 +44,7 @@ export default Alchemy.Stack(
     const postgres = yield* Docker.Container("Postgres", {
       image,
       environment: {
-        POSTGRES_DB: "open_instinct",
+        POSTGRES_DB: database,
         POSTGRES_USER: "postgres",
         POSTGRES_PASSWORD: password,
       },
@@ -43,7 +53,7 @@ export default Alchemy.Stack(
         { hostPath: data.name, containerPath: "/var/lib/postgresql/data" },
       ],
       healthcheck: {
-        cmd: "pg_isready -U postgres -d open_instinct",
+        cmd: `pg_isready -U postgres -d ${database}`,
         interval: "2 seconds",
         timeout: "5 seconds",
         retries: 10,
@@ -51,6 +61,8 @@ export default Alchemy.Stack(
       start: true,
     });
     return {
+      stage,
+      database,
       container: postgres.name,
       ports: postgres.ports,
       volume: data.name,
