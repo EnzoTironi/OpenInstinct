@@ -240,13 +240,18 @@ describe("personal memory unstructured forget + recall-refresh", () => {
       Effect.forEach(
         notes,
         (text) =>
-          Effect.tryPromise(() =>
-            saveMemory.execute(
-              // @ts-expect-error heterogeneous tool map
-              { text },
-              toolExecution(context, "profile__save_memory")
-            )
-          ),
+          Effect.tryPromise({
+            try: () =>
+              Promise.resolve(
+                saveMemory.execute(
+                  // @ts-expect-error heterogeneous tool map
+                  { text },
+                  toolExecution(context, "profile__save_memory")
+                )
+              ),
+            catch: (cause) =>
+              cause instanceof Error ? cause : new Error(String(cause)),
+          }),
         { concurrency: 1 }
       )
     );
