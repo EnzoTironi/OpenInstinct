@@ -19,6 +19,8 @@ import {
   LeaseSchema,
   type Lease,
   type MessagingError,
+  ResolveOutboxUncertainSchema,
+  type ResolveOutboxUncertainInput,
 } from "./model";
 import { makeQueue, storageFailure } from "./store";
 import { makeInputResponses } from "./input-response";
@@ -185,6 +187,15 @@ const makeMessaging = Effect.gen(function* () {
       const value = yield* decodeInput(rejected)(input);
       return yield* outbox.stop(value.lease, "failed", value.reason);
     }, protect),
+    // Explicit audited reconciliation for uncertain outbox. A lost receipt must
+    // not block an identity forever; authorize_retry accepts duplicate-send risk.
+    resolveOutboxUncertain: Effect.fn("Messaging.resolveOutboxUncertain")(
+      function* (input: ResolveOutboxUncertainInput) {
+        const value = yield* decodeInput(ResolveOutboxUncertainSchema)(input);
+        return yield* outbox.resolveUncertain(value);
+      },
+      protect
+    ),
     checkInboxLease: Effect.fn("Messaging.checkInboxLease")(function* (
       input: Lease
     ) {

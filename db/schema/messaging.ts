@@ -177,3 +177,60 @@ export const channelOutbox = pgTable(
     ),
   ]
 );
+
+export const channelOutboxResolutions = pgTable(
+  "channel_outbox_resolution",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    outboxId: uuid("outbox_id")
+      .notNull()
+      .references(() => channelOutbox.id, { onDelete: "cascade" }),
+    identityId: uuid("identity_id")
+      .notNull()
+      .references(() => channelIdentities.id, { onDelete: "cascade" }),
+    decision: text("decision").notNull(),
+    detail: text("detail").notNull(),
+    priorStatus: text("prior_status").notNull(),
+    priorError: text("prior_error"),
+    actorPrincipalId: text("actor_principal_id").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("channel_outbox_resolution_outbox_idx").on(
+      table.outboxId,
+      table.createdAt
+    ),
+    index("channel_outbox_resolution_identity_idx").on(
+      table.identityId,
+      table.createdAt
+    ),
+    check(
+      "channel_outbox_resolution_decision_check",
+      sql`${table.decision} IN ('mark_delivered', 'cancel', 'authorize_retry')`
+    ),
+    check(
+      "channel_outbox_resolution_prior_status_check",
+      sql`${table.priorStatus} = 'uncertain'`
+    ),
+    check(
+      "channel_outbox_resolution_detail_check",
+      sql`length(trim(${table.detail})) > 0 AND length(${table.detail}) <= 512`
+    ),
+    check(
+      "channel_outbox_resolution_actor_check",
+      sql`length(trim(${table.actorPrincipalId})) > 0 AND length(${table.actorPrincipalId}) <= 256`
+    ),
+    check(
+      "channel_outbox_resolution_note_check",
+      sql`${table.note} IS NULL OR (length(trim(${table.note})) > 0 AND length(${table.note}) <= 200)`
+    ),
+    check(
+      "channel_outbox_resolution_prior_error_check",
+      sql`${table.priorError} IS NULL OR length(${table.priorError}) <= 200`
+    ),
+  ]
+);
+
