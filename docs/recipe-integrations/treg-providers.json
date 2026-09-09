@@ -1,0 +1,398 @@
+[
+  {
+    "provider": "akta",
+    "catalog_endpoints": 12,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "apify",
+    "catalog_endpoints": 7,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "apollo",
+    "catalog_endpoints": 8,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "aviato",
+    "catalog_endpoints": 21,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "branddev",
+    "catalog_endpoints": 13,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "brightdata",
+    "catalog_endpoints": 52,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "cloro",
+    "catalog_endpoints": 11,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "coingecko",
+    "catalog_endpoints": 11,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "companyenrich",
+    "catalog_endpoints": 41,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "coresignal",
+    "catalog_endpoints": 5,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "crunchbase",
+    "catalog_endpoints": 5,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "crustdata",
+    "catalog_endpoints": 8,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "dataforseo",
+    "catalog_endpoints": 217,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "diffbot",
+    "catalog_endpoints": 22,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "eodhd",
+    "catalog_endpoints": 3,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "exa",
+    "catalog_endpoints": 10,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "facebook",
+    "catalog_endpoints": 32,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "fiber-ai",
+    "catalog_endpoints": 12,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "findymail",
+    "catalog_endpoints": 18,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "finnhub",
+    "catalog_endpoints": 5,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "google-ads",
+    "catalog_endpoints": 47,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "google-analytics",
+    "catalog_endpoints": 66,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "google-business-profile",
+    "catalog_endpoints": 64,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "google-search-console",
+    "catalog_endpoints": 11,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "google-tag-manager",
+    "catalog_endpoints": 106,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "hunter",
+    "catalog_endpoints": 35,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "icypeas",
+    "catalog_endpoints": 18,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "influencersclub",
+    "catalog_endpoints": 15,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "instagram",
+    "catalog_endpoints": 32,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "justoneapi",
+    "catalog_endpoints": 272,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "leadmagic",
+    "catalog_endpoints": 22,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "leadsforge",
+    "catalog_endpoints": 32,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "linkedin",
+    "catalog_endpoints": 5,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "lusha",
+    "catalog_endpoints": 31,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "majestic",
+    "catalog_endpoints": 7,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "marketstack",
+    "catalog_endpoints": 7,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "meta-ad-library",
+    "catalog_endpoints": 4,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "meta-ads",
+    "catalog_endpoints": 37,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "microsoft-ads",
+    "catalog_endpoints": 4,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "millionverifier",
+    "catalog_endpoints": 2,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "minimax",
+    "catalog_endpoints": 7,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "moz",
+    "catalog_endpoints": 12,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "oceanio",
+    "catalog_endpoints": 23,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "openrouter",
+    "catalog_endpoints": 31,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "pdl",
+    "catalog_endpoints": 22,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "pinterest-ads",
+    "catalog_endpoints": 6,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "polygon",
+    "catalog_endpoints": 6,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "predictleads",
+    "catalog_endpoints": 27,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "replicate",
+    "catalog_endpoints": 130,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "scrapecreators",
+    "catalog_endpoints": 171,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "semrush",
+    "catalog_endpoints": 11,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "seranking",
+    "catalog_endpoints": 11,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "serpapi",
+    "catalog_endpoints": 58,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "serpstat",
+    "catalog_endpoints": 12,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "slack",
+    "catalog_endpoints": 9,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "snapchat-ads",
+    "catalog_endpoints": 6,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "spyfu",
+    "catalog_endpoints": 6,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "thecompaniesapi",
+    "catalog_endpoints": 5,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "tiingo",
+    "catalog_endpoints": 4,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "tikhub",
+    "catalog_endpoints": 1002,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "tiktok",
+    "catalog_endpoints": 7,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "tiktok-ads",
+    "catalog_endpoints": 5,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "tomba",
+    "catalog_endpoints": 23,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "twelvedata",
+    "catalog_endpoints": 4,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "x",
+    "catalog_endpoints": 173,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  },
+  {
+    "provider": "youtube",
+    "catalog_endpoints": 84,
+    "source": "https://github.com/superdesigndev/treg/tree/7bc16c08196aec7c3a668b5e1b13b70905d989fb/src/treg/catalog",
+    "license": "Apache-2.0-with-restrictive-additional-terms"
+  }
+]

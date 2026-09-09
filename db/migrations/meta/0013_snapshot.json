@@ -1,5 +1,5 @@
 {
-  "id": "8d971fcd-e5d8-46d2-93a1-93d6e8ccb63a",
+  "id": "d60b7c56-df0f-4818-b5fc-e8f0b9c76890",
   "prevId": "ce48709e-63fe-4dd6-b07c-9bfea0ea48b6",
   "version": "7",
   "dialect": "postgresql",
@@ -912,6 +912,328 @@
         "browser_traces_duration_ms_check": {
           "name": "browser_traces_duration_ms_check",
           "value": "\"browser_traces\".\"duration_ms\" IS NULL OR \"browser_traces\".\"duration_ms\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.channel_auth_challenge": {
+      "name": "channel_auth_challenge",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "browser_secret_hash": {
+          "name": "browser_secret_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_user_id": {
+          "name": "target_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_session_id": {
+          "name": "requesting_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "installation_id": {
+          "name": "installation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identity_id": {
+          "name": "identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "channel_auth_challenge_token_uidx": {
+          "name": "channel_auth_challenge_token_uidx",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "channel_auth_challenge_expiry_idx": {
+          "name": "channel_auth_challenge_expiry_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "channel_auth_challenge_target_user_id_user_id_fk": {
+          "name": "channel_auth_challenge_target_user_id_user_id_fk",
+          "tableFrom": "channel_auth_challenge",
+          "tableTo": "user",
+          "columnsFrom": ["target_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "channel_auth_challenge_requesting_session_id_session_id_fk": {
+          "name": "channel_auth_challenge_requesting_session_id_session_id_fk",
+          "tableFrom": "channel_auth_challenge",
+          "tableTo": "session",
+          "columnsFrom": ["requesting_session_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "channel_auth_challenge_identity_fkey": {
+          "name": "channel_auth_challenge_identity_fkey",
+          "tableFrom": "channel_auth_challenge",
+          "tableTo": "channel_identity",
+          "columnsFrom": ["identity_id", "channel", "installation_id"],
+          "columnsTo": ["id", "channel", "installation_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "channel_auth_challenge_channel_check": {
+          "name": "channel_auth_challenge_channel_check",
+          "value": "\"channel_auth_challenge\".\"channel\" IN ('telegram', 'kapso') AND length(trim(\"channel_auth_challenge\".\"installation_id\")) > 0"
+        },
+        "channel_auth_challenge_purpose_check": {
+          "name": "channel_auth_challenge_purpose_check",
+          "value": "(\"channel_auth_challenge\".\"purpose\" = 'login' AND \"channel_auth_challenge\".\"target_user_id\" IS NULL AND \"channel_auth_challenge\".\"requesting_session_id\" IS NULL) OR (\"channel_auth_challenge\".\"purpose\" = 'link' AND \"channel_auth_challenge\".\"target_user_id\" IS NOT NULL AND \"channel_auth_challenge\".\"requesting_session_id\" IS NOT NULL)"
+        },
+        "channel_auth_challenge_hash_check": {
+          "name": "channel_auth_challenge_hash_check",
+          "value": "\"channel_auth_challenge\".\"token_hash\" ~ '^[0-9a-f]{64}$' AND \"channel_auth_challenge\".\"browser_secret_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "channel_auth_challenge_confirmation_check": {
+          "name": "channel_auth_challenge_confirmation_check",
+          "value": "\"channel_auth_challenge\".\"confirmed_at\" IS NULL OR \"channel_auth_challenge\".\"identity_id\" IS NOT NULL"
+        },
+        "channel_auth_challenge_consumption_check": {
+          "name": "channel_auth_challenge_consumption_check",
+          "value": "\"channel_auth_challenge\".\"consumed_at\" IS NULL OR (\"channel_auth_challenge\".\"confirmed_at\" IS NOT NULL AND \"channel_auth_challenge\".\"identity_id\" IS NOT NULL AND \"channel_auth_challenge\".\"cancelled_at\" IS NULL)"
+        },
+        "channel_auth_challenge_expiry_check": {
+          "name": "channel_auth_challenge_expiry_check",
+          "value": "\"channel_auth_challenge\".\"expires_at\" > \"channel_auth_challenge\".\"created_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.channel_identity": {
+      "name": "channel_identity",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "installation_id": {
+          "name": "installation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_id": {
+          "name": "sender_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "channel_identity_sender_uidx": {
+          "name": "channel_identity_sender_uidx",
+          "columns": [
+            {
+              "expression": "channel",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "installation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sender_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "channel_identity_user_idx": {
+          "name": "channel_identity_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "channel_identity_user_id_user_id_fk": {
+          "name": "channel_identity_user_id_user_id_fk",
+          "tableFrom": "channel_identity",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "channel_identity_installation_key": {
+          "name": "channel_identity_installation_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "channel", "installation_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "channel_identity_channel_check": {
+          "name": "channel_identity_channel_check",
+          "value": "\"channel_identity\".\"channel\" IN ('telegram', 'kapso')"
+        },
+        "channel_identity_address_check": {
+          "name": "channel_identity_address_check",
+          "value": "length(trim(\"channel_identity\".\"installation_id\")) > 0 AND length(trim(\"channel_identity\".\"sender_id\")) > 0"
         }
       },
       "isRLSEnabled": false
@@ -1932,116 +2254,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.workstreams": {
-      "name": "workstreams",
-      "schema": "",
-      "columns": {
-        "workspace_id": {
-          "name": "workspace_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "scope_key": {
-          "name": "scope_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "content": {
-          "name": "content",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_operation_id": {
-          "name": "last_operation_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp (3) with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "workstreams_recent_idx": {
-          "name": "workstreams_recent_idx",
-          "columns": [
-            {
-              "expression": "workspace_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "scope_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "updated_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "workstreams_workspace_id_workspaces_id_fk": {
-          "name": "workstreams_workspace_id_workspaces_id_fk",
-          "tableFrom": "workstreams",
-          "tableTo": "workspaces",
-          "columnsFrom": ["workspace_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "workstreams_workspace_id_scope_key_id_pk": {
-          "name": "workstreams_workspace_id_scope_key_id_pk",
-          "columns": ["workspace_id", "scope_key", "id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "workstreams_revision_check": {
-          "name": "workstreams_revision_check",
-          "value": "\"workstreams\".\"revision\" > 0"
-        }
-      },
       "isRLSEnabled": false
     }
   },

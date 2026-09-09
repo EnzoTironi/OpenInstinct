@@ -33,7 +33,7 @@ const exhaustedRunOutcome = {
 } satisfies ScheduledRunOutcome;
 
 export interface CreateScheduledAgentJob {
-  readonly conversationChannel: "eve" | "linq";
+  readonly conversationChannel: typeof scheduledAgentJobs.$inferSelect.conversationChannel;
   readonly conversationId: string;
   readonly missedRunPolicy: "catch_up" | "run_latest";
   readonly prompt: string;
@@ -656,6 +656,15 @@ export async function releaseScheduledAgentRun(
   return released?.status;
 }
 
+export async function getScheduledReportChannel(runId: string) {
+  const run = await db.query.scheduledAgentRuns.findFirst({
+    columns: { id: true },
+    where: eq(scheduledAgentRuns.id, runId),
+    with: { job: { columns: { conversationChannel: true } } },
+  });
+  return run?.job.conversationChannel;
+}
+
 export async function claimScheduledReport(runId: string, now = new Date()) {
   const reportLeaseToken = randomUUID();
   const [claimed] = await db
@@ -669,6 +678,15 @@ export async function claimScheduledReport(runId: string, now = new Date()) {
     .where(
       and(
         eq(scheduledAgentRuns.id, runId),
+        inArray(
+          scheduledAgentRuns.jobId,
+          db
+            .select({ id: scheduledAgentJobs.id })
+            .from(scheduledAgentJobs)
+            .where(
+              inArray(scheduledAgentJobs.conversationChannel, ["eve", "linq"])
+            )
+        ),
         inArray(scheduledAgentRuns.status, [
           "completed",
           "dead_letter",
@@ -714,7 +732,13 @@ export async function listRecoverableScheduledReports(
             eq(scheduledAgentRuns.reportStatus, "pending"),
             and(
               eq(scheduledAgentRuns.reportStatus, "queued"),
-              lte(scheduledAgentRuns.reportLeaseExpiresAt, now)
+              or(
+                inArray(scheduledAgentJobs.conversationChannel, [
+                  "telegram",
+                  "kapso",
+                ]),
+                lte(scheduledAgentRuns.reportLeaseExpiresAt, now)
+              )
             )
           )
         )
@@ -723,6 +747,10 @@ export async function listRecoverableScheduledReports(
       .limit(limit)
       .for("update", { of: scheduledAgentRuns, skipLocked: true });
     const stale = reports
+      .filter(
+        ({ conversationChannel }) =>
+          conversationChannel === "eve" || conversationChannel === "linq"
+      )
       .map(({ run }) => run)
       .filter((run) => run.reportStatus === "queued");
     if (stale.length > 0) {

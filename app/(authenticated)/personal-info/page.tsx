@@ -1,8 +1,11 @@
+import { headers } from "next/headers";
 import { PersonalInfoForm } from "./_components/personal-info-form";
-import { readUserProfile } from "@db/services/user-profile";
-import { requireRequestScope } from "@web/auth/request-scope";
+import { readPersonalProfile } from "../../../server/personal-memory/profile";
+import { serverRuntime } from "../../../server/runtime";
 
 export default async function Page() {
-  const scope = await requireRequestScope();
-  return <PersonalInfoForm initialProfile={await readUserProfile(scope)} />;
+  const profile = await serverRuntime.runPromise(
+    readPersonalProfile(await headers())
+  );
+  return <PersonalInfoForm initialProfile={profile} />;
 }

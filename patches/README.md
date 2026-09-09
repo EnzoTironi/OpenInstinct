@@ -1,37 +1,20 @@
-# Eve and Linq patches
+# Companion patches
 
-Eve is pinned to the official, immutable `pkg.eve.dev` build at
-`59ec96cc99f65a80f7a2daf4ca5e2a0ad95455f2` (`0.52.2+main.59ec96cc99f65a80`).
-It includes the merged turn-context placement fix in
-[vercel/eve#3089](https://github.com/vercel/eve/pull/3089), which is absent from
-npm's `0.52.2` release. Return to a registry version once a release contains this
-commit and the patches below have been checked against it.
+This Companion branch keeps Effect-native runtime patches and does **not** yet
+switch Eve to the upstream `pkg.eve.dev` `0.52.2+main.59ec96cc99f65a80` pin.
 
-The tarball SHA-256 is
-`633c0d9ebf5d0d5733d8cc2fdc5315952a7ccca8cb7902c31f550dc8ab0750a9`.
-The lockfile also records its package integrity. pnpm matches URL dependency
-patches by package name, so keep the immutable dependency pin when changing the
-Eve patch.
+## Active patchedDependencies (see `pnpm-workspace.yaml`)
 
-## Remaining patches
+- `@linqapp/chat-sdk-adapter@0.5.1` — native `replyToMessageId` delivery.
+- `eve@0.49.0` — Companion Eve recovery / native-runtime cohort patch.
+- `@workflow/world@5.0.0-beta.32` — workflow recovery / acceptance cohort.
+- `@workflow/world-postgres@5.0.0-beta.39` — PGWorld renewable worker leases,
+  generation fencing, and owner-aware Graphile completion (SIGKILL reclaim).
 
-- `@linqapp__chat-sdk-adapter@0.5.1.patch` adds `replyToMessageId` to native
-  message delivery, preserving attachments and idempotency keys.
-- `eve@0.52.2+main.59ec96cc99f65a80.patch` applies that same reply option to the
-  adapter Eve actually bundles. It also redirects incomplete bundled Linq and
-  Chat SDK declaration exports to the explicitly installed packages. Eve's
-  runtime still uses its bundled adapter and Chat SDK.
+Native-runtime rebuild notes and manifests live under `patches/native-runtime/`.
 
-Remove reply changes when upstream Linq and Eve's bundled adapter both support
-native replies. Remove declaration bridges when the published declaration
-files resolve without them. `linq-bundled-adapter.test.ts` exercises Eve's actual
-bundled runtime; `linq-message-delivery.test.ts` covers application delivery and
-the separately installed adapter.
+## Parked upstream Eve patch
 
-The old Eve patches for `ask_question` and `task_cancel` exports are no longer
-needed: both now have public entry points. Callback authorization is composed
-in `agent/channels/eve.ts` using public `defineChannel` and `routeAuth` APIs.
-The Linq webhook verifier already converts an unsuccessful OIDC verification
-into `false`, so the extra bundled null-verifier patch was redundant.
-
-No task-loop or prompt-placement patch is applied locally.
+`eve@0.52.2+main.59ec96cc99f65a80.patch` arrived via upstream Merit-Systems sync.
+It is kept in-tree for a future Effect-safe Eve upgrade, but it is **not** wired
+in `patchedDependencies` while Companion remains on `eve@^0.49.0` with fencing.

@@ -1,0 +1,1 @@
+ALTER TABLE "channel_inbox" ADD COLUMN "source_message_id" text NOT NULL;

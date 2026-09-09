@@ -12,7 +12,7 @@ import type { requireWorkerScope } from "@agent/subagents/browser-agent/lib/acce
 import type { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
 import type * as TraceDomainsModule from "@agent/subagents/browser-agent/lib/trace/domains";
 import type { harvestBrowserTraceDomains } from "@agent/subagents/browser-agent/lib/trace/domains";
-import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { toolContextFor } from "@tests/helpers/tool-context";
 import manageBrowsers, {
   kernelProfileNameForWorkspace,
@@ -65,17 +65,17 @@ vi.mock("eve/context", () => ({
 }));
 
 const mocks = {
-  createBrowser: vi.spyOn(kernel.browsers, "create"),
+  createBrowser: vi.spyOn(getKernel().browsers, "create"),
   createBrowserSession: serviceMocks.createBrowserSession,
-  deleteBrowser: vi.spyOn(kernel.browsers, "deleteByID"),
+  deleteBrowser: vi.spyOn(getKernel().browsers, "deleteByID"),
   deleteBrowserSession: serviceMocks.deleteBrowserSession,
   harvestBrowserTraceDomains: serviceMocks.harvestBrowserTraceDomains,
   listBrowserSessions: serviceMocks.listBrowserSessions,
-  listKernelBrowsers: vi.spyOn(kernel.browsers, "list"),
+  listKernelBrowsers: vi.spyOn(getKernel().browsers, "list"),
   readBrowserSession: serviceMocks.requireOwnedBrowserSession,
   recordBrowserTraceDomains: serviceMocks.recordBrowserTraceDomains,
-  retrieveBrowser: vi.spyOn(kernel.browsers, "retrieve"),
-  retrieveProfile: vi.spyOn(kernel.profiles, "retrieve"),
+  retrieveBrowser: vi.spyOn(getKernel().browsers, "retrieve"),
+  retrieveProfile: vi.spyOn(getKernel().profiles, "retrieve"),
   requireWorkerScope: serviceMocks.requireWorkerScope,
   withBrowserProfileWriteLock: serviceMocks.withBrowserProfileWriteLock,
 };
@@ -282,5 +282,7 @@ function asyncItems<T>(items: readonly T[]): AsyncIterable<T> {
 
 function kernelBrowserPage(items: readonly unknown[]) {
   // SAFETY: manage_browsers consumes only the SDK page's AsyncIterable contract.
-  return asyncItems(items) as ReturnType<typeof kernel.browsers.list>;
+  return asyncItems(items) as ReturnType<
+    ReturnType<typeof getKernel>["browsers"]["list"]
+  >;
 }

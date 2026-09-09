@@ -1,3 +1,4 @@
+import { Result, Schema } from "effect";
 import { defineEval, type EveEvalContext } from "eve/evals";
 import { includes, satisfies } from "eve/evals/expect";
 import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
@@ -113,11 +114,13 @@ const reactionEvals = [
       thanked.calledTool("react_to_message", {
         count: 1,
         input: (input) => {
-          const parsed = reactToMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(reactToMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.operation === "add" &&
-            ["heart", "thumbs_up"].includes(parsed.data.type)
+            Result.isSuccess(parsed) &&
+            parsed.success.operation === "add" &&
+            ["heart", "thumbs_up"].includes(parsed.success.type)
           );
         },
         status: "completed",
@@ -175,12 +178,14 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = sendMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.kind === "message" &&
-            parsed.data.replyTo?.kind === "task" &&
-            parsed.data.replyTo.id === taskId
+            Result.isSuccess(parsed) &&
+            parsed.success.kind === "message" &&
+            parsed.success.replyTo?.kind === "task" &&
+            parsed.success.replyTo.id === taskId
           );
         },
         status: "completed",
@@ -208,12 +213,14 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = sendMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.kind === "message" &&
-            parsed.data.replyTo?.kind === "automation" &&
-            parsed.data.replyTo.id === automationId
+            Result.isSuccess(parsed) &&
+            parsed.success.kind === "message" &&
+            parsed.success.replyTo?.kind === "automation" &&
+            parsed.success.replyTo.id === automationId
           );
         },
         status: "completed",
@@ -232,12 +239,14 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = sendMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.kind === "message" &&
-            parsed.data.replyTo?.kind === "current" &&
-            parsed.data.text?.includes("23") === true
+            Result.isSuccess(parsed) &&
+            parsed.success.kind === "message" &&
+            parsed.success.replyTo?.kind === "current" &&
+            parsed.success.text?.includes("23") === true
           );
         },
         status: "completed",
@@ -258,11 +267,13 @@ const replyEvals = [
       question.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = sendMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.kind === "message" &&
-            parsed.data.replyTo?.kind === "current"
+            Result.isSuccess(parsed) &&
+            parsed.success.kind === "message" &&
+            parsed.success.replyTo?.kind === "current"
           );
         },
         status: "completed",
@@ -276,12 +287,14 @@ const replyEvals = [
       answer.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = sendMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.kind === "message" &&
-            parsed.data.replyTo?.kind === "current" &&
-            /boston/iu.test(parsed.data.text ?? "")
+            Result.isSuccess(parsed) &&
+            parsed.success.kind === "message" &&
+            parsed.success.replyTo?.kind === "current" &&
+            /boston/iu.test(parsed.success.text ?? "")
           );
         },
         status: "completed",
@@ -306,12 +319,14 @@ const replyEvals = [
       second.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = sendMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.kind === "message" &&
-            parsed.data.replyTo?.kind === "current" &&
-            /paris/iu.test(parsed.data.text ?? "")
+            Result.isSuccess(parsed) &&
+            parsed.success.kind === "message" &&
+            parsed.success.replyTo?.kind === "current" &&
+            /paris/iu.test(parsed.success.text ?? "")
           );
         },
         status: "completed",
@@ -336,12 +351,14 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = sendMessageOutputSchema.safeParse(input);
+          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+            input
+          );
           return (
-            parsed.success &&
-            parsed.data.kind === "message" &&
-            parsed.data.replyTo === undefined &&
-            /maintenance/iu.test(parsed.data.text ?? "")
+            Result.isSuccess(parsed) &&
+            parsed.success.kind === "message" &&
+            parsed.success.replyTo === undefined &&
+            /maintenance/iu.test(parsed.success.text ?? "")
           );
         },
         status: "completed",

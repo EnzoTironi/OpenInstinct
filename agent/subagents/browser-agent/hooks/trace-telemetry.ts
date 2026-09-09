@@ -8,7 +8,7 @@ import {
 import { traceTimelineRows } from "@agent/subagents/browser-agent/lib/trace/timeline";
 import { listWorkerBrowserSessions } from "@db/services/browsers";
 import type { AccessScope } from "@shared/identity/access-scope";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "../../../../shared/identity/principal-scope";
 import { taskCompletionOutputSchema } from "@agent/subagents/browser-agent/lib/completion";
 import { harvestBrowserTraceDomains } from "@agent/subagents/browser-agent/lib/trace/domains";
 

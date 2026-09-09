@@ -15,7 +15,7 @@ export async function createHTTPContext(
 
   try {
     return {
-      origin: new URL(request.url).origin,
+      requestHeaders: request.headers,
       scope: await getScope(),
     };
   } catch (error) {

@@ -16,7 +16,7 @@ import {
   sniffBrowserImageMediaType,
 } from "@shared/browser/artifact";
 import { env } from "@shared/environment";
-import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 
 const regionSchema = z.object({
   height: z.number().int().positive(),
@@ -109,7 +109,7 @@ async function captureBrowserImage(
         input.session_id,
         signal,
         async () =>
-          kernel.browsers.computer.captureScreenshot(
+          getKernel().browsers.computer.captureScreenshot(
             input.session_id,
             input.region ? { region: input.region } : undefined,
             { signal }
@@ -168,7 +168,7 @@ async function captureImageResource(
   selector: string,
   signal?: AbortSignal
 ) {
-  const result = await kernel.browsers.playwright.execute(
+  const result = await getKernel().browsers.playwright.execute(
     sessionId,
     {
       code: `
@@ -197,8 +197,8 @@ return await image.evaluate((element) => {
     throw new Error("The selected image does not use an HTTP URL.");
   }
 
-  await kernel.browsers.retrieve(sessionId, {}, { signal });
-  const response = await kernel.browsers.fetch(sessionId, url, {
+  await getKernel().browsers.retrieve(sessionId, {}, { signal });
+  const response = await getKernel().browsers.fetch(sessionId, url, {
     headers: {
       accept: "image/webp,image/png,image/jpeg,image/gif,*/*;q=0.1",
     },
@@ -237,7 +237,7 @@ async function capturePlaywrightScreenshot(
 const target = page.locator(${JSON.stringify(target.selector)}).first();
 await target.waitFor({ state: "visible", timeout: 5_000 });
 await target.screenshot({ animations: "disabled", caret: "hide", path: ${JSON.stringify(remotePath)}, type: "png" });`;
-      const result = await kernel.browsers.playwright.execute(
+      const result = await getKernel().browsers.playwright.execute(
         sessionId,
         { code: `${screenshotCode}\nreturn true;`, timeout_sec: 25 },
         { signal }
@@ -247,15 +247,15 @@ await target.screenshot({ animations: "disabled", caret: "hide", path: ${JSON.st
           result.error ?? "Kernel could not capture the screenshot."
         );
       }
-      const response = await kernel.browsers.fs.readFile(
+      const response = await getKernel().browsers.fs.readFile(
         sessionId,
         { path: remotePath },
         { signal }
       );
       return await readBoundedResponse(response);
     } finally {
-      await kernel.browsers.fs
-        .deleteFile(sessionId, { path: remotePath })
+      await getKernel()
+        .browsers.fs.deleteFile(sessionId, { path: remotePath })
         .catch(() => undefined);
     }
   });

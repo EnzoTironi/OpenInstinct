@@ -3,15 +3,23 @@
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import { api } from "@web/trpc/client";
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 
 export function GoogleWorkspaceAction({
   state,
+  returnTo,
 }: {
   readonly state?: "connected" | "disconnected" | "unavailable";
+  readonly returnTo?: string;
 }) {
+  const returnPath = googleWorkspaceReturnTo(returnTo);
   const update = api.googleWorkspace.update.useMutation({
     onError: () => {
-      window.location.assign("/?google=unavailable");
+      const query = new URLSearchParams({
+        google: "unavailable",
+        returnTo: returnPath,
+      });
+      window.location.assign(`/?${query}`);
     },
     onSuccess: ({ redirectTo }) => {
       window.location.assign(redirectTo);
@@ -30,7 +38,7 @@ export function GoogleWorkspaceAction({
     <Button
       disabled={update.isPending}
       onClick={() => {
-        update.mutate(action);
+        update.mutate({ action, returnTo: returnPath });
       }}
       size="sm"
       type="button"

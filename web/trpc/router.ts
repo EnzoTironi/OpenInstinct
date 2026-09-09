@@ -1,18 +1,18 @@
 import { gateway } from "ai";
-import { revokeToken, startAuthorization } from "@vercel/connect";
 import { z } from "zod";
+import { Effect, Schema } from "effect";
+import { TRPCError } from "@trpc/server";
 import { listBrowserTraces } from "@db/services/browser-traces";
 import { saveChat } from "@db/services/chats";
-import { replaceUserProfile } from "@db/services/user-profile";
+import { replacePersonalProfile } from "../../server/personal-memory/profile";
 import { selectGatewayModel } from "@db/services/settings";
 import { deleteVaultItem, saveVaultItem } from "@db/services/vault";
-import type { AccessScope } from "@shared/identity/access-scope";
 import { saveChatSchema } from "@shared/chat/schema";
-import { env } from "@shared/environment";
-import {
-  googleWorkspaceSubject,
-  googleWorkspaceTokenParams,
-} from "@shared/google-workspace/connection";
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
+import { serverRuntime } from "../../server/runtime";
+import { disconnectGoogleWorkspace } from "../../server/google-workspace";
+import { IdentitySchema } from "../../server/accounts";
+import { revokeLinkedChannelIdentity } from "../../server/accounts/controls";
 import { userProfileSchema } from "@shared/user-profile/schema";
 import {
   vaultCreateItemSchema,
@@ -21,6 +21,32 @@ import {
 import { createTRPCRouter, protectedProcedure } from "./init";
 
 export const appRouter = createTRPCRouter({
+  accountChannels: {
+    revoke: protectedProcedure
+      .input(
+        Schema.toStandardSchemaV1(
+          Schema.Struct({ identityId: IdentitySchema.fields.id })
+        )
+      )
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          revokeLinkedChannelIdentity(
+            ctx.requestHeaders,
+            input.identityId
+          ).pipe(
+            Effect.mapError(
+              () =>
+                new TRPCError({
+                  code: "INTERNAL_SERVER_ERROR",
+                  message:
+                    "Your linked channel could not be updated. Please try again.",
+                })
+            )
+          ),
+          { signal }
+        )
+      ),
+  },
   chats: {
     save: protectedProcedure
       .input(saveChatSchema)
@@ -28,22 +54,30 @@ export const appRouter = createTRPCRouter({
   },
   googleWorkspace: {
     update: protectedProcedure
-      .input(z.enum(["connect", "disconnect"]))
+      .input(
+        Schema.toStandardSchemaV1(
+          Schema.Struct({
+            action: Schema.Literals(["connect", "disconnect"]),
+            returnTo: Schema.optional(Schema.String),
+          })
+        )
+      )
       .mutation(async ({ ctx, input }) => {
-        if (input === "disconnect") {
-          await revokeToken(env.GOOGLE_CONNECTOR_UID, {
-            subject: googleWorkspaceSubject(ctx.scope.userId),
+        const returnTo = googleWorkspaceReturnTo(input.returnTo);
+        if (input.action === "disconnect") {
+          await serverRuntime.runPromise(
+            disconnectGoogleWorkspace(ctx.requestHeaders)
+          );
+          const query = new URLSearchParams({
+            google: "disconnected",
+            returnTo,
           });
-          return { redirectTo: "/?google=disconnected" };
+          return { redirectTo: `/?${query}` };
         }
 
-        const callbackUrl = new URL("/", ctx.origin);
-        callbackUrl.searchParams.set("google", "connected");
+        const query = new URLSearchParams({ returnTo });
         return {
-          redirectTo: await startGoogleWorkspaceAuthorization(
-            ctx.scope,
-            callbackUrl.toString()
-          ),
+          redirectTo: `/api/google-workspace/connect?${query}`,
         };
       }),
   },
@@ -58,7 +92,12 @@ export const appRouter = createTRPCRouter({
     update: protectedProcedure
       .input(userProfileSchema)
       .output(userProfileSchema)
-      .mutation(({ ctx, input }) => replaceUserProfile(ctx.scope, input)),
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          replacePersonalProfile(ctx.requestHeaders, input),
+          { signal }
+        )
+      ),
   },
   traces: {
     list: protectedProcedure
@@ -88,18 +127,6 @@ export const appRouter = createTRPCRouter({
 });
 
 export type AppRouter = typeof appRouter;
-
-async function startGoogleWorkspaceAuthorization(
-  scope: AccessScope,
-  callbackUrl: string
-) {
-  const authorization = await startAuthorization(
-    env.GOOGLE_CONNECTOR_UID,
-    googleWorkspaceTokenParams(scope.userId),
-    { callbackUrl, expiresInMs: 10 * 60_000 }
-  );
-  return authorization.url;
-}
 
 async function readModelCatalog() {
   const { models } = await gateway.getAvailableModels();

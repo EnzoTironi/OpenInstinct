@@ -1,0 +1,2517 @@
+diff --git a/.changeset/input-wake-recovery.md b/.changeset/input-wake-recovery.md
+new file mode 100644
+index 0000000..e1c5bbd
+--- /dev/null
++++ b/.changeset/input-wake-recovery.md
+@@ -0,0 +1,5 @@
++---
++"@workflow/core": patch
++---
++
++Expose recovery of an already accepted hook input by native receipt key, republishing its wake without reconstructing or resending the payload.
+diff --git a/packages/core/src/runtime.ts b/packages/core/src/runtime.ts
+index 643f834..91ec7f1 100644
+--- a/packages/core/src/runtime.ts
++++ b/packages/core/src/runtime.ts
+@@ -153,9 +153,12 @@ export {
+ export {
+   getHookByToken,
+   type ResumedHook,
++  type ResumeHookOptions,
+   resumeHook,
++  recoverHookResume,
+   resumeWebhook,
+ } from './runtime/resume-hook.js';
++export { snapshotResumeInput } from './runtime/resume-input.js';
+ export {
+   getRun,
+   Run,
+diff --git a/packages/core/src/runtime/resume-hook.ts b/packages/core/src/runtime/resume-hook.ts
+index daab201..45b27ff 100644
+--- a/packages/core/src/runtime/resume-hook.ts
++++ b/packages/core/src/runtime/resume-hook.ts
+@@ -1,12 +1,15 @@
++import type { Span } from '@opentelemetry/api';
+ import {
+   ERROR_SLUGS,
+   HookNotFoundError,
+   RunExpiredError,
+   WorkflowRuntimeError,
++  WorkflowWorldError,
+ } from '@workflow/errors';
+ import {
+   HOOK_RESUME_DEDUP_VERSION,
+   type Hook,
++  type HookResumeReceipt,
+   type HookResumeContext,
+   isLegacySpecVersion,
+   isTerminalWorkflowRunStatus,
+@@ -15,6 +18,7 @@ import {
+   SPEC_VERSION_SUPPORTS_COMPRESSION,
+   type WorkflowInvokePayload,
+   type WorkflowRun,
++  type World,
+ } from '@workflow/world';
+ import { monotonicFactory } from 'ulid';
+ import { getRunCapabilities } from '../capabilities.js';
+@@ -35,6 +39,7 @@ import { linkToTraceCarrier, trace } from '../telemetry.js';
+ import { getWorldLazy } from './get-world-lazy.js';
+ import { getWorkflowQueueName } from './helpers.js';
+ import { safeWaitUntil, waitedUntil } from './wait-until.js';
++import { snapshotResumeInput } from './resume-input.js';
+ 
+ /** Monotonic ULID factory for per-call resume idempotency keys. */
+ const generateResumeId = monotonicFactory();
+@@ -263,6 +268,23 @@ export async function getHookByToken(token: string): Promise<Hook> {
+  */
+ export type ResumedHook = Hook & { resilientResume?: boolean };
+ 
++/** Caller-stable acceptance for JSON input on an already identified run. */
++export interface ResumeHookOptions {
++  /** Trusted target run, resolved by the host before authorizing this call. */
++  runId: string;
++  /** Stable per-run input identity; never an authorization credential. */
++  inputId: string;
++  /** Host-derived recovery namespace; never take this from an unauthenticated caller. */
++  scope?: string;
++}
++
++interface ResumeClaim {
++  runId: string;
++  resumeId: string;
++  payloadDigest: string;
++  resumeScope?: string;
++}
++
+ /**
+  * Resumes a workflow run by sending a payload to a hook identified by its token.
+  *
+@@ -312,7 +334,27 @@ export async function resumeHook<T = any>(
+   tokenOrHook: string | Hook,
+   payload: T,
+   encryptionKeyOverride?: PayloadKey
+-): Promise<ResumedHook> {
++): Promise<ResumedHook>;
++export async function resumeHook(
++  tokenOrHook: string | Hook,
++  payload: unknown,
++  encryptionKeyOverride: PayloadKey | undefined,
++  options: ResumeHookOptions
++): Promise<HookResumeReceipt>;
++export async function resumeHook(
++  tokenOrHook: string | Hook,
++  payload: unknown,
++  encryptionKeyOverride?: PayloadKey,
++  options?: ResumeHookOptions
++): Promise<ResumedHook | HookResumeReceipt> {
++  if (options !== undefined) {
++    return resumeKeyedHook(
++      tokenOrHook,
++      payload,
++      encryptionKeyOverride,
++      options
++    );
++  }
+   // Public entry point. It never attests hook freshness, so a Hook object
+   // supplied here (which may carry a `resumeCapabilities` cached before a
+   // server rollback or kill switch) is ignored by the dynamic-dedup gate and
+@@ -334,6 +376,151 @@ export async function resumeHook<T = any>(
+   );
+ }
+ 
++async function resumeKeyedHook(
++  tokenOrHook: string | Hook,
++  input: unknown,
++  encryptionKey: PayloadKey | undefined,
++  options: ResumeHookOptions
++): Promise<HookResumeReceipt> {
++  if (
++    typeof options.runId !== 'string' ||
++    !options.runId ||
++    typeof options.inputId !== 'string' ||
++    !options.inputId ||
++    options.inputId.length > 256 ||
++    (options.scope !== undefined &&
++      (typeof options.scope !== 'string' ||
++        !options.scope ||
++        options.scope.length > 256))
++  ) {
++    throw new TypeError(
++      'Keyed hook resumes require runId and an inputId of 1–256 characters.'
++    );
++  }
++  const snapshot = snapshotResumeInput(input);
++  const claim: ResumeClaim = {
++    runId: options.runId,
++    resumeId: options.inputId,
++    payloadDigest: await computeResumePayloadDigest(snapshot.bytes),
++    ...(options.scope === undefined ? {} : { resumeScope: options.scope }),
++  };
++  const world = await getWorldLazy();
++  const getResume = world.events.getResume?.bind(world.events);
++  if (
++    !getResume ||
++    (options.scope !== undefined && !world.events.getResumeByScope)
++  )
++    throw new Error(
++      'This World does not support caller-stable hook acceptance.'
++    );
++  const previous = await replayHookResume(world, tokenOrHook, claim);
++  if (previous) return previous;
++  try {
++    await resumeHookImpl(
++      tokenOrHook,
++      snapshot.payload,
++      encryptionKey,
++      false,
++      Date.now(),
++      claim
++    );
++  } catch (error) {
++    // Another writer may have committed between lookup and hook disposal.
++    if (HookNotFoundError.is(error) || RunExpiredError.is(error)) {
++      const accepted = await replayHookResume(world, tokenOrHook, claim);
++      if (accepted) return accepted;
++    }
++    throw error;
++  }
++  const receipt = await getResume(claim.runId, claim.resumeId);
++  if (!receipt)
++    throw new Error('World accepted a keyed resume without a durable receipt.');
++  return receipt;
++}
++
++/**
++ * Republishes the wake for an input already durably accepted by this World.
++ * The receipt is always read from native storage; callers supply only its key.
++ * Missing receipts do not enqueue work. Terminal runs return their receipt
++ * without a wake. Queue failures remain errors even though acceptance survived.
++ */
++export async function recoverHookResume(input: {
++  readonly runId: string;
++  readonly inputId: string;
++  readonly scope?: string;
++}): Promise<HookResumeReceipt | undefined> {
++  if (!input.runId || !input.inputId || input.inputId.length > 256) {
++    throw new TypeError(
++      'Hook recovery requires runId and an inputId of 1–256 characters.'
++    );
++  }
++  const world = await getWorldLazy();
++  if (!world.events.getResume) {
++    throw new Error(
++      'This World does not support caller-stable hook acceptance.'
++    );
++  }
++  const receipt = await world.events.getResume(input.runId, input.inputId);
++  if (receipt === undefined) return undefined;
++  if (
++    receipt.runId !== input.runId ||
++    receipt.resumeId !== input.inputId ||
++    receipt.resumeScope !== input.scope
++  ) {
++    throw new WorkflowWorldError(
++      'Input receipt does not match its recovery scope.',
++      {
++        status: 422,
++      }
++    );
++  }
++  await wakeAcceptedHookResume(world, receipt);
++  return receipt;
++}
++
++async function replayHookResume(
++  world: World,
++  tokenOrHook: string | Hook,
++  claim: ResumeClaim
++): Promise<HookResumeReceipt | undefined> {
++  const getResume = world.events.getResume!.bind(world.events);
++  const receipt = await getResume(claim.runId, claim.resumeId);
++  if (!receipt) return undefined;
++  const token =
++    typeof tokenOrHook === 'string' ? tokenOrHook : tokenOrHook.token;
++  if (
++    receipt.payloadDigest !== claim.payloadDigest ||
++    receipt.resumeScope !== claim.resumeScope ||
++    receipt.token !== token ||
++    (typeof tokenOrHook !== 'string' &&
++      (tokenOrHook.runId !== receipt.runId ||
++        tokenOrHook.hookId !== receipt.hookId))
++  ) {
++    throw new WorkflowWorldError(
++      'Input identity was already accepted for another hook or payload.',
++      { status: 422 }
++    );
++  }
++  await wakeAcceptedHookResume(world, receipt);
++  return receipt;
++}
++
++/** Both content replay and payload-free recovery use the same native wake. */
++async function wakeAcceptedHookResume(
++  world: World,
++  receipt: HookResumeReceipt
++): Promise<void> {
++  const run = await world.runs.get(receipt.runId);
++  if (!isTerminalWorkflowRunStatus(run.status)) {
++    await wakeHookRun(world, run.runId, {
++      workflowName: run.workflowName,
++      deploymentId: run.deploymentId,
++      runSpecVersion: run.specVersion,
++      traceCarrier: run.executionContext?.traceCarrier,
++    });
++  }
++}
++
+ /**
+  * Internal implementation of {@link resumeHook}. NOT exported: the
+  * `hookFreshlyLookedUp` attestation must never be reachable by public callers
+@@ -356,7 +543,8 @@ async function resumeHookImpl<T = any>(
+   payload: T,
+   encryptionKeyOverride: PayloadKey | undefined,
+   hookFreshlyLookedUp: boolean,
+-  resumeRequestedAtMs: number
++  resumeRequestedAtMs: number,
++  claim?: ResumeClaim
+ ): Promise<ResumedHook> {
+   return await waitedUntil(() => {
+     return trace('hook.resume', async (span) => {
+@@ -367,6 +555,12 @@ async function resumeHookImpl<T = any>(
+         const hook: Hook = suppliedToken
+           ? await world.hooks.getByToken(tokenOrHook)
+           : tokenOrHook;
++        if (claim && hook.runId !== claim.runId) {
++          throw new WorkflowWorldError(
++            'Hook does not belong to the authorized run.',
++            { status: 422 }
++          );
++        }
+         // The dynamic, response-only `resumeCapabilities` may only be trusted
+         // when it came from a by-token lookup performed during this resume.
+         const hookResumeCapabilitiesAreFresh =
+@@ -388,7 +582,11 @@ async function resumeHookImpl<T = any>(
+         // check happens server-side: `hook_received` against an ended run is
+         // rejected, which the catch around `world.events.create` below re-keys
+         // to HookNotFoundError: same public contract, no run pre-fetch.
+-        if (info.run && isTerminalWorkflowRunStatus(info.run.status)) {
++        if (
++          !claim &&
++          info.run &&
++          isTerminalWorkflowRunStatus(info.run.status)
++        ) {
+           throw new HookNotFoundError(hook.token);
+         }
+ 
+@@ -457,6 +655,11 @@ async function resumeHookImpl<T = any>(
+         const ops: Promise<any>[] = [];
+         const readbackOps: Promise<any>[] = [];
+         const v1Compat = isLegacySpecVersion(hook.specVersion);
++        if (claim && v1Compat) {
++          throw new Error(
++            'Caller-stable hook acceptance requires the current hook wire format.'
++          );
++        }
+         const dehydratedPayload = await dehydrateStepReturnValue(
+           payload,
+           hook.runId,
+@@ -511,139 +714,18 @@ async function resumeHookImpl<T = any>(
+           span?.addLink?.(originLink);
+         }
+ 
+-        const queueName = getWorkflowQueueName(resumeContext.workflowName);
+-        const queueOptions = {
+-          deploymentId: resumeContext.deploymentId,
+-          specVersion: resumeContext.runSpecVersion ?? SPEC_VERSION_LEGACY,
+-        };
+-
+-        // The dispatch is strictly serial: the hook_received event is made
+-        // durable FIRST, and the workflow wake is published only after the
+-        // write is acknowledged. This is what lets `resumeHook()` resolving
+-        // mean "the resume survives anything that happens next" — a disposal
+-        // or run completion racing the queue delivery cannot erase a committed
+-        // event, and the wake itself carries no payload, so nothing rides on
+-        // the message but the trigger.
+-        //
+-        // Backend dedup is attested when EITHER the live server attests it
+-        // fresh on this by-token hook (world-vercel: response-only, recomputed
+-        // every read, so rollback/kill-switch take effect immediately) OR the
+-        // static world capability is set (world-local: adapter + backend ship
+-        // together). When attested, the write carries a per-call resumeId +
+-        // payload digest so transport-level retries of the SAME write converge
+-        // on exactly one committed event via the backend's (runId, resumeId)
+-        // constraint. Without it the write is a plain single-shot create,
+-        // exactly as before dedup existed.
+-        const backendDedupSupported =
+-          (hookResumeCapabilitiesAreFresh
+-            ? (hook.resumeCapabilities?.hookResumeDedupVersion ?? 0)
+-            : 0) >= HOOK_RESUME_DEDUP_VERSION ||
+-          world.capabilities?.hookResumeDedup === true;
+-        const canClaimResume =
+-          backendDedupSupported &&
+-          !v1Compat &&
+-          dehydratedPayload instanceof Uint8Array;
+-
+-        span?.setAttributes({
+-          'workflow.hook.resume_strategy': 'sequential',
++        await commitHookResume({
++          world,
++          hook,
++          resumeContext,
++          dehydratedPayload,
++          v1Compat,
++          hookResumeCapabilitiesAreFresh,
++          claim,
++          resumeRequestedAtMs,
++          span,
+         });
+ 
+-        const resumeId = canClaimResume ? generateResumeId() : undefined;
+-        const payloadDigest = canClaimResume
+-          ? await computeResumePayloadDigest(dehydratedPayload)
+-          : undefined;
+-        if (resumeId) {
+-          span?.setAttributes({ 'workflow.hook.resume_id': resumeId });
+-        }
+-
+-        // Re-key any "hook can no longer be received" rejection to
+-        // HookNotFoundError(hook.token) so `.token` matches the historical
+-        // contract. The specific error depends on the World:
+-        //   - a genuinely missing hook maps to HookNotFoundError (keyed on
+-        //     the event correlationId / hook ID);
+-        //   - a terminal run on Vercel rejects hook_received with 404, which
+-        //     world-vercel maps to HookNotFoundError;
+-        //   - a terminal run on world-local / world-postgres rejects with
+-        //     RunExpiredError.
+-        //
+-        // An EntityConflictError (HTTP 409) is deliberately NOT re-keyed,
+-        // breaking with the historical mapping: every 409 the backend emits
+-        // on this write today is TRANSIENT — a slot conflict that escaped the
+-        // server's own retry budget under contention, or a resume-claim race
+-        // mid-resolution — and its transaction committed nothing. Re-keying
+-        // it to HookNotFoundError told the caller (and a webhook sender, via
+-        // 404) that a retryable failure was permanent, silently dropping the
+-        // resume. It now surfaces as-is: retryable, with nothing committed.
+-        // (A 422 resumeId-reuse error likewise passes through unmapped — it
+-        // means the caller replayed a resumeId with a different payload, and
+-        // hiding that behind "not found" would mask the bug.)
+-        const isHookGoneError = (err: unknown): boolean =>
+-          HookNotFoundError.is(err) || RunExpiredError.is(err);
+-        try {
+-          await world.events.create(
+-            hook.runId,
+-            {
+-              eventType: 'hook_received',
+-              specVersion: SPEC_VERSION_CURRENT,
+-              correlationId: hook.hookId,
+-              eventData: {
+-                ...(v1Compat ? {} : { token: hook.token }),
+-                payload: dehydratedPayload,
+-              },
+-            },
+-            {
+-              v1Compat,
+-              ...(resumeId && payloadDigest
+-                ? { resumeId, resumePayloadDigest: payloadDigest }
+-                : {}),
+-            }
+-          );
+-        } catch (err) {
+-          if (isHookGoneError(err)) {
+-            throw new HookNotFoundError(hook.token);
+-          }
+-          throw err;
+-        }
+-        // Stamped AFTER the write resolves (entry-time attributes cannot tell
+-        // an attempted resume from a committed one): together with
+-        // HookWakePublished below, this is what makes a stranded resume — a
+-        // committed event whose wake never went out or was never delivered —
+-        // queryable from traces. See the alerting note on HookWakePublished.
+-        span?.setAttributes(Attribute.HookResumeCommitted(true));
+-
+-        // T1 of the TTR window. Stamped immediately before the publish so
+-        // `producer_prep` covers exactly the work above it (hook lookup, key
+-        // resolution, serialization, and the awaited hook_received write,
+-        // which is genuinely serial here).
+-        const queuePublishRequestedAtMs = Date.now();
+-        await publishHookWakeWithRetry(
+-          () =>
+-            world.queue(
+-              queueName,
+-              {
+-                runId: hook.runId,
+-                traceCarrier: resumeContext.traceCarrier ?? undefined,
+-                hookResumeTiming: {
+-                  resumeRequestedAtMs,
+-                  queuePublishRequestedAtMs,
+-                  strategy: 'sequential',
+-                },
+-              } satisfies WorkflowInvokePayload,
+-              {
+-                ...queueOptions,
+-                // Dedup retried publishes whose response was lost: a
+-                // duplicate wake is harmless for correctness (deterministic
+-                // replay) but costs a full replay of the run, and the queue
+-                // accepts a repeated idempotency key by delivering only one
+-                // of the messages. Claim-less writes have no resumeId and
+-                // keep the previous behavior.
+-                ...(resumeId ? { idempotencyKey: `hook-${resumeId}` } : {}),
+-              }
+-            ),
+-          world.isDeploymentUnavailableError?.bind(world)
+-        );
+-        span?.setAttributes(Attribute.HookWakePublished(true));
+-
+         return hook satisfies ResumedHook;
+       } catch (err) {
+         span?.setAttributes({
+@@ -658,6 +740,142 @@ async function resumeHookImpl<T = any>(
+   });
+ }
+ 
++/** Commit the payload before publishing a wake; retry publishes never append input. */
++async function commitHookResume(input: {
++  world: World;
++  hook: Hook;
++  resumeContext: HookResumeContext;
++  dehydratedPayload: unknown;
++  v1Compat: boolean;
++  hookResumeCapabilitiesAreFresh: boolean;
++  claim?: ResumeClaim;
++  resumeRequestedAtMs: number;
++  span?: Span;
++}): Promise<void> {
++  const {
++    world,
++    hook,
++    resumeContext,
++    dehydratedPayload,
++    v1Compat,
++    hookResumeCapabilitiesAreFresh,
++    claim,
++    resumeRequestedAtMs,
++    span,
++  } = input;
++
++  // Dynamic dedup capabilities are trusted only on a hook freshly read by token.
++  // Caller-stable claims were validated against events.getResume by the wrapper.
++  const backendDedupSupported =
++    (hookResumeCapabilitiesAreFresh
++      ? (hook.resumeCapabilities?.hookResumeDedupVersion ?? 0)
++      : 0) >= HOOK_RESUME_DEDUP_VERSION ||
++    world.capabilities?.hookResumeDedup === true;
++  const canClaimResume =
++    backendDedupSupported &&
++    !v1Compat &&
++    dehydratedPayload instanceof Uint8Array;
++
++  span?.setAttributes({
++    'workflow.hook.resume_strategy': 'sequential',
++  });
++
++  const resumeId =
++    claim?.resumeId ?? (canClaimResume ? generateResumeId() : undefined);
++  const payloadDigest =
++    claim?.payloadDigest ??
++    (canClaimResume
++      ? await computeResumePayloadDigest(dehydratedPayload)
++      : undefined);
++  if (resumeId) {
++    span?.setAttributes({ 'workflow.hook.resume_id': resumeId });
++  }
++
++  // Only terminal/missing hooks map to not-found. Preserve retryable 409 and
++  // conflicting-input 422 errors so callers cannot mistake them for success.
++  const isHookGoneError = (err: unknown): boolean =>
++    HookNotFoundError.is(err) || RunExpiredError.is(err);
++  try {
++    await world.events.create(
++      hook.runId,
++      {
++        eventType: 'hook_received',
++        specVersion: SPEC_VERSION_CURRENT,
++        correlationId: hook.hookId,
++        eventData: {
++          ...(v1Compat ? {} : { token: hook.token }),
++          payload: dehydratedPayload,
++        },
++      },
++      {
++        v1Compat,
++        ...(claim?.resumeScope === undefined
++          ? {}
++          : { resumeScope: claim.resumeScope }),
++        ...(resumeId && payloadDigest
++          ? { resumeId, resumePayloadDigest: payloadDigest }
++          : {}),
++      }
++    );
++  } catch (err) {
++    if (isHookGoneError(err)) {
++      throw new HookNotFoundError(hook.token);
++    }
++    throw err;
++  }
++  // Stamp commitment only after storage acknowledges, never at dispatch time.
++  span?.setAttributes(Attribute.HookResumeCommitted(true));
++
++  await wakeHookRun(world, hook.runId, resumeContext, {
++    resumeId,
++    resumeRequestedAtMs,
++  });
++  span?.setAttributes(Attribute.HookWakePublished(true));
++}
++
++/** Replays need a fresh wake key: the previous queued job may already be consumed. */
++async function wakeHookRun(
++  world: World,
++  runId: string,
++  context: Pick<
++    HookResumeContext,
++    'workflowName' | 'deploymentId' | 'runSpecVersion' | 'traceCarrier'
++  >,
++  options?: { resumeId?: string; resumeRequestedAtMs: number }
++): Promise<void> {
++  const queuePublishRequestedAtMs = Date.now();
++  await publishHookWakeWithRetry(
++    () =>
++      world.queue(
++        getWorkflowQueueName(context.workflowName),
++        {
++          runId,
++          traceCarrier: context.traceCarrier ?? undefined,
++          hookResumeTiming: {
++            resumeRequestedAtMs:
++              options?.resumeRequestedAtMs ?? queuePublishRequestedAtMs,
++            queuePublishRequestedAtMs,
++            strategy: 'sequential',
++          },
++        } satisfies WorkflowInvokePayload,
++        {
++          deploymentId: context.deploymentId,
++          specVersion: context.runSpecVersion ?? SPEC_VERSION_LEGACY,
++          // Dedup retried publishes whose response was lost: a
++          // duplicate wake is harmless for correctness (deterministic
++          // replay) but costs a full replay of the run, and the queue
++          // accepts a repeated idempotency key by delivering only one
++          // of the messages. Claim-less writes have no resumeId and
++          // keep the previous behavior.
++          ...(options?.resumeId
++            ? { idempotencyKey: `hook-${runId}-${options.resumeId}` }
++            : {}),
++        }
++      ),
++    world.isDeploymentUnavailableError?.bind(world)
++  );
++}
++
+ /**
+  * Resumes a webhook by sending a {@link https://developer.mozilla.org/en-US/docs/Web/API/Request | Request}
+  * object to a hook identified by its token.
+diff --git a/packages/core/src/runtime/resume-input.test.ts b/packages/core/src/runtime/resume-input.test.ts
+new file mode 100644
+index 0000000..3269f03
+--- /dev/null
++++ b/packages/core/src/runtime/resume-input.test.ts
+@@ -0,0 +1,75 @@
++import { describe, expect, it } from 'vitest';
++import { snapshotResumeInput } from './resume-input.js';
++
++describe('keyed resume input snapshot', () => {
++  it('canonicalizes key order while preserving content and array order', () => {
++    const first = snapshotResumeInput({
++      b: [2, 1],
++      a: { y: true, x: 'hello' },
++    });
++    const reordered = snapshotResumeInput({
++      a: { x: 'hello', y: true },
++      b: [2, 1],
++    });
++    expect(first.bytes).toEqual(reordered.bytes);
++    expect(first.payload).toEqual({ a: { x: 'hello', y: true }, b: [2, 1] });
++    expect(first.bytes).not.toEqual(
++      snapshotResumeInput({ a: { x: 'hello', y: true }, b: [1, 2] }).bytes
++    );
++  });
++
++  it('snapshots the actual input independently of subsequent caller mutation', () => {
++    const input = { action: { recipient: 'alice' }, context: ['original'] };
++    const saved = snapshotResumeInput(input);
++    input.action.recipient = 'bob';
++    input.context.push('changed');
++    expect(saved.payload).toEqual({
++      action: { recipient: 'alice' },
++      context: ['original'],
++    });
++    expect(saved.bytes).toEqual(snapshotResumeInput(saved.payload).bytes);
++  });
++
++  it('does not execute accessors or toJSON while computing the accepted input', () => {
++    const input = {
++      get value() {
++        throw new Error('accessor executed');
++      },
++    };
++    expect(() => snapshotResumeInput(input)).toThrow('accessors');
++    expect(() => snapshotResumeInput(new Date())).toThrow('plain JSON');
++    expect(() =>
++      snapshotResumeInput({
++        toJSON() {
++          throw new Error('toJSON executed');
++        },
++      })
++    ).toThrow('finite JSON');
++  });
++
++  it('rejects unsupported payloads and cycles instead of silently changing semantics', () => {
++    const cycle: { self?: unknown } = {};
++    cycle.self = cycle;
++    for (const input of [
++      NaN,
++      Infinity,
++      1n,
++      [undefined],
++      new Uint8Array([1]),
++      new Map(),
++      cycle,
++    ]) {
++      expect(() => snapshotResumeInput(input)).toThrow(TypeError);
++    }
++    expect(() => snapshotResumeInput({ [Symbol('key')]: 'hidden' })).toThrow(
++      'symbol'
++    );
++  });
++
++  it('allows shared acyclic values and safely preserves prototype-named keys', () => {
++    const value = { message: 'shared' };
++    const input = JSON.parse('{"__proto__":{"name":"ordinary data"}}');
++    expect(snapshotResumeInput(input).payload).toEqual(input);
++    expect(snapshotResumeInput([value, value]).payload).toEqual([value, value]);
++  });
++});
+diff --git a/packages/core/src/runtime/resume-input.ts b/packages/core/src/runtime/resume-input.ts
+new file mode 100644
+index 0000000..2a96e2c
+--- /dev/null
++++ b/packages/core/src/runtime/resume-input.ts
+@@ -0,0 +1,72 @@
++/** Snapshot JSON before awaiting I/O so the digest and accepted input agree. */
++export function snapshotResumeInput(input: unknown): {
++  payload: unknown;
++  bytes: Uint8Array;
++} {
++  const json = canonicalJson(input, new Set());
++  return {
++    payload: JSON.parse(json),
++    bytes: new TextEncoder().encode(json),
++  };
++}
++
++function canonicalJson(value: unknown, ancestors: Set<object>): string {
++  if (
++    value === null ||
++    typeof value === 'boolean' ||
++    typeof value === 'string'
++  ) {
++    return JSON.stringify(value);
++  }
++  if (typeof value === 'number' && Number.isFinite(value)) {
++    return JSON.stringify(value);
++  }
++  if (typeof value !== 'object' || value === null) {
++    throw new TypeError('Keyed hook resumes require finite JSON input.');
++  }
++  if (ancestors.has(value) || ancestors.size >= 128) {
++    throw new TypeError(
++      'Keyed hook input must be acyclic and at most 128 levels deep.'
++    );
++  }
++  const descriptors = jsonProperties(value);
++  ancestors.add(value);
++  try {
++    if (Array.isArray(value)) {
++      return `[${Array.from({ length: value.length }, (_, index) =>
++        canonicalJson(descriptors[String(index)]?.value, ancestors)
++      ).join(',')}]`;
++    }
++    return `{${Object.keys(descriptors)
++      .sort()
++      .flatMap((key) => {
++        const entry = descriptors[key];
++        if (!entry.enumerable || entry.value === undefined) return [];
++        return [
++          `${JSON.stringify(key)}:${canonicalJson(entry.value, ancestors)}`,
++        ];
++      })
++      .join(',')}}`;
++  } finally {
++    ancestors.delete(value);
++  }
++}
++
++/** Validate object shape without invoking user accessors or serialization hooks. */
++function jsonProperties(value: object): PropertyDescriptorMap {
++  if (
++    !Array.isArray(value) &&
++    Object.getPrototypeOf(value) !== Object.prototype &&
++    Object.getPrototypeOf(value) !== null
++  ) {
++    throw new TypeError('Keyed hook resumes require plain JSON objects.');
++  }
++  if (Object.getOwnPropertySymbols(value).length > 0) {
++    throw new TypeError('Keyed hook input cannot contain symbol properties.');
++  }
++  const descriptors = Object.getOwnPropertyDescriptors(value);
++  if (Object.values(descriptors).some((entry) => entry.get || entry.set)) {
++    throw new TypeError('Keyed hook input cannot contain accessors.');
++  }
++  return descriptors;
++}
+diff --git a/packages/world-postgres/README.md b/packages/world-postgres/README.md
+index a782e13..251ca49 100644
+--- a/packages/world-postgres/README.md
++++ b/packages/world-postgres/README.md
+@@ -227,3 +227,49 @@ To use the PostgreSQL world, set the `WORKFLOW_TARGET_WORLD` environment variabl
+ ```bash
+ export WORKFLOW_TARGET_WORLD="@workflow/world-postgres"
+ ```
++
++### Stable hook acceptance (experimental)
++
++`world.events.getResume(runId, resumeId)` reads a durable acceptance receipt from
++that run's event journal, or returns `undefined`. Its presence supports keyed
++`hook_received` creation through `events.create` with both `resumeId` (1–256
++characters) and `resumePayloadDigest` (64 lowercase hexadecimal characters).
++The event must include its hook token. The caller supplies the digest of its
++canonical semantic payload; World persists and compares it, rather than hashing
++serialized or encrypted transport bytes.
++
++The run lock serializes acceptance. Reusing a key with the same hook ID, token,
++and digest returns the original event, including after hook disposal or run
++completion. Reusing it with different values returns HTTP-status 422
++`WorkflowWorldError`. Distinct keys remain distinct inputs. A new acceptance
++requires a live hook belonging to the specified nonterminal run. Keyed legacy
++requests and runs are rejected. Unkeyed receives keep their existing append
++semantics and also validate hook run ownership.
++
++Receipts and their uniqueness constraint live in `workflow_events`; there is no
++second journal. Apply the standard migrations before using this API. Receipts
++last only as long as the corresponding event history. They attest durable input
++acceptance, not execution or user-visible delivery. This does not advertise the
++general lazy `hookResumeDedup` capability, and callers still enforce session
++authorization and schedule any required wake.
++
++For native lookup when the caller no longer knows the run, a keyed create may
++also supply `resumeScope` (1–256 characters). `events.getResumeByScope(scope, id)`
++returns the canonical owner's receipt, including `resumeScope`, even after hook
++disposal or completion. The native event journal uniquely binds `(scope, id)`
++to one run. A different run claiming that pair receives 422, including under
++concurrent writes. Per-run key uniqueness remains in force: replay must match
++the original scope, including whether it was absent. Different scopes can use
++the same input ID on different runs. Unscoped receipts omit `resumeScope`.
++Scope is a caller-supplied namespace, not authorization; the host derives it
++from trusted context and validates the returned owner before using the receipt.
++
++The real PostgreSQL property harness uses disposable `postgres:15-alpine`,
++standard migrations, independent child processes, a post-commit SIGKILL barrier,
++and observed PostgreSQL row-lock waits for disposal/completion races. Build the
++package and its workspace dependencies, then run from this package:
++
++```sh
++pnpm build
++pnpm exec vitest run test/hook-acceptance.test.ts
++```
+diff --git a/packages/world-postgres/src/drizzle/migrations/0020_add_hook_acceptance.sql b/packages/world-postgres/src/drizzle/migrations/0020_add_hook_acceptance.sql
+new file mode 100644
+index 0000000..d00eb09
+--- /dev/null
++++ b/packages/world-postgres/src/drizzle/migrations/0020_add_hook_acceptance.sql
+@@ -0,0 +1,5 @@
++ALTER TABLE "workflow"."workflow_events" ADD COLUMN IF NOT EXISTS "resume_id" varchar(256);
++--> statement-breakpoint
++ALTER TABLE "workflow"."workflow_events" ADD COLUMN IF NOT EXISTS "resume_payload_digest" varchar(64);
++--> statement-breakpoint
++CREATE UNIQUE INDEX IF NOT EXISTS "workflow_events_resume_unique" ON "workflow"."workflow_events" ("run_id", "resume_id");
+diff --git a/packages/world-postgres/src/drizzle/migrations/0021_add_hook_resume_scope.sql b/packages/world-postgres/src/drizzle/migrations/0021_add_hook_resume_scope.sql
+new file mode 100644
+index 0000000..decdd7e
+--- /dev/null
++++ b/packages/world-postgres/src/drizzle/migrations/0021_add_hook_resume_scope.sql
+@@ -0,0 +1,3 @@
++ALTER TABLE "workflow"."workflow_events" ADD COLUMN IF NOT EXISTS "resume_scope" varchar(256);
++--> statement-breakpoint
++CREATE UNIQUE INDEX IF NOT EXISTS "workflow_events_resume_scope_unique" ON "workflow"."workflow_events" ("resume_scope", "resume_id");
+diff --git a/packages/world-postgres/src/drizzle/migrations/meta/_journal.json b/packages/world-postgres/src/drizzle/migrations/meta/_journal.json
+index 7df53db..3dbaaab 100644
+--- a/packages/world-postgres/src/drizzle/migrations/meta/_journal.json
++++ b/packages/world-postgres/src/drizzle/migrations/meta/_journal.json
+@@ -141,6 +141,20 @@
+       "when": 1786060800000,
+       "tag": "0019_add_event_slots",
+       "breakpoints": true
++    },
++    {
++      "idx": 20,
++      "version": "7",
++      "when": 1786060800001,
++      "tag": "0020_add_hook_acceptance",
++      "breakpoints": true
++    },
++    {
++      "idx": 21,
++      "version": "7",
++      "when": 1786060800002,
++      "tag": "0021_add_hook_resume_scope",
++      "breakpoints": true
+     }
+   ]
+ }
+diff --git a/packages/world-postgres/src/drizzle/schema.ts b/packages/world-postgres/src/drizzle/schema.ts
+index 9884182..4ef096f 100644
+--- a/packages/world-postgres/src/drizzle/schema.ts
++++ b/packages/world-postgres/src/drizzle/schema.ts
+@@ -142,13 +142,16 @@ export const events = schema.table(
+     eventDataJson: jsonb('payload'),
+     eventData: Cbor<unknown>()('payload_cbor'),
+     specVersion: integer('spec_version'),
+-    // `resumeId` is omitted deliberately: world-postgres does not advertise
+-    // lazy hook-resume dedup and stays on the sequential single-writer path,
+-    // so it never needs to persist the resume idempotency key (no column, no
+-    // migration).
++    resumeId: varchar('resume_id', { length: 256 }),
++    resumeScope: varchar('resume_scope', { length: 256 }),
++    resumePayloadDigest: varchar('resume_payload_digest', { length: 64 }),
+   } satisfies DrizzlishOfType<
+     Cborized<
+-      Omit<Event, 'occurredAt' | 'resumeId'> & { eventData?: undefined },
++      Omit<Event, 'occurredAt'> & {
++        eventData?: undefined;
++        resumePayloadDigest?: string;
++        resumeScope?: string;
++      },
+       'eventData'
+     >
+   >,
+@@ -158,6 +161,11 @@ export const events = schema.table(
+     // created before slots keep globally-unique ULIDs, which this key also
+     // admits.
+     primaryKey({ columns: [tb.runId, tb.eventId] }),
++    uniqueIndex('workflow_events_resume_unique').on(tb.runId, tb.resumeId),
++    uniqueIndex('workflow_events_resume_scope_unique').on(
++      tb.resumeScope,
++      tb.resumeId
++    ),
+     // No standalone index on `runId`: the primary key leads with it, so every
+     // by-run lookup and range scan is served by that index already. Keeping one
+     // would cost a second write per event on the table's hottest path.
+diff --git a/packages/world-postgres/src/storage.ts b/packages/world-postgres/src/storage.ts
+index 77f3697..11bddee 100644
+--- a/packages/world-postgres/src/storage.ts
++++ b/packages/world-postgres/src/storage.ts
+@@ -12,10 +12,13 @@ import type {
+   AttributeChange,
+   CreateEventParams,
+   Event,
++  EventOfType,
++  EventRequestOfType,
+   EventResult,
+   ExperimentalSetAttributesResult,
+   GetEventParams,
+   Hook,
++  HookResumeReceipt,
+   ListEventsParams,
+   ListHooksParams,
+   PaginatedResponse,
+@@ -715,6 +718,232 @@ async function handleLegacyEventPostgres(
+   }
+ }
+ 
++/** Validated caller key; payload digests are computed by the runtime, not World. */
++interface HookResumeClaim {
++  resumeId: string;
++  resumeScope?: string;
++  payloadDigest: string;
++}
++
++interface HookReceiveRequest {
++  runId: string;
++  data: EventRequestOfType<'hook_received'>;
++  claim?: HookResumeClaim;
++}
++
++function parseHookResumeClaim(
++  data: AnyEventRequest,
++  params?: CreateEventParams
++): HookResumeClaim | undefined {
++  if (
++    params?.resumeId === undefined &&
++    params?.resumePayloadDigest === undefined &&
++    params?.resumeScope === undefined
++  ) {
++    return undefined;
++  }
++  if (
++    data.eventType !== 'hook_received' ||
++    typeof params?.resumeId !== 'string' ||
++    params.resumeId.length === 0 ||
++    params.resumeId.length > 256 ||
++    (params.resumeScope !== undefined &&
++      (typeof params.resumeScope !== 'string' ||
++        params.resumeScope.length === 0 ||
++        params.resumeScope.length > 256)) ||
++    typeof params.resumePayloadDigest !== 'string' ||
++    !/^[a-f0-9]{64}$/.test(params.resumePayloadDigest) ||
++    typeof data.eventData.token !== 'string' ||
++    isLegacySpecVersion(data.specVersion ?? SPEC_VERSION_CURRENT)
++  ) {
++    throw new WorkflowWorldError('Invalid keyed hook resume parameters', {
++      status: 422,
++    });
++  }
++  return {
++    resumeId: params.resumeId,
++    resumeScope: params.resumeScope,
++    payloadDigest: params.resumePayloadDigest,
++  };
++}
++
++/** One decoder for public receipts and transactional acceptance replay. */
++async function readHookResume(
++  db: DrizzleLike,
++  identity: SQL
++): Promise<
++  | {
++      event: EventOfType<'hook_received'>;
++      receipt: HookResumeReceipt;
++    }
++  | undefined
++> {
++  const { events } = Schema;
++  const [value] = await db
++    .select()
++    .from(events)
++    .where(and(identity, eq(events.eventType, 'hook_received')))
++    .limit(1);
++  if (!value) return undefined;
++  const event = EventSchema.parse(compact(value));
++  if (
++    event.eventType !== 'hook_received' ||
++    typeof event.eventData.token !== 'string' ||
++    !value.resumeId ||
++    !value.resumePayloadDigest
++  ) {
++    throw new WorkflowWorldError('Invalid stored hook resume receipt');
++  }
++  return {
++    event,
++    receipt: {
++      runId: event.runId,
++      eventId: event.eventId,
++      hookId: event.correlationId,
++      token: event.eventData.token,
++      resumeId: value.resumeId,
++      payloadDigest: value.resumePayloadDigest,
++      ...(value.resumeScope !== null ? { resumeScope: value.resumeScope } : {}),
++    },
++  };
++}
++
++/** Bind either native unique index to the same receipt decoder. */
++function createHookResumeReader(
++  db: DrizzleLike,
++  ownerColumn: typeof Schema.events.runId | typeof Schema.events.resumeScope
++) {
++  return async (owner: string, resumeId: string) =>
++    (
++      await readHookResume(
++        db,
++        and(eq(ownerColumn, owner), eq(Schema.events.resumeId, resumeId))!
++      )
++    )?.receipt;
++}
++
++async function findAcceptedHookResume(
++  db: DrizzleLike,
++  request: HookReceiveRequest
++) {
++  const { runId, data, claim } = request;
++  if (!claim) return undefined;
++  const accepted = await readHookResume(
++    db,
++    and(
++      eq(Schema.events.runId, runId),
++      eq(Schema.events.resumeId, claim.resumeId)
++    )!
++  );
++  if (!accepted) return undefined;
++  if (
++    accepted.receipt.hookId !== data.correlationId ||
++    accepted.receipt.token !== data.eventData.token ||
++    accepted.receipt.resumeScope !== claim.resumeScope ||
++    accepted.receipt.payloadDigest !== claim.payloadDigest
++  ) {
++    throw new WorkflowWorldError(
++      'Resume key already accepted different hook, token, scope, or payload',
++      { status: 422 }
++    );
++  }
++  return accepted.event;
++}
++
++/** The hook lock orders a new receive before disposal, or observes its deletion. */
++async function lockHookForReceive(
++  db: DrizzleLike,
++  request: HookReceiveRequest
++) {
++  const { runId, data, claim } = request;
++  const [hook] = await db
++    .select({ token: Schema.hooks.token })
++    .from(Schema.hooks)
++    .where(
++      and(
++        eq(Schema.hooks.hookId, data.correlationId),
++        eq(Schema.hooks.runId, runId)
++      )
++    )
++    .for('update')
++    .limit(1);
++  if (!hook) throw new HookNotFoundError(data.correlationId);
++  if (claim && hook.token !== data.eventData.token) {
++    throw new WorkflowWorldError('Hook token does not match the target hook', {
++      status: 422,
++    });
++  }
++}
++
++async function appendHookReceive(db: DrizzleLike, request: HookReceiveRequest) {
++  const { runId, data, claim } = request;
++  const specVersion = data.specVersion ?? SPEC_VERSION_CURRENT;
++  // Allocate only after both lifecycle locks: waiting writers cannot carry an
++  // earlier slot into a later insert. A rolled-back claim consumes no slot.
++  const inserted = await insertEventRow(db, {
++    runId,
++    eventId: await allocateEventId(db, runId),
++    correlationId: data.correlationId,
++    eventType: data.eventType,
++    eventData: data.eventData,
++    specVersion,
++    resumeId: claim?.resumeId,
++    resumeScope: claim?.resumeScope,
++    resumePayloadDigest: claim?.payloadDigest,
++  });
++  if (!inserted) {
++    throw new EntityConflictError(
++      `Event for hook "${data.correlationId}" could not be created`
++    );
++  }
++  return EventSchema.parse({
++    ...data,
++    ...inserted,
++    runId,
++    specVersion,
++    ...(claim ? { resumeId: claim.resumeId } : {}),
++  });
++}
++
++/** Run lock -> prior receipt -> live hook lock -> append, in one transaction. */
++async function receiveHookEvent(drizzle: Drizzle, request: HookReceiveRequest) {
++  return drizzle
++    .transaction(async (tx) => {
++      const [run] = await tx
++        .select({ status: Schema.runs.status })
++        .from(Schema.runs)
++        .where(eq(Schema.runs.runId, request.runId))
++        .for('update')
++        .limit(1);
++      if (!run) throw new WorkflowRunNotFoundError(request.runId);
++      // The run lock serializes key claims and terminal transitions. A committed
++      // receipt remains valid after completion or disposal; only NEW input needs
++      // the lifecycle checks. READ COMMITTED observes a preceding writer's commit.
++      const accepted = await findAcceptedHookResume(tx, request);
++      if (accepted) return accepted;
++      if (isTerminalWorkflowRunStatus(run.status)) {
++        throw new RunExpiredError(
++          `Workflow run "${request.runId}" is already in terminal state "${run.status}"`
++        );
++      }
++      await lockHookForReceive(tx, request);
++      return appendHookReceive(tx, request);
++    }, SLOT_INSERT_TRANSACTION)
++    .catch((error: unknown) => {
++      const pgError = pgErrorOf(error);
++      if (
++        pgError.code === '23505' &&
++        pgError.constraint === 'workflow_events_resume_scope_unique'
++      ) {
++        throw new WorkflowWorldError(
++          'Resume scope and key already belong to another run',
++          { status: 422 }
++        );
++      }
++      throw error;
++    });
++}
++
+ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+   const hookRetentionLimitMs = getHookRetentionLimitMs();
+   const ulid = monotonicFactory();
+@@ -819,10 +1048,13 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+         );
+       }
+ 
++      const resumeClaim = parseHookResumeClaim(data, params);
++
+       // The id this call's event took, known only once its insert has
+       // committed: on a slot-numbered run the position is chosen inside the
+       // INSERT, so there is nothing to read before it.
+       let eventId: string | undefined;
++      let acceptedEvent: Event | undefined;
+       // Lazy, because on a legacy run this mints a ULID and on a slot run it
+       // reads which of the two schemes applies. Every caller below awaits it
+       // immediately before its insert. A caller that has already fixed the id
+@@ -1007,6 +1239,12 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+         // is ULID-numbered by definition, so the id is minted here rather than
+         // read out of a slot marker the run cannot have.
+         if (isLegacySpecVersion(currentRun.specVersion)) {
++          if (resumeClaim) {
++            throw new WorkflowWorldError(
++              'Keyed hook resume requires a current-spec run',
++              { status: 422 }
++            );
++          }
+           return handleLegacyEventPostgres(
+             drizzle,
+             effectiveRunId,
+@@ -1183,11 +1421,20 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+       // the gap between this read and the append. Both writers take the hook's
+       // row lock for that. See the `hook_disposed` and `hook_received`
+       // branches below.
+-      if (isHookEventRequiringExistence(data.eventType) && data.correlationId) {
++      if (
++        !resumeClaim &&
++        isHookEventRequiringExistence(data.eventType) &&
++        data.correlationId
++      ) {
+         const [existingHook] = await drizzle
+           .select({ hookId: Schema.hooks.hookId })
+           .from(Schema.hooks)
+-          .where(eq(Schema.hooks.hookId, data.correlationId))
++          .where(
++            and(
++              eq(Schema.hooks.hookId, data.correlationId),
++              eq(Schema.hooks.runId, effectiveRunId)
++            )
++          )
+           .limit(1);
+ 
+         if (!existingHook) {
+@@ -1962,7 +2209,12 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+         value = await drizzle.transaction(async (tx) => {
+           const [deleted] = await tx
+             .delete(Schema.hooks)
+-            .where(eq(Schema.hooks.hookId, disposedHookId))
++            .where(
++              and(
++                eq(Schema.hooks.hookId, disposedHookId),
++                eq(Schema.hooks.runId, effectiveRunId)
++              )
++            )
+             .returning({ hookId: Schema.hooks.hookId });
+           if (!deleted) {
+             throw new EntityConflictError(
+@@ -1991,85 +2243,15 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+         }, SLOT_INSERT_TRANSACTION);
+       }
+ 
+-      // Handle hook_received event: append the event only if the run has
+-      // not reached a terminal state. hook_received has no branch in the
+-      // terminal-run guard above (it doesn't transition the run or create
+-      // an entity), so without this, the generic INSERT further below
+-      // could append a hook_received event after a concurrent
+-      // run_completed / run_failed / run_cancelled has already committed.
+-      // `FOR UPDATE` takes the run row lock inside this transaction: it
+-      // blocks until any in-flight terminal transition (whose own
+-      // conditional UPDATE takes the same row lock) commits, then
+-      // observes the post-commit status. That linearizes this insert
+-      // against the run's terminal transition the same way step_started's
+-      // guarded UPDATE linearizes against a concurrent terminal step
+-      // event.
+       if (data.eventType === 'hook_received') {
+-        value = await drizzle.transaction(async (tx) => {
+-          const [runRow] = await tx
+-            .select({ status: Schema.runs.status })
+-            .from(Schema.runs)
+-            .where(eq(Schema.runs.runId, effectiveRunId))
+-            .for('update')
+-            .limit(1);
+-          if (!runRow) {
+-            throw new WorkflowRunNotFoundError(effectiveRunId);
+-          }
+-          if (isTerminalWorkflowRunStatus(runRow.status)) {
+-            throw new RunExpiredError(
+-              `Workflow run "${effectiveRunId}" is already in terminal state "${runRow.status}"`
+-            );
+-          }
+-
+-          // Re-check the hook under its own row lock, for the ordering the
+-          // unlocked read near the top of `create` cannot settle. `FOR UPDATE`
+-          // blocks on the disposer's `DELETE`, which holds that lock until its
+-          // `hook_disposed` row is committed, then re-evaluates: either this
+-          // delivery got the lock first and its `hook_received` is ordered
+-          // BEFORE the disposal, or the disposer got it and the row is gone and
+-          // this delivery is refused. The one order that is unreachable is the
+-          // one that corrupts the run: a `hook_received` journaled behind its
+-          // hook's `hook_disposed`, which no replay can consume.
+-          //
+-          // Under READ COMMITTED (see SLOT_INSERT_TRANSACTION) a locked read of
+-          // a row deleted by the transaction it waited on returns no row rather
+-          // than raising, so the refusal needs no serialization-failure
+-          // handling. Reported as HookNotFoundError, matching the unlocked
+-          // check and the public resume contract for a hook that can no longer
+-          // receive.
+-          if (data.correlationId) {
+-            const [liveHook] = await tx
+-              .select({ hookId: Schema.hooks.hookId })
+-              .from(Schema.hooks)
+-              .where(eq(Schema.hooks.hookId, data.correlationId))
+-              .for('update')
+-              .limit(1);
+-            if (!liveHook) {
+-              throw new HookNotFoundError(data.correlationId);
+-            }
+-          }
+-
+-          // Allocate the position only after the row locks are acquired,
+-          // matching step_started's ordering guarantee: a writer blocked
+-          // on a lock must not carry an earlier position into a later
+-          // insert.
+-          const eventValue = await insertEventRow(tx, {
+-            runId: effectiveRunId,
+-            eventId: await allocateEventId(tx, effectiveRunId),
+-            correlationId: data.correlationId,
+-            eventType: data.eventType,
+-            eventData: storedEventData,
+-            specVersion: effectiveSpecVersion,
+-          });
+-
+-          if (!eventValue) {
+-            throw new EntityConflictError(
+-              `Event for hook "${data.correlationId}" could not be created`
+-            );
+-          }
+-          eventId = eventValue.eventId;
+-          return { createdAt: eventValue.createdAt };
+-        }, SLOT_INSERT_TRANSACTION);
++        const received = await receiveHookEvent(drizzle, {
++          runId: effectiveRunId,
++          data,
++          claim: resumeClaim,
++        });
++        eventId = received.eventId;
++        value = { createdAt: received.createdAt };
++        acceptedEvent = resumeClaim ? received : undefined;
+       }
+ 
+       // Handle wait_created event: create wait entity
+@@ -2295,7 +2477,7 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+       if (data.eventType === 'run_started') {
+         delete (result as any).eventData;
+       }
+-      const parsed = EventSchema.parse(result);
++      const parsed = acceptedEvent ?? EventSchema.parse(result);
+       const resolveData = params?.resolveData ?? 'all';
+ 
+       // For run_started: include all events so the runtime can skip
+@@ -2410,6 +2592,8 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+         hasMore: eventPage.hasMore,
+       };
+     },
++    getResume: createHookResumeReader(drizzle, events.runId),
++    getResumeByScope: createHookResumeReader(drizzle, events.resumeScope),
+     async get(
+       runId: string,
+       eventId: string,
+diff --git a/packages/world-postgres/test/core-acceptance-child.mjs b/packages/world-postgres/test/core-acceptance-child.mjs
+new file mode 100644
+index 0000000..02cb83a
+--- /dev/null
++++ b/packages/world-postgres/test/core-acceptance-child.mjs
+@@ -0,0 +1,29 @@
++import { createWorld } from '../dist/index.js';
++import {
++  resumeHook,
++  recoverHookResume,
++  setWorld,
++} from '../../core/dist/runtime.js';
++process.env.PORT = '0';
++process.once(
++  'message',
++  async ({ connectionString, token, payload, options, recovery }) => {
++    const world = createWorld({
++      connectionString,
++      applicationManagedShutdown: true,
++    });
++    setWorld(world);
++    try {
++      const receipt = recovery
++        ? await recoverHookResume(options)
++        : await resumeHook(token, payload, undefined, options);
++      process.send({ receipt });
++    } catch (error) {
++      process.send({ error: String(error) });
++      process.exitCode = 1;
++    } finally {
++      await world.close();
++      process.disconnect();
++    }
++  }
++);
+diff --git a/packages/world-postgres/test/core-acceptance.test.ts b/packages/world-postgres/test/core-acceptance.test.ts
+new file mode 100644
+index 0000000..fc045be
+--- /dev/null
++++ b/packages/world-postgres/test/core-acceptance.test.ts
+@@ -0,0 +1,252 @@
++import {
++  createAcceptanceFixture,
++  readAcceptedHooks,
++} from './hook-acceptance-fixture.js';
++import { fork } from 'node:child_process';
++import { randomUUID } from 'node:crypto';
++import { once } from 'node:events';
++import { fileURLToPath } from 'node:url';
++import { PostgreSqlContainer } from '@testcontainers/postgresql';
++import { drizzle } from 'drizzle-orm/node-postgres';
++import { migrate } from 'drizzle-orm/node-postgres/migrator';
++import { makeWorkerUtils } from 'graphile-worker';
++import { Pool } from 'pg';
++import { afterAll, beforeAll, expect, it } from 'vitest';
++import {
++  resumeHook,
++  recoverHookResume,
++  setWorld,
++} from '../../core/dist/runtime.js';
++import { createWorld } from '../dist/index.js';
++
++let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
++let pool: Pool;
++let world: ReturnType<typeof createWorld>;
++let connectionString: string;
++const previousPort = process.env.PORT;
++beforeAll(async () => {
++  // No executor is started in this storage/queue integration profile.
++  process.env.PORT = '0';
++  container = await new PostgreSqlContainer('postgres:15-alpine').start();
++  connectionString = container.getConnectionUri();
++  pool = new Pool({ connectionString });
++  await migrate(drizzle(pool), {
++    migrationsFolder: fileURLToPath(
++      new URL('../src/drizzle/migrations', import.meta.url)
++    ),
++    migrationsTable: 'workflow_migrations',
++    migrationsSchema: 'workflow_drizzle',
++  });
++  const utils = await makeWorkerUtils({ pgPool: pool });
++  await utils.migrate();
++  await utils.release();
++  world = createWorld({ pool, applicationManagedShutdown: true });
++  setWorld(world);
++}, 120_000);
++afterAll(async () => {
++  await world?.close();
++  await pool?.end();
++  await container?.stop();
++  if (previousPort === undefined) delete process.env.PORT;
++  else process.env.PORT = previousPort;
++});
++it('binds the actual semantic payload, rejects cross-run input, and replays after closure', async () => {
++  const hook = await createAcceptanceFixture(world);
++  const options = {
++    runId: hook.runId,
++    inputId: randomUUID(),
++    scope: randomUUID(),
++  };
++  const first = await resumeHook(
++    hook.token,
++    { b: 2, a: 1 },
++    undefined,
++    options
++  );
++  expect(
++    await resumeHook(hook.token, { a: 1, b: 2 }, undefined, options)
++  ).toEqual(first);
++  await expect(
++    resumeHook(hook.token, { a: 9, b: 2 }, undefined, options)
++  ).rejects.toThrow();
++  const foreign = await createAcceptanceFixture(world);
++  await expect(
++    resumeHook(foreign.token, { a: 1 }, undefined, {
++      ...options,
++      inputId: randomUUID(),
++    })
++  ).rejects.toThrow();
++  expect(await readAcceptedHooks(world, foreign.runId)).toHaveLength(0);
++  const second = await resumeHook(hook.token, { a: 1, b: 2 }, undefined, {
++    ...options,
++    inputId: randomUUID(),
++  });
++  expect(second.eventId).not.toBe(first.eventId);
++  await world.events.create(hook.runId, {
++    eventType: 'hook_disposed',
++    correlationId: hook.hookId,
++  });
++  await world.events.create(hook.runId, {
++    eventType: 'run_completed',
++    eventData: { output: new Uint8Array() },
++  });
++  expect(
++    await resumeHook(hook.token, { a: 1, b: 2 }, undefined, options)
++  ).toEqual(first);
++  expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(2);
++  expect(
++    await world.events.getResumeByScope!(options.scope, options.inputId)
++  ).toEqual(first);
++  await expect(
++    resumeHook(hook.token, { a: 1, b: 2 }, undefined, {
++      ...options,
++      scope: 'different',
++    })
++  ).rejects.toThrow();
++}, 30_000);
++
++it('recovers without payload after a real core process dies between event commit and queue publication', async () => {
++  const hook = await createAcceptanceFixture(world);
++  const options = {
++    runId: hook.runId,
++    inputId: randomUUID(),
++    scope: randomUUID(),
++  };
++  const barrier = await pool.connect();
++  const producerName = `core-prewake-${randomUUID()}`;
++  const producerUrl = new URL(connectionString);
++  producerUrl.searchParams.set('application_name', producerName);
++  const child = fork(
++    fileURLToPath(new URL('./core-acceptance-child.mjs', import.meta.url)),
++    [],
++    {
++      stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
++    }
++  );
++  const exited = once(child, 'exit');
++  let childMessage: unknown;
++  child.on('message', (message) => {
++    childMessage = message;
++  });
++  try {
++    await barrier.query('BEGIN');
++    await barrier.query(
++      'LOCK TABLE graphile_worker._private_jobs IN ACCESS EXCLUSIVE MODE'
++    );
++    child.send({
++      connectionString: producerUrl.toString(),
++      token: hook.token,
++      payload: { text: 'persisted' },
++      options,
++    });
++    let canonical;
++    let queueBlocked = false;
++    const deadline = Date.now() + 15_000;
++    while (Date.now() < deadline) {
++      if (childMessage)
++        throw new Error(
++          `Child returned before queue barrier: ${JSON.stringify(childMessage)}`
++        );
++      canonical = await world.events.getResume!(hook.runId, options.inputId);
++      const blocked = await pool.query(
++        "SELECT 1 FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0 AND query LIKE '%add_job%'"
++      );
++      queueBlocked = Boolean(blocked.rowCount);
++      if (canonical && queueBlocked) break;
++      await new Promise((resolve) => setTimeout(resolve, 10));
++    }
++    expect(canonical).toBeDefined();
++    expect(queueBlocked).toBe(true);
++    expect(childMessage).toBeUndefined();
++    const publishers = await pool.query<{ pid: number }>(
++      "SELECT pid FROM pg_stat_activity WHERE application_name = $1 AND cardinality(pg_blocking_pids(pid)) > 0 AND query LIKE '%add_job%'",
++      [producerName]
++    );
++    expect(publishers.rows.length).toBeGreaterThan(0);
++    child.kill('SIGKILL');
++    expect((await exited)[1]).toBe('SIGKILL');
++    // A blocked PostgreSQL statement can outlive its dead TCP client.
++    // Terminate those exact backends before releasing the queue barrier.
++    const pids = publishers.rows.map((row) => row.pid);
++    await pool.query(
++      'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = ANY($1::int[])',
++      [pids]
++    );
++    while (
++      (
++        await pool.query(
++          'SELECT 1 FROM pg_stat_activity WHERE pid = ANY($1::int[])',
++          [pids]
++        )
++      ).rowCount
++    ) {
++      await new Promise((resolve) => setTimeout(resolve, 10));
++    }
++    await barrier.query('COMMIT');
++    const unpublished = await pool.query(
++      "SELECT 1 FROM graphile_worker._private_jobs WHERE convert_from(decode(payload->>'data', 'base64'), 'UTF8')::jsonb->>'runId' = $1",
++      [hook.runId]
++    );
++    expect(unpublished.rows).toHaveLength(0);
++    const retry = fork(
++      fileURLToPath(new URL('./core-acceptance-child.mjs', import.meta.url)),
++      [],
++      {
++        stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
++      }
++    );
++    const retriedExit = once(retry, 'exit');
++    const response = once(retry, 'message');
++    retry.send({
++      connectionString,
++      recovery: true,
++      options,
++    });
++    try {
++      expect((await response)[0]).toEqual({ receipt: canonical });
++      expect((await retriedExit)[0]).toBe(0);
++    } finally {
++      if (retry.exitCode === null) retry.kill('SIGKILL');
++    }
++    expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(1);
++    const jobs = await pool.query(
++      "SELECT convert_from(decode(payload->>'data', 'base64'), 'UTF8')::jsonb AS body FROM graphile_worker._private_jobs"
++    );
++    expect(jobs.rows.some((row) => row.body.runId === hook.runId)).toBe(true);
++  } finally {
++    if (child.exitCode === null && child.signalCode === null)
++      child.kill('SIGKILL');
++    await barrier.query('ROLLBACK');
++    barrier.release();
++  }
++}, 30_000);
++
++it('recovery reads native proof, rejects wrong scopes, and does not wake terminal or absent inputs', async () => {
++  const hook = await createAcceptanceFixture(world);
++  const key = { runId: hook.runId, inputId: randomUUID(), scope: randomUUID() };
++  const receipt = await resumeHook(
++    hook.token,
++    { text: 'stored only' },
++    undefined,
++    key
++  );
++  await world.events.create(hook.runId, {
++    eventType: 'run_completed',
++    eventData: { output: new Uint8Array() },
++  });
++  const before = await pool.query(
++    'SELECT count(*)::int AS count FROM graphile_worker._private_jobs'
++  );
++  expect(await recoverHookResume(key)).toEqual(receipt);
++  expect(
++    await recoverHookResume({ ...key, inputId: randomUUID() })
++  ).toBeUndefined();
++  await expect(
++    recoverHookResume({ ...key, scope: randomUUID() })
++  ).rejects.toThrow('recovery scope');
++  const after = await pool.query(
++    'SELECT count(*)::int AS count FROM graphile_worker._private_jobs'
++  );
++  expect(after.rows).toEqual(before.rows);
++  expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(1);
++}, 30_000);
+diff --git a/packages/world-postgres/test/hook-acceptance-child.mjs b/packages/world-postgres/test/hook-acceptance-child.mjs
+new file mode 100644
+index 0000000..cd88ab7
+--- /dev/null
++++ b/packages/world-postgres/test/hook-acceptance-child.mjs
+@@ -0,0 +1,28 @@
++import { createWorld } from '../dist/index.js';
++
++process.once(
++  'message',
++  async ({ connectionString, runId, data, params, park }) => {
++    const world = createWorld({
++      connectionString,
++      applicationManagedShutdown: true,
++    });
++    try {
++      const result = await world.events.create(runId, data, params);
++      // The parent kills this process only after the real create committed, before
++      // it can do any subsequent work or graceful shutdown.
++      process.send({ event: result.event });
++      if (park) {
++        setInterval(() => {}, 1000);
++      } else {
++        await world.close();
++        process.disconnect();
++      }
++    } catch (error) {
++      process.send({ error: String(error) });
++      await world.close();
++      process.disconnect();
++      process.exitCode = 1;
++    }
++  }
++);
+diff --git a/packages/world-postgres/test/hook-acceptance-fixture.ts b/packages/world-postgres/test/hook-acceptance-fixture.ts
+new file mode 100644
+index 0000000..5ba7f0e
+--- /dev/null
++++ b/packages/world-postgres/test/hook-acceptance-fixture.ts
+@@ -0,0 +1,39 @@
++import { randomUUID } from 'node:crypto';
++import type { World } from '@workflow/world';
++import { expect } from 'vitest';
++
++export async function createAcceptanceFixture(world: World) {
++  const created = await world.events.create(null, {
++    eventType: 'run_created',
++    eventData: {
++      deploymentId: 'dpl_acceptance',
++      workflowName: 'acceptance',
++      input: new Uint8Array(),
++      executionContext: { workflowCoreVersion: '5.0.0-beta.47' },
++    },
++  });
++  const runId = created.run!.runId;
++  await world.events.create(runId, { eventType: 'run_started' });
++  const hookId = `hook_${randomUUID()}`;
++  const token = `token_${randomUUID()}`;
++  await world.events.create(runId, {
++    eventType: 'hook_created',
++    correlationId: hookId,
++    eventData: { token },
++  });
++  return { runId, hookId, token };
++}
++
++/** Assert that these bounded keyed fixtures expose complete, identified events. */
++export async function readAcceptedHooks(world: World, runId: string) {
++  const page = await world.events.list({ runId });
++  expect(page.hasMore).toBe(false);
++  const accepted = page.data.filter(
++    (event) => event.eventType === 'hook_received'
++  );
++  for (const event of accepted) {
++    expect(event.resumeId).toEqual(expect.any(String));
++    expect(event.runId).toBe(runId);
++  }
++  return accepted;
++}
+diff --git a/packages/world-postgres/test/hook-acceptance.test.ts b/packages/world-postgres/test/hook-acceptance.test.ts
+new file mode 100644
+index 0000000..3d0e36e
+--- /dev/null
++++ b/packages/world-postgres/test/hook-acceptance.test.ts
+@@ -0,0 +1,557 @@
++import { fork } from 'node:child_process';
++import { createHash, randomUUID } from 'node:crypto';
++import { once } from 'node:events';
++import { fileURLToPath } from 'node:url';
++import { PostgreSqlContainer } from '@testcontainers/postgresql';
++import { WorkflowWorldError } from '@workflow/errors';
++import type { CreateEventParams, Event, World } from '@workflow/world';
++import { eventIdToSlot } from '@workflow/world';
++import { drizzle } from 'drizzle-orm/node-postgres';
++import { migrate } from 'drizzle-orm/node-postgres/migrator';
++import { Pool } from 'pg';
++import { afterAll, beforeAll, describe, expect, it } from 'vitest';
++import { createWorld } from '../dist/index.js';
++import {
++  createAcceptanceFixture,
++  readAcceptedHooks,
++} from './hook-acceptance-fixture.js';
++
++describe('durable hook acceptance (real PostgreSQL)', () => {
++  let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
++  let pool: Pool;
++  let world: World;
++  let connectionString: string;
++
++  beforeAll(async () => {
++    container = await new PostgreSqlContainer('postgres:15-alpine').start();
++    connectionString = container.getConnectionUri();
++    pool = new Pool({ connectionString });
++    const config = {
++      migrationsFolder: fileURLToPath(
++        new URL('../src/drizzle/migrations', import.meta.url)
++      ),
++      migrationsTable: 'workflow_migrations',
++      migrationsSchema: 'workflow_drizzle',
++    };
++    await migrate(drizzle(pool), config);
++    await migrate(drizzle(pool), config);
++    world = createWorld({ pool, applicationManagedShutdown: true });
++  }, 120_000);
++
++  afterAll(async () => {
++    await world?.close?.();
++    await pool?.end();
++    await container?.stop();
++  });
++
++  function request(
++    hook: { hookId: string; token: string },
++    payload = 'semantic input',
++    resumeId = randomUUID()
++  ) {
++    return {
++      data: {
++        eventType: 'hook_received' as const,
++        correlationId: hook.hookId,
++        eventData: { token: hook.token, payload },
++      },
++      params: {
++        resumeId,
++        resumePayloadDigest: createHash('sha256')
++          .update(JSON.stringify(payload))
++          .digest('hex'),
++      },
++    };
++  }
++
++  async function childAccept(
++    runId: string,
++    input: ReturnType<typeof request>,
++    park = false
++  ) {
++    const child = fork(
++      fileURLToPath(new URL('./hook-acceptance-child.mjs', import.meta.url)),
++      [],
++      { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }
++    );
++    const exit = once(child, 'exit');
++    try {
++      const response = new Promise<{ event: Event }>((resolve, reject) => {
++        const timer = setTimeout(
++          () => reject(new Error('Child acceptance timed out')),
++          15_000
++        );
++        child.once('message', (message: { event: Event; error?: string }) => {
++          clearTimeout(timer);
++          if (message.error) reject(new Error(message.error));
++          else resolve(message);
++        });
++        child.once('error', reject);
++      });
++      child.send({ connectionString, runId, ...input, park });
++      const result = await response;
++      if (park) child.kill('SIGKILL');
++      const [code, signal] = await exit;
++      expect(park ? signal : code).toBe(park ? 'SIGKILL' : 0);
++      return result.event;
++    } finally {
++      if (child.exitCode === null && child.signalCode === null)
++        child.kill('SIGKILL');
++    }
++  }
++
++  it('keeps one canonical event across commit, process kill, and independent retry', async () => {
++    const hook = await createAcceptanceFixture(world);
++    const input = request(hook);
++    const first = await childAccept(hook.runId, input, true);
++    const second = await childAccept(hook.runId, input);
++    expect(second).toEqual(first);
++    expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(1);
++    expect(
++      await world.events.getResume!(hook.runId, input.params.resumeId)
++    ).toEqual({
++      runId: hook.runId,
++      eventId: first.eventId,
++      hookId: hook.hookId,
++      token: hook.token,
++      resumeId: input.params.resumeId,
++      payloadDigest: input.params.resumePayloadDigest,
++    });
++    expect(
++      await world.events.getResume!(randomUUID(), input.params.resumeId)
++    ).toBeUndefined();
++    expect(await world.events.getResume!(hook.runId, 'absent')).toBeUndefined();
++  }, 30_000);
++
++  it('rejects changed semantic content, hook, or token without another append', async () => {
++    const hook = await createAcceptanceFixture(world);
++    const input = request(hook);
++    await world.events.create(hook.runId, input.data, input.params);
++    const changed = request(
++      hook,
++      'changed semantic input',
++      input.params.resumeId
++    );
++    for (const data of [
++      changed,
++      { ...input, data: { ...input.data, correlationId: 'other-hook' } },
++      {
++        ...input,
++        data: {
++          ...input.data,
++          eventData: { ...input.data.eventData, token: 'other-token' },
++        },
++      },
++    ]) {
++      await expect(
++        world.events.create(hook.runId, data.data, data.params)
++      ).rejects.toMatchObject({ status: 422 });
++    }
++    expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(1);
++  });
++
++  it('rejects cross-run hooks for keyed and ordinary receives', async () => {
++    const own = await createAcceptanceFixture(world);
++    const foreign = await createAcceptanceFixture(world);
++    const input = request(foreign);
++    await expect(
++      world.events.create(own.runId, input.data, input.params)
++    ).rejects.toThrow();
++    await expect(world.events.create(own.runId, input.data)).rejects.toThrow();
++    expect(await readAcceptedHooks(world, own.runId)).toHaveLength(0);
++    expect(await readAcceptedHooks(world, foreign.runId)).toHaveLength(0);
++    expect(
++      await world.events.getResume!(own.runId, input.params.resumeId)
++    ).toBeUndefined();
++  });
++
++  it('rejects a forged token on first acceptance without claiming the key', async () => {
++    const hook = await createAcceptanceFixture(world);
++    const forged = request({ ...hook, token: 'forged-token' });
++    await expect(
++      world.events.create(hook.runId, forged.data, forged.params)
++    ).rejects.toMatchObject({ status: 422 });
++    expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(0);
++    expect(
++      await world.events.getResume!(hook.runId, forged.params.resumeId)
++    ).toBeUndefined();
++    const valid = request(hook, 'semantic input', forged.params.resumeId);
++    const accepted = await world.events.create(
++      hook.runId,
++      valid.data,
++      valid.params
++    );
++    expect(
++      await world.events.getResume!(hook.runId, valid.params.resumeId)
++    ).toMatchObject({ token: hook.token, eventId: accepted.event!.eventId });
++    expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(1);
++  });
++
++  it('converges concurrent claims while preserving distinct keys and contiguous slots', async () => {
++    const hook = await createAcceptanceFixture(world);
++    const inputs = [request(hook), request(hook)];
++    const results = await Promise.all(
++      Array.from({ length: 12 }, (_, i) => {
++        const input = inputs[i % 2];
++        return world.events.create(hook.runId, input.data, input.params);
++      })
++    );
++    expect(new Set(results.map((result) => result.event!.eventId)).size).toBe(
++      2
++    );
++    expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(2);
++    const page = await world.events.list({ runId: hook.runId });
++    expect(page.data.map((event) => eventIdToSlot(event.eventId))).toEqual(
++      page.data.map((_, i) => i + 1)
++    );
++  });
++
++  it('validates complete key/digest pairs and rejects keyed legacy requests', async () => {
++    const hook = await createAcceptanceFixture(world);
++    const input = request(hook);
++    const invalid: CreateEventParams[] = [
++      { resumeId: '', resumePayloadDigest: input.params.resumePayloadDigest },
++      { ...input.params, resumeId: 'x'.repeat(257) },
++      { resumeId: 'key' },
++      { resumePayloadDigest: input.params.resumePayloadDigest },
++      { ...input.params, resumePayloadDigest: 'A'.repeat(64) },
++      { ...input.params, resumePayloadDigest: 'a'.repeat(63) },
++    ];
++    for (const params of invalid) {
++      await expect(
++        world.events.create(hook.runId, input.data, params)
++      ).rejects.toMatchObject({ status: 422 });
++    }
++    await expect(
++      world.events.create(
++        hook.runId,
++        { ...input.data, specVersion: 1 },
++        input.params
++      )
++    ).rejects.toMatchObject({ status: 422 });
++    expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(0);
++  });
++
++  it('requires a bounded scope and a complete key/digest pair', async () => {
++    const hook = await createAcceptanceFixture(world);
++    const input = request(hook);
++    const invalid: CreateEventParams[] = [
++      { ...input.params, resumeScope: '' },
++      { ...input.params, resumeScope: 'x'.repeat(257) },
++      { resumeScope: 'scope' },
++      { resumeScope: 'scope', resumeId: input.params.resumeId },
++      {
++        resumeScope: 'scope',
++        resumePayloadDigest: input.params.resumePayloadDigest,
++      },
++    ];
++    for (const params of invalid) {
++      await expect(
++        world.events.create(hook.runId, input.data, params)
++      ).rejects.toMatchObject({ status: 422 });
++    }
++    expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(0);
++  });
++
++  it('retains the scoped owner after closure without accepting another run as that owner', async () => {
++    const owner = await createAcceptanceFixture(world);
++    const other = await createAcceptanceFixture(world);
++    const input = request(owner);
++    const params = { ...input.params, resumeScope: randomUUID() };
++    const accepted = await world.events.create(owner.runId, input.data, params);
++    const receipt = await world.events.getResumeByScope!(
++      params.resumeScope,
++      params.resumeId
++    );
++    expect(receipt).toEqual({
++      runId: owner.runId,
++      eventId: accepted.event!.eventId,
++      hookId: owner.hookId,
++      token: owner.token,
++      resumeId: params.resumeId,
++      payloadDigest: params.resumePayloadDigest,
++      resumeScope: params.resumeScope,
++    });
++    expect(await world.events.getResume!(owner.runId, params.resumeId)).toEqual(
++      receipt
++    );
++    expect(
++      await world.events.getResumeByScope!('absent-scope', params.resumeId)
++    ).toBeUndefined();
++    expect(
++      await world.events.getResumeByScope!(params.resumeScope, 'absent-input')
++    ).toBeUndefined();
++    await expect(
++      world.events.create(owner.runId, input.data, input.params)
++    ).rejects.toMatchObject({ status: 422 });
++    await world.events.create(owner.runId, {
++      eventType: 'hook_disposed',
++      correlationId: owner.hookId,
++    });
++    expect(
++      await world.events.getResumeByScope!(params.resumeScope, params.resumeId)
++    ).toEqual(receipt);
++    await world.events.create(owner.runId, {
++      eventType: 'run_completed',
++      eventData: { output: new Uint8Array() },
++    });
++    expect(
++      await world.events.getResumeByScope!(params.resumeScope, params.resumeId)
++    ).toEqual(receipt);
++    expect(
++      (await world.events.create(owner.runId, input.data, params)).event
++    ).toEqual(accepted.event);
++    const foreign = request(other, 'semantic input', params.resumeId);
++    await expect(
++      world.events.create(other.runId, foreign.data, params)
++    ).rejects.toMatchObject({ status: 422 });
++    expect(await readAcceptedHooks(world, other.runId)).toHaveLength(0);
++    expect(
++      await world.events.getResume!(other.runId, params.resumeId)
++    ).toBeUndefined();
++    const otherScope = { ...params, resumeScope: randomUUID() };
++    await world.events.create(other.runId, foreign.data, otherScope);
++    expect(
++      await world.events.getResumeByScope!(
++        otherScope.resumeScope,
++        params.resumeId
++      )
++    ).toMatchObject({
++      runId: other.runId,
++      resumeScope: otherScope.resumeScope,
++    });
++    expect(
++      await world.events.getResumeByScope!(params.resumeScope, params.resumeId)
++    ).toEqual(receipt);
++  });
++
++  it('keeps receipts independently of run metadata but cannot attest absence after event purge', async () => {
++    const hook = await createAcceptanceFixture(world);
++    const input = request(hook);
++    const params = { ...input.params, resumeScope: randomUUID() };
++    const accepted = await world.events.create(hook.runId, input.data, params);
++    await pool.query('DELETE FROM workflow.workflow_runs WHERE id = $1', [hook.runId]);
++    expect(await world.events.getResumeByScope!(params.resumeScope, params.resumeId))
++      .toMatchObject({ runId: hook.runId, eventId: accepted.event.eventId });
++    // Destructive maintenance is demonstrated only on this fresh disposable fixture.
++    // The native API has no expired-receipt variant, so hosts must prohibit retries
++    // once the event retention guarantee has been broken.
++    await pool.query('DELETE FROM workflow.workflow_events WHERE run_id = $1 AND id = $2',
++      [hook.runId, accepted.event.eventId]);
++    expect(await world.events.getResumeByScope!(params.resumeScope, params.resumeId)).toBeUndefined();
++  });
++
++  it('atomically chooses one scoped owner across concurrently writing runs', async () => {
++    const hooks = await Promise.all([
++      createAcceptanceFixture(world),
++      createAcceptanceFixture(world),
++    ]);
++    const names = hooks.map(() => `scope-${randomUUID()}`);
++    const pools = names.map(
++      (application_name) =>
++        new Pool({ connectionString, application_name, max: 1 })
++    );
++    const writers = pools.map((pool) => createWorld({ pool }));
++    const input = request(hooks[0]);
++    const params = { ...input.params, resumeScope: randomUUID() };
++    const barrier = await pool.connect();
++    let pending: ReturnType<typeof Promise.allSettled> | undefined;
++    try {
++      await barrier.query('BEGIN');
++      await barrier.query(
++        'SELECT id FROM workflow.workflow_runs WHERE id = ANY($1::varchar[]) ORDER BY id FOR UPDATE',
++        [hooks.map((hook) => hook.runId)]
++      );
++      pending = Promise.allSettled(
++        writers.map((writer, i) =>
++          writer.events.create(hooks[i].runId, request(hooks[i]).data, params)
++        )
++      );
++      await Promise.all(names.map(waitBlocked));
++      await barrier.query('COMMIT');
++      const results = await pending;
++      expect(
++        results.filter((result) => result.status === 'fulfilled')
++      ).toHaveLength(1);
++      const rejected = results.find((result) => result.status === 'rejected');
++      expect(rejected?.status).toBe('rejected');
++      if (rejected?.status !== 'rejected')
++        throw new Error('Expected one rejected scope claim');
++      expect(WorkflowWorldError.is(rejected.reason)).toBe(true);
++      expect(rejected.reason).toMatchObject({ status: 422 });
++      const winner = results.findIndex(
++        (result) => result.status === 'fulfilled'
++      );
++      const loser = 1 - winner;
++      expect(
++        await world.events.getResumeByScope!(
++          params.resumeScope,
++          params.resumeId
++        )
++      ).toMatchObject({ runId: hooks[winner].runId });
++      expect(
++        await world.events.getResume!(hooks[loser].runId, params.resumeId)
++      ).toBeUndefined();
++      expect(await readAcceptedHooks(world, hooks[winner].runId)).toHaveLength(
++        1
++      );
++      expect(await readAcceptedHooks(world, hooks[loser].runId)).toHaveLength(
++        0
++      );
++      const log = await world.events.list({ runId: hooks[loser].runId });
++      expect(log.data.map((event) => eventIdToSlot(event.eventId))).toEqual(
++        log.data.map((_, i) => i + 1)
++      );
++    } finally {
++      await barrier.query('ROLLBACK');
++      barrier.release();
++      await pending;
++      await Promise.all(writers.map((writer) => writer.close!()));
++      await Promise.all(pools.map((pool) => pool.end()));
++    }
++  }, 30_000);
++
++  // Observe real lock waits, not elapsed-time guesses or mocked transactions.
++  async function waitBlocked(applicationName: string) {
++    const deadline = Date.now() + 10_000;
++    while (Date.now() < deadline) {
++      const result = await pool.query(
++        'SELECT 1 FROM pg_stat_activity WHERE application_name = $1 AND cardinality(pg_blocking_pids(pid)) > 0',
++        [applicationName]
++      );
++      if (result.rowCount) return;
++      await new Promise((resolve) => setTimeout(resolve, 10));
++    }
++    throw new Error(`No lock barrier reached for ${applicationName}`);
++  }
++
++  for (const lifecycle of ['hook_disposed', 'run_completed'] as const) {
++    for (const acceptanceFirst of [true, false]) {
++      it(`${lifecycle}: ${acceptanceFirst ? 'acceptance' : 'lifecycle'} wins a controlled race and replay survives closure`, async () => {
++        const hook = await createAcceptanceFixture(world);
++        const earlier = request(hook);
++        const canonical = await world.events.create(
++          hook.runId,
++          earlier.data,
++          earlier.params
++        );
++        const input = request(hook);
++        const acceptName = `accept-${randomUUID()}`;
++        const finishName = `finish-${randomUUID()}`;
++        const acceptPool = new Pool({
++          connectionString,
++          max: 1,
++          application_name: acceptName,
++        });
++        const finishPool = new Pool({
++          connectionString,
++          max: 1,
++          application_name: finishName,
++        });
++        const accepter = createWorld({ pool: acceptPool });
++        const finisher = createWorld({ pool: finishPool });
++        const barrier = await pool.connect();
++        let accepting:
++          | Promise<
++              PromiseSettledResult<
++                Awaited<ReturnType<World['events']['create']>>
++              >
++            >
++          | undefined;
++        let finishing:
++          | Promise<
++              PromiseSettledResult<
++                Awaited<ReturnType<World['events']['create']>>
++              >
++            >
++          | undefined;
++        const settle = <T>(promise: Promise<T>) =>
++          Promise.allSettled([promise]).then(([result]) => result);
++        try {
++          await barrier.query('BEGIN');
++          // Hold the hook to park acceptance after its run lock. For a terminal
++          // winner, hold the run so completion queues ahead of acceptance.
++          const table =
++            lifecycle === 'run_completed' && !acceptanceFirst
++              ? 'workflow_runs'
++              : 'workflow_hooks';
++          const column = table === 'workflow_runs' ? 'id' : 'hook_id';
++          await barrier.query(
++            `SELECT 1 FROM workflow.${table} WHERE ${column} = $1 FOR UPDATE`,
++            [table === 'workflow_runs' ? hook.runId : hook.hookId]
++          );
++          const accept = () =>
++            settle(
++              accepter.events.create(hook.runId, input.data, input.params)
++            );
++          const finish = () =>
++            settle(
++              finisher.events.create(
++                hook.runId,
++                lifecycle === 'hook_disposed'
++                  ? { eventType: lifecycle, correlationId: hook.hookId }
++                  : {
++                      eventType: lifecycle,
++                      eventData: { output: new Uint8Array() },
++                    }
++              )
++            );
++          if (acceptanceFirst) {
++            accepting = accept();
++            await waitBlocked(acceptName);
++            finishing = finish();
++            await waitBlocked(finishName);
++          } else {
++            finishing = finish();
++            await waitBlocked(finishName);
++            accepting = accept();
++            await waitBlocked(acceptName);
++          }
++          await barrier.query('COMMIT');
++          const accepted = await accepting;
++          expect((await finishing).status).toBe('fulfilled');
++          expect(accepted.status).toBe(
++            acceptanceFirst ? 'fulfilled' : 'rejected'
++          );
++          const replay = await world.events.create(
++            hook.runId,
++            earlier.data,
++            earlier.params
++          );
++          expect(replay.event).toEqual(canonical.event);
++          expect(
++            await world.events.getResume!(hook.runId, earlier.params.resumeId)
++          ).toMatchObject({ eventId: canonical.event!.eventId });
++          expect(await readAcceptedHooks(world, hook.runId)).toHaveLength(
++            acceptanceFirst ? 2 : 1
++          );
++          const fresh = request(hook);
++          await expect(
++            world.events.create(hook.runId, fresh.data, fresh.params)
++          ).rejects.toThrow();
++          if (accepted.status === 'fulfilled') {
++            const events = (await world.events.list({ runId: hook.runId }))
++              .data;
++            expect(
++              events.findIndex(
++                (event) => event.eventId === accepted.value.event!.eventId
++              )
++            ).toBeLessThan(
++              events.findIndex((event) => event.eventType === lifecycle)
++            );
++            expect(
++              (await world.events.create(hook.runId, input.data, input.params))
++                .event
++            ).toEqual(accepted.value.event);
++          }
++        } finally {
++          await barrier.query('ROLLBACK');
++          barrier.release();
++          await Promise.all([accepting, finishing]);
++          await Promise.all([accepter.close!(), finisher.close!()]);
++          await Promise.all([acceptPool.end(), finishPool.end()]);
++        }
++      }, 30_000);
++    }
++  }
++});
+diff --git a/packages/world/src/events.ts b/packages/world/src/events.ts
+index a3c192d..6ffc963 100644
+--- a/packages/world/src/events.ts
++++ b/packages/world/src/events.ts
+@@ -712,6 +712,8 @@ export interface CreateEventParams {
+    * alongside {@link resumeId}.
+    */
+   resumePayloadDigest?: string;
++  /** Optional host-derived namespace with global (scope, resumeId) uniqueness. */
++  resumeScope?: string;
+   /**
+    * Marks a `step_created` create as the queue consumer's re-ensure of a
+    * resilient step dispatch (a step message carrying `stepInput`, see
+@@ -1057,6 +1059,17 @@ export interface GetEventParams {
+   resolveData?: ResolveData;
+ }
+ 
++/** Durable acceptance of one keyed hook input, retained with its event log. */
++export interface HookResumeReceipt {
++  runId: string;
++  eventId: string;
++  hookId: string;
++  token: string;
++  resumeId: string;
++  payloadDigest: string;
++  resumeScope?: string;
++}
++
+ export interface ListEventsParams {
+   runId: string;
+   /** Omit `limit` to return every remaining event. */
+diff --git a/packages/world/src/interfaces.ts b/packages/world/src/interfaces.ts
+index e688353..03f0977 100644
+--- a/packages/world/src/interfaces.ts
++++ b/packages/world/src/interfaces.ts
+@@ -12,6 +12,7 @@ import type {
+   EventBatchResult,
+   EventResult,
+   GetEventParams,
++  HookResumeReceipt,
+   ListEventsByCorrelationIdParams,
+   ListEventsParams,
+   RunCreatedEventRequest,
+@@ -128,6 +129,113 @@ export interface Streamer {
+   };
+ }
+ 
++/** Durable event log operations shared by World implementations. */
++export interface EventStorage {
++  /**
++   * Create a run_created event to start a new workflow run.
++   * The runId may be provided by the client or left as null for the server to generate.
++   *
++   * @param runId - Client-generated runId, or null for server-generated
++   * @param data - The run_created event data
++   * @param params - Optional parameters for event creation
++   * @returns Promise resolving to the created event and run entity
++   */
++  create<T extends RunCreatedEventRequest>(
++    runId: string | null,
++    data: T,
++    params?: CreateEventParams
++  ): Promise<EventResult<T['eventType']>>;
++
++  /**
++   * Create an event for an existing workflow run and atomically update the entity.
++   * Returns both the event and the affected entity (run/step/hook).
++   *
++   * @param runId - The workflow run ID (required for all events except run_created)
++   * @param data - The event to create
++   * @param params - Optional parameters for event creation
++   * @returns Promise resolving to the created event and affected entity
++   */
++  create<T extends CreateEventRequest>(
++    runId: string,
++    data: T,
++    params?: CreateEventParams
++  ): Promise<EventResult<T['eventType']>>;
++
++  /**
++   * OPTIONAL batch write: append an ordered list of events to the run's
++   * log in one durable, atomic-per-attempt write, with a per-event outcome
++   * for each (see {@link BatchEventItemResult}). The events land in request
++   * order at consecutive slots. A concurrent writer may push the whole
++   * batch to slots above the caller's view of the log; no skipped-event
++   * report accompanies the result, so a position-tracking caller compares
++   * the committed slots against its expectation and reloads the log to
++   * observe what landed in between. Its local view stays a strict PREFIX
++   * of the log (never a hole), so replaying it stays correct and the
++   * next reload self-corrects.
++   *
++   * Presence of the method IS the capability declaration: the core runtime
++   * batches only when the World implements it (and the run's spec version
++   * supports slot identity); absent, every write takes the single-event
++   * `create` path unchanged. A World must implement it with real
++   * atomicity per attempt (a lost race must leave nothing behind) or not
++   * implement it at all.
++   *
++   * Size limits are the caller's problem: Worlds enforce their own caps
++   * (world-vercel enforces an event-count cap and a byte budget over frame
++   * meta plus inline-bound payloads) and reject an oversized batch with a
++   * request-level error. The core fold sizes its chunks accordingly.
++   *
++   * Not expressible in a batch (Worlds reject the whole batch with a
++   * request-level error): `run_created`, `run_started`, `run_cancelled`,
++   * `hook_created`, `hook_disposed`, `attr_set`, and more events targeting
++   * one entity than a single write can express (the one legal combination
++   * is `step_created` followed by `step_started` for the same step, which
++   * creates the step born-running: the step's input MUST ride the
++   * `step_created`; a `step_started` carrying a payload rejects the whole
++   * batch). Events outside this list keep their own ordering requirements:
++   * a caller mixing a batch with single writes (hook or attribute events)
++   * owns those barriers itself: the core runtime never batches a
++   * suspension that carries hook or attribute writes.
++   */
++  createBatch?(
++    runId: string,
++    events: BatchEventRequest[],
++    params?: CreateEventBatchParams
++  ): Promise<EventBatchResult>;
++
++  get(runId: string, eventId: string, params?: GetEventParams): Promise<Event>;
++
++  /**
++   * Keyed acceptance lookup, including after hook disposal or run completion.
++   * Presence attests that events.create atomically deduplicates hook_received
++   * by (runId, resumeId), rejects a different hook/token/digest, and returns
++   * the original event on an identical retry before checking hook liveness.
++   * Authorization belongs to the host; keys never grant access to a run.
++   * Receipts expire with their native event log, not with the live hook.
++   * Hosts must retain events for the entire input recovery lifetime. There is
++   * no expiry watermark: undefined cannot distinguish never accepted from a
++   * purged event. Block automatic retries across destructive purge/restore;
++   * lookup errors and timeouts never establish absence.
++   */
++  getResume?(
++    runId: string,
++    resumeId: string
++  ): Promise<HookResumeReceipt | undefined>;
++
++  /** Resolve an accepted input without guessing its run. Hosts must authenticate
++   * and derive the scope; the scope itself grants no authority. Presence attests
++   * global uniqueness of (resumeScope, resumeId) in the native event log. */
++  getResumeByScope?(
++    resumeScope: string,
++    resumeId: string
++  ): Promise<HookResumeReceipt | undefined>;
++
++  list(params: ListEventsParams): Promise<PaginatedResponse<Event>>;
++  listByCorrelationId(
++    params: ListEventsByCorrelationIdParams
++  ): Promise<PaginatedResponse<Event>>;
++}
++
+ /**
+  * Storage interface for workflow data.
+  *
+@@ -353,90 +461,7 @@ export interface Storage {
+    * position out earlier, and can therefore let an event land behind one a
+    * reader has already passed, breaks the property every replay depends on.
+    */
+-  events: {
+-    /**
+-     * Create a run_created event to start a new workflow run.
+-     * The runId may be provided by the client or left as null for the server to generate.
+-     *
+-     * @param runId - Client-generated runId, or null for server-generated
+-     * @param data - The run_created event data
+-     * @param params - Optional parameters for event creation
+-     * @returns Promise resolving to the created event and run entity
+-     */
+-    create<T extends RunCreatedEventRequest>(
+-      runId: string | null,
+-      data: T,
+-      params?: CreateEventParams
+-    ): Promise<EventResult<T['eventType']>>;
+-
+-    /**
+-     * Create an event for an existing workflow run and atomically update the entity.
+-     * Returns both the event and the affected entity (run/step/hook).
+-     *
+-     * @param runId - The workflow run ID (required for all events except run_created)
+-     * @param data - The event to create
+-     * @param params - Optional parameters for event creation
+-     * @returns Promise resolving to the created event and affected entity
+-     */
+-    create<T extends CreateEventRequest>(
+-      runId: string,
+-      data: T,
+-      params?: CreateEventParams
+-    ): Promise<EventResult<T['eventType']>>;
+-
+-    /**
+-     * OPTIONAL batch write: append an ordered list of events to the run's
+-     * log in one durable, atomic-per-attempt write, with a per-event outcome
+-     * for each (see {@link BatchEventItemResult}). The events land in request
+-     * order at consecutive slots. A concurrent writer may push the whole
+-     * batch to slots above the caller's view of the log; no skipped-event
+-     * report accompanies the result, so a position-tracking caller compares
+-     * the committed slots against its expectation and reloads the log to
+-     * observe what landed in between. Its local view stays a strict PREFIX
+-     * of the log (never a hole), so replaying it stays correct and the
+-     * next reload self-corrects.
+-     *
+-     * Presence of the method IS the capability declaration: the core runtime
+-     * batches only when the World implements it (and the run's spec version
+-     * supports slot identity); absent, every write takes the single-event
+-     * `create` path unchanged. A World must implement it with real
+-     * atomicity per attempt (a lost race must leave nothing behind) or not
+-     * implement it at all.
+-     *
+-     * Size limits are the caller's problem: Worlds enforce their own caps
+-     * (world-vercel enforces an event-count cap and a byte budget over frame
+-     * meta plus inline-bound payloads) and reject an oversized batch with a
+-     * request-level error. The core fold sizes its chunks accordingly.
+-     *
+-     * Not expressible in a batch (Worlds reject the whole batch with a
+-     * request-level error): `run_created`, `run_started`, `run_cancelled`,
+-     * `hook_created`, `hook_disposed`, `attr_set`, and more events targeting
+-     * one entity than a single write can express (the one legal combination
+-     * is `step_created` followed by `step_started` for the same step, which
+-     * creates the step born-running: the step's input MUST ride the
+-     * `step_created`; a `step_started` carrying a payload rejects the whole
+-     * batch). Events outside this list keep their own ordering requirements:
+-     * a caller mixing a batch with single writes (hook or attribute events)
+-     * owns those barriers itself: the core runtime never batches a
+-     * suspension that carries hook or attribute writes.
+-     */
+-    createBatch?(
+-      runId: string,
+-      events: BatchEventRequest[],
+-      params?: CreateEventBatchParams
+-    ): Promise<EventBatchResult>;
+-
+-    get(
+-      runId: string,
+-      eventId: string,
+-      params?: GetEventParams
+-    ): Promise<Event>;
+-
+-    list(params: ListEventsParams): Promise<PaginatedResponse<Event>>;
+-    listByCorrelationId(
+-      params: ListEventsByCorrelationIdParams
+-    ): Promise<PaginatedResponse<Event>>;
+-  };
++  events: EventStorage;
+ 
+   hooks: {
+     /**

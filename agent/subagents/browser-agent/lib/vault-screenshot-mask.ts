@@ -1,4 +1,4 @@
-import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 
 export async function withVaultScreenshotMask<T>(
   sessionId: string,
@@ -57,7 +57,7 @@ for (const currentContext of browser.contexts()) {
   }
 }
 return true;`;
-  const result = await kernel.browsers.playwright.execute(
+  const result = await getKernel().browsers.playwright.execute(
     sessionId,
     { code, timeout_sec: 10 },
     { signal }

@@ -1,34 +1,39 @@
 import type { ToolContext } from "eve/tools";
-import { z } from "zod";
+import { Option, Schema } from "effect";
+import { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
+import { ScheduleOwnerInactive } from "../../../server/schedules/channel-owner";
 import type {
   createScheduledAgentJob,
   listScheduledAgentJobs,
 } from "@db/services/scheduled-agent-jobs";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 
 export function scheduleOwner(context: ToolContext) {
   const auth = context.session.auth.current;
-  if (auth?.principalType !== "user") {
-    throw new Error("An authenticated user is required to manage schedules.");
-  }
-  const conversationChannel = z
-    .enum(["eve", "linq"])
-    .parse(auth.attributes.conversationChannel);
+  if (auth?.principalType !== "user") throw new ScheduleOwnerInactive();
+  const conversationChannel = Schema.decodeUnknownSync(
+    scheduledConversationChannelSchema
+  )(auth.attributes.conversationChannel);
+  const scope = scopeFromPrincipal(auth);
   const conversationId =
     conversationChannel === "eve"
       ? context.session.id
-      : z.string().startsWith("linq:").parse(auth.attributes.conversationId);
-  return {
-    conversation: { conversationChannel, conversationId },
-    scope: scopeFromPrincipal(auth),
-  };
+      : Schema.decodeUnknownSync(
+          conversationChannel === "linq"
+            ? Schema.String.check(Schema.isStartsWith("linq:"))
+            : Schema.String.check(Schema.isUUID())
+        )(auth.attributes.conversationId);
+  return { conversation: { conversationChannel, conversationId }, scope };
 }
 
 export function scheduleReplyAnchor(context: ToolContext) {
   const auth = context.session.auth.current;
   if (auth?.attributes.conversationChannel !== "linq") return undefined;
-  const messageId = z.string().min(1).safeParse(auth.attributes.linqMessageId);
-  return messageId.success ? messageId.data : undefined;
+  return Option.getOrUndefined(
+    Schema.decodeUnknownOption(Schema.NonEmptyString)(
+      auth.attributes.linqMessageId
+    )
+  );
 }
 
 export function scheduleSummary(
@@ -56,6 +61,7 @@ export function scheduleListSummary(
       ? {
           completedAt: latestRun.completedAt?.toISOString() ?? null,
           id: latestRun.id,
+          pendingInputRequests: latestRun.pendingInputRequests,
           lastError: latestRun.lastError,
           reportStatus: latestRun.reportStatus,
           scheduledFor: latestRun.scheduledFor.toISOString(),

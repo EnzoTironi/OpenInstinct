@@ -6,7 +6,8 @@ import {
   routeAuth,
   UnauthenticatedError,
 } from "eve/channels/auth";
-import { z } from "zod";
+import { Effect, Result, Schedule, Schema } from "effect";
+import { AuthUnavailable } from "@db/services/auth";
 import { isSessionOwned } from "@db/services/sessions";
 import {
   accessScopeForUser,
@@ -26,14 +27,14 @@ const authenticate: Parameters<typeof routeAuth>[1] = [
   async (request) => {
     const identity = await requestIdentityFromRequest(request);
     if (!identity) return null;
-    const { phoneNumber, scope } = identity;
+    const { scope } = identity;
 
     await requireOwnedRouteSubject(scope, request);
 
     return {
       attributes: {
+        authSessionId: identity.sessionId,
         conversationChannel: "eve",
-        phoneNumber,
         workspaceId: scope.workspaceId,
       },
       authenticator: "authjs",
@@ -52,8 +53,8 @@ const authenticate: Parameters<typeof routeAuth>[1] = [
       ...local,
       attributes: {
         ...local.attributes,
+        authSessionId: "browser-benchmark",
         conversationChannel: "eve",
-        phoneNumber: "+15555550100",
         workspaceId: scope.workspaceId,
       },
       principalId: scope.userId,
@@ -74,7 +75,9 @@ const channel = eveChannel({
     async "action.result"(event, _channel, session) {
       if (
         event.status === "completed" &&
-        sendMessageToolResultSchema.safeParse(event.result).success
+        Result.isSuccess(
+          Schema.decodeUnknownResult(sendMessageToolResultSchema)(event.result)
+        )
       ) {
         await finalizeScheduledReportDelivery(session);
       }
@@ -140,7 +143,12 @@ async function requireOwnedRouteSubject(scope: AccessScope, request: Request) {
   const { pathname } = new URL(request.url);
   if (subjectFreeRoutes.has(pathname)) return;
   const sessionId = sessionIdFromPath(pathname);
-  if (!sessionId || !(await waitForSessionOwnership(scope, sessionId))) {
+  if (
+    !sessionId ||
+    !(await Effect.runPromise(waitForSessionOwnership(scope, sessionId), {
+      signal: request.signal,
+    }))
+  ) {
     throw new ForbiddenError({ message: "Session not found." });
   }
 }
@@ -177,21 +185,24 @@ function decodePathSegment(segment: string) {
 async function requestIdentityFromRequest(request: Request) {
   const session = await getAuthSession(request.headers);
   if (!session) return undefined;
-  const phoneNumber = z.string().safeParse(session.user.phoneNumber);
-  if (!phoneNumber.success) return undefined;
-
   return {
-    phoneNumber: phoneNumber.data,
     scope: accessScopeForUser(`better-auth:${session.user.id}`),
+    sessionId: session.session.id,
   };
 }
 
-async function waitForSessionOwnership(scope: AccessScope, sessionId: string) {
-  /* oxlint-disable eslint/no-await-in-loop -- Ownership visibility is checked by a bounded sequential retry loop. */
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    if (await isSessionOwned(scope, sessionId)) return true;
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  /* oxlint-enable eslint/no-await-in-loop */
-  return false;
-}
+const waitForSessionOwnership = Effect.fn("waitForSessionOwnership")(function* (
+  scope: AccessScope,
+  sessionId: string
+) {
+  return yield* Effect.tryPromise({
+    try: () => isSessionOwned(scope, sessionId),
+    catch: () => new AuthUnavailable(),
+  }).pipe(
+    Effect.repeat({
+      while: (owned) => !owned,
+      times: 49,
+      schedule: Schedule.spaced("100 millis"),
+    })
+  );
+});

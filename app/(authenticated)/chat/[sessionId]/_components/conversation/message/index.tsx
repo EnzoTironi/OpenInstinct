@@ -91,7 +91,16 @@ function userVisibleParts(
     );
   }
 
-  return sentMessageParts ?? [];
+  const controls = message.parts.filter((part) =>
+    part.type === "authorization"
+      ? part.state === "required"
+      : part.type === "dynamic-tool" &&
+        part.toolMetadata?.eve?.inputRequest !== undefined &&
+        part.toolMetadata.eve.inputResponse === undefined &&
+        (part.state === "input-available" ||
+          part.state === "approval-requested")
+  );
+  return [...(sentMessageParts ?? []), ...controls];
 }
 
 const timestampFormatter = new Intl.DateTimeFormat(undefined, {

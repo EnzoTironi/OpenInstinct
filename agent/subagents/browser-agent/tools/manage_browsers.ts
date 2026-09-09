@@ -14,7 +14,7 @@ import {
   withBrowserProfileWriteLock,
 } from "@db/services/browsers";
 import { recordBrowserTraceDomains } from "@db/services/browser-traces";
-import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
 import { disposeBrowserLoopSession } from "../lib/semantic-loop";
 import { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
@@ -69,7 +69,7 @@ const manageBrowsers = defineTool({
               );
             }
           }
-          const browser = await kernel.browsers.create(
+          const browser = await getKernel().browsers.create(
             {
               profile: {
                 id: profile.id,
@@ -94,8 +94,8 @@ const manageBrowsers = defineTool({
               workerSessionId: context.session.id,
             });
           } catch (error) {
-            await kernel.browsers
-              .deleteByID(browser.session_id, { signal })
+            await getKernel()
+              .browsers.deleteByID(browser.session_id, { signal })
               .catch(() => undefined);
             throw error;
           }
@@ -119,7 +119,7 @@ const manageBrowsers = defineTool({
         const browsers = await Promise.all(
           records.map(async ({ sessionId }) => {
             try {
-              const browser = await kernel.browsers.retrieve(
+              const browser = await getKernel().browsers.retrieve(
                 sessionId,
                 { include_deleted: includeDeleted },
                 { signal }
@@ -162,7 +162,11 @@ const manageBrowsers = defineTool({
         await requireOwnedBrowserSession(scope, sessionId);
         const viewport = browserViewport(input);
         const browser = viewport
-          ? await kernel.browsers.update(sessionId, { viewport }, { signal })
+          ? await getKernel().browsers.update(
+              sessionId,
+              { viewport },
+              { signal }
+            )
           : await retrieveBrowser(scope, sessionId, signal);
         return lifecycleResult(browser);
       }
@@ -176,8 +180,8 @@ const manageBrowsers = defineTool({
           signal
         );
         await disposeBrowserLoopSession(sessionId);
-        await kernel.browsers
-          .deleteByID(sessionId, { signal })
+        await getKernel()
+          .browsers.deleteByID(sessionId, { signal })
           .catch((cause: unknown) => {
             if (!isNotFoundError(cause)) throw cause;
           });
@@ -202,7 +206,7 @@ async function retrieveBrowser(
   signal?: AbortSignal
 ) {
   try {
-    return await kernel.browsers.retrieve(sessionId, {}, { signal });
+    return await getKernel().browsers.retrieve(sessionId, {}, { signal });
   } catch (error) {
     if (!isNotFoundError(error)) throw error;
     await disposeBrowserLoopSession(sessionId);
@@ -269,16 +273,16 @@ async function ensureWorkspaceProfile(
 ) {
   const name = kernelProfileNameForWorkspace(workspaceId);
   try {
-    return await kernel.profiles.retrieve(name, { signal });
+    return await getKernel().profiles.retrieve(name, { signal });
   } catch (error) {
     if (!(error instanceof NotFoundError)) throw error;
   }
 
   try {
-    return await kernel.profiles.create({ name }, { signal });
+    return await getKernel().profiles.create({ name }, { signal });
   } catch (error) {
     if (!(error instanceof ConflictError)) throw error;
-    return kernel.profiles.retrieve(name, { signal });
+    return getKernel().profiles.retrieve(name, { signal });
   }
 }
 
@@ -287,7 +291,7 @@ async function findActiveProfileWriter(
   signal: AbortSignal | undefined
 ) {
   if (!profileId) return undefined;
-  for await (const browser of kernel.browsers.list(
+  for await (const browser of getKernel().browsers.list(
     { query: profileId, status: "active" },
     { signal }
   )) {

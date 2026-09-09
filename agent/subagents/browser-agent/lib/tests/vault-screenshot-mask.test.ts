@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
-  kernel: { browsers: { playwright: { execute: mocks.execute } } },
+  getKernel: () => ({ browsers: { playwright: { execute: mocks.execute } } }),
 }));
 
 describe("Vault screenshot masking", () => {

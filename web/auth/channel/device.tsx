@@ -1,0 +1,113 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type {
+  deviceBoundSchema,
+  deviceRequestSchema,
+} from "@shared/identity/channel-auth";
+import { Effect } from "effect";
+import {
+  bindNativeBrowser,
+  resumeNativeBrowser,
+  channelFailureMessage,
+  channelHttpError,
+  type ChannelAuthorizationError,
+} from "./client";
+import {
+  PendingAuthorization,
+  useAuthorizationRequest,
+  SignInAgain,
+} from "./form";
+import { Button } from "@web/components/ui/button";
+
+export function NativeDeviceForm({
+  id,
+  purpose,
+}: typeof deviceRequestSchema.Type) {
+  const [bound, setBound] = useState<typeof deviceBoundSchema.Type>();
+  const action = useAuthorizationRequest();
+  const [loading, setLoading] = useState(true);
+  const [resumeError, setResumeError] = useState<ChannelAuthorizationError>();
+  useEffect(() => {
+    const controller = new AbortController();
+    void Effect.runPromise(
+      resumeNativeBrowser({ id, purpose }).pipe(
+        Effect.match({
+          onSuccess: setBound,
+          onFailure: (failure) => {
+            if (!window.location.hash) setResumeError(failure);
+          },
+        })
+      ),
+      { signal: controller.signal }
+    )
+      .catch(() => {
+        if (!controller.signal.aborted) setResumeError(channelHttpError(0));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [id, purpose]);
+  if (loading) return <output>Checking this browser…</output>;
+  if (resumeError)
+    return (
+      <div className="space-y-4">
+        <p role="alert">{channelFailureMessage(resumeError, purpose)}</p>
+        {purpose === "link" && resumeError.status === 401 ? (
+          <SignInAgain callbackUrl="/account" />
+        ) : null}
+      </div>
+    );
+  if (bound)
+    return (
+      <PendingAuthorization
+        challenge={bound}
+        purpose={bound.purpose}
+        callbackUrl={bound.purpose === "link" ? "/account" : "/"}
+        onRestart={() => {
+          window.location.assign(purpose === "link" ? "/account" : "/sign-in");
+        }}
+      />
+    );
+  return (
+    <div className="space-y-4">
+      <p>
+        {purpose === "link"
+          ? "Use the account recently signed in to this browser, then return to your messenger conversation to confirm the association. If your messenger belongs to another account, the request will be refused. Accounts and their data are not combined."
+          : "Bind this browser, then return to your messenger conversation and tell the assistant you are ready. You will be asked to approve this browser’s sign-in there."}
+      </p>
+      <Button
+        type="button"
+        disabled={action.busy}
+        onClick={() => {
+          action.run(
+            bindNativeBrowser({
+              id,
+              purpose,
+              token: window.location.hash.slice(1),
+            }),
+            (result) => {
+              window.history.replaceState(
+                null,
+                "",
+                `${window.location.pathname}?id=${encodeURIComponent(id)}&purpose=${purpose}`
+              );
+              setBound(result);
+            }
+          );
+        }}
+      >
+        {action.busy ? "Binding browser…" : "Use this browser"}
+      </Button>
+      {action.error ? (
+        <p role="alert">{channelFailureMessage(action.error, purpose)}</p>
+      ) : null}
+      {purpose === "link" && action.error?.status === 401 ? (
+        <SignInAgain callbackUrl="/account" />
+      ) : null}
+    </div>
+  );
+}

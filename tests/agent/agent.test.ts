@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import type { DynamicResolveContext } from "eve";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { isScheduledAgentRunLeaseActive } from "@db/services/scheduled-agent-run-leases";
@@ -43,7 +44,7 @@ describe("root agent model resolution", () => {
     );
     expect(services.getModel).toHaveBeenCalledExactlyOnceWith({
       userId: "user-1",
-      workspaceId: "workspace-1",
+      workspaceId: accessScopeForUser("user-1").workspaceId,
     });
     expect(model).toBe("openai/gpt-5.6-sol-fast");
   });
@@ -68,7 +69,7 @@ function scheduledWorkerContext(): DynamicResolveContext {
           attributes: {
             scheduledRunId: runId,
             scheduledRunLeaseToken: retryLeaseToken,
-            workspaceId: "workspace-1",
+            workspaceId: accessScopeForUser("user-1").workspaceId,
           },
           authenticator: "scheduled-worker",
           principalId: "user-1",
@@ -78,7 +79,7 @@ function scheduledWorkerContext(): DynamicResolveContext {
           attributes: {
             scheduledRunId: runId,
             scheduledRunLeaseToken: oldLeaseToken,
-            workspaceId: "workspace-1",
+            workspaceId: accessScopeForUser("user-1").workspaceId,
           },
           authenticator: "scheduled-worker",
           principalId: "user-1",

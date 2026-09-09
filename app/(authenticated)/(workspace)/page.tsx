@@ -1,113 +1,107 @@
-import {
-  BotIcon,
-  CloudIcon,
-  ImageIcon,
-  MailIcon,
-  MessageSquareIcon,
-} from "lucide-react";
+import { BotIcon, MailIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  getTokenResponse,
-  NoValidTokenError,
-  UserAuthorizationRequiredError,
-} from "@vercel/connect";
-import { z } from "zod";
+import { Effect, Result } from "effect";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
-import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import { getGatewayModel } from "@db/services/settings";
-import { env } from "@shared/environment";
-import { googleWorkspaceTokenParams } from "@shared/google-workspace/connection";
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
+import { serverRuntime } from "../../../server/runtime";
+import { readGoogleWorkspaceConnection } from "../../../server/google-workspace";
 import { requireRequestScope } from "@web/auth/request-scope";
 import { GoogleWorkspaceAction } from "./_components/google-workspace-action";
+import { HomeOverview } from "./_components/home-overview";
 import { ModelSelector } from "./_components/model-selector";
 
 export default async function Page({ searchParams }: PageProps<"/">) {
-  const google = (await searchParams).google;
+  const params = await searchParams;
+  const google = params.google;
+  const returnTo = googleWorkspaceReturnTo(params.returnTo);
   const scope = await requireRequestScope();
   const [googleWorkspace, gatewayModel] = await Promise.all([
-    readGoogleWorkspaceConnection(scope.userId),
+    serverRuntime.runPromise(
+      readGoogleWorkspaceConnection(scope).pipe(Effect.result)
+    ),
     getGatewayModel(scope),
   ]);
-  const browserReady = true;
-  const imageStorageReady = Boolean(
-    env.BLOB_STORE_ID ?? env.BLOB_READ_WRITE_TOKEN
-  );
 
   return (
     <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="sr-only">Workspace</h1>
+      {returnTo !== "/" ? (
+        <Button
+          className="self-start"
+          nativeButton={false}
+          render={<Link href={returnTo} />}
+          variant="outline"
+        >
+          Return to conversation
+        </Button>
+      ) : null}
+      <HomeOverview />
 
       {google === "unavailable" ? (
         <Alert>
           <MailIcon />
-          <AlertTitle>Google Workspace unavailable</AlertTitle>
+          <AlertTitle>Google connection unavailable</AlertTitle>
           <AlertDescription>
-            This deployment does not have a working Google OAuth connector yet.
+            Your Google connection couldn’t be updated. You can return to your
+            conversation and keep chatting.
           </AlertDescription>
         </Alert>
       ) : null}
 
-      <ChannelsSection
-        browserReady={browserReady}
-        linqConfigured={env.LINQ_CONNECTOR !== undefined}
-        linqPhoneNumber={env.LINQ_PHONE_NUMBER}
-      />
-      <GoogleWorkspaceSection connection={googleWorkspace} />
+      {Result.isFailure(googleWorkspace) ? (
+        <Alert>
+          <MailIcon />
+          <AlertTitle>Couldn’t load your Google connection</AlertTitle>
+          <AlertDescription>Reload this page to try again.</AlertDescription>
+        </Alert>
+      ) : (
+        <GoogleWorkspaceSection
+          connection={googleWorkspace.success}
+          returnTo={returnTo}
+        />
+      )}
 
-      <WorkspaceSection headingId="connectors-heading" title="Infrastructure">
-        <div className="divide-y divide-border/50 border-y border-border/50">
-          <ConnectorRow
-            action={<Badge variant="success">Connected</Badge>}
-            description="Run isolated browsers in your Kernel account."
-            icon={<CloudIcon />}
-            label="Kernel browser"
-          />
-          <ConnectorRow
-            action={
-              <Badge variant={imageStorageReady ? "success" : "secondary"}>
-                {imageStorageReady ? "Connected" : "Setup required"}
-              </Badge>
-            }
-            description={
-              imageStorageReady
-                ? "Store browser images in a private Vercel Blob store."
-                : "Connect a private Vercel Blob store to share browser images."
-            }
-            icon={<ImageIcon />}
-            label="Vercel Blob"
-          />
+      <details className="rounded-lg border border-border/50 p-4">
+        <summary className="cursor-pointer type-label">
+          Advanced settings
+        </summary>
+        <div className="mt-3">
           <ConnectorRow
             action={<ModelSelector modelId={gatewayModel} />}
-            description={gatewayModel}
+            description="Choose the model used when this installation runs through AI Gateway."
             icon={<BotIcon />}
             label="AI Gateway model"
           />
         </div>
-      </WorkspaceSection>
+      </details>
     </div>
   );
 }
 
 function GoogleWorkspaceSection({
   connection,
+  returnTo,
 }: {
-  readonly connection?: GoogleWorkspaceConnection;
+  readonly connection: Effect.Success<
+    ReturnType<typeof readGoogleWorkspaceConnection>
+  >;
+  readonly returnTo: string;
 }) {
-  const state = connection?.state;
+  const state = connection.state;
   const description =
     state === "connected"
-      ? (connection?.accountLabel ?? "Gmail, Calendar, and Contacts connected.")
+      ? "Gmail, Calendar, and Contacts connected."
       : state === "unavailable"
-        ? "Attach a Vercel Connect Google OAuth connector to enable this."
+        ? "Google connections aren’t enabled on this installation yet."
         : "Gmail, Calendar, and Contacts through your Google account.";
 
   return (
     <WorkspaceSection headingId="connections-heading" title="Connections">
       <div className="divide-y divide-border/50 border-y border-border/50">
         <ConnectorRow
-          action={<GoogleWorkspaceAction state={state} />}
+          action={<GoogleWorkspaceAction returnTo={returnTo} state={state} />}
           description={description}
           icon={<MailIcon />}
           label="Google Workspace"
@@ -115,116 +109,6 @@ function GoogleWorkspaceSection({
       </div>
     </WorkspaceSection>
   );
-}
-
-interface GoogleWorkspaceConnection {
-  readonly accountLabel: string | null;
-  readonly state: "connected" | "disconnected" | "unavailable";
-}
-
-async function readGoogleWorkspaceConnection(
-  userId: string
-): Promise<GoogleWorkspaceConnection> {
-  try {
-    const response = await getTokenResponse(
-      env.GOOGLE_CONNECTOR_UID,
-      googleWorkspaceTokenParams(userId),
-      { forceRefresh: true }
-    );
-    const claims = z
-      .object({ email: z.string().optional() })
-      .safeParse(response.claims);
-    return {
-      accountLabel:
-        response.name ?? (claims.success ? (claims.data.email ?? null) : null),
-      state: "connected",
-    };
-  } catch (error) {
-    if (
-      error instanceof UserAuthorizationRequiredError ||
-      error instanceof NoValidTokenError
-    ) {
-      return { accountLabel: null, state: "disconnected" };
-    }
-    return { accountLabel: null, state: "unavailable" };
-  }
-}
-
-export function ChannelsSection({
-  browserReady,
-  linqConfigured,
-  linqPhoneNumber,
-}: {
-  readonly browserReady: boolean;
-  readonly linqConfigured: boolean;
-  readonly linqPhoneNumber?: string;
-}) {
-  return (
-    <WorkspaceSection headingId="channels-heading" title="Channels">
-      <div className="grid gap-2 sm:grid-cols-2">
-        {browserReady ? (
-          <Button
-            nativeButton={false}
-            render={<Link href="/chat" />}
-            variant="surface"
-          >
-            <MessageSquareIcon />
-            WebChat
-          </Button>
-        ) : (
-          <Button disabled variant="surface">
-            <MessageSquareIcon />
-            WebChat
-          </Button>
-        )}
-        {linqConfigured && linqPhoneNumber ? (
-          <Button
-            nativeButton={false}
-            render={
-              <a aria-label="Open iMessage" href={`sms:${linqPhoneNumber}`} />
-            }
-            variant="surface"
-          >
-            <MailIcon />
-            iMessage
-          </Button>
-        ) : (
-          <Button disabled variant="surface">
-            <MailIcon />
-            iMessage
-          </Button>
-        )}
-      </div>
-      <p className="type-caption text-muted-foreground">
-        {channelAvailabilityMessage({
-          browserReady,
-          linqConfigured,
-          linqPhoneNumber,
-        })}
-      </p>
-    </WorkspaceSection>
-  );
-}
-
-function channelAvailabilityMessage({
-  browserReady,
-  linqConfigured,
-  linqPhoneNumber,
-}: {
-  readonly browserReady: boolean;
-  readonly linqConfigured: boolean;
-  readonly linqPhoneNumber?: string;
-}) {
-  return [
-    browserReady
-      ? "WebChat is ready."
-      : "KERNEL_API_KEY is required to enable WebChat.",
-    linqConfigured && linqPhoneNumber
-      ? `iMessage opens ${linqPhoneNumber}.`
-      : linqConfigured
-        ? "Linq is connected. Use its assigned line to start an iMessage."
-        : "Set up Linq to enable iMessage.",
-  ].join(" ");
 }
 
 function WorkspaceSection({

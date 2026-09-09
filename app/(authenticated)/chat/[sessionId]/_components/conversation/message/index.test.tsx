@@ -90,14 +90,14 @@ describe("agent messages", () => {
     expect(markup).not.toContain("web_search");
   });
 
-  it("hides non-send_message controls in the iMessage projection", () => {
+  it("shows pending approval details and actions in the default projection", () => {
     const message = {
       id: "turn-2:assistant",
       metadata: { status: "streaming", turnId: "turn-2" },
       parts: [
         {
           approval: { id: "approval-1" },
-          input: { amount: 50, recipient: "Hidden recipient" },
+          input: { amount: 50, recipient: "Exact recipient" },
           state: "approval-requested",
           stepIndex: 0,
           toolCallId: "call-2",
@@ -133,10 +133,45 @@ describe("agent messages", () => {
       />
     );
 
-    expect(markup).not.toContain("Approve this action?");
-    expect(markup).not.toContain("Approve");
-    expect(markup).not.toContain("Cancel");
+    expect(markup).toContain("Approve this action?");
+    expect(markup).toContain("Approve");
+    expect(markup).toContain("Cancel");
     expect(markup).not.toContain("send_payment");
-    expect(markup).not.toContain("Hidden recipient");
+    expect(markup).toContain("Exact recipient");
+  });
+  it("shows authorization in the default view and removes the completed challenge", () => {
+    const challenge = {
+      type: "authorization",
+      state: "required",
+      name: "google-workspace",
+      displayName: "Google Workspace",
+      description: "Connect to create your event.",
+      stepIndex: 0,
+      turnId: "turn-auth",
+      authorization: { url: "https://example.com/connect", userCode: "ABCD" },
+    } as const;
+    const pending = renderAuthorizationPart(challenge);
+    expect(pending).toContain("Sign in with Google Workspace");
+    expect(pending).toContain('href="https://example.com/connect"');
+    expect(pending).toContain("ABCD");
+    expect(
+      renderAuthorizationPart({
+        ...challenge,
+        state: "completed",
+        outcome: "authorized",
+      })
+    ).toBe("");
   });
 });
+
+function renderAuthorizationPart(part: EveMessage["parts"][number]) {
+  return renderToStaticMarkup(
+    <AgentMessage
+      canRespond
+      isStreaming={false}
+      message={{ id: "auth-message", role: "assistant", parts: [part] }}
+      onInputResponses={() => undefined}
+      userVisibleOnly
+    />
+  );
+}

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Redacted } from "effect";
 
 const requiredEnvironment = {
   BETTER_AUTH_SECRET: "test-auth-secret-0123456789abcdefghijklmnop",
@@ -18,6 +19,8 @@ describe("environment", () => {
     }
     vi.stubEnv("LINQ_CONNECTOR", "");
     vi.stubEnv("LINQ_PHONE_NUMBER", "");
+    vi.stubEnv("GOOGLE_CLIENT_ID", "");
+    vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
   });
 
   afterEach(() => {
@@ -31,14 +34,27 @@ describe("environment", () => {
     expect(env).toMatchObject(requiredEnvironment);
   });
 
-  it("provides the Google connector default without enabling Linq", async () => {
-    vi.stubEnv("GOOGLE_CONNECTOR_UID", "");
-
+  it("keeps Linq disabled without configuration", async () => {
     const { env } = await import("@shared/environment");
 
-    expect(env.GOOGLE_CONNECTOR_UID).toBe("google/open-instinct");
     expect(env.LINQ_CONNECTOR).toBeUndefined();
     expect(env.LINQ_PHONE_NUMBER).toBeUndefined();
+  });
+
+  it("keeps Google optional and redacts its configured client secret", async () => {
+    const unconfigured = await import("@shared/environment");
+    expect(unconfigured.env.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(unconfigured.env.GOOGLE_CLIENT_SECRET).toBeUndefined();
+
+    vi.resetModules();
+    vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client-id");
+    vi.stubEnv("GOOGLE_CLIENT_SECRET", "synthetic-client-secret");
+    const { env } = await import("@shared/environment");
+    expect(env.GOOGLE_CLIENT_ID).toBe("synthetic-client-id");
+    expect(Redacted.isRedacted(env.GOOGLE_CLIENT_SECRET)).toBe(true);
+    expect(JSON.stringify(env.GOOGLE_CLIENT_SECRET)).not.toContain(
+      "synthetic-client-secret"
+    );
   });
 
   it("provides stable auth and encryption defaults in local development", async () => {
@@ -48,15 +64,13 @@ describe("environment", () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("VERCEL_ENV", undefined);
 
-    const { env, localPhoneAuthBypassEnabled } =
-      await import("@shared/environment");
+    const { env } = await import("@shared/environment");
 
     expect(env).toMatchObject({
       BETTER_AUTH_SECRET: "openinstinct-local-auth-development-secret",
       BETTER_AUTH_URL: "http://localhost:3000",
       SECRET_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     });
-    expect(localPhoneAuthBypassEnabled).toBe(true);
   });
 
   it.each([
@@ -77,13 +91,11 @@ describe("environment", () => {
   );
 
   it("accepts connector overrides", async () => {
-    vi.stubEnv("GOOGLE_CONNECTOR_UID", "google/custom");
     vi.stubEnv("LINQ_CONNECTOR", "linq/custom");
     vi.stubEnv("LINQ_PHONE_NUMBER", "+12025550123");
 
     const { env } = await import("@shared/environment");
 
-    expect(env.GOOGLE_CONNECTOR_UID).toBe("google/custom");
     expect(env.LINQ_CONNECTOR).toBe("linq/custom");
     expect(env.LINQ_PHONE_NUMBER).toBe("+12025550123");
   });
@@ -103,7 +115,7 @@ describe("environment", () => {
     expect(env.SECRET_ENCRYPTION_KEY).toBeUndefined();
   });
 
-  it.each(["DATABASE_URL", "KERNEL_API_KEY"])(
+  it.each(["DATABASE_URL"])(
     "keeps %s required in local development",
     async (name) => {
       vi.stubEnv(name, "");
@@ -126,10 +138,7 @@ describe("environment", () => {
     expect(env.SECRET_ENCRYPTION_KEY).toBe(key);
   });
 
-  it.each([
-    ["DATABASE_URL", "Invalid environment variables"],
-    ["KERNEL_API_KEY", "Invalid environment variables"],
-  ])(
+  it.each([["DATABASE_URL", "Invalid environment variables"]])(
     "rejects a missing required %s value during import",
     async (name, errorMessage) => {
       vi.stubEnv(name, "");
@@ -183,23 +192,10 @@ describe("environment", () => {
     );
   });
 
-  it.each([
-    ["http://localhost:3000", "development", undefined, true],
-    ["https://openinstinct.localhost", "development", undefined, true],
-    ["http://localhost:3000", "production", undefined, false],
-    ["http://localhost:3000", "development", "development", false],
-    ["https://preview.example.com", "development", undefined, false],
-  ] as const)(
-    "resolves local phone auth bypass for %s in %s",
-    async (url, nodeEnv, vercelEnv, expected) => {
-      vi.stubEnv("BETTER_AUTH_URL", url);
-      vi.stubEnv("NODE_ENV", nodeEnv);
-      vi.stubEnv("VERCEL_ENV", vercelEnv);
-
-      const { localPhoneAuthBypassEnabled } =
-        await import("@shared/environment");
-
-      expect(localPhoneAuthBypassEnabled).toBe(expected);
-    }
-  );
+  it("allows non-browser application configuration without a Kernel key", async () => {
+    vi.stubEnv("KERNEL_API_KEY", undefined);
+    const { env } = await import("@shared/environment");
+    expect(env.KERNEL_API_KEY).toBeUndefined();
+    expect(env.DATABASE_URL).toBe(requiredEnvironment.DATABASE_URL);
+  });
 });

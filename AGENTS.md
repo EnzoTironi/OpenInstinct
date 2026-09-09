@@ -22,6 +22,12 @@ Follow links or inspect public types only when the routed page leaves the task u
 
 ## Prefer an existing integration
 
+For recipe, routine, or integration discovery work, first read
+[`docs/recipe-integrations/README.md`](docs/recipe-integrations/README.md). It records
+the agreed conversational recipe experience, public source catalogs and reuse
+constraints. Catalog entries are research evidence, not implemented capabilities
+or permission to install, activate, or redistribute vendor code.
+
 When a task names an external product or service, search the registry before implementing its integration. For a generic capability, author a tool instead.
 
 ```sh
@@ -60,7 +66,7 @@ Run the validation the task requests. When it does not establish the behavior yo
 - The workspace manager lives on `/` and the agent chat on `/chat`; browser execution belongs only to the declared browser-agent subagent's flat tool surface under `agent/subagents/browser-agent/tools`.
 - Keep each worker browser tool's schema and implementation together. Share the Kernel SDK client through `agent/subagents/browser-agent/lib/kernel.ts`; do not add a Kernel extension or root browser connection.
 - `agent/subagents/browser-agent/lib` is for code genuinely shared by worker tools. Group a shared worker domain in a lower-case folder, such as `trace/domains.ts` or `autofill/provider.ts`; do not use it as a holding area for a tool's one-off logic.
-- Validate runtime environment variables through `shared/environment/env.ts`. `KERNEL_API_KEY` is required by the worker browser tools.
+- Validate runtime environment variables through `shared/environment/env.ts`. `KERNEL_API_KEY` is optional for application startup and required when browser execution is invoked.
 - Run `pnpm check` and `pnpm build` before handing off changes.
 
 ## Code organization
@@ -102,3 +108,24 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Effect application architecture
+
+This repository uses the Effect Typescript library EVERYWHERE.
+
+Use Effect 4 (`effect@rc`, exact resolution in the lockfile) for application
+logic: services, I/O, configuration, validation, typed errors,
+resource lifetimes, concurrency, retries and observability. Migrate existing
+features as complete slices, including callers and tests. Do not keep duplicate
+Promise and Effect implementations of the same application behavior.
+
+Eve remains the owner of agent turns, sessions and durable workflow execution.
+Bridge Effect into Eve/Next/Better Auth/SDK callbacks at their public boundaries;
+keep runtime execution out of inner services. Propagate cancellation and map typed
+errors deliberately. Do not introduce a second scheduler or agent loop. React
+components remain idiomatic React; shared application logic follows Effect.
+Use framework-required schemas at integration edges only; avoid maintaining two
+independent domain schemas. Retain third-party libraries through narrow adapters
+where needed rather than rewriting their internals.
+
+Before writing any Effect code, first read `node_modules/effect/AGENTS.md` completely, and follow its links when required. Search `node_modules/effect/src` for APIs the guide does not cover.

@@ -1,0 +1,392 @@
+[
+  {
+    "id": "airtable",
+    "binding": "airtableConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "asana",
+    "binding": "asanaConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "ashby",
+    "binding": "ashbyConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "azure_devops",
+    "binding": "azureDevopsConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "bitbucket",
+    "binding": "bitbucketConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "box",
+    "binding": "boxConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "circleback",
+    "binding": "circlebackConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "clickup",
+    "binding": "clickupConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "confluence",
+    "binding": "confluenceConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "databricks",
+    "binding": "databricksConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "discord",
+    "binding": "discordConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "docusign",
+    "binding": "docusignConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "dropbox",
+    "binding": "dropboxConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "fathom",
+    "binding": "fathomConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "fireflies",
+    "binding": "firefliesConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "github",
+    "binding": "githubConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "gitlab",
+    "binding": "gitlabConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "gmail",
+    "binding": "gmailConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "gong",
+    "binding": "gongConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_calendar",
+    "binding": "googleCalendarConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_chat",
+    "binding": "googleChatConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_docs",
+    "binding": "googleDocsConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_drive",
+    "binding": "googleDriveConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_forms",
+    "binding": "googleFormsConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_meet",
+    "binding": "googleMeetConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_sheets",
+    "binding": "googleSheetsConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_slides",
+    "binding": "googleSlidesConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "google_vault",
+    "binding": "googleVaultConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "grain",
+    "binding": "grainConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "granola",
+    "binding": "granolaConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "greenhouse",
+    "binding": "greenhouseConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "hubspot",
+    "binding": "hubspotConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "incidentio",
+    "binding": "incidentioConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "intercom",
+    "binding": "intercomConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "jira",
+    "binding": "jiraConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "jsm",
+    "binding": "jsmConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "linear",
+    "binding": "linearConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "microsoft_excel",
+    "binding": "microsoftExcelConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "microsoft_teams",
+    "binding": "microsoftTeamsConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "mintlify",
+    "binding": "mintlifyConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "monday",
+    "binding": "mondayConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "notion",
+    "binding": "notionConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "obsidian",
+    "binding": "obsidianConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "onedrive",
+    "binding": "onedriveConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "outlook",
+    "binding": "outlookConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "pagerduty",
+    "binding": "pagerdutyConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "reddit",
+    "binding": "redditConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "rootly",
+    "binding": "rootlyConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "s3",
+    "binding": "s3ConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "salesforce",
+    "binding": "salesforceConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "sentry",
+    "binding": "sentryConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "servicenow",
+    "binding": "servicenowConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "sftp",
+    "binding": "sftpConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "sharepoint",
+    "binding": "sharepointConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "slack",
+    "binding": "slackConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "trello",
+    "binding": "trelloConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "typeform",
+    "binding": "typeformConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "webflow",
+    "binding": "webflowConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "wordpress",
+    "binding": "wordpressConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "workday",
+    "binding": "workdayConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "x",
+    "binding": "xConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "youtube",
+    "binding": "youtubeConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "zendesk",
+    "binding": "zendeskConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "zoho_desk",
+    "binding": "zohoDeskConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  },
+  {
+    "id": "zoom",
+    "binding": "zoomConnectorMeta",
+    "source": "https://github.com/simstudioai/sim/blob/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/connectors/registry.ts",
+    "kind": "knowledge_ingestion_connector"
+  }
+]

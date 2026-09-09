@@ -19,7 +19,7 @@ describe("appRouter", () => {
     listBrowserTracesMock.mockResolvedValue({ nextCursor: null, traces: [] });
 
     await appRouter
-      .createCaller({ origin: "https://example.com", scope })
+      .createCaller({ requestHeaders: new Headers(), scope })
       .traces.list({ cursor: "next-page" });
 
     expect(listBrowserTracesMock).toHaveBeenCalledWith(scope, "next-page");
@@ -28,7 +28,7 @@ describe("appRouter", () => {
   it("rejects invalid chat writes before persistence", async () => {
     await expect(
       appRouter
-        .createCaller({ origin: "https://example.com", scope })
+        .createCaller({ requestHeaders: new Headers(), scope })
         .chats.save({ sessionId: "" })
     ).rejects.toThrow("Too small");
     expect(saveChatMock).not.toHaveBeenCalled();

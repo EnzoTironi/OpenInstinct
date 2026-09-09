@@ -21,11 +21,15 @@ describe("root and worker capability boundaries", () => {
   it("keeps root coordination separate from browser execution", () => {
     expect(rootAgent.defaultTools).toBe(false);
     expect(toolFiles(rootTools)).toEqual([
+      "artifacts.ts",
       "ask_question.ts",
       "calendar.ts",
       "contacts.ts",
+      "device-auth.ts",
       "gmail.ts",
       "messaging.ts",
+      "personal-memory.ts",
+      "respond-to-approval.ts",
       "schedules.ts",
       "task_cancel.ts",
       "task_update.ts",
@@ -39,6 +43,7 @@ describe("root and worker capability boundaries", () => {
       false
     );
     expect(existsSync("agent/skills/browser-execution/SKILL.md")).toBe(false);
+    expect(existsSync(`${rootTools}/agent.ts`)).toBe(false);
     const rootInstructions = readFileSync(
       "agent/instructions/content/role/interactive.md",
       "utf8"
@@ -137,10 +142,6 @@ describe("root and worker capability boundaries", () => {
     expect(workerInstructions).toContain(
       "Never use the browser for general web search"
     );
-    expect(workerInstructions).toContain(
-      "A named vertical search or booking product"
-    );
-    expect(workerInstructions).toContain("such as Google Flights");
     expect(workerInstructions).toContain(
       "Use `playwright_execute` as the primary browser execution surface"
     );

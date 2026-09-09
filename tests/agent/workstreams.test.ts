@@ -30,11 +30,12 @@ import {
   saveWorkstreamSchema,
   type WorkstreamContent,
 } from "@shared/workstreams/schema";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 
 const client = new PGlite();
 const database = drizzle(client, { schema });
-const alice = { userId: "alice", workspaceId: "workspace-alice" };
-const bob = { userId: "bob", workspaceId: "workspace-bob" };
+const alice = accessScopeForUser("alice");
+const bob = accessScopeForUser("bob");
 const content = {
   title: "Autumn trip",
   objective: "Choose train tickets for the autumn trip.",

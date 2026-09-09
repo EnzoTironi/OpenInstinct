@@ -1,6 +1,6 @@
 import { recordBrowserTraceDomains } from "@db/services/browser-traces";
 import type { AccessScope } from "@shared/identity/access-scope";
-import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 
 const maximumTelemetryEvents = 5000;
 
@@ -20,7 +20,7 @@ async function collectNavigationDomains(
 ) {
   const domains = new Set<string>();
   let seen = 0;
-  for await (const { event } of kernel.browsers.telemetry.events(
+  for await (const { event } of getKernel().browsers.telemetry.events(
     browser.sessionId,
     { category: ["page"], limit: 1000, since: browser.createdAt },
     { signal }

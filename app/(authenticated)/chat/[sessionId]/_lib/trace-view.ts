@@ -3,7 +3,7 @@ import type { EveMessage } from "eve/react";
 import { z } from "zod";
 
 const backgroundWorkerDelivery =
-  /^Background task (\S+) \(browser-agent\) (?:update: |needs input\.$|is cancelled\.$|is completed\.\n\nResult:\n|failed\.\n\nError:\n)/u;
+  /^Background task (\S+) \((?:browser-agent|agent)\) (?:update: |needs input\.$|is cancelled\.$|is completed\.\n\nResult:\n|failed\.\n\nError:\n)/u;
 const backgroundWorkerAuthorization =
   /^Background task (\S+) needs authorization\.$/u;
 const taskCancelResultSchema = z.object({
@@ -12,7 +12,7 @@ const taskCancelResultSchema = z.object({
   toolName: z.literal("task_cancel"),
 });
 const cancelledWorkerTaskSchema = z.object({
-  metadata: z.object({ name: z.literal("browser-agent") }),
+  metadata: z.object({ name: z.enum(["browser-agent", "agent"]) }),
   status: z.literal("cancelled"),
   taskId: z.string(),
 });
@@ -32,9 +32,7 @@ export function messagesForTraceView(
 export function backgroundWorkerDeliveryMessageIds(
   events: readonly MessageStreamEvent[]
 ) {
-  // Eve task deliveries currently share message.received with user input, so
-  // require both its exact framework grammar and a receipt from this worker.
-  const taskIds = workerTaskIds(events);
+  // The runtime marks task-origin messages; user text cannot supply that provenance.
   const cancelledTaskIds = new Set<string>();
   const messageIds = new Set<string>();
 
@@ -49,13 +47,13 @@ export function backgroundWorkerDeliveryMessageIds(
       continue;
     }
 
-    if (event.type !== "message.received") continue;
+    if (event.type !== "message.received" || event.data.source !== "task")
+      continue;
     const taskId = deliveredTaskId(event.data.message);
-    if (taskId && taskIds.has(taskId)) {
-      const isCancellation = event.data.message.endsWith(
-        "(browser-agent) is cancelled."
-      );
-      if (!isCancellation) messageIds.add(`${event.data.turnId}:user`);
+    if (taskId) {
+      const isCancellation =
+        /\((?:browser-agent|agent)\) is cancelled\.$/u.test(event.data.message);
+      messageIds.add(`${event.data.turnId}:user`);
       if (isCancellation && cancelledTaskIds.delete(taskId)) {
         messageIds.add(`${event.data.turnId}:user`);
         messageIds.add(`${event.data.turnId}:assistant`);
@@ -72,9 +70,15 @@ export function hasPendingBackgroundWorker(
   const taskIds = new Set<string>();
 
   for (const event of events) {
+    const accepted = genericTaskReceipt(event);
+    if (accepted) {
+      taskIds.add(accepted);
+      continue;
+    }
+
     if (
       event.type === "subagent.completed" &&
-      event.data.subagentName === "browser-agent" &&
+      ["browser-agent", "agent"].includes(event.data.subagentName) &&
       event.data.backgroundTask !== undefined
     ) {
       taskIds.add(event.data.backgroundTask.taskId);
@@ -85,7 +89,7 @@ export function hasPendingBackgroundWorker(
       const result = event.data.result;
       if (
         result.kind === "subagent-result" &&
-        result.subagentName === "browser-agent" &&
+        ["browser-agent", "agent"].includes(result.subagentName) &&
         result.origin === "child" &&
         result.backgroundTask !== undefined
       ) {
@@ -102,12 +106,13 @@ export function hasPendingBackgroundWorker(
       continue;
     }
 
-    if (event.type !== "message.received") continue;
+    if (event.type !== "message.received" || event.data.source !== "task")
+      continue;
     const taskId = deliveredTaskId(event.data.message);
     if (
       taskId &&
-      !event.data.message.startsWith(
-        `Background task ${taskId} (browser-agent) update: `
+      /^Background task \S+ \((?:browser-agent|agent)\) (?:is cancelled\.$|is completed\.\n\nResult:\n|failed\.\n\nError:\n)/u.test(
+        event.data.message
       )
     ) {
       taskIds.delete(taskId);
@@ -117,36 +122,22 @@ export function hasPendingBackgroundWorker(
   return taskIds.size > 0;
 }
 
-function workerTaskIds(events: readonly MessageStreamEvent[]) {
-  const taskIds = new Set<string>();
-
-  for (const event of events) {
-    if (
-      event.type === "subagent.completed" &&
-      event.data.subagentName === "browser-agent" &&
-      event.data.backgroundTask !== undefined
-    ) {
-      taskIds.add(event.data.backgroundTask.taskId);
-      continue;
-    }
-
-    if (
-      event.type === "action.result" &&
-      event.data.result.kind === "subagent-result" &&
-      event.data.result.subagentName === "browser-agent" &&
-      event.data.result.origin === "child" &&
-      event.data.result.backgroundTask !== undefined
-    ) {
-      taskIds.add(event.data.result.backgroundTask.taskId);
-    }
-  }
-
-  return taskIds;
-}
-
 function deliveredTaskId(message: string) {
   return (
     backgroundWorkerDelivery.exec(message)?.[1] ??
     backgroundWorkerAuthorization.exec(message)?.[1]
   );
+}
+
+const genericTaskReceiptSchema = z.object({
+  kind: z.literal("tool-result"),
+  toolName: z.literal("agent"),
+  output: z.object({ status: z.literal("working"), taskId: z.string() }),
+});
+
+function genericTaskReceipt(event: MessageStreamEvent) {
+  if (event.type !== "action.result" || event.data.status !== "completed")
+    return undefined;
+  const receipt = genericTaskReceiptSchema.safeParse(event.data.result);
+  return receipt.success ? receipt.data.output.taskId : undefined;
 }

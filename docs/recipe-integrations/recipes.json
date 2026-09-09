@@ -1,0 +1,1541 @@
+[
+  {
+    "vendor": "Poke",
+    "name": "Forward Travel Plans to Tripsy",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/xQ2fBi3BWhf",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Robinhood",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/robinhood",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Flight Deals Tracker",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/flight-deals-tracker",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Meme Machine",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/meme-machine",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Decision Council",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/decision-council",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Personal Memory & Action Log",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/personal-memory-action-log",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Campus Cravings",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/campus-cravings",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Apartment Hunter",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/apartment-hunter",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Global Pollen Alert",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/global-pollen-alert",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Stress Tracker",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/stress-tracker",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Design Effects",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/design-effects",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Birthday Reminder",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/birthday-reminder",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Cycle Support Guide",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/cycle-support-guide",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Chonky Cat",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/chonky-cat",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Period Tracker",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/period-tracker",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Subscription Watchdog",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/subscription-watchdog",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Quick QR Generator",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/quick-qr-generator",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Did You Know?",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/did-you-know",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Mood Checker",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/mood-checker",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Daily AI News Briefing",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/daily-ai-news-briefing",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "YouTube Transcript Summarizer",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/youtube-transcript-summarizer",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Market Watch",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/market-watch",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Canva",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/canva",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "PostHog",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/posthog",
+    "page": 2,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Sonos",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/sonos",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Philips Hue",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/philips-hue",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Asana",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/asana",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Palo Alto Weather Comparison",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/palo-alto-weather-comparison",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Fit",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/fit",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Journal",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/journal",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Bible",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/bible",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Forward Receipts to Navan",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/forward-receipts-to-navan",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Parallel Web Systems",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/parallel-web-systems",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Forward Receipts to Mercury",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/forward-receipts-to-mercury",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Webflow",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/webflow",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Forward Receipts to Ramp",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/forward-receipts-to-ramp",
+    "page": 3,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Netlify",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/netlify",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Forward Travel Plans to TripIt",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/forward-travel-plans-to-tripit",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Supabase",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/supabase",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Forward Flights to Flighty",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/forward-flights-to-flighty",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "DeepWiki",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/deepwiki",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Add Flights to Calendar",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/add-flights-to-calendar",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Withings",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/withings",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Vercel",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/vercel",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Nightly Gratitude",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/nightly-gratitude",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Fitbit",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/fitbit",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Hydration Reminders",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/hydration-reminders",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Devin",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/devin",
+    "page": 4,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Daily Horoscope",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/daily-horoscope",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Sentry",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/sentry",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Rent Reminders",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/rent-reminders",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Oura",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/oura",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Weekly Reading Suggestion",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/weekly-reading-suggestion",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Ramp",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/ramp",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Bad Weather Alerts",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/bad-weather-alerts",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Outlook Calendar",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/outlook-calendar",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Weekly Productivity Check-in",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/weekly-productivity-check-in",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Outlook Mail",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/outlook-mail",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Monthly Subscription Audit",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/monthly-subscription-audit",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Granola",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/granola",
+    "page": 5,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Notion",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/notion",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Google Calendar",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/google-calendar",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Birthday Gift Ideas",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/birthday-gift-ideas",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Gmail",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/gmail",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Linear",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/linear",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Add Deadlines to Calendar",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/add-deadlines-to-calendar",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Todoist",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/todoist",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Follow-up Reminders",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/follow-up-reminders",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "GitHub",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/github",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Daily Weather",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/daily-weather",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Morning Briefing",
+    "kind": "gallery_recipe",
+    "source": "https://poke.com/recipes/morning-briefing",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "Cursor Cloud Agents",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/cursor",
+    "page": 6,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Poke",
+    "name": "WHOOP",
+    "kind": "connection_recipe",
+    "source": "https://poke.com/recipes/whoop",
+    "page": 7,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Auto-inbox",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Morning Briefing",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Weekly Briefing",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Newsletter Digest",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Meeting Briefing",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Schedule Optimizer",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Deal Spotter",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Competitive Intel Briefing",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Contact Research Dossier",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "GitHub Reports",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Relationship Reconnect",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Meeting Action Hand-Off",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Direct-Report Feedback Prep",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Decline Cold Outreach",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "X Daily Digest",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Mentions & Reply Brief",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Bookmark Butler",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Save-to-Action",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Topic Radar",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Competitor Pulse",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Engage Assist",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "X Post Ideas",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Your Week on X",
+    "kind": "stock_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Town",
+    "name": "Daily Work Summary",
+    "kind": "retired_routine",
+    "source": "https://www.town.com/docs/routines/stock-routines/daily-work-summary",
+    "page": "",
+    "status": "retired_in_public_docs",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Daily briefs",
+    "kind": "documented_routine_pattern",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Email drafting",
+    "kind": "documented_routine_pattern",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Email labeling",
+    "kind": "documented_routine_pattern",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Urgent email alerting",
+    "kind": "documented_routine_pattern",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Follow-up bumps",
+    "kind": "documented_routine_pattern",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Meeting Recording",
+    "kind": "documented_routine_pattern",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Meeting prep",
+    "kind": "documented_routine_pattern",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Meeting scheduling",
+    "kind": "documented_routine_pattern",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Promise tracker",
+    "kind": "discover_template",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "End-of-day review",
+    "kind": "discover_template",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Weekly wrap",
+    "kind": "discover_template",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Post-meeting follow-ups",
+    "kind": "discover_template",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Calendar audit",
+    "kind": "discover_template",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Channel digest",
+    "kind": "discover_template",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Lindy",
+    "name": "Morning briefing",
+    "kind": "discover_template",
+    "source": "https://docs.lindy.ai/teammate/routines",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Flip",
+    "name": "Cross-account spending recap",
+    "kind": "descriptive_public_pattern",
+    "source": "https://fliptexts.com/articles/automate-your-budget",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Flip",
+    "name": "Bill due-date reminders",
+    "kind": "descriptive_public_pattern",
+    "source": "https://fliptexts.com/articles/bill-and-money-reminders",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Flip",
+    "name": "Trial and renewal alerts",
+    "kind": "descriptive_public_pattern",
+    "source": "https://fliptexts.com/articles/bill-and-money-reminders",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Flip",
+    "name": "Shared-expense tracking",
+    "kind": "descriptive_public_pattern",
+    "source": "https://fliptexts.com/articles/manage-money-by-text",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Flip",
+    "name": "Subscription audit",
+    "kind": "descriptive_public_pattern",
+    "source": "https://fliptexts.com/articles/manage-money-by-text",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Flip",
+    "name": "Conditional savings transfer",
+    "kind": "descriptive_public_pattern",
+    "source": "https://fliptexts.com/",
+    "page": "",
+    "status": "financial_effect_unqualified",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Flip",
+    "name": "Confirmed brokerage trade",
+    "kind": "descriptive_public_pattern",
+    "source": "https://fliptexts.com/",
+    "page": "",
+    "status": "financial_effect_unqualified",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Flip",
+    "name": "Actionable morning recap",
+    "kind": "descriptive_public_pattern",
+    "source": "https://fliptexts.com/paper",
+    "page": "",
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Call it in",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/call-it-in",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Morning brief",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/morning-brief",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "The friendly nag",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/the-friendly-nag",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Workout accountability",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/workout-accountability",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Inbox, triaged",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/inbox-triaged",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Never miss a birthday",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/never-miss-a-birthday",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "iMessage catch-up",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/imessage-catch-up",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "WhatsApp catch-up",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/whatsapp-catch-up",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Email catch-up",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/inbox-catch-up",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "A memory for your people",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/people-memory",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Flight finder",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/flight-finder",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Flight day",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/flight-day",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Flight check-in",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/flight-checkin",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Trip mode",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/trip-mode",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Location reminders",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/location-reminders",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Buy it for me",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/buy-it-for-me",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Price scout",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/price-scout",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Price drop & restock watch",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/price-drop-watch",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Ticket hunter",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/ticket-hunter",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Package tracker",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/package-tracker",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "The web errand",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/web-errand",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Pre-meeting briefs",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/pre-meeting-briefs",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Meeting memory",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/meeting-memory",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Slack sentry",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/slack-sentry",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Todo catcher",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/todo-catcher",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Ship it from your phone",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/ship-it",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Receipt keeper",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/receipt-keeper",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Expense it",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/expense-it",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Weekly spending recap",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/spending-recap",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "WhatsApp daily recap",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/whatsapp-daily-recap",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "iMessage daily recap",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/imessage-daily-recap",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Group chat concierge",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/group-chat-concierge",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Keep in touch",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/keep-in-touch",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Follow-up chaser",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/follow-up-chaser",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Say it later",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/say-it-later",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Photo fixer",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/photo-fixer",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Sunday recap",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/sunday-recap",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Picture this",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/picture-this",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Make it move",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/make-it-move",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Write me a song",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/write-me-a-song",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Your Mac, from anywhere",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/your-mac-from-anywhere",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Call your pally",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/call-your-pally",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Quote hunter",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/quote-hunter",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Grocery run",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/grocery-run",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Table for four",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/table-for-four",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Calorie tracker",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/calorie-tracker",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Training log",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/training-log",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Dose tracker",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/dose-tracker",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Peptide tracker",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/peptide-tracker",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Your day, rebuilt",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/day-rebuilt",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "vendor": "Pally",
+    "name": "Wrangle your coding agents",
+    "kind": "gallery_recipe",
+    "source": "https://pally.com/recipes/coding-agents",
+    "page": 1,
+    "status": "public_pattern_not_implemented",
+    "observed_on": "2026-09-08"
+  }
+]

@@ -1,0 +1,664 @@
+diff --git a/.changeset/input-wake-recovery.md b/.changeset/input-wake-recovery.md
+new file mode 100644
+index 0000000..043704c
+--- /dev/null
++++ b/.changeset/input-wake-recovery.md
+@@ -0,0 +1,5 @@
++---
++"eve": patch
++---
++
++Add payload-free recovery of accepted inputs so a dispatcher can republish a lost workflow wake using the original principal and destination. Receipt lookup remains read-only.
+diff --git a/docs/channels/custom.mdx b/docs/channels/custom.mdx
+index a672036..8acb687 100644
+--- a/docs/channels/custom.mdx
++++ b/docs/channels/custom.mdx
+@@ -137,6 +137,18 @@ Receipts survive hook disposal while native events remain retained. Stable paylo
+ finite, acyclic JSON; use URL file parts instead of binary buffers. Acceptance does not imply
+ processing completion or external delivery.
+ 
++A committed input event and its workflow wake are separate native writes. A process can die
++between them. `getInputAcceptance` remains strictly read-only and cannot repair that gap.
++After checking the stored input, current authority and transport lease, call
++`source.recoverInputAcceptance(inputId, auth)` and require the same receipt before marking the
++transport accepted. This operation reads the actual native receipt again and republishes the
++canonical nonterminal run's wake; it needs neither content nor artifacts and never resends input.
++Use `session.recoverInputAcceptance(inputId, auth)` for the fixed-session namespace. Repeated
++recovery can publish another wake, but native event replay consumes the existing input once.
++Terminal runs return the same receipt without queue publication. Missing receipts return
++`undefined`; queue/storage errors remain uncertain and must not be treated as acceptance.
++Recovery does not grant application authority, validate a replacement payload, or prove completion.
++
+ Retain native events for the entire input recovery lifetime. This API has no retention watermark
+ or expired-receipt result: after event purging or a restore that loses an accepted event,
+ `undefined` cannot distinguish that lost receipt from an input never accepted. Block automatic
+diff --git a/packages/eve/src/channel/channel-address.test.ts b/packages/eve/src/channel/channel-address.test.ts
+index c197f18..7429fe9 100644
+--- a/packages/eve/src/channel/channel-address.test.ts
++++ b/packages/eve/src/channel/channel-address.test.ts
+@@ -12,6 +12,9 @@ function createRuntime(): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     createSession: vi.fn(),
+     dispatchContinuation: vi.fn().mockResolvedValue({ sessionId: "sess_1", status: "accepted" }),
+     dispatchSession: vi.fn(),
+diff --git a/packages/eve/src/channel/channel-address.ts b/packages/eve/src/channel/channel-address.ts
+index c696cdf..2d18579 100644
+--- a/packages/eve/src/channel/channel-address.ts
++++ b/packages/eve/src/channel/channel-address.ts
+@@ -60,6 +60,11 @@ export interface ChannelAddress<TState = undefined> {
+     inputId: string,
+     auth: SessionAuthContext,
+   ): Promise<SessionInputReceipt | undefined>;
++  /** Confirms the native receipt and republishes its wake; never resends input content. */
++  recoverInputAcceptance(
++    inputId: string,
++    auth: SessionAuthContext,
++  ): Promise<SessionInputReceipt | undefined>;
+   deliver(input: SendPayload, options: ChannelAddressDeliveryOptions<TState>): Promise<Session>;
+   send(
+     message: string | UserContent,
+@@ -101,6 +106,9 @@ export function createChannelAddress<TState = undefined>(input: {
+     getInputAcceptance(inputId, auth) {
+       return input.runtime.getInputAcceptance({ auth, inputId, targetToken: namespacedToken });
+     },
++    recoverInputAcceptance(inputId, auth) {
++      return input.runtime.recoverInputAcceptance({ auth, inputId, targetToken: namespacedToken });
++    },
+     async deliver(sendInput, options) {
+       const delivery =
+         metadata.channelKind !== undefined && metadata.channelName !== undefined
+diff --git a/packages/eve/src/channel/channel-operations.test.ts b/packages/eve/src/channel/channel-operations.test.ts
+index e15d2fb..7575fad 100644
+--- a/packages/eve/src/channel/channel-operations.test.ts
++++ b/packages/eve/src/channel/channel-operations.test.ts
+@@ -34,6 +34,9 @@ function createRuntime(): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     createSession: vi.fn(),
+     dispatchContinuation: vi.fn().mockResolvedValue({
+       sessionId: "sess_1",
+diff --git a/packages/eve/src/channel/channel-operations.ts b/packages/eve/src/channel/channel-operations.ts
+index 2288ad4..64b32a9 100644
+--- a/packages/eve/src/channel/channel-operations.ts
++++ b/packages/eve/src/channel/channel-operations.ts
+@@ -68,6 +68,11 @@ export interface ChannelSource<TState = undefined> {
+     inputId: string,
+     auth: SessionAuthContext,
+   ): Promise<SessionInputReceipt | undefined>;
++  /** Confirms the native receipt and republishes its wake; never resends input content. */
++  recoverInputAcceptance(
++    inputId: string,
++    auth: SessionAuthContext,
++  ): Promise<SessionInputReceipt | undefined>;
+   /** Starts or resumes a turn with a user message. May create a session. */
+   send(message: string | UserContent, options: ChannelSendOptions<TState>): Promise<Session>;
+   /** Answers pending input requests. Never creates a session. */
+@@ -130,6 +135,9 @@ export function createChannelOperations<TState = undefined>(input: {
+         getInputAcceptance(inputId, auth) {
+           return bound.getInputAcceptance(inputId, auth);
+         },
++        recoverInputAcceptance(inputId, auth) {
++          return bound.recoverInputAcceptance(inputId, auth);
++        },
+         async send(message, options) {
+           return await bound.deliver(
+             attachClientContext(
+diff --git a/packages/eve/src/channel/cross-channel-receive.test.ts b/packages/eve/src/channel/cross-channel-receive.test.ts
+index 3b9ae28..8745fd6 100644
+--- a/packages/eve/src/channel/cross-channel-receive.test.ts
++++ b/packages/eve/src/channel/cross-channel-receive.test.ts
+@@ -15,6 +15,9 @@ function makeRuntime(): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     createSession: vi.fn(),
+     dispatchContinuation: vi.fn(),
+     dispatchSession: vi.fn(),
+@@ -29,6 +32,9 @@ function makeSession(): Session {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     id: "sess_1",
+     async cancel() {
+       return { status: "no_active_turn" };
+diff --git a/packages/eve/src/channel/schedule.test.ts b/packages/eve/src/channel/schedule.test.ts
+index 63a743f..82b046d 100644
+--- a/packages/eve/src/channel/schedule.test.ts
++++ b/packages/eve/src/channel/schedule.test.ts
+@@ -27,6 +27,9 @@ function createMockRuntime(): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     createSession: vi.fn().mockResolvedValue(createMockRunHandle()),
+     dispatchContinuation: vi.fn().mockResolvedValue({ status: "session_not_active" }),
+     dispatchSession: vi.fn(),
+diff --git a/packages/eve/src/channel/session.test.ts b/packages/eve/src/channel/session.test.ts
+index 04cdb51..58632de 100644
+--- a/packages/eve/src/channel/session.test.ts
++++ b/packages/eve/src/channel/session.test.ts
+@@ -37,6 +37,9 @@ function createRuntime(): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     createSession: vi.fn(),
+     dispatchContinuation: vi.fn(),
+     dispatchSession: vi
+diff --git a/packages/eve/src/channel/session.ts b/packages/eve/src/channel/session.ts
+index c13f5eb..11eac6a 100644
+--- a/packages/eve/src/channel/session.ts
++++ b/packages/eve/src/channel/session.ts
+@@ -42,6 +42,11 @@ export interface Session {
+     inputId: string,
+     auth: SessionAuthContext,
+   ): Promise<SessionInputReceipt | undefined>;
++  /** Confirms the native receipt and republishes its wake; never resends input content. */
++  recoverInputAcceptance(
++    inputId: string,
++    auth: SessionAuthContext,
++  ): Promise<SessionInputReceipt | undefined>;
+   /** Sends a message to this exact session ID without creating or following a replacement. */
+   send(
+     message: string | UserContent,
+@@ -115,6 +120,13 @@ export function createSession(
+         targetToken: sessionCommandHookToken(id),
+       });
+     },
++    recoverInputAcceptance(inputId, auth) {
++      return runtime.recoverInputAcceptance({
++        auth,
++        inputId,
++        targetToken: sessionCommandHookToken(id),
++      });
++    },
+     async send(message, options) {
+       const delivery = createDelivery(metadata);
+       const caller = sessionCallbackToTurnCaller(options.callback, options.activityObserver);
+diff --git a/packages/eve/src/channel/types.ts b/packages/eve/src/channel/types.ts
+index 3c2a9f0..2b7d3ed 100644
+--- a/packages/eve/src/channel/types.ts
++++ b/packages/eve/src/channel/types.ts
+@@ -609,6 +609,13 @@ export interface Runtime {
+     readonly targetToken: string;
+   }): Promise<SessionInputReceipt | undefined>;
+ 
++  /** Confirms acceptance in native storage and republishes the canonical run wake. */
++  recoverInputAcceptance(input: {
++    readonly auth: SessionAuthContext | null;
++    readonly inputId: string;
++    readonly targetToken: string;
++  }): Promise<SessionInputReceipt | undefined>;
++
+   dispatchContinuation<TCommand extends SessionCommand>(
+     input: DispatchContinuationInput<TCommand>,
+   ): Promise<SessionCommandResult<TCommand>>;
+diff --git a/packages/eve/src/execution/input-acceptance.ts b/packages/eve/src/execution/input-acceptance.ts
+index a1ef3d2..9e99548 100644
+--- a/packages/eve/src/execution/input-acceptance.ts
++++ b/packages/eve/src/execution/input-acceptance.ts
+@@ -16,6 +16,7 @@ import {
+   getHookByToken,
+   getWorld,
+   resumeHook,
++  recoverHookResume,
+   snapshotResumeInput,
+ } from "#internal/workflow/runtime.js";
+ import { isObject } from "#shared/guards.js";
+@@ -119,6 +120,31 @@ export async function readSessionInputReceipt(
+       };
+ }
+ 
++/** Recover dispatch liveness for a stored receipt, without resending or reconstructing its input. */
++export async function recoverSessionInputReceipt(
++  input: SessionInputIdentity,
++): Promise<SessionInputReceipt | undefined> {
++  const receipt = await readSessionInputReceipt(input);
++  if (receipt === undefined) return undefined;
++  const scope = inputAcceptanceScope(input);
++  const recovered = await recoverHookResume({
++    runId: receipt.sessionId,
++    inputId: nativeInputKey(scope, input.inputId),
++    scope,
++  });
++  if (
++    recovered === undefined ||
++    recovered.runId !== receipt.sessionId ||
++    recovered.eventId !== receipt.eventId ||
++    recovered.payloadDigest !== receipt.payloadDigest
++  ) {
++    throw new WorkflowWorldError("Native input receipt changed during dispatch recovery.", {
++      status: 503,
++    });
++  }
++  return receipt;
++}
++
+ /** Encode the semantic input itself; attempt-specific metadata never enters its digest. */
+ export function acceptedInputWire(command: SendCommand, scope: string) {
+   return encodeSessionCommandV3({
+diff --git a/packages/eve/src/execution/node-step.test.ts b/packages/eve/src/execution/node-step.test.ts
+index d249560..5f25a42 100644
+--- a/packages/eve/src/execution/node-step.test.ts
++++ b/packages/eve/src/execution/node-step.test.ts
+@@ -316,6 +316,9 @@ function createNoopRuntime(): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     createSession: vi
+       .fn()
+       .mockRejectedValue(new Error("runtime.createSession should not be called in this test")),
+diff --git a/packages/eve/src/execution/workflow-runtime.ts b/packages/eve/src/execution/workflow-runtime.ts
+index dbf6dfe..a885585 100644
+--- a/packages/eve/src/execution/workflow-runtime.ts
++++ b/packages/eve/src/execution/workflow-runtime.ts
+@@ -2,6 +2,7 @@ import { DEFAULT_TURN_POLICY } from "#channel/types.js";
+ import {
+   acceptSessionInput,
+   readSessionInputReceipt,
++  recoverSessionInputReceipt,
+   inputAcceptanceScope,
+   inputCreationDigest,
+ } from "#execution/input-acceptance.js";
+@@ -143,6 +144,7 @@ export function createWorkflowRuntime(config: {
+ }): Runtime {
+   return {
+     getInputAcceptance: readSessionInputReceipt,
++    recoverInputAcceptance: recoverSessionInputReceipt,
+     async createSession(input: RunInput): Promise<RunHandle> {
+       const initialCommand = buildInitialInputCommand(input);
+       const initialInputBootstrap =
+diff --git a/packages/eve/src/internal/nitro/routes/channel-dispatch.test.ts b/packages/eve/src/internal/nitro/routes/channel-dispatch.test.ts
+index 1cd73b0..ef79410 100644
+--- a/packages/eve/src/internal/nitro/routes/channel-dispatch.test.ts
++++ b/packages/eve/src/internal/nitro/routes/channel-dispatch.test.ts
+@@ -64,6 +64,9 @@ function createRuntime(overrides: Partial<Runtime> = {}): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     createSession: vi.fn(),
+     dispatchContinuation: vi.fn(),
+     dispatchSession: vi.fn(),
+diff --git a/packages/eve/src/internal/testing/mocks/mock-channel-operations.ts b/packages/eve/src/internal/testing/mocks/mock-channel-operations.ts
+index ce84dd1..a028306 100644
+--- a/packages/eve/src/internal/testing/mocks/mock-channel-operations.ts
++++ b/packages/eve/src/internal/testing/mocks/mock-channel-operations.ts
+@@ -31,6 +31,9 @@ export function mockChannelContext<TState = undefined>(
+         getInputAcceptance() {
+           throw new Error("This fixture does not implement native input acceptance.");
+         },
++        recoverInputAcceptance() {
++          throw new Error("This fixture does not implement native input recovery.");
++        },
+         async send(message, options) {
+           return (await observeDelivery(continuationToken, { ...options, message })) as never;
+         },
+diff --git a/packages/eve/src/public/channels/eve-session-routes.test.ts b/packages/eve/src/public/channels/eve-session-routes.test.ts
+index da1ad96..be5477d 100644
+--- a/packages/eve/src/public/channels/eve-session-routes.test.ts
++++ b/packages/eve/src/public/channels/eve-session-routes.test.ts
+@@ -20,6 +20,9 @@ function createFixedSession(overrides: Partial<Session> = {}): Session {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     id: "wrun_A",
+     send: vi.fn().mockResolvedValue({ sessionId: "wrun_A", status: "accepted" }),
+     respond: vi.fn().mockResolvedValue({ sessionId: "wrun_A", status: "accepted" }),
+diff --git a/packages/eve/src/public/channels/eve-subagent-stream.test.ts b/packages/eve/src/public/channels/eve-subagent-stream.test.ts
+index 76ab9c8..d1d531c 100644
+--- a/packages/eve/src/public/channels/eve-subagent-stream.test.ts
++++ b/packages/eve/src/public/channels/eve-subagent-stream.test.ts
+@@ -212,6 +212,9 @@ function createHarness(input: {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     id: coordinates.parentSessionId,
+     send: vi.fn(),
+     respond: vi.fn(),
+diff --git a/packages/eve/src/public/channels/eve.test.ts b/packages/eve/src/public/channels/eve.test.ts
+index 2c2ab45..82d58b9 100644
+--- a/packages/eve/src/public/channels/eve.test.ts
++++ b/packages/eve/src/public/channels/eve.test.ts
+@@ -72,6 +72,9 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     id: "test-session-id",
+     send: vi.fn().mockResolvedValue({ sessionId: "test-session-id", status: "accepted" }),
+     respond: vi.fn().mockResolvedValue({ sessionId: "test-session-id", status: "accepted" }),
+diff --git a/packages/eve/src/public/definitions/channel.test.ts b/packages/eve/src/public/definitions/channel.test.ts
+index bb45a8f..d4aba15 100644
+--- a/packages/eve/src/public/definitions/channel.test.ts
++++ b/packages/eve/src/public/definitions/channel.test.ts
+@@ -577,6 +577,9 @@ describe("defineChannel", () => {
+           getInputAcceptance() {
+             throw new Error("This fixture does not implement native input acceptance.");
+           },
++          recoverInputAcceptance() {
++            throw new Error("This fixture does not implement native input recovery.");
++          },
+           id: channelId,
+           async send() {
+             return { sessionId: channelId, status: "accepted" as const };
+diff --git a/packages/eve/test/eve-run-stream-channel.test.ts b/packages/eve/test/eve-run-stream-channel.test.ts
+index 4a1aa11..ebdfc7f 100644
+--- a/packages/eve/test/eve-run-stream-channel.test.ts
++++ b/packages/eve/test/eve-run-stream-channel.test.ts
+@@ -173,6 +173,9 @@ function createMockAttachSession(events: ReadableStream<MessageStreamEvent>) {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     id: "session_xyz",
+     async send() {
+       return { sessionId: "session_xyz", status: "accepted" };
+diff --git a/packages/eve/test/scenarios/cross-channel-receive.scenario.test.ts b/packages/eve/test/scenarios/cross-channel-receive.scenario.test.ts
+index bfbc640..5db8811 100644
+--- a/packages/eve/test/scenarios/cross-channel-receive.scenario.test.ts
++++ b/packages/eve/test/scenarios/cross-channel-receive.scenario.test.ts
+@@ -80,6 +80,9 @@ function createCapturingRuntime(captured: CapturedRun[]): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     async createSession(input) {
+       captured.push({
+         adapter: input.adapter,
+diff --git a/packages/eve/test/scenarios/input-acceptance.scenario.test.ts b/packages/eve/test/scenarios/input-acceptance.scenario.test.ts
+index 2a59c54..43e150e 100644
+--- a/packages/eve/test/scenarios/input-acceptance.scenario.test.ts
++++ b/packages/eve/test/scenarios/input-acceptance.scenario.test.ts
+@@ -1,4 +1,5 @@
+-import { execFile, spawn, type ChildProcess } from "node:child_process";
++import { execFile, fork, spawn, type ChildProcess } from "node:child_process";
++import { once } from "node:events";
+ import { createHash, randomUUID } from "node:crypto";
+ import { readFile, writeFile } from "node:fs/promises";
+ import { createServer } from "node:net";
+@@ -101,12 +102,39 @@ test("native HTTP acceptance survives races, principal isolation, process loss a
+       name: "native-input-acceptance",
+       installDependencies: true,
+       dependencies: {
+-        zod: "4.3.6",
++        zod: "4.5.4",
++        ai: "7.0.83",
+         "@workflow/world-postgres": `file:${postgresTarball}`,
+       },
+       files: {
+         "pnpm-workspace.yaml": `overrides:\n  "@workflow/world": ${JSON.stringify(`file:${worldTarball}`)}\n`,
+         "approval-executions.txt": "",
++        "input-producer.mjs": `import { createRequire } from "node:module";
++import { dirname, join } from "node:path";
++import { pathToFileURL } from "node:url";
++import { createWorld } from "@workflow/world-postgres";
++import { httpBasic, routeAuth } from "eve/channels/auth";
++const require = createRequire(import.meta.url);
++const root = dirname(require.resolve("eve/package.json"));
++const load = path => import(pathToFileURL(join(root, "dist/src", path)).href);
++const { setWorld } = await load("internal/workflow/runtime.js");
++const { createSession } = await load("channel/session.js");
++const { createWorkflowRuntime } = await load("execution/workflow-runtime.js");
++process.once("message", async input => {
++  const world = createWorld({ connectionString: process.env.WORKFLOW_POSTGRES_URL, applicationManagedShutdown: true });
++  setWorld(world);
++  try {
++    const auth = await routeAuth(new Request("http://localhost/", { headers: { authorization: "Basic " + Buffer.from("alice:" + process.env.ACCEPTANCE_PASSWORD).toString("base64") } }), [httpBasic({ username: "alice", password: process.env.ACCEPTANCE_PASSWORD })]);
++    if (auth instanceof Response) throw new Error("Producer authentication failed");
++    const runtime = createWorkflowRuntime({ compiledArtifactsSource: { kind: "bundled" } });
++    const session = createSession(input.sessionId, runtime);
++    const result = await session.send(input.message, { inputId: input.inputId, auth });
++    process.send({ receipt: result.acceptedInput });
++  } catch (error) {
++    process.send({ error: String(error) });
++    process.exitCode = 1;
++  } finally { await world.close(); process.disconnect(); }
++});`,
+         "agent/tools/approval_probe.ts": `import { appendFile } from "node:fs/promises";
+ import { defineTool } from "eve/tools";
+ import { always } from "eve/tools/approval";
+@@ -152,6 +180,7 @@ export default defineChannel({ routes: [POST("/proof", async (request, { from, a
+   const body = await request.json();
+   const target = body.sessionId ? attachSession(body.sessionId) : from(body.address);
+   if (body.action === "receipt") return Response.json({ receipt: await target.getInputAcceptance(body.inputId, auth) });
++  if (body.action === "recover") return Response.json({ receipt: await target.recoverInputAcceptance(body.inputId, auth) });
+   if (body.action === "reset") return Response.json(await target.reset({ reason: "native terminal replay proof" }));
+   if (body.action === "pending") {
+     const reader = (await target.getEventStream()).getReader();
+@@ -370,6 +399,17 @@ export default defineChannel({ routes: [POST("/proof", async (request, { from, a
+     expect(event.rows[0].created_at.getTime()).toBeLessThanOrEqual(
+       (await turns(first.sessionId))[0].created_at.getTime(),
+     );
++    const recoveredAddress = (
++      await readReceipt(
++        await request({ address: cold.address, inputId: cold.inputId, action: "recover" }),
++      )
++    ).receipt;
++    expect(recoveredAddress).toEqual(first);
++    expect(
++      await (
++        await request({ address: cold.address, inputId: cold.inputId, action: "recover" }, "bob")
++      ).json(),
++    ).toEqual({});
+     const other = await request({ ...cold, action: "receipt" }, "bob");
+     expect(other.status).toBe(200);
+     expect(await other.json()).toEqual({});
+@@ -517,6 +557,17 @@ export default defineChannel({ routes: [POST("/proof", async (request, { from, a
+     ).toEqual(answerBody.receipt);
+     expect(await turns(question.sessionId)).toHaveLength(5);
+     console.info("official input response replay verified");
++    // The target is already idle on its session hook, with no queued work that
++    // could accidentally rescue the commit-before-wake cut.
++    const targetJobs = () =>
++      pool!
++        .query(
++          "SELECT count(*)::int AS count FROM graphile_worker._private_jobs WHERE convert_from(decode(payload->>'data', 'base64'), 'UTF8')::jsonb->>'runId' = $1",
++          [first.sessionId],
++        )
++        .then((result) => result.rows[0].count as number);
++    await eventually(targetJobs, (count) => count === 0);
++    expect(await turns(first.sessionId)).toHaveLength(4);
+     const lock = await pool.connect();
+     const crashInput = {
+       sessionId: first.sessionId,
+@@ -540,16 +591,25 @@ export default defineChannel({ routes: [POST("/proof", async (request, { from, a
+       .digest("hex");
+     let crashEventId: string | undefined;
+     let acknowledged = false;
+-    let pending: Promise<unknown> | undefined;
++    const producerName = `native-prewake-${randomUUID()}`;
++    const producerDatabaseUrl = new URL(databaseUrl);
++    producerDatabaseUrl.searchParams.set("application_name", producerName);
++    const producer = fork(join(app.appRoot, "input-producer.mjs"), [], {
++      cwd: app.appRoot,
++      env: { ...env, WORKFLOW_POSTGRES_URL: producerDatabaseUrl.toString() },
++      stdio: ["ignore", "pipe", "pipe", "ipc"],
++    });
++    producer.stdout!.on("data", (chunk) => logs.push(String(chunk)));
++    producer.stderr!.on("data", (chunk) => logs.push(String(chunk)));
++    const producerExit = once(producer, "exit");
++    producer.on("message", (message) => {
++      acknowledged = true;
++      logs.push(JSON.stringify(message));
++    });
+     try {
+       await lock.query("BEGIN");
+       await lock.query("LOCK TABLE graphile_worker._private_jobs IN ACCESS EXCLUSIVE MODE");
+-      pending = request(crashInput).then(
+-        () => {
+-          acknowledged = true;
+-        },
+-        () => undefined,
+-      );
++      producer.send(crashInput);
+       const persisted = await eventually(
+         () =>
+           pool!
+@@ -559,19 +619,77 @@ export default defineChannel({ routes: [POST("/proof", async (request, { from, a
+       );
+       crashEventId = persisted[0].id;
+       expect(acknowledged).toBe(false);
+-      console.info("native acceptance persisted with HTTP acknowledgement blocked");
+-      await stop();
++      await eventually(
++        () =>
++          pool!
++            .query(
++              "SELECT count(*)::int AS count FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0 AND query LIKE '%add_job%'",
++            )
++            .then((result) => result.rows[0].count as number),
++        (count) => count > 0,
++      );
++      // The getter can observe acceptance while the wake is still blocked.
++      const observed = (
++        await readReceipt(
++          await request({
++            sessionId: first.sessionId,
++            inputId: crashInput.inputId,
++            action: "receipt",
++          }),
++        )
++      ).receipt;
++      expect(observed.eventId).toBe(crashEventId);
++      expect(await turns(first.sessionId)).toHaveLength(4);
++      console.info(
++        "native acceptance persisted; queue publication blocked and getter did not wake",
++      );
++      const blockedPublishers = await pool.query<{ pid: number }>(
++        "SELECT pid FROM pg_stat_activity WHERE application_name = $1 AND cardinality(pg_blocking_pids(pid)) > 0 AND query LIKE '%add_job%'",
++        [producerName],
++      );
++      expect(blockedPublishers.rows.length).toBeGreaterThan(0);
++      producer.kill("SIGKILL");
++      expect((await producerExit)[1]).toBe("SIGKILL");
++      // PostgreSQL may finish a blocked statement after its TCP client dies.
++      // Abort those exact producer backends while the table lock is held so
++      // this cut is before queue commit, not merely before client ACK.
++      const publisherPids = blockedPublishers.rows.map((row) => row.pid);
++      await pool.query(
++        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = ANY($1::int[])",
++        [publisherPids],
++      );
++      await eventually(
++        () =>
++          pool!
++            .query(
++              "SELECT count(*)::int AS count FROM pg_stat_activity WHERE pid = ANY($1::int[])",
++              [publisherPids],
++            )
++            .then((result) => result.rows[0].count as number),
++        (count) => count === 0,
++      );
+     } finally {
++      if (producer.exitCode === null && producer.signalCode === null) producer.kill("SIGKILL");
+       await lock.query("ROLLBACK");
+       lock.release();
+     }
+-    await pending;
+-    await start();
+-    const crashReceipt = await accepted(crashInput);
+-    expect(crashReceipt.eventId).toBe(crashEventId);
+-    expect(await accepted(crashInput)).toEqual(crashReceipt);
++    expect(await targetJobs()).toBe(0);
++    const recover = { sessionId: first.sessionId, inputId: crashInput.inputId, action: "recover" };
++    const beforeRecovery = (await readReceipt(await request({ ...recover, action: "receipt" })))
++      .receipt;
++    expect(beforeRecovery.eventId).toBe(crashEventId);
++    expect(await targetJobs()).toBe(0);
++    expect(await turns(first.sessionId)).toHaveLength(4);
++    expect(await (await request(recover, "bob")).json()).toEqual({});
++    expect(await (await request({ ...recover, inputId: randomUUID() })).json()).toEqual({});
++    expect(await targetJobs()).toBe(0);
++    const crashReceipt = (await readReceipt(await request(recover))).receipt;
++    expect(crashReceipt).toEqual(beforeRecovery);
++    expect((await readReceipt(await request(recover))).receipt).toEqual(crashReceipt);
+     await completed(first.sessionId, 5);
+-    console.info("crash restart replay verified");
++    console.info(
++      "payload-free recovery after commit-before-wake SIGKILL processed the sole native event",
++    );
+     expect((await request({ sessionId: first.sessionId, action: "reset" })).status).toBe(200);
+     await eventually(
+       () =>
+@@ -580,7 +698,7 @@ export default defineChannel({ routes: [POST("/proof", async (request, { from, a
+           .then((result) => result.rows[0]?.status),
+       (status) => ["completed", "cancelled"].includes(status),
+     );
+-    expect(await accepted(crashInput)).toEqual(crashReceipt);
++    expect((await readReceipt(await request(recover))).receipt).toEqual(crashReceipt);
+     expect(await turns(first.sessionId)).toHaveLength(5);
+     const events = await pool.query(
+       "SELECT id FROM workflow.workflow_events WHERE run_id = $1 AND type = 'hook_received' AND resume_id IS NOT NULL",
+diff --git a/packages/eve/test/scenarios/schedule-trigger.scenario.test.ts b/packages/eve/test/scenarios/schedule-trigger.scenario.test.ts
+index 99446c1..015a4ce 100644
+--- a/packages/eve/test/scenarios/schedule-trigger.scenario.test.ts
++++ b/packages/eve/test/scenarios/schedule-trigger.scenario.test.ts
+@@ -60,6 +60,9 @@ function createCapturingRuntime(captured: CapturedRun[]): Runtime {
+     getInputAcceptance() {
+       throw new Error("This fixture does not implement native input acceptance.");
+     },
++    recoverInputAcceptance() {
++      throw new Error("This fixture does not implement native input recovery.");
++    },
+     async createSession(input) {
+       captured.push({
+         adapter: input.adapter,
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 9a09617..84c3a9e 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -8505,7 +8505,7 @@ packages:
+     resolution: {integrity: sha512-KXOws/UvRrxaOkr/wZYePZHyaICLGLl0uK1WwH811+xI6cDdjtKFbIB8jz3FSqJ61Ux+Cy8EwMmT6VnuhNJnng==}
+ 
+   '@workflow/core@file:.acceptance-packages/workflow-core-5.0.0-beta.47.tgz':
+-    resolution: {integrity: sha512-jngRxpb4gTwtxsenOUobOCX5DenZqs4x6xsVRgLxVevITaiKfalTGkeoLbc5QV44nFMWVvbxtZ4w/jclxPVGlQ==, tarball: file:.acceptance-packages/workflow-core-5.0.0-beta.47.tgz}
++    resolution: {integrity: sha512-vbVzjsOcJz45sG1kifkLVFpM4khCs07F8/X9O97FR09s/rj6OCTLtkVWTJJ25dXL0SM4ihgjznwD1Dv0zhtLHA==, tarball: file:.acceptance-packages/workflow-core-5.0.0-beta.47.tgz}
+     version: 5.0.0-beta.47
+     peerDependencies:
+       '@opentelemetry/api': '1'
+@@ -8554,7 +8554,7 @@ packages:
+         optional: true
+ 
+   '@workflow/world@file:.acceptance-packages/workflow-world-5.0.0-beta.32.tgz':
+-    resolution: {integrity: sha512-MPIwfVHaqkvz7wqi9meN0GwFQyp9ryAR0I4JNU9uI3YKI6EtZHEEBmnYGQspOONIsNrUr8YIY1QqpVnfM0rKwg==, tarball: file:.acceptance-packages/workflow-world-5.0.0-beta.32.tgz}
++    resolution: {integrity: sha512-jTVb8T9ECcFJNOUtVWY+PFlnXTwXUaxf2IaoNr9ou4ciq8WBhmO+RNuMFEmoPeZs40OTaSYrybSSDjl7xMnFdA==, tarball: file:.acceptance-packages/workflow-world-5.0.0-beta.32.tgz}
+     version: 5.0.0-beta.32
+ 
+   '@zernio/chat-sdk-adapter@0.5.0':

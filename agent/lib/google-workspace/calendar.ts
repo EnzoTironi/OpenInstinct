@@ -3,6 +3,7 @@ import { calendar, type calendar_v3 } from "@googleapis/calendar";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { googleApiErrorStatus, withGoogleAuth } from "./client";
+import { calendarEventTime } from "./calendar-time";
 
 export const calendarEventSchema = z.object({
   attendees: z.array(z.email()).max(50).default([]),
@@ -22,6 +23,7 @@ export async function listCalendarEvents(
     maxResults: number;
     timeMax: string;
     timeMin: string;
+    timezone: string;
   }
 ) {
   return withCalendar(ctx, async (client) => {
@@ -35,10 +37,19 @@ export async function listCalendarEvents(
         singleEvents: true,
         timeMax: input.timeMax,
         timeMin: input.timeMin,
+        timeZone: input.timezone,
       },
       { signal: ctx.abortSignal }
     );
-    return { events: data.items ?? [] };
+    return {
+      displayTimezone: input.timezone,
+      events: (data.items ?? []).map((event) =>
+        Object.assign(event, {
+          localStart: calendarEventTime(event.start, input.timezone),
+          localEnd: calendarEventTime(event.end, input.timezone),
+        })
+      ),
+    };
   });
 }
 

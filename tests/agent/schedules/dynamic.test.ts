@@ -181,7 +181,11 @@ describe("scheduled report delivery", () => {
     const to = vi.fn<ScheduleToFn>(() => ({ send }));
     const attachSession = vi.fn<(sessionId: string) => Session>();
 
-    await dispatchScheduledReport({ attachSession, to }, report.run.id);
+    await dispatchScheduledReport(
+      { attachSession, to },
+      report.run.id,
+      report.job.conversationChannel
+    );
 
     expect(to).toHaveBeenCalledWith(expect.anything(), {
       adapterName: "linq",
@@ -219,7 +223,11 @@ describe("scheduled report delivery", () => {
       .mockReturnValue(attached);
     const to = vi.fn<ScheduleToFn>();
 
-    await dispatchScheduledReport({ attachSession, to }, report.run.id);
+    await dispatchScheduledReport(
+      { attachSession, to },
+      report.run.id,
+      report.job.conversationChannel
+    );
 
     expect(attachSession).toHaveBeenCalledExactlyOnceWith("web-session");
     expect(to).not.toHaveBeenCalled();
@@ -246,7 +254,8 @@ describe("scheduled report delivery", () => {
 
     await dispatchScheduledReport(
       { attachSession, to: vi.fn<ScheduleToFn>() },
-      report.run.id
+      report.run.id,
+      report.job.conversationChannel
     );
 
     expect(services.finalizeReport).toHaveBeenCalledExactlyOnceWith(
@@ -286,6 +295,16 @@ function workerSession(
   send = vi.fn<Session["send"]>()
 ): Session {
   return {
+    getInputAcceptance() {
+      throw new Error(
+        "Unexpected native acceptance lookup in scheduled-run regression."
+      );
+    },
+    recoverInputAcceptance() {
+      throw new Error(
+        "Unexpected native acceptance recovery in scheduled-run regression."
+      );
+    },
     cancel: vi.fn<Session["cancel"]>(),
     clear: vi.fn<Session["clear"]>(),
     compact: vi.fn<Session["compact"]>(),

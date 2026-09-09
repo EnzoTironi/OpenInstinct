@@ -1,4 +1,5 @@
 import { createEnv } from "@t3-oss/env-nextjs";
+import { Schema } from "effect";
 import { z } from "zod";
 import { isE164PhoneNumber } from "@shared/identity/phone-number";
 import { databaseUrlSchema } from "@shared/environment/database-url";
@@ -63,7 +64,7 @@ export const env = createEnv({
   server: {
     // Required
     DATABASE_URL: databaseUrlSchema,
-    KERNEL_API_KEY: requiredValue,
+    KERNEL_API_KEY: requiredValue.optional(),
 
     // Optional overrides with local defaults. Vercel deployments provision
     // installation secrets in their connected private Blob store.
@@ -83,7 +84,16 @@ export const env = createEnv({
     // Optional
     BLOB_READ_WRITE_TOKEN: requiredValue.optional(),
     BLOB_STORE_ID: requiredValue.optional(),
-    GOOGLE_CONNECTOR_UID: requiredValue.default("google/open-instinct"),
+    GOOGLE_CLIENT_ID: Schema.toStandardSchemaV1(
+      Schema.optional(Schema.NonEmptyString.check(Schema.isTrimmed()))
+    ),
+    GOOGLE_CLIENT_SECRET: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.NonEmptyString, {
+          disallowEncode: true,
+        })
+      )
+    ),
     LINQ_CONNECTOR: requiredValue.optional(),
     LINQ_PHONE_NUMBER: requiredValue
       .refine(
@@ -103,17 +113,6 @@ export const env = createEnv({
   experimental__runtimeEnv: {},
   emptyStringAsUndefined: true,
 });
-
-const authHostname = env.BETTER_AUTH_URL
-  ? new URL(env.BETTER_AUTH_URL).hostname
-  : undefined;
-
-export const localPhoneAuthBypassEnabled =
-  localDevelopment &&
-  (authHostname === "localhost" ||
-    authHostname?.endsWith(".localhost") === true ||
-    authHostname === "127.0.0.1" ||
-    authHostname === "[::1]");
 
 function hasValue(value: string | undefined) {
   return value !== undefined && value.trim().length > 0;

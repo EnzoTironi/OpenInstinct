@@ -1,0 +1,3 @@
+ALTER TABLE "channel_auth_challenge" DROP CONSTRAINT "channel_auth_challenge_confirmation_check";--> statement-breakpoint
+ALTER TABLE "channel_auth_challenge" ADD COLUMN "confirmed_sender_id" text;--> statement-breakpoint
+ALTER TABLE "channel_auth_challenge" ADD CONSTRAINT "channel_auth_challenge_confirmation_check" CHECK (("channel_auth_challenge"."confirmed_at" IS NULL AND "channel_auth_challenge"."confirmed_sender_id" IS NULL) OR ("channel_auth_challenge"."confirmed_at" IS NOT NULL AND "channel_auth_challenge"."confirmed_sender_id" IS NOT NULL AND length(trim("channel_auth_challenge"."confirmed_sender_id")) > 0));

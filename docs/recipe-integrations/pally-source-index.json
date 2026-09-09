@@ -1,0 +1,554 @@
+[
+  {
+    "name": "Pally vs Poke",
+    "source": "https://pally.com/compare/pally-vs-poke",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Instinct",
+    "source": "https://pally.com/compare/pally-vs-instinct",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Martin",
+    "source": "https://pally.com/compare/pally-vs-martin",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Folk",
+    "source": "https://pally.com/compare/pally-vs-folk",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Meta AI",
+    "source": "https://pally.com/compare/pally-vs-meta-ai",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Fyxer",
+    "source": "https://pally.com/compare/pally-vs-fyxer",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Lindy",
+    "source": "https://pally.com/compare/pally-vs-lindy",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Town",
+    "source": "https://pally.com/compare/pally-vs-town",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Ohai",
+    "source": "https://pally.com/compare/pally-vs-ohai",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Tomo",
+    "source": "https://pally.com/compare/pally-vs-tomo",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs ChatGPT",
+    "source": "https://pally.com/compare/pally-vs-chatgpt",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Alexa+",
+    "source": "https://pally.com/compare/pally-vs-alexa-plus",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs OpenClaw",
+    "source": "https://pally.com/compare/pally-vs-openclaw",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally vs Hermes Agent",
+    "source": "https://pally.com/compare/pally-vs-hermes-agent",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "The best AI personal assistants in 2026",
+    "source": "https://pally.com/guides/best-ai-personal-assistant",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Poke alternatives in 2026",
+    "source": "https://pally.com/guides/poke-alternatives",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Martin alternatives in 2026",
+    "source": "https://pally.com/guides/martin-alternatives",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "The best AI assistants for WhatsApp in 2026",
+    "source": "https://pally.com/guides/best-ai-assistant-for-whatsapp",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "The best AI assistants you can text in 2026",
+    "source": "https://pally.com/guides/best-ai-assistant-imessage-texting",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "The best AI email assistants in 2026",
+    "source": "https://pally.com/guides/best-ai-assistant-for-email",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep up with group chats without reading every message",
+    "source": "https://pally.com/guides/keep-up-with-group-chats",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "I keep missing important texts. How to stop notification overload on iPhone",
+    "source": "https://pally.com/guides/stop-missing-important-texts",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to catch up on WhatsApp and iMessage after a trip or a busy week",
+    "source": "https://pally.com/guides/catch-up-on-messages-after-a-trip",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to get through email without living in your inbox",
+    "source": "https://pally.com/guides/get-through-email-without-living-in-inbox",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to stop forgetting to reply to emails",
+    "source": "https://pally.com/guides/stop-forgetting-to-reply-to-emails",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to chase people who don't reply without being annoying",
+    "source": "https://pally.com/guides/chase-people-who-dont-reply",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to remember to follow up with people without a CRM",
+    "source": "https://pally.com/guides/remember-to-follow-up-without-a-crm",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep in touch with friends when life gets busy",
+    "source": "https://pally.com/guides/keep-in-touch-with-friends-when-busy",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to remember birthdays and the small details about people",
+    "source": "https://pally.com/guides/remember-birthdays-and-details-about-people",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Reminders that actually work when you have ADHD",
+    "source": "https://pally.com/guides/adhd-reminders-that-actually-work",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Location-based reminders on iPhone: what works and what doesn't",
+    "source": "https://pally.com/guides/location-based-reminders-iphone",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to get someone to make phone calls for you",
+    "source": "https://pally.com/guides/get-someone-to-make-phone-calls-for-you",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to book a restaurant or appointment without calling",
+    "source": "https://pally.com/guides/book-restaurant-or-appointment-without-calling",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to cancel a subscription that only lets you cancel by phone",
+    "source": "https://pally.com/guides/cancel-subscription-that-requires-a-phone-call",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to get quotes from contractors without spending your day on the phone",
+    "source": "https://pally.com/guides/get-contractor-quotes-without-phone-calls",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to find cheap flights without checking every day",
+    "source": "https://pally.com/guides/find-cheap-flights-without-checking-every-day",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to get notified when tickets go on sale or a price drops",
+    "source": "https://pally.com/guides/get-notified-when-tickets-or-prices-drop",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to track expenses and receipts without a budgeting app",
+    "source": "https://pally.com/guides/track-expenses-and-receipts-without-a-budgeting-app",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to split bills with friends without a spreadsheet",
+    "source": "https://pally.com/guides/split-bills-with-friends-without-a-spreadsheet",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Do I need an executive assistant, or can AI do it now?",
+    "source": "https://pally.com/guides/do-i-need-an-executive-assistant-or-ai",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How much does a personal assistant cost in 2026: human, virtual, and AI",
+    "source": "https://pally.com/guides/how-much-does-a-personal-assistant-cost",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "What can an AI assistant actually do over text?",
+    "source": "https://pally.com/guides/what-can-an-ai-assistant-do-over-text",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Can ChatGPT text me? What works and what doesn't",
+    "source": "https://pally.com/guides/can-chatgpt-text-me",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Can Siri send WhatsApp messages? What works and the alternatives",
+    "source": "https://pally.com/guides/can-siri-send-whatsapp-messages",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep track of school emails, permission slips, and deadlines without a spreadsheet",
+    "source": "https://pally.com/guides/track-school-emails-and-deadlines",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to manage the family calendar when everyone is on different apps",
+    "source": "https://pally.com/guides/manage-family-calendar-across-apps",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep up with the class group chat without reading 200 messages",
+    "source": "https://pally.com/guides/keep-up-with-class-group-chat",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to remember every kid's appointments, practices, and pickups",
+    "source": "https://pally.com/guides/remember-kids-appointments-and-pickups",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to plan a week of meals and get groceries ordered in ten minutes",
+    "source": "https://pally.com/guides/plan-meals-and-order-groceries-fast",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to remember birthdays, gifts, and thank-you notes for the whole family",
+    "source": "https://pally.com/guides/remember-family-birthdays-gifts-thank-you-notes",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to book a pediatrician, dentist, or hair appointment without sitting on hold",
+    "source": "https://pally.com/guides/book-pediatrician-or-dentist-without-hold",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep a medication log for kids that actually gets followed",
+    "source": "https://pally.com/guides/kids-medication-log-that-gets-followed",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to get a summary of the group chat while you were at work",
+    "source": "https://pally.com/guides/group-chat-summary-while-at-work",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to never miss a pickup change or a snow day text",
+    "source": "https://pally.com/guides/never-miss-pickup-change-or-snow-day",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Do busy parents need a personal assistant? What AI can and cannot take off your plate",
+    "source": "https://pally.com/guides/do-busy-parents-need-a-personal-assistant",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to stop forgetting assignment deadlines without a planner app",
+    "source": "https://pally.com/guides/stop-forgetting-assignment-deadlines",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep up with professor emails, Canvas notifications, and club group chats",
+    "source": "https://pally.com/guides/keep-up-with-professor-emails-and-club-chats",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to get reminded to leave for class based on where you are",
+    "source": "https://pally.com/guides/leave-for-class-reminders-by-location",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to split rent, utilities, and groceries with roommates without arguments",
+    "source": "https://pally.com/guides/split-rent-and-utilities-with-roommates",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to track spending on a college budget without a finance app",
+    "source": "https://pally.com/guides/track-spending-on-a-college-budget",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to find cheap flights home for break without checking every day",
+    "source": "https://pally.com/guides/cheap-flights-home-for-break",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to get reminded to apply for internships and follow up with recruiters",
+    "source": "https://pally.com/guides/internship-application-and-recruiter-follow-up-reminders",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to research a topic fast and get sources you can cite",
+    "source": "https://pally.com/guides/research-a-topic-fast-with-citable-sources",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to build a workout or study habit with a daily accountability nudge",
+    "source": "https://pally.com/guides/daily-accountability-nudge-for-workout-or-study",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Best free AI assistant for college students in 2026 and what the free tiers include",
+    "source": "https://pally.com/guides/best-free-ai-assistant-for-college-students",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to reply to every lead within an hour when you are a one-person team",
+    "source": "https://pally.com/guides/reply-to-every-lead-within-an-hour-solo",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to run your day without an executive assistant",
+    "source": "https://pally.com/guides/run-your-day-without-an-executive-assistant",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to chase unpaid invoices without awkward emails",
+    "source": "https://pally.com/guides/chase-unpaid-invoices-without-awkward-emails",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to prep for every meeting in five minutes",
+    "source": "https://pally.com/guides/prep-for-every-meeting-in-five-minutes",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep up with Slack, email, and WhatsApp customers from one place",
+    "source": "https://pally.com/guides/keep-up-with-slack-email-whatsapp-customers",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to remember every promise you made on a call or in a chat",
+    "source": "https://pally.com/guides/remember-every-promise-from-calls-and-chats",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to get quotes from suppliers and contractors without a day of phone calls",
+    "source": "https://pally.com/guides/get-supplier-quotes-without-a-day-of-calls",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to track business expenses and receipts by text",
+    "source": "https://pally.com/guides/track-business-expenses-and-receipts-by-text",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to schedule a meeting over text without the back and forth",
+    "source": "https://pally.com/guides/schedule-a-meeting-over-text-without-back-and-forth",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to follow up with leads consistently without a CRM",
+    "source": "https://pally.com/guides/follow-up-with-leads-without-a-crm",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep customers updated on orders and shipments without doing it by hand",
+    "source": "https://pally.com/guides/keep-customers-updated-on-orders-and-shipments",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Executive assistant vs virtual assistant vs AI assistant: what a founder should hire in 2026",
+    "source": "https://pally.com/guides/executive-assistant-vs-virtual-assistant-vs-ai",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How much does an executive assistant cost, and when does AI make sense instead",
+    "source": "https://pally.com/guides/how-much-does-an-executive-assistant-cost",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to lock in and stop procrastinating",
+    "source": "https://pally.com/guides/how-to-lock-in-and-stop-procrastinating",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to stay consistent at the gym when motivation fades",
+    "source": "https://pally.com/guides/how-to-stay-consistent-at-the-gym",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to track workouts and protein without another app",
+    "source": "https://pally.com/guides/track-workouts-and-protein-by-text",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to stay motivated when you don't feel like doing anything",
+    "source": "https://pally.com/guides/stay-motivated-when-you-dont-feel-like-it",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to stop doomscrolling and get your time back",
+    "source": "https://pally.com/guides/stop-doomscrolling-and-get-time-back",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to fix your sleep schedule in two weeks",
+    "source": "https://pally.com/guides/fix-your-sleep-schedule",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to keep up with schoolwork and a packed schedule",
+    "source": "https://pally.com/guides/keep-up-with-schoolwork-and-a-packed-schedule",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to study for finals without burning out",
+    "source": "https://pally.com/guides/study-for-finals-without-burning-out",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to budget your first paycheck",
+    "source": "https://pally.com/guides/budget-your-first-paycheck",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "How to build a morning routine that sticks",
+    "source": "https://pally.com/guides/build-a-morning-routine-that-sticks",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally for parents",
+    "source": "https://pally.com/guides/for-parents",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally for students",
+    "source": "https://pally.com/guides/for-students",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally for founders",
+    "source": "https://pally.com/guides/for-founders",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  },
+  {
+    "name": "Pally for Gen Z",
+    "source": "https://pally.com/guides/for-genz",
+    "status": "indexed_in_llms_not_individually_audited",
+    "observed_on": "2026-09-08"
+  }
+]

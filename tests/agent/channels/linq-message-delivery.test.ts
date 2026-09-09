@@ -1,3 +1,5 @@
+import { Result, Schema } from "effect";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import type { LinqChannelConfig } from "eve/channels/linq";
 import {
   createLinqAdapter,
@@ -519,71 +521,93 @@ describe("Linq message delivery", () => {
 
   it("requires a native link preview to be its own send_message call", () => {
     expect(
-      sendMessageOutputSchema.safeParse({
-        kind: "link",
-        text: "Read this",
-        url: "https://example.com/article",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          kind: "link",
+          text: "Read this",
+          url: "https://example.com/article",
+        })
+      )
     ).toBe(false);
   });
 
   it("accepts typed reply handles for text, attachments, and native links", () => {
     expect(
-      sendMessageOutputSchema.safeParse({
-        kind: "message",
-        replyTo: { kind: "current" },
-        text: "This one.",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          kind: "message",
+          replyTo: { kind: "current" },
+          text: "This one.",
+        })
+      )
     ).toBe(true);
     expect(
-      sendMessageOutputSchema.safeParse({
-        kind: "message",
-        replyTo: { id: "task-1", kind: "task" },
-        text: "This one.",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          kind: "message",
+          replyTo: { id: "task-1", kind: "task" },
+          text: "This one.",
+        })
+      )
     ).toBe(true);
     expect(
-      sendMessageOutputSchema.safeParse({
-        kind: "link",
-        replyTo: {
-          id: "00000000-0000-4000-8000-000000000003",
-          kind: "automation",
-        },
-        url: "https://example.com",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          kind: "link",
+          replyTo: {
+            id: "00000000-0000-4000-8000-000000000003",
+            kind: "automation",
+          },
+          url: "https://example.com",
+        })
+      )
     ).toBe(true);
     expect(
-      sendMessageOutputSchema.safeParse({
-        attachments: [{ kind: "image", url: "https://example.com/image.png" }],
-        kind: "message",
-        replyTo: { kind: "current" },
-        text: "This one.",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          attachments: [
+            { kind: "image", url: "https://example.com/image.png" },
+          ],
+          kind: "message",
+          replyTo: { kind: "current" },
+          text: "This one.",
+        })
+      )
     ).toBe(true);
   });
 
   it("discriminates native links from message content", () => {
     expect(
-      sendMessageOutputSchema.safeParse({
-        attachments: [{ kind: "image", url: "https://example.com/image.png" }],
-        kind: "message",
-        text: "A caption",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          attachments: [
+            { kind: "image", url: "https://example.com/image.png" },
+          ],
+          kind: "message",
+          text: "A caption",
+        })
+      )
     ).toBe(true);
-    expect(sendMessageOutputSchema.safeParse({ kind: "message" }).success).toBe(
-      false
-    );
     expect(
-      sendMessageOutputSchema.safeParse({
-        kind: "message",
-        text: "Read this",
-        url: "https://example.com/article",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({ kind: "message" })
+      )
     ).toBe(false);
     expect(
-      sendMessageOutputSchema.safeParse({
-        link: "https://example.com/article",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          kind: "message",
+          text: "Read this",
+          url: "https://example.com/article",
+        })
+      )
+    ).toBe(false);
+    expect(
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          link: "https://example.com/article",
+        })
+      )
     ).toBe(false);
   });
 
@@ -592,22 +616,28 @@ describe("Linq message delivery", () => {
     const maximumLengthLink = `${prefix}${"a".repeat(2048 - prefix.length)}`;
 
     expect(
-      sendMessageOutputSchema.safeParse({
-        kind: "link",
-        url: maximumLengthLink,
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          kind: "link",
+          url: maximumLengthLink,
+        })
+      )
     ).toBe(true);
     expect(
-      sendMessageOutputSchema.safeParse({
-        kind: "link",
-        url: `${maximumLengthLink}a`,
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          kind: "link",
+          url: `${maximumLengthLink}a`,
+        })
+      )
     ).toBe(false);
     expect(
-      sendMessageOutputSchema.safeParse({
-        kind: "link",
-        url: "http://example.com/article",
-      }).success
+      Result.isSuccess(
+        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+          kind: "link",
+          url: "http://example.com/article",
+        })
+      )
     ).toBe(false);
   });
 
@@ -675,7 +705,7 @@ describe("Linq message delivery", () => {
     expect(linqChannelCapture.readImage).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user-1",
-        workspaceId: "workspace-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
       }),
       artifactId,
       { rootSessionId: "session-1", signal: undefined }
@@ -723,7 +753,7 @@ describe("Linq message delivery", () => {
     expect(linqChannelCapture.readImage).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user-1",
-        workspaceId: "workspace-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
       }),
       artifactId,
       { rootSessionId: "scheduled-run-session", signal: undefined }
@@ -963,12 +993,12 @@ function sessionContext(
           scheduledReportSequence: "1",
           scheduledRunId: "00000000-0000-4000-8000-000000000002",
           scheduledRunSessionId: "scheduled-run-session",
-          workspaceId: "workspace-1",
+          workspaceId: accessScopeForUser("user-1").workspaceId,
         }
       : {
           conversationChannel: "linq",
           conversationId: "linq:dm:chat-1",
-          workspaceId: "workspace-1",
+          workspaceId: accessScopeForUser("user-1").workspaceId,
         };
   if (authenticator !== "scheduled-result" && currentMessageId) {
     attributes.linqMessageId = currentMessageId;

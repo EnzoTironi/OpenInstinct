@@ -123,13 +123,20 @@ export function ChatConversation({
                     canRespond={!isBusy && agent.status !== "resuming"}
                     isStreaming={false}
                     key={delivery.id}
-                    message={{ ...message, id: delivery.id }}
+                    message={{ ...message, id: delivery.id, parts: [] }}
                     onInputResponses={(responses) => agent.respond(responses)}
                     sentMessageParts={delivery.parts}
                     timestamp={delivery.timestamp}
                     userVisibleOnly
                   />
                 ))}
+                <AgentMessage
+                  canRespond={!isBusy && agent.status !== "resuming"}
+                  isStreaming={false}
+                  message={message}
+                  onInputResponses={(responses) => agent.respond(responses)}
+                  userVisibleOnly
+                />
               </Fragment>
             );
           }

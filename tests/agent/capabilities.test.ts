@@ -1,3 +1,4 @@
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import type { DynamicResolveContext } from "eve/tools";
 import { describe, expect, it } from "vitest";
 import personalInfoMemory from "@agent/memory/personal_info";
@@ -79,7 +80,7 @@ async function authoredCapabilities(authenticator: string) {
       scope: {
         key: "personal-info-key",
         namespace: "openinstinct-personal-info-v1",
-        value: "personal:workspace",
+        value: accessScopeForUser("user-1").workspaceId,
       },
       slot: "personal_info",
     },
@@ -123,7 +124,7 @@ function dynamicContext(authenticator: string) {
     session: {
       auth: {
         current: {
-          attributes: { workspaceId: "personal:workspace" },
+          attributes: { workspaceId: accessScopeForUser("user-1").workspaceId },
           authenticator,
           principalId: "user-1",
           principalType: "user",

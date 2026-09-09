@@ -1,3 +1,5 @@
+import { isToolSchema } from "../../../node_modules/eve/dist/src/tools/schema.js";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import type {
   DynamicResolveContext,
   ToolContext,
@@ -72,7 +74,10 @@ describe("schedule tools", () => {
       toolContext("schedules-answer", "linq")
     );
     expect(services.getInput).toHaveBeenCalledExactlyOnceWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       {
         conversationChannel: "linq",
         conversationId: "linq:dm:chat-1",
@@ -145,7 +150,10 @@ describe("schedule tools", () => {
       "timing",
     ]);
     expect(services.create).toHaveBeenCalledExactlyOnceWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       {
         conversationChannel: "linq",
         conversationId: "linq:dm:chat-1",
@@ -174,7 +182,10 @@ describe("schedule tools", () => {
 
     expect(inputProperties(listSchedules.inputSchema)).toEqual([]);
     expect(services.list).toHaveBeenCalledExactlyOnceWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       {
         conversationChannel: "linq",
         conversationId: "linq:dm:chat-1",
@@ -202,7 +213,10 @@ describe("schedule tools", () => {
       "timing",
     ]);
     expect(services.update).toHaveBeenCalledExactlyOnceWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       {
         conversationChannel: "linq",
         conversationId: "linq:dm:chat-1",
@@ -256,21 +270,22 @@ describe("schedule tools", () => {
       debugMessaging && !("execute" in debugMessaging)
         ? debugMessaging.send_message
         : undefined;
-    if (
-      !(reportSend?.inputSchema instanceof z.ZodType) ||
-      !(interactiveSend?.inputSchema instanceof z.ZodType) ||
-      !(debugSend?.inputSchema instanceof z.ZodType)
-    ) {
-      throw new Error("Expected authored send_message schemas.");
-    }
     const reply = {
       kind: "message",
       replyTo: { kind: "current" as const },
       text: "This one.",
     };
-    expect(interactiveSend.inputSchema.safeParse(reply).success).toBe(true);
-    expect(debugSend.inputSchema.safeParse(reply).success).toBe(true);
-    expect(reportSend.inputSchema.safeParse(reply).success).toBe(true);
+    await Promise.all(
+      [interactiveSend, debugSend, reportSend].map(async (tool) => {
+        const schema = tool?.inputSchema;
+        if (!isToolSchema(schema)) {
+          throw new Error("Expected authored send_message schemas.");
+        }
+        const result = await schema["~standard"].validate(reply);
+        expect(result.issues).toBeUndefined();
+        expect(result).toEqual({ value: reply });
+      })
+    );
   });
 
   it("owns web schedules by their Eve session", async () => {
@@ -295,7 +310,10 @@ describe("schedule tools", () => {
     );
 
     expect(services.create).toHaveBeenCalledWith(
-      { userId: "user-1", workspaceId: "workspace-1" },
+      {
+        userId: "user-1",
+        workspaceId: accessScopeForUser("user-1").workspaceId,
+      },
       expect.objectContaining({
         conversationChannel: "eve",
         conversationId: "session-1",
@@ -370,7 +388,7 @@ function toolContext(
             conversationId: "linq:dm:chat-1",
             linqMessageId: "message-1",
             linqThreadId: "linq:dm:chat-1",
-            workspaceId: "workspace-1",
+            workspaceId: accessScopeForUser("user-1").workspaceId,
           },
           authenticator,
           principalId: "user-1",
@@ -446,7 +464,7 @@ function scheduledJob(
       timezone: "America/New_York",
     },
     updatedAt: new Date("2026-09-01T12:00:00.000Z"),
-    workspaceId: "workspace-1",
+    workspaceId: accessScopeForUser("user-1").workspaceId,
   };
 }
 

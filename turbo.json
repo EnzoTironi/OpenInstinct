@@ -15,7 +15,7 @@
         "SECRET_ENCRYPTION_KEY",
         "VERCEL_*"
       ],
-      "outputs": [".next/**", "!.next/cache/**", "next-env.d.ts"]
+      "outputs": [".next/**", "!.next/cache/**", ".output/**", "next-env.d.ts"]
     },
     "build:vercel": {
       "dependsOn": ["db:migrate"],
@@ -40,6 +40,7 @@
     "dev:app": {
       "cache": false,
       "passThroughEnv": [
+        "AI_GATEWAY_API_KEY",
         "BETTER_AUTH_*",
         "BLOB_*",
         "DATABASE_URL",
@@ -48,7 +49,8 @@
         "LINQ_*",
         "NODE_ENV",
         "SECRET_ENCRYPTION_KEY",
-        "VERCEL_*"
+        "VERCEL_*",
+        "WORKFLOW_*"
       ],
       "persistent": true
     },
@@ -62,11 +64,13 @@
       "outputs": []
     },
     "lint:app": {
-      "outputs": []
+      "outputs": [],
+      "dependsOn": ["types:generate"]
     },
     "start:app": {
       "cache": false,
       "passThroughEnv": [
+        "AI_GATEWAY_API_KEY",
         "BETTER_AUTH_*",
         "BLOB_*",
         "DATABASE_URL",
@@ -75,7 +79,8 @@
         "LINQ_*",
         "NODE_ENV",
         "SECRET_ENCRYPTION_KEY",
-        "VERCEL_*"
+        "VERCEL_*",
+        "WORKFLOW_*"
       ],
       "persistent": true
     },

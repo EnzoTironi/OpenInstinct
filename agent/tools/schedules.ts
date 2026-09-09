@@ -1,8 +1,10 @@
 import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
 import { z } from "zod";
+import { requireChannelPrincipal } from "../../server/channels/principal";
+import { serverRuntime } from "../../server/runtime";
 import { resolveModeValue } from "@agent/lib/mode";
 import { scheduledReportIdentity } from "@agent/lib/schedules/identity";
-import { postScheduledRunRoute } from "@agent/lib/schedules/request";
+import { postInternalRequest } from "@agent/lib/internal-request";
 import {
   scheduleListSummary,
   scheduleOwner,
@@ -27,7 +29,7 @@ export const createSchedule = defineTool({
     timing: scheduleTimingSchema,
   }),
   async execute(input, context) {
-    const owner = scheduleOwner(context);
+    const owner = await authorizedScheduleOwner(context);
     return scheduleSummary(
       await createScheduledAgentJob(owner.scope, {
         ...owner.conversation,
@@ -45,7 +47,7 @@ export const listSchedules = defineTool({
     "List the authenticated user's one-time and recurring jobs for this conversation. Use this before changing a schedule when the target is ambiguous.",
   inputSchema: z.object({}),
   async execute(_input, context) {
-    const owner = scheduleOwner(context);
+    const owner = await authorizedScheduleOwner(context);
     return (await listScheduledAgentJobs(owner.scope, owner.conversation)).map(
       scheduleListSummary
     );
@@ -70,7 +72,7 @@ export const updateSchedule = defineTool({
     "Update, pause, resume, or delete one of the authenticated user's scheduled jobs. Set status paused or active to pause or resume it. List schedules first when the target is ambiguous.",
   inputSchema: updateScheduleInputSchema,
   async execute({ id, ...patch }, context) {
-    const owner = scheduleOwner(context);
+    const owner = await authorizedScheduleOwner(context);
     const job = await updateScheduledAgentJob(
       owner.scope,
       owner.conversation,
@@ -94,7 +96,7 @@ export const answerSchedule = defineTool({
     if (!pending) {
       throw new Error("That scheduled task is not waiting for input.");
     }
-    const response = await postScheduledRunRoute(
+    const response = await postInternalRequest(
       "/internal/scheduled-run/respond",
       {
         answer,
@@ -130,8 +132,8 @@ export default defineDynamic({
 
 async function pendingScheduledRun(context: ToolContext, runId: string) {
   const resolvePending = resolveModeValue(context, {
-    interactive: () => {
-      const owner = scheduleOwner(context);
+    interactive: async () => {
+      const owner = await authorizedScheduleOwner(context);
       return getScheduledAgentRunInput(owner.scope, owner.conversation, runId);
     },
     "scheduled-report": () => {
@@ -146,4 +148,15 @@ async function pendingScheduledRun(context: ToolContext, runId: string) {
     },
   });
   return resolvePending?.();
+}
+
+async function authorizedScheduleOwner(context: ToolContext) {
+  const owner = scheduleOwner(context);
+  const channel = owner.conversation.conversationChannel;
+  if (channel === "telegram" || channel === "kapso") {
+    await serverRuntime.runPromise(
+      requireChannelPrincipal(channel, context.session.auth.current)
+    );
+  }
+  return owner;
 }

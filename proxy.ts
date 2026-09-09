@@ -5,7 +5,10 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   if (
     pathname === "/sign-in" ||
+    pathname === "/sign-in/device" ||
     pathname.startsWith("/api/auth/") ||
+    pathname === "/api/channels/telegram" ||
+    pathname === "/api/channels/kapso" ||
     pathname === "/eve/v1/health" ||
     pathname.startsWith("/internal/scheduled-run/") ||
     pathname === "/eve/v1/dev/schedules/dynamic"

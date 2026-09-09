@@ -1,29 +1,33 @@
+import { serverRuntime } from "../../server/runtime";
+import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
 import { defineChannel, POST } from "eve/channels";
-import { localDev, routeAuth, vercelOidc } from "eve/channels/auth";
 import { parseInputResponses, resolveTextToResponses } from "eve/client";
-import { z } from "zod";
+import { ConfigProvider, Effect, Result, Schema } from "effect";
+import {
+  InternalCallbackRejected,
+  readAuthenticatedInternalCallback,
+  internalCallbackBodies,
+} from "../../server/internal/callback-auth";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
 import {
   claimScheduledAgentRunInput,
+  getScheduledReportChannel,
   finishScheduledAgentRunInput,
   restoreScheduledAgentRunInput,
 } from "@db/services/scheduled-agent-jobs";
 
-const scheduledRunTargetSchema = z.strictObject({
-  restart: z.boolean().optional(),
-  runId: z.uuid(),
+const scheduledRunTargetSchema = Schema.Struct({
+  restart: Schema.optionalKey(Schema.Boolean),
+  runId: Schema.String.check(Schema.isUUID()),
 });
-const reportSchema = z.strictObject({ runId: z.uuid() });
-const respondSchema = z.strictObject({
-  answer: z.string().trim().min(1).max(8_000),
-  leaseToken: z.uuid(),
-  runId: z.uuid(),
-});
-const internalRouteAuth = [vercelOidc(), localDev()];
 
 export default defineChannel({
   async receive(input, { from }) {
-    const target = scheduledRunTargetSchema.parse(input.target);
+    const target = await Effect.runPromise(
+      Schema.decodeUnknownEffect(scheduledRunTargetSchema, {
+        onExcessProperty: "error",
+      })(input.target)
+    );
     const source = from(`scheduled-run:${target.runId}`);
     if (target.restart) {
       await source.reset({
@@ -39,23 +43,88 @@ export default defineChannel({
     POST(
       "/internal/scheduled-run/report",
       async (request, { attachSession, to, waitUntil }) => {
-        const auth = await routeAuth(request, internalRouteAuth);
-        if (auth instanceof Response) return auth;
-        const parsed = reportSchema.safeParse(await request.json());
-        if (parsed.success) {
-          waitUntil(
-            dispatchScheduledReport({ attachSession, to }, parsed.data.runId)
-          );
-        }
-        return new Response(null, { status: 202 });
+        return Effect.runPromise(
+          Effect.gen(function* () {
+            const raw = yield* readAuthenticatedInternalCallback(
+              request,
+              "/internal/scheduled-run/report"
+            );
+            if (raw instanceof Response) return raw;
+            const input = yield* Schema.decodeUnknownEffect(
+              Schema.fromJsonString(
+                internalCallbackBodies["/internal/scheduled-run/report"]
+              ),
+              { onExcessProperty: "error" }
+            )(raw.toString("utf8")).pipe(
+              Effect.mapError(
+                () => new InternalCallbackRejected({ status: 400 })
+              )
+            );
+            const channel = yield* Effect.tryPromise(() =>
+              getScheduledReportChannel(input.runId)
+            );
+            if (channel)
+              waitUntil(
+                dispatchScheduledReport(
+                  { attachSession, to },
+                  input.runId,
+                  channel
+                )
+              );
+            return new Response(null, { status: 202 });
+          }).pipe(
+            Effect.provideService(
+              ConfigProvider.ConfigProvider,
+              ConfigProvider.fromEnv()
+            ),
+            Effect.catchTag("InternalCallbackRejected", (error) =>
+              Effect.succeed(
+                new Response("Scheduled callback rejected", {
+                  status: error.status,
+                })
+              )
+            )
+          ),
+          { signal: request.signal }
+        );
       }
     ),
     POST(
       "/internal/scheduled-run/respond",
       async (request, { attachSession }) => {
-        const auth = await routeAuth(request, internalRouteAuth);
-        if (auth instanceof Response) return auth;
-        const input = respondSchema.parse(await request.json());
+        const decoded = await Effect.runPromise(
+          Effect.gen(function* () {
+            const raw = yield* readAuthenticatedInternalCallback(
+              request,
+              "/internal/scheduled-run/respond"
+            );
+            if (raw instanceof Response) return raw;
+            return yield* Schema.decodeUnknownEffect(
+              Schema.fromJsonString(
+                internalCallbackBodies["/internal/scheduled-run/respond"]
+              ),
+              { onExcessProperty: "error" }
+            )(raw.toString("utf8")).pipe(
+              Effect.mapError(
+                () => new InternalCallbackRejected({ status: 400 })
+              )
+            );
+          }).pipe(
+            Effect.provideService(
+              ConfigProvider.ConfigProvider,
+              ConfigProvider.fromEnv()
+            ),
+            Effect.result
+          ),
+          { signal: request.signal }
+        );
+        if (Result.isFailure(decoded)) {
+          return new Response("Scheduled callback rejected", {
+            status: decoded.failure.status,
+          });
+        }
+        if (decoded.success instanceof Response) return decoded.success;
+        const input = decoded.success;
         const claimed = await claimScheduledAgentRunInput(
           input.runId,
           input.leaseToken
@@ -78,17 +147,33 @@ export default defineChannel({
           return new Response(null, { status: 422 });
         }
         try {
+          const channel = claimed.job.conversationChannel;
+          if (channel === "telegram" || channel === "kapso") {
+            await serverRuntime.runPromise(
+              requireScheduledChannelOwner({
+                ...claimed.job,
+                conversationChannel: channel,
+              })
+            );
+          }
+          const attributes = {
+            conversationChannel: claimed.job.conversationChannel,
+            conversationId: claimed.job.conversationId,
+            scheduleId: claimed.job.id,
+            scheduledRunId: claimed.run.id,
+            workspaceId: claimed.job.workspaceId,
+          };
           const result = await attachSession(
             claimed.run.workerSessionId
           ).respond(responses, {
             auth: {
-              attributes: {
-                conversationChannel: claimed.job.conversationChannel,
-                conversationId: claimed.job.conversationId,
-                scheduleId: claimed.job.id,
-                scheduledRunId: claimed.run.id,
-                workspaceId: claimed.job.workspaceId,
-              },
+              attributes:
+                channel === "telegram" || channel === "kapso"
+                  ? {
+                      ...attributes,
+                      channelIdentityId: claimed.job.conversationId,
+                    }
+                  : attributes,
               authenticator: "scheduled-input",
               issuer: "open-instinct",
               principalId: claimed.job.createdByUserId,

@@ -184,6 +184,64 @@ describe("iMessage event projection", () => {
     ]);
   });
 
+  it("shows a task report once across call retries and later terminal deliveries", () => {
+    const first = toolResult(
+      "send_message",
+      { kind: "message", text: "Original report", deliveryId: "report-a" },
+      1,
+      undefined,
+      "completed",
+      "call-first"
+    );
+    const retry = toolResult(
+      "send_message",
+      { kind: "message", text: "Reworded report", deliveryId: "report-a" },
+      2,
+      undefined,
+      "completed",
+      "call-retry"
+    );
+    if (retry.type !== "action.result")
+      throw new Error("Expected result fixture");
+    const later = { ...retry, data: { ...retry.data, turnId: "turn-2" } };
+    const next = toolResult(
+      "send_message",
+      { kind: "message", text: "Different task", deliveryId: "report-b" },
+      3,
+      undefined,
+      "completed",
+      "call-next"
+    );
+    const ordinary = toolResult(
+      "send_message",
+      { kind: "message", text: "An ordinary answer" },
+      4,
+      undefined,
+      "completed",
+      "call-ordinary"
+    );
+    const messages = [
+      ...sentMessages([first, retry, later, next, ordinary]).values(),
+    ].flat();
+    expect(messages).toHaveLength(3);
+    expect(messages.map((message) => message.parts)).toEqual([
+      [expect.objectContaining({ text: "Original report" })],
+      [expect.objectContaining({ text: "Different task" })],
+      [expect.objectContaining({ text: "An ordinary answer" })],
+    ]);
+  });
+
+  it("does not display an already-delivered task receipt as another message", () => {
+    expect(
+      sentMessages([
+        toolResult("send_message", {
+          kind: "task-report-receipt",
+          deliveryId: "report-a",
+        }),
+      ]).size
+    ).toBe(0);
+  });
+
   it.each(["failed", "rejected"] as const)(
     "ignores %s send_message results",
     (status) => {

@@ -1,3 +1,4 @@
+import { Result, Schema } from "effect";
 import { connectLinqCredentials } from "@vercel/connect/eve";
 import { LinqAPIV3 } from "@linqapp/sdk";
 import type { AdapterPostableMessage } from "chat";
@@ -9,7 +10,7 @@ import {
 import { vercelOidc } from "eve/channels/auth";
 import { z } from "zod";
 import { resolveLinqReplyTarget } from "@agent/lib/reply-targets";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "../../shared/identity/principal-scope";
 import { getAuth } from "@db/services/auth";
 import { sendMessageToolResultSchema } from "@shared/chat/message-delivery";
 import { reactToMessageToolResultSchema } from "@shared/chat/reaction";
@@ -68,8 +69,10 @@ export default linqChannel({
   credentials,
   events: {
     async "action.result"(event, context, session) {
-      const reaction = reactToMessageToolResultSchema.safeParse(event.result);
-      if (event.status === "completed" && reaction.success) {
+      const reaction = Schema.decodeUnknownResult(
+        reactToMessageToolResultSchema
+      )(event.result);
+      if (event.status === "completed" && Result.isSuccess(reaction)) {
         if (!context.thread) {
           throw new Error(
             "react_to_message requires an active Linq conversation thread."
@@ -80,25 +83,27 @@ export default linqChannel({
           throw new Error("react_to_message requires a current Linq message.");
         }
         const adapter = context.bot.getAdapter("linq");
-        if (reaction.data.output.operation === "remove") {
+        if (reaction.success.output.operation === "remove") {
           await adapter.removeReaction(
             context.thread.id,
             messageId,
-            reaction.data.output.type
+            reaction.success.output.type
           );
         } else {
           await adapter.addReaction(
             context.thread.id,
             messageId,
-            reaction.data.output.type
+            reaction.success.output.type
           );
         }
         await finalizeScheduledReportDelivery(session);
         return;
       }
 
-      const message = sendMessageToolResultSchema.safeParse(event.result);
-      if (event.status === "completed" && message.success) {
+      const message = Schema.decodeUnknownResult(sendMessageToolResultSchema)(
+        event.result
+      );
+      if (event.status === "completed" && Result.isSuccess(message)) {
         const { thread } = context;
         if (!thread) {
           throw new Error(
@@ -107,7 +112,7 @@ export default linqChannel({
         }
         const report = scheduledReportFromSession(session);
         const replyTarget = resolveLinqReplyTarget(
-          message.data.output.replyTo,
+          message.success.output.replyTo,
           session.session.auth
         );
         const requestedReplyMessageId =
@@ -144,8 +149,8 @@ export default linqChannel({
           return chatId;
         };
 
-        if (message.data.output.kind === "link") {
-          const { url } = message.data.output;
+        if (message.success.output.kind === "link") {
+          const { url } = message.success.output;
           const chatId = resolveExistingChatId();
           const apiKey = await credentials.apiKey();
           const client = new LinqAPIV3({ apiKey });
@@ -183,10 +188,10 @@ export default linqChannel({
           return;
         }
 
-        const attachments = message.data.output.attachments?.map(
+        const attachments = message.success.output.attachments?.map(
           ({ kind, ...attachment }) => ({ ...attachment, type: kind })
         );
-        const { text: requestedText } = message.data.output;
+        const { text: requestedText } = message.success.output;
         if (!requestedText) {
           if (attachments?.length) {
             await sendLinqMessage({

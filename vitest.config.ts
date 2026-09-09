@@ -29,6 +29,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // Keep simultaneous PGlite initialization bounded while CI runs TS7 and lint.
+    maxWorkers: 2,
     setupFiles: ["./tests/setup-env.ts"],
   },
 });
