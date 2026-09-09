@@ -242,16 +242,15 @@ describe("trace event persistence", () => {
     );
   });
 
-  it("labels durable workflow tool calls in the trace", async () => {
+  it("labels tool calls in the trace", async () => {
     await fire("*", {
       data: {
         actions: [
           {
             callId: "workflow-call",
             input: {},
-            kind: "workflow-tool-call",
+            kind: "tool-call",
             toolName: "check_availability",
-            workflowId: "workflow-hotel",
           },
         ],
         sequence: 0,

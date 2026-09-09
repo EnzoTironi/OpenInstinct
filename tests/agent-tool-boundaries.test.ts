@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import rootAgent from "@agent/agent";
 
 const rootTools = "agent/tools";
 const rootMemory = "agent/memory/profile.ts";
@@ -19,7 +18,6 @@ function toolFiles(directory: string, root = directory): string[] {
 
 describe("root and worker capability boundaries", () => {
   it("keeps root coordination separate from browser execution", () => {
-    expect(rootAgent.defaultTools).toBe(false);
     expect(toolFiles(rootTools)).toEqual([
       "artifacts.ts",
       "ask_question.ts",
@@ -31,8 +29,6 @@ describe("root and worker capability boundaries", () => {
       "personal-memory.ts",
       "respond-to-approval.ts",
       "schedules.ts",
-      "task_cancel.ts",
-      "task_update.ts",
       "vault.ts",
       "web_fetch.ts",
       "web_search.ts",

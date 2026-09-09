@@ -47,6 +47,7 @@ describe("browser benchmark live activity", () => {
         {
           data: {
             messageDelta: "Searching ",
+            messageSoFar: "Searching ",
             sequence: 0,
             stepIndex: 0,
             turnId: "turn_1",
@@ -57,6 +58,7 @@ describe("browser benchmark live activity", () => {
         {
           data: {
             messageDelta: "current Brooklyn showtimes",
+            messageSoFar: "Searching current Brooklyn showtimes",
             sequence: 0,
             stepIndex: 0,
             turnId: "turn_1",
