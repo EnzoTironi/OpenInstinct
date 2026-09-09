@@ -69,6 +69,31 @@ describe("shared channel authorization", () => {
       expect(html).not.toContain(absent);
     }
   );
+  it.each(["pending", "confirmed"] as const)(
+    "describes native link %s without promising an account merge",
+    (status) => {
+      const html = renderToStaticMarkup(
+        createElement(ChannelStatus, {
+          challenge: {
+            id: challenge.id,
+            channel: "kapso",
+            purpose: "link",
+            expiresAt: challenge.expiresAt,
+          },
+          purpose: "link",
+          status,
+          busy: false,
+          error: undefined,
+          onContinue: () => undefined,
+          onRestart: () => undefined,
+        })
+      );
+      expect(html).toContain("existing association");
+      expect(html).toContain("Accounts and their data are not combined");
+      expect(html).not.toContain("Enter this browser");
+      expect(html).not.toContain("wa.me");
+    }
+  );
   it("explains session freshness and account conflicts without changing login errors", () => {
     expect(channelFailureMessage(channelHttpError(401), "link")).toContain(
       "Sign in again"

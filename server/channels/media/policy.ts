@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { artifactLimits } from "../../artifacts/model";
 import type { MessagePayload } from "../../messaging/model";
 import { sniffBrowserImageMediaType } from "../../../shared/browser/artifact";
 
@@ -6,9 +7,9 @@ export type MediaReference = NonNullable<MessagePayload["attachments"]>[number];
 
 export const mediaLimits = {
   attachments: 3,
-  totalBytes: 10 * 1024 * 1024,
+  totalBytes: artifactLimits.bytes,
   imageBytes: 3 * 1024 * 1024,
-  textBytes: 64 * 1024,
+  textBytes: artifactLimits.textBytes,
   audioBytes: 3 * 1024 * 1024,
   audioSeconds: 120,
 } as const;

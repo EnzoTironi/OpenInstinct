@@ -22,6 +22,12 @@ Follow links or inspect public types only when the routed page leaves the task u
 
 ## Prefer an existing integration
 
+For recipe, routine, or integration discovery work, first read
+[`docs/recipe-integrations/README.md`](docs/recipe-integrations/README.md). It records
+the agreed conversational recipe experience, public source catalogs and reuse
+constraints. Catalog entries are research evidence, not implemented capabilities
+or permission to install, activate, or redistribute vendor code.
+
 When a task names an external product or service, search the registry before implementing its integration. For a generic capability, author a tool instead.
 
 ```sh

@@ -3,6 +3,7 @@ import { defineTool, toolOutput } from "eve/tools";
 import { ChannelTransport } from "../../server/channels/transport";
 import { serverRuntime } from "../../server/runtime";
 import { requireChannelPrincipal } from "./channel-session";
+import { taskReportDeliveryId } from "./task-report";
 
 const Message = Schema.Struct({
   kind: Schema.Literal("message"),
@@ -24,6 +25,10 @@ export const privateMessageTool = (channel: "telegram" | "kapso") =>
       )["~standard"],
     },
     execute(input, context) {
+      if (context.session.parent)
+        throw new Error(
+          "Return the result to the parent conversation instead of sending a message."
+        );
       return serverRuntime.runPromise(
         Effect.gen(function* () {
           const auth =
@@ -37,16 +42,21 @@ export const privateMessageTool = (channel: "telegram" | "kapso") =>
               )
             : undefined;
           const transport = yield* ChannelTransport;
+          const reportId = taskReportDeliveryId(context);
+          const enqueue = reportId
+            ? transport.enqueueTaskReport
+            : transport.enqueueText;
           const base = {
             identityId: identity.id,
-            deliveryKey: `tool:${context.session.id}:${context.callId}`,
+            deliveryKey:
+              reportId ?? `tool:${context.session.id}:${context.callId}`,
             text: input.text,
           };
           const intent = reply ? { ...base, replyToMessageId: reply } : base;
-          yield* transport.enqueueText(intent);
+          yield* enqueue(intent);
           yield* transport.drainOutbox(identity.id);
           // Read the exact intent again through idempotent enqueue, not aggregate lane state.
-          const receipts = yield* transport.enqueueText(intent);
+          const receipts = yield* enqueue(intent);
           return {
             deliveries: receipts.map((receipt) => ({
               id: receipt.id,

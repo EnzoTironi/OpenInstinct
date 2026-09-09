@@ -63,7 +63,12 @@ export const channelAuthChallenges = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     purpose: text("purpose").notNull(),
     tokenHash: text("token_hash").notNull(),
-    browserSecretHash: text("browser_secret_hash").notNull(),
+    browserSecretHash: text("browser_secret_hash"),
+    intendedIdentityId: uuid("intended_identity_id"),
+    entryTokenHash: text("entry_token_hash"),
+    browserBoundAt: timestamp("browser_bound_at", { withTimezone: true }),
+    sourceSessionId: text("source_session_id"),
+    sourceCallId: text("source_call_id"),
     targetUserId: text("target_user_id").references(() => user.id, {
       onDelete: "cascade",
     }),
@@ -85,12 +90,27 @@ export const channelAuthChallenges = pgTable(
   },
   (table) => [
     uniqueIndex("channel_auth_challenge_token_uidx").on(table.tokenHash),
+    uniqueIndex("channel_auth_challenge_entry_uidx").on(table.entryTokenHash),
+    uniqueIndex("channel_auth_challenge_native_source_uidx").on(
+      table.intendedIdentityId,
+      table.sourceSessionId,
+      table.sourceCallId
+    ),
     unique("channel_auth_challenge_installation_key").on(
       table.id,
       table.channel,
       table.installationId
     ),
     index("channel_auth_challenge_expiry_idx").on(table.expiresAt),
+    foreignKey({
+      name: "channel_auth_challenge_intended_identity_fkey",
+      columns: [table.intendedIdentityId, table.channel, table.installationId],
+      foreignColumns: [
+        channelIdentities.id,
+        channelIdentities.channel,
+        channelIdentities.installationId,
+      ],
+    }).onDelete("cascade"),
     foreignKey({
       name: "channel_auth_challenge_identity_fkey",
       columns: [table.identityId, table.channel, table.installationId],
@@ -106,11 +126,40 @@ export const channelAuthChallenges = pgTable(
     ),
     check(
       "channel_auth_challenge_purpose_check",
-      sql`(${table.purpose} = 'login' AND ${table.targetUserId} IS NULL AND ${table.requestingSessionId} IS NULL) OR (${table.purpose} = 'link' AND ${table.targetUserId} IS NOT NULL AND ${table.requestingSessionId} IS NOT NULL)`
+      sql`(${table.purpose} = 'login' AND ${table.targetUserId} IS NULL AND ${table.requestingSessionId} IS NULL) OR (
+        ${table.purpose} = 'link' AND (
+          (${table.intendedIdentityId} IS NOT NULL AND ${table.browserBoundAt} IS NULL
+            AND ${table.targetUserId} IS NULL AND ${table.requestingSessionId} IS NULL)
+          OR ((${table.intendedIdentityId} IS NULL OR ${table.browserBoundAt} IS NOT NULL)
+            AND ${table.targetUserId} IS NOT NULL AND ${table.requestingSessionId} IS NOT NULL)
+        )
+      )`
     ),
     check(
       "channel_auth_challenge_hash_check",
-      sql`${table.tokenHash} ~ '^[0-9a-f]{64}$' AND ${table.browserSecretHash} ~ '^[0-9a-f]{64}$'`
+      sql`${table.tokenHash} ~ '^[0-9a-f]{64}$' AND (${table.browserSecretHash} IS NULL OR ${table.browserSecretHash} ~ '^[0-9a-f]{64}$') AND (${table.entryTokenHash} IS NULL OR ${table.entryTokenHash} ~ '^[0-9a-f]{64}$')`
+    ),
+    check(
+      "channel_auth_challenge_native_check",
+      sql`(
+        ${table.intendedIdentityId} IS NULL
+        AND ${table.entryTokenHash} IS NULL AND ${table.browserBoundAt} IS NULL
+        AND ${table.sourceSessionId} IS NULL AND ${table.sourceCallId} IS NULL
+        AND ${table.browserSecretHash} IS NOT NULL
+      ) OR (
+        ${table.intendedIdentityId} IS NOT NULL AND ${table.purpose} IN ('login', 'link')
+        AND ${table.sourceSessionId} IS NOT NULL AND length(trim(${table.sourceSessionId})) > 0
+        AND ${table.sourceCallId} IS NOT NULL AND length(trim(${table.sourceCallId})) > 0
+        AND (
+          (${table.browserBoundAt} IS NULL AND ${table.browserSecretHash} IS NULL
+            AND ${table.entryTokenHash} IS NOT NULL AND ${table.confirmedAt} IS NULL)
+          OR (${table.browserBoundAt} IS NOT NULL AND ${table.browserSecretHash} IS NOT NULL
+            AND ${table.entryTokenHash} IS NULL AND ${table.browserBoundAt} >= ${table.createdAt}
+            AND ${table.browserBoundAt} < ${table.expiresAt})
+        )
+        AND (${table.confirmedAt} IS NULL OR ${table.confirmedAt} >= ${table.browserBoundAt})
+        AND (${table.identityId} IS NULL OR ${table.identityId} = ${table.intendedIdentityId})
+      )`
     ),
     check(
       "channel_auth_challenge_confirmation_check",

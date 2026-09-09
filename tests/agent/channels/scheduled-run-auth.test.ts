@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { ConfigProvider, Effect } from "effect";
 import { routeAuth, vercelOidc } from "eve/channels/auth";
-import { scheduledCallbackHeaders } from "../../../server/internal/scheduled-callback-auth";
+import { internalCallbackHeaders } from "../../../server/internal/callback-auth";
 import type {
   ChannelResolveSession,
   ChannelSource,
@@ -67,7 +67,7 @@ describe("scheduled run channel authentication", () => {
     async (path) => {
       const body = "not valid JSON";
       const headers = await Effect.runPromise(
-        scheduledCallbackHeaders(path, body).pipe(
+        internalCallbackHeaders(path, body).pipe(
           Effect.provideService(
             ConfigProvider.ConfigProvider,
             ConfigProvider.fromEnv()

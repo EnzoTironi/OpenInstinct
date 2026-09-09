@@ -39,6 +39,7 @@ export function imessageTimestamps(events: readonly MessageStreamEvent[]) {
 }
 
 export function sentMessages(events: readonly MessageStreamEvent[]) {
+  const delivered = new Set<string>();
   const messagesByTurn = new Map<
     string,
     { id: string; parts: EveMessagePart[]; timestamp: string }[]
@@ -50,6 +51,11 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
     const reaction = completedReactionOutput(event);
     const completed = delivery ?? reaction;
     if (!completed) continue;
+    const deliveryId = delivery?.output.deliveryId ?? completed.callId;
+    if (delivery?.output.deliveryId) {
+      if (delivered.has(delivery.output.deliveryId)) continue;
+      delivered.add(delivery.output.deliveryId);
+    }
 
     const turnMessageId = `${event.data.turnId}:assistant`;
     const parts: EveMessagePart[] = [];
@@ -89,7 +95,7 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
     }
     const messages = messagesByTurn.get(turnMessageId) ?? [];
     messages.push({
-      id: `${turnMessageId}:${completed.callId}`,
+      id: `${turnMessageId}:${deliveryId}`,
       parts,
       timestamp: event.meta.at,
     });

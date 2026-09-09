@@ -1,6 +1,8 @@
 import { PgClient } from "@effect/sql-pg";
 import { Config, Layer, ManagedRuntime } from "effect";
 import { ChannelAccounts } from "./accounts";
+import { NativeDeviceAuth } from "./accounts/device";
+import { Artifacts } from "./artifacts";
 import { Messaging } from "./messaging";
 import { Telegram } from "./channels/telegram";
 import { Kapso } from "./channels/kapso";
@@ -22,6 +24,8 @@ const infrastructure = Layer.mergeAll(
 ).pipe(Layer.provideMerge(database));
 
 const services = Layer.mergeAll(
+  NativeDeviceAuth.layer,
+  Artifacts.layer,
   ChannelTransport.layer,
   ChannelAuthPrompts.layer
 ).pipe(Layer.provideMerge(infrastructure));

@@ -1,0 +1,2291 @@
+[
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "Guardrails",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/Guardrails",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "ModelSelector",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/ModelSelector",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "ToolExecutor",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/ToolExecutor",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "agents",
+    "source_files": 8,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/agents",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "chains",
+    "source_files": 8,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/chains",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "code",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/code",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "document_loaders",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/document_loaders",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "embeddings",
+    "source_files": 12,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/embeddings",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "llms",
+    "source_files": 25,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/llms",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "mcp",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/mcp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "memory",
+    "source_files": 9,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/memory",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "output_parser",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/output_parser",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "rerankers",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/rerankers",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "retrievers",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/retrievers",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "text_splitters",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/text_splitters",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "tools",
+    "source_files": 12,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/tools",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "trigger",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/trigger",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "vector_store",
+    "source_files": 24,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/vector_store",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/@n8n/nodes-langchain",
+    "family": "vendors",
+    "source_files": 10,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/@n8n/nodes-langchain/nodes/vendors",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ActionNetwork",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ActionNetwork",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ActiveCampaign",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ActiveCampaign",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "AcuityScheduling",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/AcuityScheduling",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Adalo",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Adalo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Affinity",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Affinity",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "AgileCrm",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/AgileCrm",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "AiTransform",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/AiTransform",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Airtable",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Airtable",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Airtop",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Airtop",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Amqp",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Amqp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ApiTemplateIo",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ApiTemplateIo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Asana",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Asana",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Autopilot",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Autopilot",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Aws",
+    "source_files": 17,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Aws",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "BambooHr",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/BambooHr",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Bannerbear",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Bannerbear",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Baserow",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Baserow",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Beeminder",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Beeminder",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Bitbucket",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Bitbucket",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Bitly",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Bitly",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Bitwarden",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Bitwarden",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Box",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Box",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Brandfetch",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Brandfetch",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Brevo",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Brevo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Bubble",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Bubble",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Cal",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Cal",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Calendly",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Calendly",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Chargebee",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Chargebee",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "CircleCi",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/CircleCi",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Cisco",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Cisco",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Clearbit",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Clearbit",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ClickUp",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ClickUp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Clockify",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Clockify",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Cloudflare",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Cloudflare",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Cockpit",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Cockpit",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Coda",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Coda",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Code",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Code",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "CoinGecko",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/CoinGecko",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "CompareDatasets",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/CompareDatasets",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Compression",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Compression",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Confluence",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Confluence",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Contentful",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Contentful",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ConvertKit",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ConvertKit",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Copper",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Copper",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Cortex",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Cortex",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "CrateDb",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/CrateDb",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Cron",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Cron",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Crypto",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Crypto",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Currents",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Currents",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "CustomerIo",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/CustomerIo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "DataTable",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/DataTable",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Databricks",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Databricks",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "DateTime",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/DateTime",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "DebugHelper",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/DebugHelper",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "DeepL",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/DeepL",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Demio",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Demio",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Dhl",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Dhl",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Discord",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Discord",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Discourse",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Discourse",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Disqus",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Disqus",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Drift",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Drift",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Dropbox",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Dropbox",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Dropcontact",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Dropcontact",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "DynamicCredentialCheck",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/DynamicCredentialCheck",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "E2eTest",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/E2eTest",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ERPNext",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ERPNext",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "EditImage",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/EditImage",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Egoi",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Egoi",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Elastic",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Elastic",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "EmailReadImap",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/EmailReadImap",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "EmailSend",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/EmailSend",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Emelia",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Emelia",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ErrorTrigger",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ErrorTrigger",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Evaluation",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Evaluation",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Eventbrite",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Eventbrite",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ExecuteCommand",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ExecuteCommand",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ExecuteWorkflow",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ExecuteWorkflow",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ExecutionData",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ExecutionData",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Facebook",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Facebook",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "FacebookLeadAds",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/FacebookLeadAds",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Figma",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Figma",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "FileMaker",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/FileMaker",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Files",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Files",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Filter",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Filter",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Flow",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Flow",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Form",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Form",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "FormIo",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/FormIo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Formstack",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Formstack",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Freshdesk",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Freshdesk",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Freshservice",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Freshservice",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "FreshworksCrm",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/FreshworksCrm",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Ftp",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Ftp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Function",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Function",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "FunctionItem",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/FunctionItem",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "GetResponse",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/GetResponse",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Ghost",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Ghost",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Git",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Git",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Github",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Github",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Gitlab",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Gitlab",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "GoToWebinar",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/GoToWebinar",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Gong",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Gong",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Google",
+    "source_files": 37,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Google",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Gotify",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Gotify",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Grafana",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Grafana",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "GraphQL",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/GraphQL",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Grist",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Grist",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Gumroad",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Gumroad",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "HackerNews",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/HackerNews",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "HaloPSA",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/HaloPSA",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Harvest",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Harvest",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "HelpScout",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/HelpScout",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "HighLevel",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/HighLevel",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "HomeAssistant",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/HomeAssistant",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Html",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Html",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "HtmlExtract",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/HtmlExtract",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "HttpRequest",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/HttpRequest",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Hubspot",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Hubspot",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "HumanticAI",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/HumanticAI",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Hunter",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Hunter",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ICalendar",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ICalendar",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "If",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/If",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Intercom",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Intercom",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Interval",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Interval",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "InvoiceNinja",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/InvoiceNinja",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ItemLists",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ItemLists",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Iterable",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Iterable",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Jenkins",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Jenkins",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "JinaAI",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/JinaAI",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Jira",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Jira",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "JotForm",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/JotForm",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Jwt",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Jwt",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Kafka",
+    "source_files": 6,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Kafka",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Keap",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Keap",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "KoBoToolbox",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/KoBoToolbox",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Ldap",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Ldap",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Lemlist",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Lemlist",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Line",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Line",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Linear",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Linear",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "LingvaNex",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/LingvaNex",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "LinkedIn",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/LinkedIn",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "LocalFileTrigger",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/LocalFileTrigger",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "LoneScale",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/LoneScale",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MQTT",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MQTT",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Magento",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Magento",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mailcheck",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mailcheck",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mailchimp",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mailchimp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MailerLite",
+    "source_files": 6,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MailerLite",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mailgun",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mailgun",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mailjet",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mailjet",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mandrill",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mandrill",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ManualTrigger",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ManualTrigger",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Markdown",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Markdown",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Marketstack",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Marketstack",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Matrix",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Matrix",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mattermost",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mattermost",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mautic",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mautic",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Medium",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Medium",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Merge",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Merge",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MessageAnAgent",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MessageAnAgent",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MessageBird",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MessageBird",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Metabase",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Metabase",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Microsoft",
+    "source_files": 24,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Microsoft",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mindee",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mindee",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Misp",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Misp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MistralAI",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MistralAI",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Mocean",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Mocean",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MondayCom",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MondayCom",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MongoDb",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MongoDb",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MonicaCrm",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MonicaCrm",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MoveBinaryData",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MoveBinaryData",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Msg91",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Msg91",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "MySql",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/MySql",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "N8n",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/N8n",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "N8nTrainingCustomerDatastore",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/N8nTrainingCustomerDatastore",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "N8nTrainingCustomerMessenger",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/N8nTrainingCustomerMessenger",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "N8nTrigger",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/N8nTrigger",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Nasa",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Nasa",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Netlify",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Netlify",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Netscaler",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Netscaler",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "NextCloud",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/NextCloud",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "NoOp",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/NoOp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "NocoDB",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/NocoDB",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Notion",
+    "source_files": 5,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Notion",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Npm",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Npm",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Odoo",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Odoo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Okta",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Okta",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "OneSimpleApi",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/OneSimpleApi",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Onfleet",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Onfleet",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "OpenAi",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/OpenAi",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "OpenThesaurus",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/OpenThesaurus",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "OpenWeatherMap",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/OpenWeatherMap",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Oracle",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Oracle",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Orbit",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Orbit",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Oura",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Oura",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Paddle",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Paddle",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "PagerDuty",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/PagerDuty",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "PayPal",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/PayPal",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Peekalink",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Peekalink",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Perplexity",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Perplexity",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Phantombuster",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Phantombuster",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "PhilipsHue",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/PhilipsHue",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Pipedrive",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Pipedrive",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Plivo",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Plivo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "PostBin",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/PostBin",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "PostHog",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/PostHog",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Postgres",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Postgres",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Postmark",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Postmark",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ProfitWell",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ProfitWell",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Pushbullet",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Pushbullet",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Pushcut",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Pushcut",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Pushover",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Pushover",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "QuestDb",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/QuestDb",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "QuickBase",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/QuickBase",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "QuickBooks",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/QuickBooks",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "QuickChart",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/QuickChart",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "RabbitMQ",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/RabbitMQ",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Raindrop",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Raindrop",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ReadBinaryFile",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ReadBinaryFile",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ReadBinaryFiles",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ReadBinaryFiles",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ReadPdf",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ReadPdf",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Reddit",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Reddit",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Redis",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Redis",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "RenameKeys",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/RenameKeys",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "RespondToWebhook",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/RespondToWebhook",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Rocketchat",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Rocketchat",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "RssFeedRead",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/RssFeedRead",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Rundeck",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Rundeck",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "S3",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/S3",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Salesforce",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Salesforce",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Salesmate",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Salesmate",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Schedule",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Schedule",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SeaTable",
+    "source_files": 8,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SeaTable",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SecurityScorecard",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SecurityScorecard",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Segment",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Segment",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SendGrid",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SendGrid",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Sendy",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Sendy",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SentryIo",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SentryIo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "ServiceNow",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/ServiceNow",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Set",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Set",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Shopify",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Shopify",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Signl4",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Signl4",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Simulate",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Simulate",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Slack",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Slack",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Sms77",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Sms77",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Snowflake",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Snowflake",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SplitInBatches",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SplitInBatches",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Splunk",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Splunk",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Spotify",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Spotify",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SpreadsheetFile",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SpreadsheetFile",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SseTrigger",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SseTrigger",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Ssh",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Ssh",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Stackby",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Stackby",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "StickyNote",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/StickyNote",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "StopAndError",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/StopAndError",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Storyblok",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Storyblok",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Strapi",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Strapi",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Strava",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Strava",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Stripe",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Stripe",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Supabase",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Supabase",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SurveyMonkey",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SurveyMonkey",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Switch",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Switch",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "SyncroMSP",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/SyncroMSP",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Taiga",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Taiga",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Tapfiliate",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Tapfiliate",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Telegram",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Telegram",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "TheHive",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/TheHive",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "TheHiveProject",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/TheHiveProject",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "TimeSaved",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/TimeSaved",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "TimescaleDb",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/TimescaleDb",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Todoist",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Todoist",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Toggl",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Toggl",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Totp",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Totp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Transform",
+    "source_files": 8,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Transform",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "TravisCi",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/TravisCi",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Trello",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Trello",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Twake",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Twake",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Twilio",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Twilio",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Twist",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Twist",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Twitter",
+    "source_files": 3,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Twitter",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Typeform",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Typeform",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "UProc",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/UProc",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "UnleashedSoftware",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/UnleashedSoftware",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Uplead",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Uplead",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "UptimeRobot",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/UptimeRobot",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "UrlScanIo",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/UrlScanIo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Venafi",
+    "source_files": 4,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Venafi",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Vero",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Vero",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Vonage",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Vonage",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Wait",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Wait",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Webflow",
+    "source_files": 6,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Webflow",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Webhook",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Webhook",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Wekan",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Wekan",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "WhatsApp",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/WhatsApp",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Wise",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Wise",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "WooCommerce",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/WooCommerce",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Wordpress",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Wordpress",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Workable",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Workable",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "WorkflowTrigger",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/WorkflowTrigger",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "WriteBinaryFile",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/WriteBinaryFile",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Wufoo",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Wufoo",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Xero",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Xero",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Xml",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Xml",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Yourls",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Yourls",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Zammad",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Zammad",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Zendesk",
+    "source_files": 2,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Zendesk",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Zoho",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Zoho",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Zoom",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Zoom",
+    "kind": "source_family_not_external_app_count"
+  },
+  {
+    "package": "packages/nodes-base",
+    "family": "Zulip",
+    "source_files": 1,
+    "source": "https://github.com/n8n-io/n8n/tree/4b36c51940cd9cba882ff71947822c1428325497/packages/nodes-base/nodes/Zulip",
+    "kind": "source_family_not_external_app_count"
+  }
+]

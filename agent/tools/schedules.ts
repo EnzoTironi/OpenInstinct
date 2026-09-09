@@ -4,7 +4,7 @@ import { requireChannelPrincipal } from "../lib/channel-session";
 import { serverRuntime } from "../../server/runtime";
 import { resolveModeValue } from "@agent/lib/mode";
 import { scheduledReportIdentity } from "@agent/lib/schedules/identity";
-import { postScheduledRunRoute } from "@agent/lib/schedules/request";
+import { postInternalRequest } from "@agent/lib/internal-request";
 import {
   scheduleListSummary,
   scheduleOwner,
@@ -96,7 +96,7 @@ export const answerSchedule = defineTool({
     if (!pending) {
       throw new Error("That scheduled task is not waiting for input.");
     }
-    const response = await postScheduledRunRoute(
+    const response = await postInternalRequest(
       "/internal/scheduled-run/respond",
       {
         answer,

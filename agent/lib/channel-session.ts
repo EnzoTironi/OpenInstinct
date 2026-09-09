@@ -1,4 +1,3 @@
-import { readChannelInputs, resolveChannelInput } from "./channel-input";
 import { Effect, Schedule, Schema } from "effect";
 import type { ChannelReceiveContext, ChannelSendOptions } from "eve/channels";
 import type { Identity } from "../../server/accounts";
@@ -15,7 +14,6 @@ class ChannelDispatchError extends Schema.TaggedError<ChannelDispatchError>()(
       "unauthorized",
       "handoff_unknown",
       "unsupported_media",
-      "invalid_response",
     ]),
   }
 ) {}
@@ -79,16 +77,11 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
       return yield* new ChannelDispatchError({ reason: "unauthorized" });
     const messaging = yield* Messaging;
     const receipt = yield* messaging.checkInboxLease(lease);
-    if (receipt.payload.text?.trim().startsWith("/responder")) {
-      return yield* respondChannelInput(
-        channel,
-        lease,
-        auth,
-        context,
-        receipt.payload.text
-      );
-    }
-    const loaded = yield* loadChannelContent(identity, receipt.payload).pipe(
+    const loaded = yield* loadChannelContent(
+      identity,
+      receipt.payload,
+      receipt.id
+    ).pipe(
       Effect.catchTag("ChannelMediaError", (error) =>
         Effect.gen(function* () {
           yield* requireChannelPrincipal(channel, auth);
@@ -197,75 +190,8 @@ export const drainChannelInbox = Effect.fn("drainChannelInbox")(function* (
       context
     ).pipe(
       Effect.catchTag("ChannelDispatchError", (error) =>
-        error.reason === "unsupported_media" ||
-        error.reason === "invalid_response"
-          ? Effect.void
-          : Effect.fail(error)
+        error.reason === "unsupported_media" ? Effect.void : Effect.fail(error)
       )
     );
   }
-});
-
-const respondChannelInput = Effect.fn("respondChannelInput")(function* (
-  channel: Identity["channel"],
-  lease: Lease,
-  auth: ChannelSendOptions["auth"],
-  context: ChannelReceiveContext,
-  text: string
-) {
-  const identity = yield* requireChannelPrincipal(channel, auth);
-  const messaging = yield* Messaging;
-  const owner = yield* Effect.tryPromise({
-    try: () => context.resolveSession(identity.id),
-    catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
-  });
-  const requests = owner
-    ? yield* Effect.tryPromise({
-        try: (signal) => readChannelInputs(owner, signal),
-        catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
-      }).pipe(
-        Effect.timeout("8 seconds"),
-        Effect.catchTag(
-          "TimeoutError",
-          () => new ChannelDispatchError({ reason: "handoff_unknown" })
-        )
-      )
-    : [];
-  const response = owner ? resolveChannelInput(owner.id, text, requests) : null;
-  if (!owner || !response) {
-    const transport = yield* ChannelTransport;
-    yield* transport.enqueueText({
-      identityId: identity.id,
-      deliveryKey: `input-invalid:${lease.id}`,
-      text: "Essa resposta não corresponde a uma solicitação pendente. Use o comando completo exibido na solicitação.",
-    });
-    yield* messaging.markInboxFailed({ lease, reason: "adapter_rejected" });
-    return yield* new ChannelDispatchError({ reason: "invalid_response" });
-  }
-  yield* requireChannelPrincipal(channel, auth);
-  const receipt = yield* messaging.checkInboxLease(lease);
-  const current = yield* Effect.tryPromise({
-    try: () => context.resolveSession(identity.id),
-    catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
-  });
-  if (current?.id !== owner.id)
-    return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
-  const result = yield* Effect.tryPromise({
-    try: () =>
-      owner.respond([response], {
-        auth: channelPrincipal(identity, receipt.sourceMessageId ?? undefined),
-      }),
-    catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
-  }).pipe(
-    Effect.tapError(() =>
-      messaging.markInboxUncertain({ lease, reason: "handoff_unknown" })
-    )
-  );
-  if (result.status !== "accepted")
-    return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
-  yield* messaging.markAccepted({
-    lease,
-    receipt: { status: "accepted", sessionId: owner.id },
-  });
-  return owner;
 });

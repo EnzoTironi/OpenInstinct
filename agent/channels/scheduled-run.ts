@@ -1,16 +1,13 @@
 import { serverRuntime } from "../../server/runtime";
 import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
 import { defineChannel, POST } from "eve/channels";
-import { routeAuth, vercelOidc } from "eve/channels/auth";
 import { parseInputResponses, resolveTextToResponses } from "eve/client";
-import { Config, ConfigProvider, Effect, Option, Result, Schema } from "effect";
+import { ConfigProvider, Effect, Result, Schema } from "effect";
 import {
-  ScheduledCallbackRejected,
-  readScheduledCallbackBody,
-  readVerifiedScheduledCallback,
-  scheduledCallbackBodies,
-  type ScheduledCallbackRoute,
-} from "../../server/internal/scheduled-callback-auth";
+  InternalCallbackRejected,
+  readAuthenticatedInternalCallback,
+  internalCallbackBodies,
+} from "../../server/internal/callback-auth";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
 import {
   claimScheduledAgentRunInput,
@@ -23,24 +20,6 @@ const scheduledRunTargetSchema = Schema.Struct({
   restart: Schema.optionalKey(Schema.Boolean),
   runId: Schema.String.check(Schema.isUUID()),
 });
-
-const authenticatedBody = Effect.fn("authenticatedScheduledCallbackBody")(
-  function* (request: Request, route: ScheduledCallbackRoute) {
-    const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
-    if (Option.isSome(vercel)) {
-      const auth = yield* Effect.tryPromise({
-        try: () => routeAuth(request, [vercelOidc()]),
-        catch: () => new ScheduledCallbackRejected({ status: 401 }),
-      });
-      if (auth instanceof Response) return auth;
-      return yield* readScheduledCallbackBody(request);
-    }
-    return yield* readVerifiedScheduledCallback(request, route);
-  },
-  Effect.catchTag("ConfigError", () =>
-    Effect.fail(new ScheduledCallbackRejected({ status: 503 }))
-  )
-);
 
 export default defineChannel({
   async receive(input, { from }) {
@@ -66,19 +45,19 @@ export default defineChannel({
       async (request, { attachSession, to, waitUntil }) => {
         return Effect.runPromise(
           Effect.gen(function* () {
-            const raw = yield* authenticatedBody(
+            const raw = yield* readAuthenticatedInternalCallback(
               request,
               "/internal/scheduled-run/report"
             );
             if (raw instanceof Response) return raw;
             const input = yield* Schema.decodeUnknownEffect(
               Schema.fromJsonString(
-                scheduledCallbackBodies["/internal/scheduled-run/report"]
+                internalCallbackBodies["/internal/scheduled-run/report"]
               ),
               { onExcessProperty: "error" }
             )(raw.toString("utf8")).pipe(
               Effect.mapError(
-                () => new ScheduledCallbackRejected({ status: 400 })
+                () => new InternalCallbackRejected({ status: 400 })
               )
             );
             const channel = yield* Effect.tryPromise(() =>
@@ -98,7 +77,7 @@ export default defineChannel({
               ConfigProvider.ConfigProvider,
               ConfigProvider.fromEnv()
             ),
-            Effect.catchTag("ScheduledCallbackRejected", (error) =>
+            Effect.catchTag("InternalCallbackRejected", (error) =>
               Effect.succeed(
                 new Response("Scheduled callback rejected", {
                   status: error.status,
@@ -115,19 +94,19 @@ export default defineChannel({
       async (request, { attachSession }) => {
         const decoded = await Effect.runPromise(
           Effect.gen(function* () {
-            const raw = yield* authenticatedBody(
+            const raw = yield* readAuthenticatedInternalCallback(
               request,
               "/internal/scheduled-run/respond"
             );
             if (raw instanceof Response) return raw;
             return yield* Schema.decodeUnknownEffect(
               Schema.fromJsonString(
-                scheduledCallbackBodies["/internal/scheduled-run/respond"]
+                internalCallbackBodies["/internal/scheduled-run/respond"]
               ),
               { onExcessProperty: "error" }
             )(raw.toString("utf8")).pipe(
               Effect.mapError(
-                () => new ScheduledCallbackRejected({ status: 400 })
+                () => new InternalCallbackRejected({ status: 400 })
               )
             );
           }).pipe(

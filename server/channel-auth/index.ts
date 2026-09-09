@@ -13,9 +13,14 @@ import {
   channelChallengeIdSchema,
   channelChallengeRequestSchema,
   channelChallengeSchema,
+  channelConversationEntrySchema,
+  deviceBindingSchema,
+  deviceRequestSchema,
+  deviceBoundSchema,
   type channelProviderSchema,
 } from "../../shared/identity/channel-auth.ts";
 import { ChannelAccountError, ChannelAccounts } from "../accounts/index.ts";
+import { NativeDeviceAuth } from "../accounts/device";
 
 type EndpointContext = Parameters<typeof setSessionCookie>[0];
 const InstallationId = Schema.NonEmptyString.check(Schema.isTrimmed());
@@ -33,7 +38,7 @@ const BrowserSecret = Schema.String.check(
   Schema.isPattern(/^[A-Za-z0-9_-]{43}$/u)
 );
 export type ChannelAuthRunEffect = <A, E>(
-  program: Effect.Effect<A, E, ChannelAccounts>
+  program: Effect.Effect<A, E, ChannelAccounts | NativeDeviceAuth>
 ) => Promise<A>;
 class ChannelAuthError extends Schema.TaggedError<ChannelAuthError>()(
   "ChannelAuthError",
@@ -108,10 +113,25 @@ const channelDestination = Effect.fn("ChannelAuth.channelDestination")(
   },
   Effect.mapError(() => new ChannelAuthError({ reason: "unavailable" }))
 );
+const readLinkSession = Effect.fn("ChannelAuth.readLinkSession")(function* (
+  ctx: EndpointContext
+) {
+  const current = yield* sdk(() => getAuthoritativeSessionFromCtx(ctx));
+  if (!current) return yield* new ChannelAuthError({ reason: "unauthorized" });
+  const link = { userId: current.user.id, sessionId: current.session.id };
+  const accounts = yield* ChannelAccounts;
+  yield* accounts.requireFreshSession(link);
+  return link;
+});
 const publicError = (error: ChannelAuthError | ChannelAccountError) => {
   if (error.reason === "unavailable")
     return new APIError("SERVICE_UNAVAILABLE", {
       message: "Channel unavailable",
+    });
+  if (error.reason === "account_conflict")
+    return new APIError("CONFLICT", {
+      message:
+        "This messenger is already associated with another account. Accounts are not merged.",
     });
   if (error.reason === "internal")
     return new APIError("INTERNAL_SERVER_ERROR", {
@@ -126,7 +146,7 @@ const publicError = (error: ChannelAuthError | ChannelAccountError) => {
 /** The sole Promise bridge; domain and SDK operations execute in the supplied runtime. */
 const execute = async <A, E>(
   runEffect: ChannelAuthRunEffect,
-  program: Effect.Effect<A, E, ChannelAccounts>
+  program: Effect.Effect<A, E, ChannelAccounts | NativeDeviceAuth>
 ) => {
   const result = await runEffect(
     program.pipe(
@@ -173,12 +193,17 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                 const destination = yield* channelDestination(ctx.body.channel);
                 const current =
                   ctx.body.purpose === "link"
-                    ? yield* sdk(() => getAuthoritativeSessionFromCtx(ctx))
+                    ? yield* readLinkSession(ctx)
                     : null;
-                if (ctx.body.purpose === "link" && !current)
-                  return yield* new ChannelAuthError({
-                    reason: "unauthorized",
+                if (ctx.body.channel === "kapso") {
+                  ctx.setHeader("Cache-Control", "no-store");
+                  return yield* Schema.decodeUnknownEffect(
+                    channelConversationEntrySchema
+                  )({
+                    channel: "kapso",
+                    conversationUrl: `${destination.url}?text=${encodeURIComponent(ctx.body.purpose === "link" ? "quero vincular meu WhatsApp à conta aberta no navegador" : "quero abrir minha conta no navegador")}`,
                   });
+                }
                 const accounts = yield* ChannelAccounts;
                 const browserSecret = yield* Effect.sync(() =>
                   randomBytes(32).toString("base64url")
@@ -192,17 +217,11 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                   current
                     ? {
                         ...issueInput,
-                        link: {
-                          userId: current.user.id,
-                          sessionId: current.session.id,
-                        },
+                        link: current,
                       }
                     : issueInput
                 );
-                const message =
-                  ctx.body.channel === "kapso"
-                    ? `/start ${challenge.token}`
-                    : challenge.token;
+                const message = challenge.token;
                 const response = yield* Schema.decodeUnknownEffect(
                   channelChallengeSchema
                 )({
@@ -222,6 +241,92 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                 );
                 ctx.setHeader("Cache-Control", "no-store");
                 return response;
+              })
+            )
+          )
+      ),
+      bindNativeDevice: createAuthEndpoint(
+        "/channel-auth/device-bind",
+        {
+          method: "POST",
+          body: Schema.toStandardSchemaV1(deviceBindingSchema, {
+            parseOptions: { onExcessProperty: "error" },
+          }),
+          use: [originCheckMiddleware, formCsrfMiddleware],
+          requireHeaders: true,
+        },
+        async (ctx) =>
+          ctx.json(
+            await execute(
+              runEffect,
+              Effect.gen(function* () {
+                const cookie = browserCookie(ctx, ctx.body.id);
+                const previous = yield* sdk(() =>
+                  ctx.getSignedCookie(cookie.name, ctx.context.secret)
+                );
+                const browserSecret = Schema.is(BrowserSecret)(previous)
+                  ? previous
+                  : randomBytes(32).toString("base64url");
+                const devices = yield* NativeDeviceAuth;
+                const input = { ...ctx.body, browserSecret };
+                const bound =
+                  ctx.body.purpose === "link"
+                    ? yield* devices.bind({
+                        ...input,
+                        link: yield* readLinkSession(ctx),
+                      })
+                    : yield* devices.bind(input);
+                yield* sdk(() =>
+                  ctx.setSignedCookie(
+                    cookie.name,
+                    browserSecret,
+                    ctx.context.secret,
+                    cookie.attributes
+                  )
+                );
+                ctx.setHeader("Cache-Control", "no-store");
+                return yield* Schema.decodeUnknownEffect(deviceBoundSchema)({
+                  id: bound.id,
+                  purpose: bound.purpose,
+                  channel: bound.channel,
+                  expiresAt: bound.expiresAt,
+                });
+              })
+            )
+          )
+      ),
+      resumeNativeDevice: createAuthEndpoint(
+        "/channel-auth/device",
+        {
+          method: "GET",
+          query: Schema.toStandardSchemaV1(deviceRequestSchema),
+          requireHeaders: true,
+        },
+        async (ctx) =>
+          ctx.json(
+            await execute(
+              runEffect,
+              Effect.gen(function* () {
+                const browserSecret = yield* readBrowserSecret(
+                  ctx,
+                  ctx.query.id
+                );
+                const devices = yield* NativeDeviceAuth;
+                const input = { ...ctx.query, browserSecret };
+                const bound =
+                  ctx.query.purpose === "link"
+                    ? yield* devices.resume({
+                        ...input,
+                        link: yield* readLinkSession(ctx),
+                      })
+                    : yield* devices.resume(input);
+                ctx.setHeader("Cache-Control", "no-store");
+                return {
+                  id: bound.id,
+                  purpose: bound.purpose,
+                  channel: bound.channel,
+                  expiresAt: bound.expiresAt,
+                };
               })
             )
           )

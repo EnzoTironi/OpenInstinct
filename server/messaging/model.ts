@@ -8,7 +8,31 @@ const reference = Schema.String.check(
   Schema.isTrimmed()
 );
 
+export const InputDeliveryReferenceSchema = Schema.Struct({
+  sessionId: reference,
+  requestId: reference,
+  revision: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
+});
+
+export const ClaimChannelInputResponseSchema = Schema.Struct({
+  ...InputDeliveryReferenceSchema.fields,
+  identityId: IdentityId,
+  sourceMessageId: reference,
+  turnId: reference,
+  decision: Schema.Literals(["approve", "cancel"]),
+});
+export type ClaimChannelInputResponse =
+  typeof ClaimChannelInputResponseSchema.Type;
+export const MarkChannelInputResponseSchema = Schema.Struct({
+  id: IdentityId,
+  status: Schema.Literals(["accepted", "uncertain"]),
+});
+
 export const MessagePayloadSchema = Schema.Struct({
+  inputRequest: Schema.optionalKey(InputDeliveryReferenceSchema),
+  sourceOccurredAtMs: Schema.optionalKey(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+  ),
   text: Schema.optionalKey(
     Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(16_384))
   ),
@@ -138,6 +162,14 @@ export const invalidInput = () =>
 // order canonicalizes JSON objects without changing meaningful array order.
 export function canonicalPayload(payload: MessagePayload) {
   const normalized: MessagePayload = {
+    inputRequest: payload.inputRequest
+      ? {
+          sessionId: payload.inputRequest.sessionId,
+          requestId: payload.inputRequest.requestId,
+          revision: payload.inputRequest.revision,
+        }
+      : undefined,
+    sourceOccurredAtMs: payload.sourceOccurredAtMs,
     text: payload.text,
     attachments: (payload.attachments ?? []).map((attachment) => ({
       id: attachment.id,

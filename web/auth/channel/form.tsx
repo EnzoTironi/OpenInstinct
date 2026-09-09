@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   channelChallengeSchema,
+  deviceBoundSchema,
   channelChallengeRequestSchema,
   channelProviderSchema,
 } from "@shared/identity/channel-auth";
@@ -38,7 +39,11 @@ export function ChannelAuthForm({
     useState<typeof channelChallengeSchema.Type>();
   const action = useAuthorizationRequest();
   function start(channel: typeof channelProviderSchema.Type) {
-    action.run(startChannelAuthorization(channel, purpose), setChallenge);
+    action.run(startChannelAuthorization(channel, purpose), (result) => {
+      if ("conversationUrl" in result)
+        window.location.assign(result.conversationUrl);
+      else setChallenge(result);
+    });
   }
 
   if (challenge)
@@ -103,13 +108,15 @@ export function ChannelAuthForm({
   );
 }
 
-function PendingAuthorization({
+export function PendingAuthorization({
   challenge,
   callbackUrl,
   purpose,
   onRestart,
 }: {
-  readonly challenge: typeof channelChallengeSchema.Type;
+  readonly challenge:
+    | typeof channelChallengeSchema.Type
+    | typeof deviceBoundSchema.Type;
   readonly callbackUrl: string;
   readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
   readonly onRestart: () => void;
@@ -211,7 +218,7 @@ function PendingAuthorization({
   );
 }
 
-function useAuthorizationRequest() {
+export function useAuthorizationRequest() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ChannelAuthorizationError>();
   const active = useRef<AbortController | undefined>(undefined);
@@ -250,7 +257,7 @@ function useAuthorizationRequest() {
   return { busy, error, run };
 }
 
-function SignInAgain({ callbackUrl }: { readonly callbackUrl: string }) {
+export function SignInAgain({ callbackUrl }: { readonly callbackUrl: string }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   return (

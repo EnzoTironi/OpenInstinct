@@ -1,6 +1,7 @@
 import { JsonSchema, Schema } from "effect";
 import { defineDynamic, defineTool, toolOutput } from "eve/tools";
 import { resolveModeValue } from "../lib/mode";
+import { deliverWebTaskReport } from "../lib/task-report";
 import {
   addReactionToMessageOutputSchema,
   reactToMessageOutputSchema,
@@ -39,8 +40,12 @@ function defineSendMessage() {
         },
       },
     },
-    execute(message) {
-      return message;
+    execute(message, context) {
+      if (context.session.parent)
+        throw new Error(
+          "Return the result to the parent conversation instead of sending a message."
+        );
+      return deliverWebTaskReport(message, context);
     },
     toModelOutput() {
       return toolOutput.text(
@@ -97,7 +102,11 @@ export default defineDynamic({
             },
           },
         },
-        execute(reaction) {
+        execute(reaction, toolContext) {
+          if (toolContext.session.parent)
+            throw new Error(
+              "Return the result to the parent conversation instead of reacting to a message."
+            );
           return reaction;
         },
         toModelOutput() {

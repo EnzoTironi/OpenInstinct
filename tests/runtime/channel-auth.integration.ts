@@ -1,3 +1,4 @@
+import { NativeDeviceAuth } from "../../server/accounts/device";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -15,6 +16,7 @@ import { Pool } from "pg";
 import { test } from "vitest";
 import {
   channelChallengeSchema,
+  channelConversationEntrySchema,
   type channelChallengeIdSchema,
   type channelChallengeRequestSchema,
 } from "../../shared/identity/channel-auth.ts";
@@ -34,7 +36,10 @@ test("real BetterAuth router, signed browser challenge and database session", as
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
   );
   const runtime = ManagedRuntime.make(
-    ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase))
+    NativeDeviceAuth.layer.pipe(
+      Layer.provideMerge(ChannelAccounts.layer),
+      Layer.provideMerge(runtimeDatabase)
+    )
   );
   const pool = new Pool({ connectionString: url });
   const installationId = `plugin-test-${randomUUID()}`;
@@ -243,29 +248,17 @@ test("real BetterAuth router, signed browser challenge and database session", as
       purpose: "login",
     });
     assert.equal(kapsoStarted.status, 200);
-    const kapsoChallenge = Schema.decodeUnknownSync(channelChallengeSchema)(
+    const entry = Schema.decodeUnknownSync(channelConversationEntrySchema)(
       await kapsoStarted.json()
     );
-    const whatsapp = new URL(kapsoChallenge.deepLink);
+    const whatsapp = new URL(entry.conversationUrl);
     assert.equal(whatsapp.origin, "https://wa.me");
     assert.equal(whatsapp.pathname, "/5511999999999");
-    const text = whatsapp.searchParams.get("text");
-    assert.ok(text);
-    assert.match(text, /^\/start [A-Za-z0-9_-]{43}$/u);
-    const kapsoPreview = await runtime.runPromise(
-      Effect.gen(function* () {
-        const accounts = yield* ChannelAccounts;
-        return yield* accounts.previewChallenge({
-          token: text.slice(7),
-          sender: {
-            channel: "kapso",
-            installationId,
-            senderId: "5511888888888",
-          },
-        });
-      })
+    assert.equal(
+      whatsapp.searchParams.get("text"),
+      "quero abrir minha conta no navegador"
     );
-    assert.equal(kapsoPreview.id, kapsoChallenge.id);
+    assert.equal(kapsoStarted.headers.getSetCookie().length, 0);
   } finally {
     await runtime.runPromise(
       Effect.gen(function* () {

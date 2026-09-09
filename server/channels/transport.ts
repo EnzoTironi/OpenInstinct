@@ -11,6 +11,7 @@ import {
   type MessageClaim,
 } from "../messaging";
 import { ProviderReferenceSchema } from "./inbound";
+import { InputDeliveryReferenceSchema } from "../messaging/model";
 import { Kapso, KapsoInstallationSchema } from "./kapso";
 import { Telegram, TelegramInstallationSchema } from "./telegram";
 
@@ -42,6 +43,7 @@ const enqueueInput = Schema.Struct({
     Schema.isTrimmed()
   ),
   text: textSchema,
+  inputRequest: Schema.optionalKey(InputDeliveryReferenceSchema),
   replyToMessageId: Schema.optionalKey(ProviderReferenceSchema),
 });
 const candidateInput = Schema.Struct({
@@ -249,60 +251,167 @@ const makeTransport = Effect.gen(function* () {
       })
     );
   });
-  return {
-    activeIdentity,
-    inboxCandidates: (channel: Identity["channel"], limit: number) =>
-      candidates("inbox", channel, limit),
-    outboxCandidates: (channel: Identity["channel"], limit: number) =>
-      candidates("outbox", channel, limit),
-    enqueueText: Effect.fn("ChannelTransport.enqueueText")(function* (
-      input: typeof enqueueInput.Type
-    ) {
-      const value = yield* Schema.decodeUnknownEffect(enqueueInput, {
-        onExcessProperty: "error",
-      })(input).pipe(Effect.mapError(invalidInput));
-      const identity = yield* findIdentity(value.identityId);
-      yield* activeIdentity(identity.id, identity.channel);
-      const chunks = yield* splitChannelText(value.text);
-      const payloads = yield* Effect.forEach(chunks, (text) => {
-        const payload: Schema.MutableJsonObject = { text };
-        if (value.replyToMessageId !== undefined)
-          payload.replyToMessageId = value.replyToMessageId;
-        return Schema.decodeUnknownEffect(MessagePayloadSchema)(payload).pipe(
-          Effect.mapError(invalidInput)
-        );
-      });
-      return yield* sql.withTransaction(
-        Effect.gen(function* () {
-          // Reserve the numeric suffix namespace under Messaging's identity lock.
-          // At most five chunks are valid; a sixth existing key already proves conflict.
-          yield* sql`SELECT id FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
-          const prefix = `${value.deliveryKey}:`;
-          const keys = payloads.map((_, index) => `${prefix}${String(index)}`);
-          const existing = yield* sql<{
-            id: string;
-            key: string;
-          }>`SELECT id, delivery_key AS key FROM channel_outbox
+  const enqueueText = Effect.fn("ChannelTransport.enqueueText")(function* (
+    input: typeof enqueueInput.Type
+  ) {
+    const value = yield* Schema.decodeUnknownEffect(enqueueInput, {
+      onExcessProperty: "error",
+    })(input).pipe(Effect.mapError(invalidInput));
+    const identity = yield* findIdentity(value.identityId);
+    yield* activeIdentity(identity.id, identity.channel);
+    const chunks = yield* splitChannelText(value.text);
+    const payloads = yield* Effect.forEach(chunks, (text) => {
+      const payload: Schema.MutableJsonObject = { text };
+      if (value.inputRequest !== undefined)
+        payload.inputRequest = { ...value.inputRequest };
+      if (value.replyToMessageId !== undefined)
+        payload.replyToMessageId = value.replyToMessageId;
+      return Schema.decodeUnknownEffect(MessagePayloadSchema)(payload).pipe(
+        Effect.mapError(invalidInput)
+      );
+    });
+    return yield* sql.withTransaction(
+      Effect.gen(function* () {
+        // Reserve the numeric suffix namespace under Messaging's identity lock.
+        // At most five chunks are valid; a sixth existing key already proves conflict.
+        yield* sql`SELECT id FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
+        const prefix = `${value.deliveryKey}:`;
+        const keys = payloads.map((_, index) => `${prefix}${String(index)}`);
+        const existing = yield* sql<{
+          id: string;
+          key: string;
+        }>`SELECT id, delivery_key AS key FROM channel_outbox
           WHERE identity_id = ${value.identityId}
             AND left(delivery_key, char_length(${prefix})) = ${prefix}
             AND substring(delivery_key FROM char_length(${prefix}) + 1) ~ '^[0-9]+$'
           LIMIT 6`;
-          if (
-            existing[0] &&
-            (existing.length !== keys.length ||
-              existing.some((row) => !keys.includes(row.key)))
-          )
-            return yield* new PayloadConflict({ id: existing[0].id });
-          return yield* Effect.forEach(payloads, (payload, index) =>
-            messaging.enqueue({
-              identityId: value.identityId,
-              deliveryKey: `${value.deliveryKey}:${String(index)}`,
-              payload,
-            })
-          );
+        if (
+          existing[0] &&
+          (existing.length !== keys.length ||
+            existing.some((row) => !keys.includes(row.key)))
+        )
+          return yield* new PayloadConflict({ id: existing[0].id });
+        return yield* Effect.forEach(payloads, (payload, index) =>
+          messaging.enqueue({
+            identityId: value.identityId,
+            deliveryKey: `${value.deliveryKey}:${String(index)}`,
+            payload,
+          })
+        );
+      })
+    );
+  });
+
+  const enqueueTaskReport = Effect.fn("ChannelTransport.enqueueTaskReport")(
+    function* (input: typeof enqueueInput.Type) {
+      const value = yield* Schema.decodeUnknownEffect(enqueueInput, {
+        onExcessProperty: "error",
+      })(input).pipe(Effect.mapError(invalidInput));
+      yield* Schema.decodeUnknownEffect(
+        Schema.String.check(Schema.isPattern(/^task-report:[0-9a-f]{64}$/u))
+      )(value.deliveryKey).pipe(Effect.mapError(invalidInput));
+      yield* sql`SELECT id FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
+      const identity = yield* findIdentity(value.identityId);
+      yield* activeIdentity(identity.id, identity.channel);
+      const prefix = `${value.deliveryKey}:`;
+      const existing = yield* sql<{
+        key: string;
+        payload: unknown;
+      }>`SELECT delivery_key AS key, payload FROM channel_outbox
+        WHERE identity_id = ${value.identityId}
+          AND left(delivery_key, char_length(${prefix})) = ${prefix}
+        ORDER BY delivery_key LIMIT 6`;
+      if (!existing.length) return yield* enqueueText(value);
+      if (
+        existing.length > 5 ||
+        existing.some((row, index) => row.key !== `${prefix}${String(index)}`)
+      )
+        return yield* invalidInput();
+      return yield* Effect.forEach(existing, (row) =>
+        Effect.gen(function* () {
+          const payload = yield* Schema.decodeUnknownEffect(
+            MessagePayloadSchema
+          )(row.payload).pipe(Effect.mapError(invalidInput));
+          return yield* messaging.enqueue({
+            identityId: value.identityId,
+            deliveryKey: row.key,
+            payload,
+          });
         })
       );
+    },
+    sql.withTransaction
+  );
+
+  return {
+    activeIdentity,
+    deliveredInput: Effect.fn("ChannelTransport.deliveredInput")(function* (
+      identityId: string,
+      reference: typeof InputDeliveryReferenceSchema.Type
+    ) {
+      const id = yield* Schema.decodeUnknownEffect(IdentityId)(identityId).pipe(
+        Effect.mapError(invalidInput)
+      );
+      const value = yield* Schema.decodeUnknownEffect(
+        InputDeliveryReferenceSchema
+      )(reference).pipe(Effect.mapError(invalidInput));
+      const prefix = `input:${value.sessionId}:${value.requestId}:`;
+      const rows = yield* sql`SELECT delivery_key AS key, payload, status,
+        (extract(epoch FROM sent_at) * 1000)::float8 AS "sentAtMs",
+        provider_message_id AS "providerMessageId"
+        FROM channel_outbox WHERE identity_id = ${id}
+          AND left(delivery_key, char_length(${prefix})) = ${prefix}
+          AND substring(delivery_key FROM char_length(${prefix}) + 1) ~ '^[0-9]+$'
+        ORDER BY sequence LIMIT 6`;
+      const chunks = yield* Schema.decodeUnknownEffect(
+        Schema.Array(
+          Schema.Struct({
+            key: Schema.String,
+            payload: MessagePayloadSchema,
+            status: Schema.String,
+            sentAtMs: Schema.NullOr(Schema.Finite),
+            providerMessageId: Schema.NullOr(Schema.String),
+          })
+        )
+      )(rows).pipe(Effect.mapError(invalidInput));
+      if (chunks.length === 0 || chunks.length > 5) return null;
+      let deliveredAtMs = 0;
+      const text: string[] = [];
+      const providerMessageIds: string[] = [];
+      for (const [index, chunk] of chunks.entries()) {
+        const delivered = chunk.payload.inputRequest;
+        if (
+          chunk.key !== `${prefix}${String(index)}` ||
+          chunk.status !== "sent" ||
+          chunk.sentAtMs === null ||
+          !chunk.providerMessageId ||
+          !chunk.payload.text ||
+          delivered?.sessionId !== value.sessionId ||
+          delivered.requestId !== value.requestId ||
+          delivered.revision !== value.revision
+        )
+          return null;
+        deliveredAtMs = Math.max(deliveredAtMs, chunk.sentAtMs);
+        text.push(chunk.payload.text);
+        providerMessageIds.push(chunk.providerMessageId);
+      }
+      const receiptId = providerMessageIds[0];
+      if (!receiptId) return null;
+      return {
+        ...value,
+        identityId: id,
+        deliveredAtMs,
+        text: text.join(""),
+        receiptId,
+        providerMessageIds,
+      };
     }),
+    inboxCandidates: (channel: Identity["channel"], limit: number) =>
+      candidates("inbox", channel, limit),
+    outboxCandidates: (channel: Identity["channel"], limit: number) =>
+      candidates("outbox", channel, limit),
+    enqueueText,
+    enqueueTaskReport,
     drainOutbox: Effect.fn("ChannelTransport.drainOutbox")(function* (
       identityId: string
     ) {

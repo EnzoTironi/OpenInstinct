@@ -258,7 +258,7 @@ function workerCancellation(taskId: string): MessageStreamEvent {
 
 function delivery(turnId: string, messageText: string): MessageStreamEvent {
   return {
-    data: { message: messageText, sequence: 0, turnId },
+    data: { message: messageText, sequence: 0, source: "task", turnId },
     meta: { at: "2026-08-27T20:00:01.000Z", id: "delivery" },
     type: "message.received",
   };

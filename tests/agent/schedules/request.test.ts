@@ -3,13 +3,13 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { getVercelOidcToken } from "@vercel/oidc";
 import { ConfigProvider, Effect, Schema } from "effect";
 import { afterEach, expect, test, vi } from "vitest";
-import { readVerifiedScheduledCallback } from "../../../server/internal/scheduled-callback-auth";
+import { readVerifiedInternalCallback } from "../../../server/internal/callback-auth";
 
 const mocks = vi.hoisted(() => ({
   getToken: vi.fn<typeof getVercelOidcToken>(),
 }));
 vi.mock("@vercel/oidc", () => ({ getVercelOidcToken: mocks.getToken }));
-import { postScheduledRunRoute } from "@agent/lib/schedules/request";
+import { postInternalRequest } from "@agent/lib/internal-request";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -26,7 +26,7 @@ test("preserves the Vercel deployment destination and both OIDC headers", async 
     .mockResolvedValue(new Response(null));
   vi.stubGlobal("fetch", fetch);
   const body = { runId: randomUUID() };
-  await postScheduledRunRoute("/internal/scheduled-run/report", body);
+  await postInternalRequest("/internal/scheduled-run/report", body);
   expect(mocks.getToken).toHaveBeenCalledOnce();
   expect(fetch).toHaveBeenCalledWith(
     new URL(
@@ -46,7 +46,7 @@ test("preserves the Vercel deployment destination and both OIDC headers", async 
     "vercel-oidc-token"
   );
   expect(headers.get("content-type")).toBe("application/json");
-  expect(headers.has("x-scheduled-callback-signature")).toBe(false);
+  expect(headers.has("x-internal-callback-signature")).toBe(false);
 });
 
 const configuration = {
@@ -91,7 +91,7 @@ test("production-local client signs real HTTP requests and refuses redirects", a
         body: payload,
       });
       void run(
-        readVerifiedScheduledCallback(
+        readVerifiedInternalCallback(
           input,
           incoming.url === "/internal/scheduled-run/respond"
             ? "/internal/scheduled-run/respond"
@@ -127,7 +127,7 @@ test("production-local client signs real HTTP requests and refuses redirects", a
   vi.stubEnv("VERCEL_ENV", undefined);
   try {
     const input = { runId: randomUUID() };
-    const response = await postScheduledRunRoute(route, input);
+    const response = await postInternalRequest(route, input);
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual(input);
     const answer = {
@@ -135,7 +135,7 @@ test("production-local client signs real HTTP requests and refuses redirects", a
       leaseToken: randomUUID(),
       answer: "Logan",
     };
-    const answered = await postScheduledRunRoute(
+    const answered = await postInternalRequest(
       "/internal/scheduled-run/respond",
       answer
     );
@@ -143,8 +143,8 @@ test("production-local client signs real HTTP requests and refuses redirects", a
     expect(await answered.json()).toEqual(answer);
     expect(mocks.getToken).not.toHaveBeenCalled();
     redirect = true;
-    await expect(postScheduledRunRoute(route, input)).rejects.toMatchObject({
-      _tag: "ScheduledCallbackRejected",
+    await expect(postInternalRequest(route, input)).rejects.toMatchObject({
+      _tag: "InternalCallbackRejected",
       status: 503,
     });
     expect(requests).toBe(3);

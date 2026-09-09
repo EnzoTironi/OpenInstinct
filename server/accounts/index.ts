@@ -38,6 +38,10 @@ const ConsumeChallenge = Schema.Struct({
   browserSecret: Secret,
   currentSessionId: Schema.optionalKey(Identifier),
 });
+const FreshSession = Schema.Struct({
+  userId: Identifier,
+  sessionId: Identifier,
+});
 const RevokeIdentity = Schema.Struct({
   identityId: Uuid,
   userId: Identifier,
@@ -95,6 +99,9 @@ const ConsumedChallenge = Schema.Struct({
 });
 type Failure = ChannelAccountError | SqlError;
 interface Accounts {
+  readonly requireFreshSession: (
+    input: typeof FreshSession.Type
+  ) => Effect.Effect<void, Failure>;
   readonly resolveVerifiedSender: (
     input: typeof VerifiedSender.Type
   ) => Effect.Effect<Identity, Failure>;
@@ -174,14 +181,22 @@ export class ChannelAccounts extends Context.Service<
       });
       const requireSession = Effect.fn("ChannelAccounts.requireSession")(
         function* (userId: string, sessionId: string, requireFresh = false) {
-          const rows =
-            yield* sql`SELECT id FROM public.session WHERE id = ${sessionId}
-        AND "userId" = ${userId} AND "expiresAt" > clock_timestamp()
-        AND (NOT ${requireFresh} OR ("createdAt" >= clock_timestamp() - interval '10 minutes' AND "createdAt" <= clock_timestamp())) FOR UPDATE`;
+          const rows = yield* sql`SELECT s.id FROM public.session s
+        JOIN workspace_memberships m ON m.user_id = ${`better-auth:${userId}`} AND m.workspace_id = ${accessScopeForUser(`better-auth:${userId}`).workspaceId}
+        WHERE s.id = ${sessionId} AND s."userId" = ${userId} AND s."expiresAt" > clock_timestamp()
+        AND (NOT ${requireFresh} OR (s."createdAt" >= clock_timestamp() - interval '10 minutes' AND s."createdAt" <= clock_timestamp())) FOR UPDATE OF s`;
           if (!rows.length) return yield* fail("session_invalid");
           return undefined;
         }
       );
+      const requireFreshSession = Effect.fn(
+        "ChannelAccounts.requireFreshSession"
+      )(function* (input: typeof FreshSession.Type) {
+        const request = yield* decode(FreshSession, input);
+        return yield* transaction(
+          requireSession(request.userId, request.sessionId, true)
+        );
+      });
       const provision = Effect.fn("ChannelAccounts.provision")(function* (
         sender: typeof VerifiedSender.Type,
         targetUserId?: string
@@ -271,6 +286,7 @@ export class ChannelAccounts extends Context.Service<
               FROM public.channel_auth_challenge
               WHERE token_hash = ${hash(request.token)} AND channel = ${request.sender.channel}
               AND installation_id = ${request.sender.installationId}
+              AND intended_identity_id IS NULL
               AND confirmed_at IS NULL AND consumed_at IS NULL AND cancelled_at IS NULL
               AND expires_at > clock_timestamp()`;
               const preview = rows[0];
@@ -307,6 +323,7 @@ export class ChannelAccounts extends Context.Service<
               >`SELECT id, purpose, channel, installation_id AS "installationId",
           target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
           FROM public.channel_auth_challenge WHERE token_hash = ${hash(request.token)}
+          AND intended_identity_id IS NULL
           AND consumed_at IS NULL AND cancelled_at IS NULL AND confirmed_at IS NULL
           AND expires_at > clock_timestamp() FOR UPDATE`;
               const challenge = rows[0];
@@ -446,7 +463,7 @@ export class ChannelAccounts extends Context.Service<
           WHERE id = ${request.identityId}`;
               yield* sql`UPDATE public.channel_auth_challenge SET cancelled_at = clock_timestamp()
           WHERE consumed_at IS NULL AND cancelled_at IS NULL
-          AND (identity_id = ${request.identityId} OR target_user_id = ${request.userId}
+          AND (identity_id = ${request.identityId} OR intended_identity_id = ${request.identityId} OR target_user_id = ${request.userId}
             OR requesting_session_id IN (SELECT id FROM public.session WHERE "userId" = ${request.userId})
             OR EXISTS (SELECT 1 FROM public.channel_identity i WHERE i.id = ${request.identityId}
               AND i.channel = public.channel_auth_challenge.channel
@@ -459,6 +476,7 @@ export class ChannelAccounts extends Context.Service<
         }
       );
       return ChannelAccounts.of({
+        requireFreshSession,
         resolveVerifiedSender,
         getActiveIdentity,
         issueChallenge,

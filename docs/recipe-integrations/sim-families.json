@@ -1,0 +1,1742 @@
+[
+  {
+    "family": "a2a",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/a2a",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "affinity",
+    "registered_tools": 70,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/affinity",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "agentmail",
+    "registered_tools": 21,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/agentmail",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "agentphone",
+    "registered_tools": 22,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/agentphone",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "agiloft",
+    "registered_tools": 18,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/agiloft",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "ahrefs",
+    "registered_tools": 23,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/ahrefs",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "airtable",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/airtable",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "airweave",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/airweave",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "algolia",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/algolia",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "amplitude",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/amplitude",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "apify",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/apify",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "apollo",
+    "registered_tools": 25,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/apollo",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "appconfig",
+    "registered_tools": 25,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/appconfig",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "arxiv",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/arxiv",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "asana",
+    "registered_tools": 14,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/asana",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "ashby",
+    "registered_tools": 44,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/ashby",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "athena",
+    "registered_tools": 12,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/athena",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "attio",
+    "registered_tools": 45,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/attio",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "azure_data_explorer",
+    "registered_tools": 14,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/azure_data_explorer",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "azure_devops",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/azure_devops",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "bitbucket",
+    "registered_tools": 30,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/bitbucket",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "box",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/box",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "box_sign",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/box_sign",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "brandfetch",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/brandfetch",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "brex",
+    "registered_tools": 34,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/brex",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "brightdata",
+    "registered_tools": 8,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/brightdata",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "browser_use",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/browser_use",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "buffer",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/buffer",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "calcom",
+    "registered_tools": 19,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/calcom",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "calendly",
+    "registered_tools": 22,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/calendly",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "cbinsights",
+    "registered_tools": 25,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/cbinsights",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "circleback",
+    "registered_tools": 20,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/circleback",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "clay",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/clay",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "clerk",
+    "registered_tools": 34,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/clerk",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "clickhouse",
+    "registered_tools": 26,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/clickhouse",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "clickup",
+    "registered_tools": 38,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/clickup",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "cloudflare",
+    "registered_tools": 48,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/cloudflare",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "cloudformation",
+    "registered_tools": 15,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/cloudformation",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "cloudtrail",
+    "registered_tools": 14,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/cloudtrail",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "cloudwatch",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/cloudwatch",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "codepipeline",
+    "registered_tools": 12,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/codepipeline",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "confluence",
+    "registered_tools": 46,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/confluence",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "context_dev",
+    "registered_tools": 19,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/context_dev",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "convex",
+    "registered_tools": 7,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/convex",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "crowdstrike",
+    "registered_tools": 23,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/crowdstrike",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "crunchbase",
+    "registered_tools": 14,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/crunchbase",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "cursor",
+    "registered_tools": 24,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/cursor",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "dagster",
+    "registered_tools": 19,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/dagster",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "databricks",
+    "registered_tools": 12,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/databricks",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "datadog",
+    "registered_tools": 41,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/datadog",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "datagma",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/datagma",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "daytona",
+    "registered_tools": 12,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/daytona",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "deployments",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/deployments",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "devin",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/devin",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "discord",
+    "registered_tools": 39,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/discord",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "docusign",
+    "registered_tools": 8,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/docusign",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "downdetector",
+    "registered_tools": 15,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/downdetector",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "dropbox",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/dropbox",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "dropcontact",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/dropcontact",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "dspy",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/dspy",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "dub",
+    "registered_tools": 17,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/dub",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "duckduckgo",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/duckduckgo",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "dynamodb",
+    "registered_tools": 7,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/dynamodb",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "dynatrace",
+    "registered_tools": 47,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/dynatrace",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "elasticsearch",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/elasticsearch",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "elevenlabs",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/elevenlabs",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "emailbison",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/emailbison",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "embeddings",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/embeddings",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "enrich",
+    "registered_tools": 32,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/enrich",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "enrichment",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/enrichment",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "enrow",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/enrow",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "exa",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/exa",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "extend",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/extend",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "fathom",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/fathom",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "file",
+    "registered_tools": 20,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/file",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "findymail",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/findymail",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "firecrawl",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/firecrawl",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "fireflies",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/fireflies",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "flint",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/flint",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "function",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/function",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "gamma",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/gamma",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "github",
+    "registered_tools": 179,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/github",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "gitlab",
+    "registered_tools": 65,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/gitlab",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "gmail",
+    "registered_tools": 36,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/gmail",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "gong",
+    "registered_tools": 29,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/gong",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_ads",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_ads",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_appsheet",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_appsheet",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_bigquery",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_bigquery",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_books",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_books",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_calendar",
+    "registered_tools": 36,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_calendar",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_contacts",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_contacts",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_docs",
+    "registered_tools": 15,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_docs",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_drive",
+    "registered_tools": 23,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_drive",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_forms",
+    "registered_tools": 9,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_forms",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_groups",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_groups",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_maps",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_maps",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_meet",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_meet",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_pagespeed",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_pagespeed",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_sheets",
+    "registered_tools": 18,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_sheets",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_slides",
+    "registered_tools": 52,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_slides",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_tasks",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_tasks",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_translate",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_translate",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "google_vault",
+    "registered_tools": 22,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/google_vault",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "grafana",
+    "registered_tools": 30,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/grafana",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "grain",
+    "registered_tools": 12,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/grain",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "granola",
+    "registered_tools": 9,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/granola",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "greenhouse",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/greenhouse",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "greptile",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/greptile",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "guardrails",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/guardrails",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "harmonic",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/harmonic",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "hex",
+    "registered_tools": 21,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/hex",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "http",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/http",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "hubspot",
+    "registered_tools": 62,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/hubspot",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "huggingface",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/huggingface",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "hunter",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/hunter",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "iam",
+    "registered_tools": 24,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/iam",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "icypeas",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/icypeas",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "identity_center",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/identity_center",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "image",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/image",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "incidentio",
+    "registered_tools": 65,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/incidentio",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "infisical",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/infisical",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "instagram",
+    "registered_tools": 24,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/instagram",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "instantly",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/instantly",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "intercom",
+    "registered_tools": 47,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/intercom",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "jina",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/jina",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "jira",
+    "registered_tools": 30,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/jira",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "jotform",
+    "registered_tools": 43,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/jotform",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "jsm",
+    "registered_tools": 43,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/jsm",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "jupyter",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/jupyter",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "kalshi",
+    "registered_tools": 44,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/kalshi",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "ketch",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/ketch",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "knowledge",
+    "registered_tools": 14,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/knowledge",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "lambda",
+    "registered_tools": 50,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/lambda",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "langsmith",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/langsmith",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "latex",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/latex",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "launchdarkly",
+    "registered_tools": 12,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/launchdarkly",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "leadmagic",
+    "registered_tools": 9,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/leadmagic",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "lemlist",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/lemlist",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "linear",
+    "registered_tools": 78,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/linear",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "linkedin",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/linkedin",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "linkup",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/linkup",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "linq",
+    "registered_tools": 34,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/linq",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "llm",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/llm",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "logfire",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/logfire",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "logrocket",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/logrocket",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "logs",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/logs",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "loops",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/loops",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "luma",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/luma",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "mailchimp",
+    "registered_tools": 73,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/mailchimp",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "mailgun",
+    "registered_tools": 8,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/mailgun",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "managed_agent",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/managed_agent",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "manageengine_sdp",
+    "registered_tools": 31,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/manageengine_sdp",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "mem0",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/mem0",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "memory",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/memory",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "microsoft_ad",
+    "registered_tools": 36,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/microsoft_ad",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "microsoft_dataverse",
+    "registered_tools": 18,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/microsoft_dataverse",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "microsoft_dynamics_365",
+    "registered_tools": 8,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/microsoft_dynamics_365",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "microsoft_excel",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/microsoft_excel",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "microsoft_planner",
+    "registered_tools": 18,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/microsoft_planner",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "microsoft_teams",
+    "registered_tools": 18,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/microsoft_teams",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "microsoft_word",
+    "registered_tools": 8,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/microsoft_word",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "millionverifier",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/millionverifier",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "mintlify",
+    "registered_tools": 18,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/mintlify",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "mistral",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/mistral",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "modal",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/modal",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "monday",
+    "registered_tools": 18,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/monday",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "mongodb",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/mongodb",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "mssql",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/mssql",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "mysql",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/mysql",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "neo4j",
+    "registered_tools": 7,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/neo4j",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "netsuite",
+    "registered_tools": 27,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/netsuite",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "neverbounce",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/neverbounce",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "new_relic",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/new_relic",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "notion",
+    "registered_tools": 36,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/notion",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "obsidian",
+    "registered_tools": 15,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/obsidian",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "okta",
+    "registered_tools": 44,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/okta",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "onedrive",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/onedrive",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "onepassword",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/onepassword",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "openai",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/openai",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "outlook",
+    "registered_tools": 23,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/outlook",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "pagerduty",
+    "registered_tools": 15,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/pagerduty",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "parallel",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/parallel",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "pdl",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/pdl",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "perplexity",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/perplexity",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "persona",
+    "registered_tools": 26,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/persona",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "pinecone",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/pinecone",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "pipedrive",
+    "registered_tools": 18,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/pipedrive",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "pitchbook",
+    "registered_tools": 91,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/pitchbook",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "polymarket",
+    "registered_tools": 20,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/polymarket",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "postgresql",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/postgresql",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "posthog",
+    "registered_tools": 48,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/posthog",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "profound",
+    "registered_tools": 24,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/profound",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "prospeo",
+    "registered_tools": 8,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/prospeo",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "pulse",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/pulse",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "qdrant",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/qdrant",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "quartr",
+    "registered_tools": 17,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/quartr",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "quickbooks",
+    "registered_tools": 49,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/quickbooks",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "quiver",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/quiver",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "rabbitmq",
+    "registered_tools": 25,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/rabbitmq",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "railway",
+    "registered_tools": 20,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/railway",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "rb2b",
+    "registered_tools": 15,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/rb2b",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "rds",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/rds",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "reddit",
+    "registered_tools": 38,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/reddit",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "redis",
+    "registered_tools": 22,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/redis",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "reducto",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/reducto",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "resend",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/resend",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "revenuecat",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/revenuecat",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "rippling",
+    "registered_tools": 86,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/rippling",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "rocketlane",
+    "registered_tools": 64,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/rocketlane",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "rootly",
+    "registered_tools": 41,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/rootly",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "s3",
+    "registered_tools": 11,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/s3",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sailpoint",
+    "registered_tools": 40,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sailpoint",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "salesforce",
+    "registered_tools": 40,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/salesforce",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sap_concur",
+    "registered_tools": 70,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sap_concur",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sap_s4hana",
+    "registered_tools": 38,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sap_s4hana",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "search",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/search",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "secrets_manager",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/secrets_manager",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "semrush",
+    "registered_tools": 44,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/semrush",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sendblue",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sendblue",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sendgrid",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sendgrid",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sentry",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sentry",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "serper",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/serper",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "servicenow",
+    "registered_tools": 35,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/servicenow",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "ses",
+    "registered_tools": 19,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/ses",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sftp",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sftp",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sharepoint",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sharepoint",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "shopify",
+    "registered_tools": 21,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/shopify",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "similarweb",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/similarweb",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sixtyfour",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sixtyfour",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "slack",
+    "registered_tools": 45,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/slack",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "smartlead",
+    "registered_tools": 47,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/smartlead",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sms",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sms",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "smtp",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/smtp",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "snowflake",
+    "registered_tools": 30,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/snowflake",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "splunk",
+    "registered_tools": 12,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/splunk",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sportmonks_core",
+    "registered_tools": 17,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sportmonks_core",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sportmonks_football",
+    "registered_tools": 122,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sportmonks_football",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sportmonks_motorsport",
+    "registered_tools": 57,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sportmonks_motorsport",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sportmonks_odds",
+    "registered_tools": 25,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sportmonks_odds",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "spotify",
+    "registered_tools": 78,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/spotify",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sqs",
+    "registered_tools": 21,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sqs",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "square",
+    "registered_tools": 34,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/square",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "ssh",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/ssh",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "ssm",
+    "registered_tools": 22,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/ssm",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "stagehand",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/stagehand",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "stripe",
+    "registered_tools": 50,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/stripe",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "sts",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/sts",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "stt",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/stt",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "supabase",
+    "registered_tools": 26,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/supabase",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "table",
+    "registered_tools": 13,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/table",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "tailscale",
+    "registered_tools": 24,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/tailscale",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "tavily",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/tavily",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "telegram",
+    "registered_tools": 19,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/telegram",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "temporal",
+    "registered_tools": 20,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/temporal",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "textract",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/textract",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "thinking",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/thinking",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "thrive",
+    "registered_tools": 47,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/thrive",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "tiktok",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/tiktok",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "tinybird",
+    "registered_tools": 7,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/tinybird",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "tinyfish",
+    "registered_tools": 9,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/tinyfish",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "trello",
+    "registered_tools": 21,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/trello",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "trigger_dev",
+    "registered_tools": 44,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/trigger_dev",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "tts",
+    "registered_tools": 7,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/tts",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "twilio",
+    "registered_tools": 1,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/twilio",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "twilio_voice",
+    "registered_tools": 3,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/twilio_voice",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "typeform",
+    "registered_tools": 8,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/typeform",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "upstash",
+    "registered_tools": 16,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/upstash",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "uptimerobot",
+    "registered_tools": 24,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/uptimerobot",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "vanta",
+    "registered_tools": 29,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/vanta",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "vercel",
+    "registered_tools": 56,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/vercel",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "video",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/video",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "vision",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/vision",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "wealthbox",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/wealthbox",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "webflow",
+    "registered_tools": 5,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/webflow",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "whatsapp",
+    "registered_tools": 8,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/whatsapp",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "wikipedia",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/wikipedia",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "windchill",
+    "registered_tools": 27,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/windchill",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "wiza",
+    "registered_tools": 4,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/wiza",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "wordpress",
+    "registered_tools": 32,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/wordpress",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "workday",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/workday",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "workflow",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/workflow",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "x",
+    "registered_tools": 32,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/x",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "youtube",
+    "registered_tools": 9,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/youtube",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "zendesk",
+    "registered_tools": 26,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/zendesk",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "zep",
+    "registered_tools": 9,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/zep",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "zerobounce",
+    "registered_tools": 2,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/zerobounce",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "zoho_desk",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/zoho_desk",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "zoom",
+    "registered_tools": 10,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/zoom",
+    "kind": "provider_or_utility_family"
+  },
+  {
+    "family": "zoominfo",
+    "registered_tools": 6,
+    "source": "https://github.com/simstudioai/sim/tree/4dbf0a0db689373faf52f760bc971c81c6b38c67/apps/sim/tools/zoominfo",
+    "kind": "provider_or_utility_family"
+  }
+]

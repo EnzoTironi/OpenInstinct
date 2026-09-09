@@ -67,6 +67,65 @@ const run = (body: Parameters<typeof fixture>[0]) =>
     fixture(body).pipe(Effect.scoped, Effect.provide(services))
   );
 
+test("input delivery requires every original chunk, current revision and matching identity", () =>
+  run((transport, _messaging, sql, identities) =>
+    Effect.gen(function* () {
+      const [identityId, otherIdentityId] = identities;
+      if (!identityId || !otherIdentityId)
+        throw new Error("Missing identities");
+      const inputRequest = {
+        sessionId: "session-delivery-proof",
+        requestId: "request-delivery-proof",
+        revision: "a".repeat(64),
+      };
+      const text = "details ".repeat(700);
+      const receipts = yield* transport.enqueueText({
+        identityId,
+        deliveryKey: `input:${inputRequest.sessionId}:${inputRequest.requestId}`,
+        text,
+        inputRequest,
+      });
+      expect(receipts).toHaveLength(2);
+      expect(
+        yield* transport.deliveredInput(identityId, inputRequest)
+      ).toBeNull();
+      const first = receipts[0];
+      if (!first) throw new Error("Missing first receipt");
+      // These rows model accepted delivery facts; this test does not qualify a provider send.
+      yield* sql`UPDATE channel_outbox SET status = 'sent',
+        sent_at = '2026-09-08T12:00:00Z', provider_message_id = 'part-1'
+        WHERE id = ${first.id}`;
+      expect(
+        yield* transport.deliveredInput(identityId, inputRequest)
+      ).toBeNull();
+      yield* sql`UPDATE channel_outbox SET status = 'sent',
+        sent_at = '2026-09-08T12:00:02Z', provider_message_id = 'part-2'
+        WHERE identity_id = ${identityId} AND id <> ${first.id}`;
+      expect(
+        yield* transport.deliveredInput(identityId, inputRequest)
+      ).toMatchObject({
+        identityId,
+        ...inputRequest,
+        text,
+        deliveredAtMs: 1_788_868_802_000,
+        providerMessageIds: ["part-1", "part-2"],
+      });
+      expect(
+        yield* transport.deliveredInput(otherIdentityId, inputRequest)
+      ).toBeNull();
+      expect(
+        yield* transport.deliveredInput(identityId, {
+          ...inputRequest,
+          revision: "b".repeat(64),
+        })
+      ).toBeNull();
+      yield* sql`UPDATE channel_outbox SET status = 'uncertain' WHERE id = ${first.id}`;
+      expect(
+        yield* transport.deliveredInput(identityId, inputRequest)
+      ).toBeNull();
+    })
+  ));
+
 test("splits at 4000 UTF-16 units without splitting surrogate pairs or changing text", async () => {
   const text = `${"a".repeat(3999)}😀${"b".repeat(12_383)}`;
   const chunks = await Effect.runPromise(splitChannelText(text));
@@ -452,5 +511,69 @@ test("rejects a stored chunk key hole even when its count matches the requested 
       }>`SELECT delivery_key AS key FROM channel_outbox
         WHERE identity_id = ${identityId} ORDER BY delivery_key`;
       expect(rows.map((row) => row.key)).toEqual(["hole:0", "hole:2"]);
+    })
+  ));
+
+test("settled task reports retain the first atomic delivery across concurrent rewording", () =>
+  run((transport, messaging, sql, identities) =>
+    Effect.gen(function* () {
+      const identityId = identities[0];
+      if (!identityId) throw new Error("Missing fixture");
+      const deliveryKey = `task-report:${"a".repeat(64)}`;
+      const wording = [
+        "First combined result. ".repeat(220),
+        "A reworded duplicate.",
+      ];
+      const [first, second] = yield* Effect.all(
+        wording.map((text) =>
+          transport.enqueueTaskReport({ identityId, deliveryKey, text })
+        ),
+        { concurrency: "unbounded" }
+      );
+      expect(first?.map((receipt) => receipt.id)).toEqual(
+        second?.map((receipt) => receipt.id)
+      );
+      const saved = yield* sql<{
+        text: string;
+      }>`SELECT payload->>'text' AS text FROM channel_outbox WHERE identity_id = ${identityId} ORDER BY delivery_key`;
+      expect(wording).toContain(saved.map((receipt) => receipt.text).join(""));
+      const replay = yield* transport.enqueueTaskReport({
+        identityId,
+        deliveryKey,
+        text: "A third version in a later turn.",
+      });
+      expect(replay.map((receipt) => receipt.id)).toEqual(
+        first?.map((receipt) => receipt.id)
+      );
+      const distinct = yield* transport.enqueueTaskReport({
+        identityId,
+        deliveryKey: `task-report:${"b".repeat(64)}`,
+        text: "Another completed cohort.",
+      });
+      expect(distinct[0]?.id).not.toBe(first?.[0]?.id);
+      yield* transport.enqueueText({
+        identityId,
+        deliveryKey: "ordinary-message",
+        text: "Original ordinary message",
+      });
+      expect(
+        yield* transport
+          .enqueueText({
+            identityId,
+            deliveryKey: "ordinary-message",
+            text: "Conflicting ordinary message",
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(PayloadConflict);
+      yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
+      expect(
+        yield* transport
+          .enqueueTaskReport({
+            identityId,
+            deliveryKey,
+            text: "After revocation",
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(ChannelTransportError);
     })
   ));

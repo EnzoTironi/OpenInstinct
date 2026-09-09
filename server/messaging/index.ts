@@ -17,6 +17,7 @@ import {
   type MessagingError,
 } from "./model";
 import { makeQueue, storageFailure } from "./store";
+import { makeInputResponses } from "./input-response";
 
 export * from "./model";
 
@@ -63,8 +64,15 @@ const makeMessaging = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
   const inbox = makeQueue(sql, "inbox");
   const outbox = makeQueue(sql, "outbox");
+  const inputResponses = makeInputResponses(sql);
 
   return {
+    claimChannelInputResponse: (
+      ...args: Parameters<typeof inputResponses.claim>
+    ) => protect(inputResponses.claim(...args)),
+    markChannelInputResponse: (
+      ...args: Parameters<typeof inputResponses.mark>
+    ) => protect(inputResponses.mark(...args)),
     accept: Effect.fn("Messaging.accept")(function* (input: AcceptInput) {
       const value = yield* decodeInput(AcceptInputSchema)(input);
       return yield* inbox.insert({ ...value, key: value.eventId });

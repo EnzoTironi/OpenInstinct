@@ -1,15 +1,17 @@
 import { describe, expect, test } from "vitest";
+import { ZodError } from "zod";
+import { ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
+import askQuestion from "../../tools/ask_question";
 import {
   defaultMessageReducer,
   type InputRequest,
   type MessageStreamEvent,
 } from "eve/client";
 import {
-  channelInputCode,
+  channelQuestionSchema,
   pendingChannelInputs,
   readChannelInputStream,
   renderChannelInput,
-  resolveChannelInput,
 } from "../channel-input";
 
 const request: InputRequest = {
@@ -26,68 +28,60 @@ const request: InputRequest = {
     callId: "call-1",
     toolName: "calendar-create-event",
     input: {
+      approvalMessage:
+        "Vou convidar test@example.com para a reunião amanhã às 10h, no horário de Brasília. Posso enviar?",
       summary: "Reunião",
       start: "2026-09-09T10:00:00-03:00",
       attendees: ["test@example.com"],
     },
   },
 };
-const command = `/responder ${channelInputCode("session-1", request.requestId)} approve`;
-
 describe("native input responses", () => {
-  test("renders the exact action and bound commands", () => {
-    const text = renderChannelInput("session-1", request);
-    expect(text).toContain(command);
-    expect(text).toContain(JSON.stringify(request.action.input, null, 2));
-    expect(text).toContain("Criar este evento?");
-  });
-  test("answers exactly one pending request", () => {
+  test("rejects an oversized question in the authored tool input schema", () => {
+    expect(askQuestion.inputSchema).toBe(channelQuestionSchema);
+    const input = { prompt: "x".repeat(16385) };
+    expect(ASK_QUESTION_INPUT_SCHEMA.safeParse(input).success).toBe(true);
+    expect(channelQuestionSchema.safeParse(input).success).toBe(false);
     expect(
-      resolveChannelInput("session-1", command, [
-        request,
-        { ...request, requestId: "approval-2" },
-      ])
-    ).toEqual({ requestId: request.requestId, optionId: "approve" });
-  });
-  test.each([
-    "approve",
-    "Aprovar",
-    "1",
-    "/responder bad approve",
-    "/responder",
-    "cancel",
-  ])("does not resolve unbound text %s", (text) => {
-    expect(resolveChannelInput("session-1", text, [request])).toBeNull();
-  });
-  test("rejects stale, other-session and ambiguous requests", () => {
-    expect(resolveChannelInput("session-1", command, [])).toBeNull();
-    expect(resolveChannelInput("session-2", command, [request])).toBeNull();
+      channelQuestionSchema.safeParse({ prompt: "x".repeat(16384) }).success
+    ).toBe(true);
     expect(
-      resolveChannelInput("session-1", command, [request, request])
-    ).toBeNull();
+      channelQuestionSchema.safeParse({
+        prompt: "x".repeat(16383),
+        options: [{ id: "yes", label: "Yes" }],
+      }).success
+    ).toBe(false);
   });
-  test("maps freeform questions through the public Eve resolver", () => {
-    const question: InputRequest = {
-      ...request,
-      kind: "question",
-      options: [],
-      allowFreeform: true,
-    };
-    expect(
-      resolveChannelInput(
-        "session-1",
-        command.replace(" approve", " Amanhã às 10h"),
-        [question]
-      )
-    ).toEqual({ requestId: request.requestId, text: "Amanhã às 10h" });
+  test("delivers the model-authored proposal without inserting transport commands or tool JSON", () => {
+    expect(renderChannelInput(request)).toBe(
+      request.action.input.approvalMessage
+    );
   });
-  test("does not publish an approval command for truncated details", () => {
+  test.each([undefined, "", "  ", "x".repeat(16385)])(
+    "refuses an absent or invalid authored proposal",
+    (approvalMessage) => {
+      expect(() =>
+        renderChannelInput({
+          ...request,
+          action: {
+            ...request.action,
+            input: approvalMessage === undefined ? {} : { approvalMessage },
+          },
+        })
+      ).toThrow(ZodError);
+    }
+  );
+  test("renders a question and its choices as normal text", () => {
     expect(
-      renderChannelInput("session-1", {
+      renderChannelInput({
         ...request,
-        action: { ...request.action, input: { body: "x".repeat(17000) } },
+        kind: "question",
+        prompt: "Qual horário?",
+        options: [
+          { id: "morning", label: "De manhã", description: "antes do almoço" },
+        ],
       })
-    ).not.toContain("/responder");
+    ).toBe("Qual horário?\n\nDe manhã: antes do almoço");
   });
   test("projects a real public input event through Eve's reducer", () => {
     const reducer = defaultMessageReducer();

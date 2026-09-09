@@ -39,6 +39,24 @@ describe("trace view", () => {
     }
   );
 
+  it.each([
+    "is cancelled.",
+    'is completed.\n\nResult:\n{"message":"Done"}',
+    "needs input.",
+  ])(
+    "hides native delivery without a receipt in the current page: %s",
+    (status) => {
+      const text = `Background task task_generic (agent) ${status}`;
+      const events = [
+        receivedMessage("recent-task", text),
+        receivedMessage("recent-user", text, "user"),
+      ];
+      expect(backgroundWorkerDeliveryMessageIds(events)).toEqual(
+        new Set(["recent-task:user"])
+      );
+    }
+  );
+
   it("identifies authorization delivery for a known worker task", () => {
     const events = [
       workerActionReceipt("task_worker"),
@@ -62,7 +80,7 @@ describe("trace view", () => {
       workerActionReceipt("task_worker"),
       workerCancellationResult("task_worker"),
       receivedMessage("task-delivery", deliveryText),
-      receivedMessage("ordinary-user-message", ordinaryText),
+      receivedMessage("ordinary-user-message", ordinaryText, "user"),
     ] satisfies MessageStreamEvent[];
     const messages = [
       userMessage("task-delivery", deliveryText),
@@ -80,7 +98,7 @@ describe("trace view", () => {
     const text = "Background task task_worker (browser-agent) is cancelled.";
     const events = [
       workerActionReceipt("task_worker"),
-      receivedMessage("user-spoof", text),
+      receivedMessage("user-spoof", text, "user"),
       workerCancellationResult("task_worker"),
       receivedMessage("framework-delivery", text),
     ] satisfies MessageStreamEvent[];
@@ -93,6 +111,80 @@ describe("trace view", () => {
 
     expect(messagesForTraceView(messages, events, "imessage")).toEqual(
       messages.slice(0, 2)
+    );
+  });
+
+  it("keeps user text visible even when it copies a known task's completion", () => {
+    const text =
+      'Background task task_worker (browser-agent) is completed.\n\nResult:\n{"message":"Done"}';
+    const events = [
+      workerActionReceipt("task_worker"),
+      receivedMessage("user-copy", text, "user"),
+    ];
+    expect(backgroundWorkerDeliveryMessageIds(events).size).toBe(0);
+    expect(hasPendingBackgroundWorker(events)).toBe(true);
+  });
+
+  it("keeps a worker pending when its update quotes a terminal status", () => {
+    expect(
+      hasPendingBackgroundWorker([
+        workerActionReceipt("task_worker"),
+        receivedMessage(
+          "quoted-completion",
+          "Background task task_worker (browser-agent) update: Example: (agent) is completed."
+        ),
+      ])
+    ).toBe(true);
+  });
+
+  it("keeps a worker pending while its authorization is unresolved", () => {
+    expect(
+      hasPendingBackgroundWorker([
+        workerActionReceipt("task_worker"),
+        receivedMessage(
+          "authorization",
+          "Background task task_worker needs authorization."
+        ),
+      ])
+    ).toBe(true);
+  });
+
+  it("recognizes generic task receipts and keeps parked questions pending", () => {
+    const receipt: MessageStreamEvent = {
+      type: "action.result",
+      meta: { at: "2026-09-09T00:00:00.000Z", id: "generic-receipt" },
+      data: {
+        turnId: "start",
+        stepIndex: 0,
+        sequence: 0,
+        status: "completed",
+        result: {
+          kind: "tool-result",
+          toolName: "agent",
+          callId: "generic-call",
+          output: {
+            status: "working",
+            taskId: "task_generic",
+            agentId: "generic-agent",
+          },
+        },
+      },
+    };
+    const waiting = receivedMessage(
+      "generic-wait",
+      "Background task task_generic (agent) needs input."
+    );
+    const done = receivedMessage(
+      "generic-done",
+      'Background task task_generic (agent) is completed.\n\nResult:\n{"message":"Done"}'
+    );
+    expect(hasPendingBackgroundWorker([receipt, waiting])).toBe(true);
+    expect(hasPendingBackgroundWorker([receipt, waiting, done])).toBe(false);
+    expect(
+      backgroundWorkerDeliveryMessageIds([receipt, waiting, done])
+    ).toEqual(new Set(["generic-wait:user", "generic-done:user"]));
+    expect(backgroundWorkerDeliveryMessageIds([waiting, done])).toEqual(
+      new Set(["generic-wait:user", "generic-done:user"])
     );
   });
 
@@ -194,9 +286,18 @@ function workerCancellationResult(taskId: string): MessageStreamEvent {
   };
 }
 
-function receivedMessage(turnId: string, message: string): MessageStreamEvent {
+function receivedMessage(
+  turnId: string,
+  message: string,
+  source: "task" | "user" = "task"
+): MessageStreamEvent {
   return {
-    data: { message, sequence: 0, turnId },
+    data: {
+      message,
+      sequence: 0,
+      turnId,
+      source: source === "task" ? "task" : undefined,
+    },
     meta: { at: "2026-08-27T20:00:01.000Z", id: `event-${turnId}` },
     type: "message.received",
   };

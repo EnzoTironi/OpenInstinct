@@ -87,11 +87,10 @@ test("normalizes media references and login commands without media URLs or raw t
     message: { ...baseMessage, text: { body: `/confirm ${token}` } },
   });
   expect(command[0]).toMatchObject({
-    kind: "command",
-    command: "confirm",
-    token,
+    kind: "message",
+    payload: { text: `/confirm ${token}` },
   });
-  expect(command[0]).not.toHaveProperty("payload");
+  expect(command[0]).not.toHaveProperty("token");
 });
 
 test("ignores status/outbound/group/system events and rejects unsupported ID-only identity", async () => {
@@ -206,7 +205,10 @@ test.each(["cloud_api", "business_app"])(
         text: { body: `/confirm ${"a".repeat(43)}` },
       },
     });
-    expect(events[0]).toMatchObject({ kind: "command", command: "confirm" });
+    expect(events[0]).toMatchObject({
+      kind: "message",
+      payload: { text: `/confirm ${"a".repeat(43)}` },
+    });
     expect(
       await parse({
         ...base,
@@ -254,9 +256,8 @@ test("accepts the live inbound delivery with null context and delivered status",
   );
   expect(events).toHaveLength(1);
   expect(events[0]).toMatchObject({
-    kind: "command",
-    command: "start",
-    token: "a".repeat(43),
+    kind: "message",
+    payload: { text: `/start ${"a".repeat(43)}` },
     senderId: "15550002222",
     installationId: "123456789",
   });

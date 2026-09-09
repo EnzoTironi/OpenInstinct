@@ -1,0 +1,65 @@
+{
+  "sim": {
+    "repository": "simstudioai/sim",
+    "revision": "4dbf0a0db689373faf52f760bc971c81c6b38c67",
+    "tree_truncated": false,
+    "tree_url": "https://api.github.com/repos/simstudioai/sim/git/trees/4dbf0a0db689373faf52f760bc971c81c6b38c67"
+  },
+  "treg": {
+    "repository": "superdesigndev/treg",
+    "revision": "7bc16c08196aec7c3a668b5e1b13b70905d989fb",
+    "tree_truncated": false,
+    "tree_url": "https://api.github.com/repos/superdesigndev/treg/git/trees/7bc16c08196aec7c3a668b5e1b13b70905d989fb"
+  },
+  "n8n": {
+    "repository": "n8n-io/n8n",
+    "revision": "4b36c51940cd9cba882ff71947822c1428325497",
+    "tree_truncated": false,
+    "tree_url": "https://api.github.com/repos/n8n-io/n8n/git/trees/4b36c51940cd9cba882ff71947822c1428325497"
+  },
+  "snapshot_date": "2026-09-08",
+  "counts": {
+    "sim-tools": 5475,
+    "sim-families": 290,
+    "sim-knowledge-connectors": 65,
+    "treg-endpoints": 3185,
+    "treg-providers": 66,
+    "n8n-node-sources": 694,
+    "n8n-node-families": 327,
+    "public-integrations": 1566,
+    "recipes": 171,
+    "pally-source-index": 92
+  },
+  "public_directory_counts": {
+    "Lindy": 1407,
+    "Town": 59,
+    "Poke": 43,
+    "Instinct": 7,
+    "Flip": 6,
+    "Pally": 44
+  },
+  "lindy_page_counts": [
+    99, 100, 100, 99, 100, 100, 100, 100, 100, 99, 100, 99, 100, 99, 12
+  ],
+  "recipe_counts": {
+    "Poke": 73,
+    "Town": 24,
+    "Lindy": 15,
+    "Flip": 8,
+    "Pally": 51
+  },
+  "pally": {
+    "recipe_index": "https://pally.com/recipes",
+    "recipe_detail_pages_read": 51,
+    "source_index": "pally-source-index.json",
+    "source_index_scope": "Guide and comparison URLs indexed in llms.txt; not all individually audited",
+    "oauth_discovery": "https://agent.pally.com/.well-known/oauth-authorization-server",
+    "oauth_discovery_status": "Public GET succeeded; no registration, authorization or tools exercised",
+    "entry_points_json_status": "Advertised in llms.txt but retrieval blocked; payload unverified",
+    "changelog_archives_read": [
+      "https://pally.com/whats-new/2026-09",
+      "https://pally.com/whats-new/2026-08"
+    ],
+    "evidence": "Vendor documentation, not execution proof"
+  }
+}

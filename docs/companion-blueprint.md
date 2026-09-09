@@ -14,6 +14,13 @@ The [product direction](product-direction.md) applies the final focus and experi
 review to this architecture. It governs launch presentation, coherent defaults,
 end-to-end journeys and what to defer; it does not waive correctness gates.
 
+The subsequent [conversation experience](conversation-experience.md) and
+[native onboarding contract](native-onboarding.md), confirmed on 2026-09-08,
+refine this direction: conversation is primary, with optional native buttons or
+cards when they reduce effort. Natural responses and controls resolve the same
+exact pending action. No visible approval codes or tool JSON; neither input path
+weakens ownership, current authorization or effect verification.
+
 A capable personal assistant in the conversations people already use. It remembers
 what matters, acts through their existing tools, follows through over time, and
 makes both its actions and its limits understandable. WhatsApp through Kapso and
@@ -202,9 +209,12 @@ Define these behaviors before adapters ship:
 5. Separate assistant response, progress update and proactive notification. Keep
    text concise; coalesce updates; provide links/files when useful. Avoid duplicate
    completion posts when tool-result and session-completion hooks both fire.
-6. Bind approvals to a pending request and authenticated sender. Ambiguous “yes”
-   with multiple pending actions must not authorize the wrong one. Provide native
-   controls where available and a secure web fallback.
+6. Bind natural-language approvals to an exact pending request, its current
+   arguments and authenticated sender. Ambiguous “yes” with multiple plausible
+   referents requires clarification. Corrections invalidate the old proposal.
+   Optional native buttons resolve the same action through the same checks;
+   stale controls cannot authorize an updated proposal. Keep codes and tool JSON
+   out of the normal conversation.
 7. Track provider acceptance, delivery and read status distinctly. A timeout after
    sending is an uncertain outcome, not permission to blindly resend. Use stable
    idempotency keys where supported and provider lookup when possible. Eve does

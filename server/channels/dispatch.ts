@@ -1,7 +1,6 @@
 import { Config, Effect } from "effect";
 import { ChannelAuthPrompts } from "../channel-auth/prompts";
 import { Telegram } from "./telegram";
-import { Kapso } from "./kapso";
 import { ProviderInputError } from "./provider-errors";
 
 export const dispatchItem = Effect.fn("dispatchItem")(function* <
@@ -26,16 +25,18 @@ export const dispatchAuthPrompt = Effect.fn("dispatchAuthPrompt")(function* (
   const claim = yield* prompts.claim(challengeId);
   if (!claim) return;
   const send = Effect.gen(function* () {
-    const installation = yield* Config.string(
-      claim.channel === "telegram" ? "TELEGRAM_BOT_ID" : "KAPSO_PHONE_NUMBER_ID"
-    );
+    if (claim.channel !== "telegram")
+      return yield* new ProviderInputError({
+        provider: claim.channel,
+        reason: "invalid_command",
+      });
+    const installation = yield* Config.string("TELEGRAM_BOT_ID");
     if (installation !== claim.installationId)
       return yield* new ProviderInputError({
         provider: claim.channel,
         reason: "wrong_installation",
       });
-    const provider =
-      claim.channel === "telegram" ? yield* Telegram : yield* Kapso;
+    const provider = yield* Telegram;
     yield* prompts.checkLease(claim.lease);
     return yield* provider.sendLoginConfirmation(claim.senderId, claim.token);
   });

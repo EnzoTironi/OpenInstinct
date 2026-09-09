@@ -1,6 +1,7 @@
 import type { ChannelAuthorizationStatus } from "@web/auth/channel/client";
 import type {
   channelChallengeSchema,
+  deviceBoundSchema,
   channelChallengeRequestSchema,
 } from "@shared/identity/channel-auth";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
@@ -15,7 +16,9 @@ export function ChannelStatus({
   onContinue,
   onRestart,
 }: {
-  readonly challenge: typeof channelChallengeSchema.Type;
+  readonly challenge:
+    | typeof channelChallengeSchema.Type
+    | typeof deviceBoundSchema.Type;
   readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
   readonly status: ChannelAuthorizationStatus;
   readonly busy: boolean;
@@ -26,30 +29,40 @@ export function ChannelStatus({
   const messenger = challenge.channel === "telegram" ? "Telegram" : "WhatsApp";
   return (
     <div className="space-y-4">
+      {purpose === "link" && "purpose" in challenge ? (
+        <p className="type-supporting-body text-muted-foreground">
+          This confirms the messenger’s existing association with the account
+          signed in to this browser. Accounts and their data are not combined.
+        </p>
+      ) : null}
       <div aria-live="polite">
         {status === "pending" ? (
           <>
             <h2 className="type-section-title">Confirm in {messenger}</h2>
             <p className="type-supporting-body mt-2 text-muted-foreground">
               {purpose === "login"
-                ? "Open the chat and confirm the request to sign in to this browser. Only approve it if you started it here. Then return to this tab."
-                : "Open the messenger account you want to link and confirm the request to link it to your current Companion account. Only approve it if you started it here. Then return to this tab."}
+                ? "Open the chat and confirm the request to sign in to this browser. Only approve a browser sign-in you requested. Then return to this tab."
+                : "purpose" in challenge
+                  ? "Return to the messenger conversation where you requested this association. Confirm the request for the account already signed in to this browser, then return to this tab."
+                  : "Open the messenger account you want to link and confirm the request to link it to your current Companion account. Only approve it if you started it here. Then return to this tab."}
             </p>
-            <Button
-              className="mt-4 w-full"
-              nativeButton={false}
-              render={
-                <a
-                  aria-label={`Open ${messenger} to confirm ${purpose === "login" ? "sign-in" : "account linking"}`}
-                  href={challenge.deepLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  referrerPolicy="no-referrer"
-                />
-              }
-            >
-              Open {messenger}
-            </Button>
+            {"deepLink" in challenge ? (
+              <Button
+                className="mt-4 w-full"
+                nativeButton={false}
+                render={
+                  <a
+                    aria-label={`Open ${messenger} to confirm ${purpose === "login" ? "sign-in" : "account linking"}`}
+                    href={challenge.deepLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    referrerPolicy="no-referrer"
+                  />
+                }
+              >
+                Open {messenger}
+              </Button>
+            ) : null}
             <p className="mt-3 type-caption text-muted-foreground">
               Waiting for your confirmation. This request expires at{" "}
               {new Date(challenge.expiresAt).toLocaleTimeString([], {
@@ -118,7 +131,7 @@ export function ChannelStatus({
         Start again or choose another messenger
       </Button>
       <p className="type-caption text-muted-foreground">
-        Keep this tab open. If you reload it, start a new request here.
+        Keep this tab open until the request is complete.
       </p>
     </div>
   );

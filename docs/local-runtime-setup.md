@@ -330,3 +330,10 @@ network failure and verified the correction: offline logout keeps the account
 page and session, displays an error and enables retry; an online retry signs out
 and invalidates the session. Independent review approved the account controls,
 native schedule boundary, membership changes and their composition.
+
+## Native parallel work and paginated history
+
+The [September 9 qualification](native-parallel-evidence.md) records the native
+worker, bounded question, one-report delivery and real browser checks, including
+the failed launch oracle and the distinction between graceful restart and
+automatic hard-crash recovery.

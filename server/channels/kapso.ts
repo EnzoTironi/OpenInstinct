@@ -13,7 +13,6 @@ import {
   HttpClientRequest,
 } from "effect/unstable/http";
 import {
-  LoginTokenSchema,
   normalizeInbound,
   ProviderReferenceSchema,
   validateEventAge,
@@ -404,18 +403,6 @@ const makeKapso = Effect.gen(function* () {
       );
     }),
     sendText,
-    sendLoginConfirmation: Effect.fn("Kapso.sendLoginConfirmation")(function* (
-      targetId: string,
-      token: string
-    ) {
-      const valid = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
-        token
-      ).pipe(Effect.mapError(malformed));
-      return yield* sendText(
-        targetId,
-        `Confirm this sign-in only if you requested it in your browser. Reply with:\n/confirm ${valid}`
-      );
-    }),
   };
 });
 

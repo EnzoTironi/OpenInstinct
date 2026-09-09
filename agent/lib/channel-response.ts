@@ -16,12 +16,12 @@ import { channelPrincipal } from "./channel-session";
 type ResponseInput =
   (typeof internalCallbackBodies)["/internal/channel-input/respond"]["Type"];
 
-export class ChannelResponseRejected extends Schema.TaggedError<ChannelResponseRejected>()(
+class ChannelResponseRejected extends Schema.TaggedError<ChannelResponseRejected>()(
   "ChannelResponseRejected",
   { reason: Schema.String }
 ) {}
 
-export class ChannelResponseUncertain extends Schema.TaggedError<ChannelResponseUncertain>()(
+class ChannelResponseUncertain extends Schema.TaggedError<ChannelResponseUncertain>()(
   "ChannelResponseUncertain",
   {}
 ) {}

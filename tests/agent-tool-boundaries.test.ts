@@ -19,15 +19,18 @@ function toolFiles(directory: string, root = directory): string[] {
 describe("root and worker capability boundaries", () => {
   it("keeps root coordination separate from browser execution", () => {
     expect(toolFiles(rootTools)).toEqual([
-      "agent.ts",
+      "artifacts.ts",
+      "ask_question.ts",
       "bash.ts",
       "calendar.ts",
       "connection_search.ts",
       "contacts.ts",
+      "device-auth.ts",
       "gmail.ts",
       "load_skill.ts",
       "messaging.ts",
       "read_file.ts",
+      "respond-to-approval.ts",
       "schedules.ts",
       "todo.ts",
       "vault.ts",
@@ -39,9 +42,7 @@ describe("root and worker capability boundaries", () => {
       false
     );
     expect(existsSync("agent/skills/browser-execution/SKILL.md")).toBe(false);
-    expect(readFileSync(`${rootTools}/agent.ts`, "utf8")).toContain(
-      "disableTool()"
-    );
+    expect(existsSync(`${rootTools}/agent.ts`)).toBe(false);
     for (const tool of [
       "bash",
       "connection_search",

@@ -1,4 +1,5 @@
 export * from "./auth";
+export * from "./artifacts";
 export * from "./browser";
 export * from "./channels";
 export * from "./chats";

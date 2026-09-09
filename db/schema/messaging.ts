@@ -13,6 +13,52 @@ import {
 } from "drizzle-orm/pg-core";
 import { channelIdentities } from "./channels";
 
+export const channelInputResponses = pgTable(
+  "channel_input_response",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    identityId: uuid("identity_id")
+      .notNull()
+      .references(() => channelIdentities.id, { onDelete: "cascade" }),
+    inboxId: uuid("inbox_id")
+      .notNull()
+      .references(() => channelInbox.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    sourceMessageId: text("source_message_id").notNull(),
+    requestId: text("request_id").notNull(),
+    revision: text("revision").notNull(),
+    decision: text("decision").notNull(),
+    turnId: text("turn_id").notNull(),
+    status: text("status").notNull().default("attempted"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("channel_input_response_request_uidx").on(
+      table.sessionId,
+      table.requestId
+    ),
+    check(
+      "channel_input_response_status_check",
+      sql`${table.status} IN ('attempted', 'accepted', 'uncertain')`
+    ),
+    check(
+      "channel_input_response_decision_check",
+      sql`${table.decision} IN ('approve', 'cancel')`
+    ),
+    check(
+      "channel_input_response_revision_check",
+      sql`${table.revision} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      "channel_input_response_completion_check",
+      sql`(${table.status} = 'attempted') = (${table.completedAt} IS NULL)`
+    ),
+  ]
+);
+
 export const channelInbox = pgTable(
   "channel_inbox",
   {

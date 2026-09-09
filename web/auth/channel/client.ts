@@ -1,7 +1,10 @@
 import type { channelProviderSchema } from "@shared/identity/channel-auth";
 import { Effect, Result, Schema } from "effect";
 import {
-  channelChallengeSchema,
+  channelStartResultSchema,
+  deviceBindingSchema,
+  type deviceRequestSchema,
+  deviceBoundSchema,
   channelChallengeStatusSchema,
   channelChallengeCompletionSchema,
   channelChallengeIdSchema,
@@ -202,7 +205,7 @@ export const startChannelAuthorization = Effect.fn(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(intent),
     },
-    channelChallengeSchema
+    channelStartResultSchema
   );
   if (challenge.channel !== channel) return yield* invalidChannelChallenge(200);
   return challenge;
@@ -246,8 +249,32 @@ export function channelFailureMessage(
   if (failure.status === 401)
     return "Sign in again before linking another channel, then return to Account to start a new request.";
   if (failure.status === 409)
-    return "This messenger account is linked to another Companion account. Choose a different messenger account.";
+    return "This messenger is already associated with another Companion account. Accounts cannot be combined here. Sign in to its existing account instead.";
   if (failure.category === "terminal")
     return "This account-linking request could not be verified. Start a new request and confirm it in the messenger account you want to link.";
   return failure.message;
 }
+
+export const bindNativeBrowser = Effect.fn("channelAuthorization.bind")(
+  function* (input: typeof deviceBindingSchema.Type) {
+    const body = yield* Schema.decodeEffect(deviceBindingSchema)(input).pipe(
+      Effect.mapError(() => channelHttpError(400))
+    );
+    return yield* requestJson(
+      "device-bind",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      deviceBoundSchema
+    );
+  }
+);
+
+export const resumeNativeBrowser = (input: typeof deviceRequestSchema.Type) =>
+  requestJson(
+    `device?id=${encodeURIComponent(input.id)}&purpose=${input.purpose}`,
+    { method: "GET" },
+    deviceBoundSchema
+  );

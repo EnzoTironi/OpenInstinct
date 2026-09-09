@@ -2,11 +2,11 @@ import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { ConfigProvider, Effect, Schema } from "effect";
 import { expect, test } from "vitest";
 import {
-  readVerifiedScheduledCallback,
-  scheduledCallbackBodies,
-  scheduledCallbackHeaders,
-  scheduledCallbackOrigin,
-} from "./scheduled-callback-auth";
+  readVerifiedInternalCallback,
+  internalCallbackBodies,
+  internalCallbackHeaders,
+  internalCallbackOrigin,
+} from "./callback-auth";
 
 const configuration = {
   BETTER_AUTH_URL: "http://127.0.0.1:3000",
@@ -41,25 +41,25 @@ function request(
 }
 
 test("authenticates raw bytes through a proxy with a different internal host", async () => {
-  const headers = await run(scheduledCallbackHeaders(route, body));
-  const raw = await run(readVerifiedScheduledCallback(request(headers), route));
+  const headers = await run(internalCallbackHeaders(route, body));
+  const raw = await run(readVerifiedInternalCallback(request(headers), route));
   expect(raw.toString()).toBe(body);
   // The public audience is configured; forwarded headers cannot change it.
   headers.set("x-forwarded-host", "untrusted.invalid");
   expect(
     (
-      await run(readVerifiedScheduledCallback(request(headers), route))
+      await run(readVerifiedInternalCallback(request(headers), route))
     ).toString()
   ).toBe(body);
 });
 
 test("rejects absent, malformed and changed signatures and changed body/method/path/query", async () => {
-  const headers = await run(scheduledCallbackHeaders(route, body));
+  const headers = await run(internalCallbackHeaders(route, body));
   const absent = new Headers();
   const malformed = new Headers(headers);
-  malformed.set("x-scheduled-callback-signature", "x");
+  malformed.set("x-internal-callback-signature", "x");
   const wrong = new Headers(headers);
-  wrong.set("x-scheduled-callback-signature", "00".repeat(32));
+  wrong.set("x-internal-callback-signature", "00".repeat(32));
   const inputs = [
     request(absent),
     request(malformed),
@@ -71,18 +71,18 @@ test("rejects absent, malformed and changed signatures and changed body/method/p
   ];
   const results = await Promise.all(
     inputs.map((input) =>
-      run(readVerifiedScheduledCallback(input, route).pipe(Effect.flip))
+      run(readVerifiedInternalCallback(input, route).pipe(Effect.flip))
     )
   );
   for (const result of results) expect(result.status).toBe(401);
 });
 
 test("rejects a signature transplanted between routes, audiences or installations", async () => {
-  const headers = await run(scheduledCallbackHeaders(route, body));
+  const headers = await run(internalCallbackHeaders(route, body));
   const respond = "/internal/scheduled-run/respond";
   expect(
     await run(
-      readVerifiedScheduledCallback(
+      readVerifiedInternalCallback(
         request(headers, body, respond),
         respond
       ).pipe(Effect.flip)
@@ -90,7 +90,7 @@ test("rejects a signature transplanted between routes, audiences or installation
   ).toMatchObject({ status: 401 });
   expect(
     await run(
-      readVerifiedScheduledCallback(request(headers), route).pipe(Effect.flip),
+      readVerifiedInternalCallback(request(headers), route).pipe(Effect.flip),
       {
         ...configuration,
         BETTER_AUTH_URL: "https://another-installation.invalid",
@@ -99,7 +99,7 @@ test("rejects a signature transplanted between routes, audiences or installation
   ).toMatchObject({ status: 401 });
   expect(
     await run(
-      readVerifiedScheduledCallback(request(headers), route).pipe(Effect.flip),
+      readVerifiedInternalCallback(request(headers), route).pipe(Effect.flip),
       {
         ...configuration,
         SECRET_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
@@ -113,7 +113,7 @@ test("rejects correctly signed expired and far-future requests", async () => {
     "sha256",
     Buffer.from(configuration.SECRET_ENCRYPTION_KEY, "base64")
   )
-    .update("companion/scheduled-callback/v1")
+    .update("companion/internal-callback/v1")
     .digest();
   await Promise.all(
     [-120, 120].map(async (offset) => {
@@ -131,12 +131,12 @@ test("rejects correctly signed expired and far-future requests", async () => {
         )
         .digest("hex");
       const headers = new Headers({
-        "x-scheduled-callback-time": timestamp,
-        "x-scheduled-callback-signature": signature,
+        "x-internal-callback-time": timestamp,
+        "x-internal-callback-signature": signature,
       });
       expect(
         await run(
-          readVerifiedScheduledCallback(request(headers), route).pipe(
+          readVerifiedInternalCallback(request(headers), route).pipe(
             Effect.flip
           )
         )
@@ -156,14 +156,14 @@ test("requires explicit valid secret and restricts cleartext destinations to loo
     configs.map(async (config) => {
       expect(
         await run(
-          scheduledCallbackHeaders(route, body).pipe(Effect.flip),
+          internalCallbackHeaders(route, body).pipe(Effect.flip),
           config
         )
       ).toMatchObject({ status: 503 });
     })
   );
   expect(
-    await run(scheduledCallbackOrigin, {
+    await run(internalCallbackOrigin, {
       ...configuration,
       BETTER_AUTH_URL: "https://host.invalid/path",
     })
@@ -172,11 +172,11 @@ test("requires explicit valid secret and restricts cleartext destinations to loo
 
 test("limits streamed body bytes without trusting Content-Length", async () => {
   const oversized = "x".repeat(64 * 1024 + 1);
-  const headers = await run(scheduledCallbackHeaders(route, oversized));
+  const headers = await run(internalCallbackHeaders(route, oversized));
   headers.set("content-length", "1");
   expect(
     await run(
-      readVerifiedScheduledCallback(request(headers, oversized), route).pipe(
+      readVerifiedInternalCallback(request(headers, oversized), route).pipe(
         Effect.flip
       )
     )
@@ -187,13 +187,13 @@ test("signed malformed JSON and extra authority fields fail the boundary schema"
   await Promise.all(
     ["{", JSON.stringify({ runId: randomUUID(), userId: "other-user" })].map(
       async (payload) => {
-        const headers = await run(scheduledCallbackHeaders(route, payload));
+        const headers = await run(internalCallbackHeaders(route, payload));
         const raw = await run(
-          readVerifiedScheduledCallback(request(headers, payload), route)
+          readVerifiedInternalCallback(request(headers, payload), route)
         );
         const result = await run(
           Schema.decodeUnknownEffect(
-            Schema.fromJsonString(scheduledCallbackBodies[route]),
+            Schema.fromJsonString(internalCallbackBodies[route]),
             { onExcessProperty: "error" }
           )(raw.toString()).pipe(Effect.result)
         );
@@ -204,11 +204,9 @@ test("signed malformed JSON and extra authority fields fail the boundary schema"
 });
 
 test("a valid retry remains authentic and must still pass the database claim", async () => {
-  const headers = await run(scheduledCallbackHeaders(route, body));
+  const headers = await run(internalCallbackHeaders(route, body));
   const results = await Promise.all(
-    [1, 2].map(() =>
-      run(readVerifiedScheduledCallback(request(headers), route))
-    )
+    [1, 2].map(() => run(readVerifiedInternalCallback(request(headers), route)))
   );
   for (const result of results) expect(result.toString()).toBe(body);
 });

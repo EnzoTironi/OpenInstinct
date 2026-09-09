@@ -10,6 +10,11 @@ experience; the [blueprint](docs/companion-blueprint.md) defines package contrac
 and acceptance gates. The [runtime evidence](docs/local-runtime-setup.md) records
 what has actually been exercised and what remains unqualified.
 
+For recipe and integration work, start with the
+[agent research package](docs/recipe-integrations/README.md): agreed experience,
+public competitor catalogs, source revisions, reuse constraints and acceptance
+patterns.
+
 ## Run locally
 
 Use Node.js 24 and pnpm 11.24.0. PostgreSQL stores application records and the

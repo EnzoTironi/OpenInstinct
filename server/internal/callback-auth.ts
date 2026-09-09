@@ -1,7 +1,24 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { Clock, Config, Effect, Redacted, Schema, Stream } from "effect";
+import {
+  Clock,
+  Config,
+  Effect,
+  Option,
+  Redacted,
+  Schema,
+  Stream,
+} from "effect";
+import { routeAuth, vercelOidc } from "eve/channels/auth";
 
-export const scheduledCallbackBodies = {
+export const internalCallbackBodies = {
+  "/internal/channel-input/respond": Schema.Struct({
+    sessionId: Schema.NonEmptyString.check(Schema.isMaxLength(256)),
+    identityId: Schema.String.check(Schema.isUUID()),
+    sourceMessageId: Schema.NonEmptyString.check(Schema.isMaxLength(256)),
+    turnId: Schema.NonEmptyString.check(Schema.isMaxLength(256)),
+    requestId: Schema.NonEmptyString.check(Schema.isMaxLength(256)),
+    decision: Schema.Literals(["approve", "cancel"]),
+  }),
   "/internal/scheduled-run/report": Schema.Struct({
     runId: Schema.String.check(Schema.isUUID()),
   }),
@@ -15,15 +32,15 @@ export const scheduledCallbackBodies = {
     runId: Schema.String.check(Schema.isUUID()),
   }),
 };
-export type ScheduledCallbackRoute = keyof typeof scheduledCallbackBodies;
+export type InternalCallbackRoute = keyof typeof internalCallbackBodies;
 
-export class ScheduledCallbackRejected extends Schema.TaggedError<ScheduledCallbackRejected>()(
-  "ScheduledCallbackRejected",
+export class InternalCallbackRejected extends Schema.TaggedError<InternalCallbackRejected>()(
+  "InternalCallbackRejected",
   { status: Schema.Literals([400, 401, 408, 413, 503]) }
 ) {}
 
-const reject = (status: ScheduledCallbackRejected["status"]) =>
-  new ScheduledCallbackRejected({ status });
+const reject = (status: InternalCallbackRejected["status"]) =>
+  new InternalCallbackRejected({ status });
 const originSchema = Schema.String.check(
   Schema.makeFilter((value) => {
     if (!URL.canParse(value)) return false;
@@ -38,7 +55,7 @@ const originSchema = Schema.String.check(
   })
 );
 
-export const scheduledCallbackOrigin = Config.string("BETTER_AUTH_URL").pipe(
+export const internalCallbackOrigin = Config.string("BETTER_AUTH_URL").pipe(
   Effect.flatMap(Schema.decodeUnknownEffect(originSchema)),
   Effect.map((value) => new URL(value).origin),
   Effect.mapError(() => reject(503))
@@ -55,7 +72,7 @@ const callbackKey = Config.redacted("SECRET_ENCRYPTION_KEY").pipe(
   Effect.map((value) =>
     Redacted.make(
       createHmac("sha256", Buffer.from(value, "base64"))
-        .update("companion/scheduled-callback/v1")
+        .update("companion/internal-callback/v1")
         .digest()
     )
   ),
@@ -65,7 +82,7 @@ const callbackKey = Config.redacted("SECRET_ENCRYPTION_KEY").pipe(
 function signature(
   key: Redacted.Redacted<Buffer>,
   origin: string,
-  route: ScheduledCallbackRoute,
+  route: InternalCallbackRoute,
   timestamp: string,
   body: Uint8Array
 ) {
@@ -83,17 +100,17 @@ function signature(
     .digest();
 }
 
-export const scheduledCallbackHeaders = Effect.fn("scheduledCallbackHeaders")(
-  function* (route: ScheduledCallbackRoute, body: string) {
-    const origin = yield* scheduledCallbackOrigin;
+export const internalCallbackHeaders = Effect.fn("internalCallbackHeaders")(
+  function* (route: InternalCallbackRoute, body: string) {
+    const origin = yield* internalCallbackOrigin;
     const key = yield* callbackKey;
     const timestamp = String(
       Math.floor((yield* Clock.currentTimeMillis) / 1000)
     );
     return new Headers({
       "content-type": "application/json",
-      "x-scheduled-callback-time": timestamp,
-      "x-scheduled-callback-signature": signature(
+      "x-internal-callback-time": timestamp,
+      "x-internal-callback-signature": signature(
         key,
         origin,
         route,
@@ -104,7 +121,7 @@ export const scheduledCallbackHeaders = Effect.fn("scheduledCallbackHeaders")(
   }
 );
 
-export const readScheduledCallbackBody = Effect.fn("readScheduledCallbackBody")(
+const readInternalCallbackBody = Effect.fn("readInternalCallbackBody")(
   function* (request: Request) {
     if (!request.body) return yield* reject(400);
     const source = request.body;
@@ -137,17 +154,17 @@ export const readScheduledCallbackBody = Effect.fn("readScheduledCallbackBody")(
   }
 );
 
-export const readVerifiedScheduledCallback = Effect.fn(
-  "readVerifiedScheduledCallback"
-)(function* (request: Request, route: ScheduledCallbackRoute) {
-  const origin = yield* scheduledCallbackOrigin;
+export const readVerifiedInternalCallback = Effect.fn(
+  "readVerifiedInternalCallback"
+)(function* (request: Request, route: InternalCallbackRoute) {
+  const origin = yield* internalCallbackOrigin;
   const key = yield* callbackKey;
   const url = new URL(request.url);
   if (request.method !== "POST" || url.pathname !== route || url.search)
     return yield* reject(401);
   const timestamp = yield* Schema.decodeUnknownEffect(
     Schema.String.check(Schema.isPattern(/^\d{10}$/u))
-  )(request.headers.get("x-scheduled-callback-time")).pipe(
+  )(request.headers.get("x-internal-callback-time")).pipe(
     Effect.mapError(() => reject(401))
   );
   const age =
@@ -155,13 +172,33 @@ export const readVerifiedScheduledCallback = Effect.fn(
   if (age < -5 || age > 60) return yield* reject(401);
   const encoded = yield* Schema.decodeUnknownEffect(
     Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
-  )(request.headers.get("x-scheduled-callback-signature")).pipe(
+  )(request.headers.get("x-internal-callback-signature")).pipe(
     Effect.mapError(() => reject(401))
   );
-  const body = yield* readScheduledCallbackBody(request);
+  const body = yield* readInternalCallbackBody(request);
   const expected = signature(key, origin, route, timestamp, body);
   if (!timingSafeEqual(Buffer.from(encoded, "hex"), expected))
     return yield* reject(401);
   // Authentication is time-bounded, not single-use. The existing run/report claim fences dispatch.
   return body;
 });
+
+export const readAuthenticatedInternalCallback = Effect.fn(
+  "readAuthenticatedInternalCallback"
+)(
+  function* (request: Request, route: InternalCallbackRoute) {
+    const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
+    if (Option.isSome(vercel)) {
+      const auth = yield* Effect.tryPromise({
+        try: () => routeAuth(request, [vercelOidc()]),
+        catch: () => new InternalCallbackRejected({ status: 503 }),
+      });
+      if (auth instanceof Response) return auth;
+      return yield* readInternalCallbackBody(request);
+    }
+    return yield* readVerifiedInternalCallback(request, route);
+  },
+  Effect.catchTag("ConfigError", () =>
+    Effect.fail(new InternalCallbackRejected({ status: 503 }))
+  )
+);

@@ -1,44 +1,37 @@
-import { createHash } from "node:crypto";
+import { approvalMessageSchema } from "./approval-message";
 import type { Session } from "eve/channels";
+import { ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
 import {
   defaultMessageReducer,
   inputRequestSchema,
-  parseInputResponse,
-  resolveTextToResponse,
   type EveMessageData,
   type InputRequest,
   type MessageStreamEvent,
 } from "eve/client";
 
-export function channelInputCode(sessionId: string, requestId: string) {
-  return createHash("sha256")
-    .update(JSON.stringify([sessionId, requestId]))
-    .digest("hex")
-    .slice(0, 16);
+export const channelQuestionSchema = ASK_QUESTION_INPUT_SCHEMA.refine(
+  (input) =>
+    approvalMessageSchema.safeParse(channelQuestionText(input)).success,
+  "The complete question and option labels must be non-empty, well-formed text within 16384 characters. Ask a shorter question."
+);
+
+export function renderChannelInput(request: InputRequest) {
+  if (request.kind === "tool-approval") {
+    return approvalMessageSchema.parse(request.action.input.approvalMessage);
+  }
+  return approvalMessageSchema.parse(channelQuestionText(request));
 }
 
-export function renderChannelInput(sessionId: string, request: InputRequest) {
-  const code = channelInputCode(sessionId, request.requestId);
-  const lines = [request.prompt];
-  if (request.kind === "tool-approval") {
-    lines.push(
-      request.action.toolName,
-      JSON.stringify(request.action.input, null, 2)
-    );
-  }
-  for (const option of request.options ?? []) {
-    lines.push(
-      `${option.label}${option.description ? `: ${option.description}` : ""}\n/responder ${code} ${option.id}`
-    );
-  }
-  if (request.allowFreeform || !request.options?.length) {
-    lines.push(`Responda com /responder ${code} seguido da sua resposta.`);
-  }
-  const text = lines.join("\n\n");
-  if (text.length > 16_384) {
-    return "A solicitação precisa de uma confirmação, mas seus detalhes excedem o limite deste canal. Peça para cancelar e refazer a ação com menos detalhes.";
-  }
-  return text;
+function channelQuestionText(
+  request: Pick<InputRequest, "prompt" | "options">
+) {
+  return [
+    request.prompt,
+    ...(request.options ?? []).map(
+      (option) =>
+        `${option.label}${option.description ? `: ${option.description}` : ""}`
+    ),
+  ].join("\n\n");
 }
 
 export function pendingChannelInputs(data: EveMessageData): InputRequest[] {
@@ -106,22 +99,4 @@ export async function readChannelInputStream(
     signal.removeEventListener("abort", cancel);
     await reader.cancel();
   }
-}
-
-export function resolveChannelInput(
-  sessionId: string,
-  text: string,
-  requests: readonly InputRequest[]
-) {
-  const match = /^\/responder\s+([a-f0-9]{16})\s+([\s\S]+)$/u.exec(text.trim());
-  if (!match) return null;
-  const matches = requests.filter(
-    (request) => channelInputCode(sessionId, request.requestId) === match[1]
-  );
-  if (matches.length !== 1) return null;
-  const [request] = matches;
-  const answer = match[2];
-  if (!request || !answer) return null;
-  const response = resolveTextToResponse(answer, request);
-  return response ? parseInputResponse(response) : null;
 }

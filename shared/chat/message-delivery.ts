@@ -86,8 +86,24 @@ export const sendMessageOutputSchema = Schema.Union([
   linkOutputSchema,
 ]);
 
+const deliveryMetadata = {
+  deliveryId: Schema.optionalKey(Schema.NonEmptyString),
+};
+
+const deliveredMessageSchema = Schema.Union([
+  Schema.Struct({
+    ...messageOutputSchema.members[0].fields,
+    ...deliveryMetadata,
+  }),
+  Schema.Struct({
+    ...messageOutputSchema.members[1].fields,
+    ...deliveryMetadata,
+  }),
+  Schema.Struct({ ...linkOutputSchema.fields, ...deliveryMetadata }),
+]).annotate({ parseOptions: { onExcessProperty: "error" } });
+
 export const sendMessageToolResultSchema = Schema.Struct({
   kind: Schema.Literal("tool-result"),
-  output: sendMessageOutputSchema,
+  output: deliveredMessageSchema,
   toolName: Schema.Literal("send_message"),
 }).annotate({ parseOptions: { onExcessProperty: "ignore" } });

@@ -42,6 +42,169 @@ function run(body: Parameters<typeof fixture>[0]) {
   );
 }
 
+test("input response fence survives concurrent replay and refuses uncertain redispatch", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      const sessionId = randomUUID();
+      const input = {
+        identityId,
+        sessionId,
+        sourceMessageId: "consent-source",
+        requestId: "approval-1",
+        revision: "a".repeat(64),
+        decision: "approve" as const,
+        turnId: "user-turn",
+      };
+      expect(
+        yield* messaging.claimChannelInputResponse(input).pipe(Effect.flip)
+      ).toBeInstanceOf(InvalidMessage);
+      yield* messaging.accept({
+        identityId,
+        eventId: "consent-event",
+        sourceMessageId: input.sourceMessageId,
+        payload: { text: "pode", sourceOccurredAtMs: 1_788_900_000_000 },
+      });
+      expect(
+        yield* messaging.claimChannelInputResponse(input).pipe(Effect.flip)
+      ).toBeInstanceOf(InvalidMessage);
+      const acceptedSource = yield* messaging.claimInbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      if (!acceptedSource) throw new Error("Missing source claim");
+      yield* messaging.markAccepted({
+        lease: {
+          identityId,
+          id: acceptedSource.id,
+          leaseToken: acceptedSource.leaseToken,
+        },
+        receipt: { status: "accepted", sessionId },
+      });
+      const results = yield* Effect.all(
+        Array.from({ length: 12 }, () =>
+          messaging.claimChannelInputResponse(input)
+        ),
+        { concurrency: 8 }
+      );
+      expect(
+        results.filter((result) => result.kind === "acquired")
+      ).toHaveLength(1);
+      expect(
+        results.filter((result) => result.kind === "duplicate")
+      ).toHaveLength(11);
+      expect(new Set(results.map((result) => result.id)).size).toBe(1);
+      const first = results[0];
+      if (!first) throw new Error("Missing response claim");
+      for (const changed of [
+        { decision: "cancel" as const },
+        { revision: "b".repeat(64) },
+        { turnId: "later-turn" },
+      ]) {
+        expect(
+          (yield* messaging.claimChannelInputResponse({ ...input, ...changed }))
+            .kind
+        ).toBe("conflict");
+      }
+      expect(
+        yield* messaging.markChannelInputResponse({
+          id: first.id,
+          status: "uncertain",
+        })
+      ).toBe(true);
+      expect(
+        yield* messaging.markChannelInputResponse({
+          id: first.id,
+          status: "accepted",
+        })
+      ).toBe(false);
+      const persisted = yield* Messaging.layer.pipe(
+        Layer.build,
+        Effect.flatMap((context) =>
+          Context.get(context, Messaging).claimChannelInputResponse(input)
+        ),
+        Effect.provideService(PgClient.PgClient, sql),
+        Effect.scoped
+      );
+      expect(persisted).toEqual({
+        kind: "duplicate",
+        id: first.id,
+        status: "uncertain",
+      });
+      const otherRequest = yield* messaging.claimChannelInputResponse({
+        ...input,
+        requestId: "approval-2",
+      });
+      expect(otherRequest.kind).toBe("acquired");
+      expect(
+        yield* messaging.markChannelInputResponse({
+          id: otherRequest.id,
+          status: "accepted",
+        })
+      ).toBe(true);
+      expect(
+        (yield* messaging.claimChannelInputResponse({
+          ...input,
+          requestId: "approval-2",
+        })).status
+      ).toBe("accepted");
+      yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
+      expect(
+        yield* messaging.claimChannelInputResponse(input).pipe(Effect.flip)
+      ).toBeInstanceOf(IdentityInactive);
+    })
+  ));
+
+test("different accepted sources cannot race approval and cancellation of one request", () =>
+  run((messaging, _sql, identityId) =>
+    Effect.gen(function* () {
+      const sessionId = randomUUID();
+      for (const sourceMessageId of ["yes", "no"]) {
+        yield* messaging.accept({
+          identityId,
+          eventId: sourceMessageId,
+          sourceMessageId,
+          payload: { text: sourceMessageId },
+        });
+        const source = yield* messaging.claimInbox({
+          identityId,
+          leaseSeconds: 30,
+        });
+        if (!source) throw new Error("Missing source claim");
+        yield* messaging.markAccepted({
+          lease: { identityId, id: source.id, leaseToken: source.leaseToken },
+          receipt: { status: "accepted", sessionId },
+        });
+      }
+      const common = {
+        identityId,
+        sessionId,
+        requestId: "request",
+        revision: "a".repeat(64),
+        turnId: "turn",
+      };
+      const results = yield* Effect.all(
+        [
+          messaging.claimChannelInputResponse({
+            ...common,
+            sourceMessageId: "yes",
+            decision: "approve",
+          }),
+          messaging.claimChannelInputResponse({
+            ...common,
+            sourceMessageId: "no",
+            decision: "cancel",
+          }),
+        ],
+        { concurrency: 2 }
+      );
+      expect(results.map((result) => result.kind).toSorted()).toEqual([
+        "acquired",
+        "conflict",
+      ]);
+      expect(results[0].id).toBe(results[1].id);
+    })
+  ));
+
 test("concurrent duplicate ingress commits one canonical receipt and rejects changed payload", () =>
   run((messaging, sql, identityId) =>
     Effect.gen(function* () {
@@ -51,6 +214,7 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
         sourceMessageId: "source-event-1",
         payload: {
           text: "hello",
+          sourceOccurredAtMs: 1_788_900_000_000,
           attachments: [
             { id: "file-1", mediaType: "image/png", name: "photo" },
           ],
@@ -65,6 +229,7 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
             { name: "photo", mediaType: "image/png", id: "file-1" },
           ],
           text: "hello",
+          sourceOccurredAtMs: 1_788_900_000_000,
         },
       };
       const receipts = yield* Effect.all(
@@ -104,6 +269,18 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
         Effect.scoped
       );
       expect(claim?.sourceMessageId).toBe("source-event-1");
+      expect(claim?.payload.sourceOccurredAtMs).toBe(1_788_900_000_000);
+      expect(
+        yield* messaging
+          .accept({
+            ...first,
+            payload: {
+              ...first.payload,
+              sourceOccurredAtMs: 1_788_900_001_000,
+            },
+          })
+          .pipe(Effect.flip)
+      ).toBeInstanceOf(PayloadConflict);
       expect(claim?.key).toBe("event-1");
       expect((yield* messaging.accept(first)).id).toBe(original.id);
     })

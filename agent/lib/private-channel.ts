@@ -1,4 +1,4 @@
-import { Config, Effect } from "effect";
+import { Config, DateTime, Effect } from "effect";
 import { defineChannel, POST, type ChannelDefinition } from "eve/channels";
 import { ChannelAccounts, type Identity } from "../../server/accounts";
 import { Messaging, type Lease } from "../../server/messaging";
@@ -62,7 +62,12 @@ export function privateChannel(channel: Identity["channel"]) {
                   identityId: identity.id,
                   eventId: event.eventId,
                   sourceMessageId: event.messageId,
-                  payload: event.payload,
+                  payload: {
+                    ...event.payload,
+                    sourceOccurredAtMs: DateTime.toEpochMillis(
+                      DateTime.makeUnsafe(event.occurredAt)
+                    ),
+                  },
                 });
                 identities.set(identity.id, identity);
               }

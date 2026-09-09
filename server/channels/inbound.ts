@@ -71,7 +71,9 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
 ): Effect.fn.Return<InboundEvent | null, ProviderInputError> {
   const text = payload.text?.trim() ?? "";
   const command =
-    /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text);
+    coordinates.channel === "telegram"
+      ? /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text)
+      : null;
   if (command?.[2] && command[2].toLowerCase() !== botUsername?.toLowerCase())
     return null;
   const greeting = command?.[1]?.toLowerCase() === "start" && !command[3];
@@ -90,7 +92,11 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
     const action = command[1]?.toLowerCase() === "start" ? "start" : "confirm";
     return { ...coordinates, kind: "command", command: action, token };
   }
-  if (!greeting && /^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) {
+  if (
+    coordinates.channel === "telegram" &&
+    !greeting &&
+    /^\/(?:start|confirm)(?:@|\s|$)/i.test(text)
+  ) {
     return yield* new ProviderInputError({
       provider: coordinates.channel,
       reason: "invalid_command",

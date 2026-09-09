@@ -1,4 +1,6 @@
 import { renderChannelInput } from "./channel-input";
+import { taskReportDeliveryId } from "./task-report";
+import { channelConsentRevision } from "./channel-consent";
 import { createHash } from "node:crypto";
 import { Effect } from "effect";
 import type { ChannelEvents } from "eve/channels";
@@ -10,10 +12,11 @@ import { requireChannelPrincipal } from "./channel-session";
 export function privateChannelEvents(channel: Identity["channel"]) {
   const terminal = (
     ...[event, _channel, context]: Parameters<
-      NonNullable<ChannelEvents["turn.cancelled"]>
+      NonNullable<ChannelEvents<unknown>["turn.cancelled"]>
     >
-  ) =>
-    serverRuntime.runPromise(
+  ) => {
+    if (context.session.parent) return Promise.resolve();
+    return serverRuntime.runPromise(
       Effect.gen(function* () {
         const auth =
           context.session.auth.current ??
@@ -28,10 +31,12 @@ export function privateChannelEvents(channel: Identity["channel"]) {
         });
       })
     );
+  };
   return {
     "message.completed": (event, _channel, context) => {
       const text = event.message;
       if (
+        context.session.parent ||
         !text?.trim() ||
         text.trim() === "DELIVERY_COMPLETE" ||
         event.finishReason === "tool-calls"
@@ -45,9 +50,15 @@ export function privateChannelEvents(channel: Identity["channel"]) {
             null;
           const identity = yield* requireChannelPrincipal(channel, auth);
           const transport = yield* ChannelTransport;
-          yield* transport.enqueueText({
+          const reportId = taskReportDeliveryId(context);
+          const enqueue = reportId
+            ? transport.enqueueTaskReport
+            : transport.enqueueText;
+          yield* enqueue({
             identityId: identity.id,
-            deliveryKey: `message:${context.session.id}:${event.turnId}:${String(event.stepIndex)}:${String(event.sequence)}`,
+            deliveryKey:
+              reportId ??
+              `message:${context.session.id}:${event.turnId}:${String(event.stepIndex)}:${String(event.sequence)}`,
             text,
           });
           yield* transport.drainOutbox(identity.id);
@@ -61,7 +72,7 @@ export function privateChannelEvents(channel: Identity["channel"]) {
     "turn.failed": terminal,
     "turn.cancelled": terminal,
   } satisfies Pick<
-    ChannelEvents,
+    ChannelEvents<unknown>,
     | "message.completed"
     | "authorization.required"
     | "input.requested"
@@ -72,9 +83,14 @@ export function privateChannelEvents(channel: Identity["channel"]) {
 
 function enqueueAuthorization(
   channel: Identity["channel"],
-  event: Parameters<NonNullable<ChannelEvents["authorization.required"]>>[0],
-  context: Parameters<NonNullable<ChannelEvents["authorization.required"]>>[2]
+  event: Parameters<
+    NonNullable<ChannelEvents<unknown>["authorization.required"]>
+  >[0],
+  context: Parameters<
+    NonNullable<ChannelEvents<unknown>["authorization.required"]>
+  >[2]
 ) {
+  if (context.session.parent) return Promise.resolve();
   return serverRuntime.runPromise(
     Effect.gen(function* () {
       const auth =
@@ -113,9 +129,10 @@ function enqueueAuthorization(
 
 function enqueueInput(
   channel: Identity["channel"],
-  event: Parameters<NonNullable<ChannelEvents["input.requested"]>>[0],
-  context: Parameters<NonNullable<ChannelEvents["input.requested"]>>[2]
+  event: Parameters<NonNullable<ChannelEvents<unknown>["input.requested"]>>[0],
+  context: Parameters<NonNullable<ChannelEvents<unknown>["input.requested"]>>[2]
 ) {
+  if (context.session.parent) return Promise.resolve();
   return serverRuntime.runPromise(
     Effect.gen(function* () {
       const identity = yield* requireChannelPrincipal(
@@ -127,7 +144,12 @@ function enqueueInput(
         yield* transport.enqueueText({
           identityId: identity.id,
           deliveryKey: `input:${context.session.id}:${request.requestId}`,
-          text: renderChannelInput(context.session.id, request),
+          text: renderChannelInput(request),
+          inputRequest: {
+            sessionId: context.session.id,
+            requestId: request.requestId,
+            revision: channelConsentRevision(request),
+          },
         });
       }
       yield* transport.drainOutbox(identity.id);
