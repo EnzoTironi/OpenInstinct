@@ -137,6 +137,7 @@ export type ResolveOutboxUncertainInput =
 export const DeliveryFailureSchema = Schema.Literals([
   "adapter_rejected",
   "adapter_unavailable",
+  "adapter_rate_limited",
   "handoff_unknown",
   "lease_expired",
   "identity_revoked",
