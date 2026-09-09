@@ -1,10 +1,9 @@
-import { PgClient } from "@effect/sql-pg";
 import { Effect } from "effect";
 import type { MemoryOperationContext, MemoryToolsContext } from "eve/memory";
 import { readUserProfile, patchUserProfile } from "@db/services/user-profile";
 import type { UserProfilePatch } from "@shared/user-profile/schema";
 import { PersonalMemoryError } from "../../server/personal-memory/access";
-import { authorizePersonalMemoryPrincipal } from "./personal-memory-access";
+import { authorizePersonalMemoryPrincipal } from "../../server/personal-memory/principal";
 import { resolveModeValue } from "./mode";
 
 const requireProfileScope = Effect.fn("requireProfileScope")(function* (
@@ -23,13 +22,7 @@ const requireProfileScope = Effect.fn("requireProfileScope")(function* (
 
 export const recallPersonalProfile = Effect.fn("recallPersonalProfile")(
   function* (context: MemoryOperationContext) {
-    const sql = yield* PgClient.PgClient;
-    return yield* sql.withTransaction(
-      Effect.gen(function* () {
-        const scope = yield* requireProfileScope(context);
-        return yield* readUserProfile(scope);
-      })
-    );
+    return yield* readUserProfile(requireProfileScope(context));
   }
 );
 
@@ -43,12 +36,6 @@ export const updatePersonalProfile = Effect.fn("updatePersonalProfile")(
   ) {
     if (resolveModeValue(context, { interactive: true }) !== true)
       return yield* new PersonalMemoryError({ reason: "unauthenticated" });
-    const sql = yield* PgClient.PgClient;
-    return yield* sql.withTransaction(
-      Effect.gen(function* () {
-        const scope = yield* requireProfileScope(context);
-        return yield* patchUserProfile(scope, input);
-      })
-    );
+    return yield* patchUserProfile(requireProfileScope(context), input);
   }
 );

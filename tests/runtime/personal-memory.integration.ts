@@ -1,3 +1,4 @@
+import { requirePersonalMemoryMembership } from "../../server/personal-memory/access";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -189,13 +190,13 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       "unresolved"
     );
     await serverRuntime.runPromise(
-      patchUserProfile(ownerScope, {
+      patchUserProfile(requirePersonalMemoryMembership(ownerScope), {
         firstName: "Personal-memory owner",
         city: "Owner-only city",
       })
     );
     await serverRuntime.runPromise(
-      patchUserProfile(otherScope, {
+      patchUserProfile(requirePersonalMemoryMembership(otherScope), {
         firstName: "Second owner",
         city: "Foreign-only city",
       })

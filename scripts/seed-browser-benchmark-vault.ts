@@ -1,3 +1,4 @@
+import { requirePersonalMemoryMembership } from "../server/personal-memory/access";
 import { replaceUserProfile } from "../db/services/user-profile";
 import { ensureScope } from "../db/services/scope";
 import { saveVaultItem } from "../db/services/vault";
@@ -8,7 +9,7 @@ import { serverRuntime } from "../server/runtime";
 const scope = accessScopeForUser("better-auth:browser-benchmark");
 await ensureScope(scope);
 await serverRuntime.runPromise(
-  replaceUserProfile(scope, {
+  replaceUserProfile(requirePersonalMemoryMembership(scope), {
     addressLine1: "123 Test Street",
     addressLine2: "Apartment 4B",
     city: "Brooklyn",

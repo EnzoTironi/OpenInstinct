@@ -1,3 +1,4 @@
+import { requirePersonalMemoryMembership } from "../../server/personal-memory/access";
 import { defineEval } from "eve/evals";
 import { includes, satisfies } from "eve/evals/expect";
 import { isDeepStrictEqual } from "node:util";
@@ -117,7 +118,7 @@ export default [
       );
       await ensureScope(isolatedScope);
       await serverRuntime.runPromise(
-        patchUserProfile(isolatedScope, {
+        patchUserProfile(requirePersonalMemoryMembership(isolatedScope), {
           firstName: isolatedFirstNameCanary,
         })
       );

@@ -7,7 +7,7 @@ import { test } from "vitest";
 import type { MemoryTurnStartedContext } from "eve/memory";
 import type { ToolContext } from "eve/tools";
 import personalInfo from "../../agent/memory/personal_info";
-import { channelPrincipal } from "../../agent/lib/channel-session";
+import { channelPrincipal } from "../../server/channels/principal";
 import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
@@ -21,6 +21,14 @@ import {
   replacePersonalProfile,
 } from "../../server/personal-memory/profile";
 import { emptyUserProfile } from "../../shared/user-profile/schema";
+
+import { authorizePersonalMemoryPrincipal } from "../../server/personal-memory/principal";
+import {
+  UserProfileError,
+  readUserProfile,
+  patchUserProfile,
+  replaceUserProfile,
+} from "../../db/services/user-profile";
 
 async function fixture() {
   await Effect.runPromise(Effect.void.pipe(Effect.provide(runtimeDatabase)));
@@ -432,6 +440,108 @@ test("real web login updates and clears profile; session revocation winning a SQ
   } finally {
     await blocker.query("ROLLBACK");
     await Promise.allSettled([pending]);
+    await blocker.end();
+    await owner.close();
+  }
+});
+
+test("mandatory profile authorization preserves concrete errors and denies every service operation after revocation", async () => {
+  const owner = await fixture();
+  const authorize = authorizePersonalMemoryPrincipal(
+    owner.context.session.auth.current
+  );
+  try {
+    await assert.rejects(
+      serverRuntime.runPromise(patchUserProfile(authorize, {})),
+      UserProfileError
+    );
+    await assert.rejects(
+      serverRuntime.runPromise(
+        replaceUserProfile(authorize, {
+          ...emptyUserProfile,
+          dateOfBirth: "invalid-date",
+        })
+      ),
+      { _tag: "UserProfileError", reason: "invalid_input" }
+    );
+    await serverRuntime.runPromise(
+      patchUserProfile(authorize, { city: "Authorized city" })
+    );
+    await owner.sql.query(
+      "UPDATE user_profiles SET email = 'invalid-email' WHERE workspace_id = $1",
+      [owner.scope.workspaceId]
+    );
+    await assert.rejects(serverRuntime.runPromise(readUserProfile(authorize)), {
+      _tag: "UserProfileError",
+      reason: "invalid_stored_profile",
+    });
+    await owner.revoke();
+    for (const operation of [
+      readUserProfile(authorize),
+      patchUserProfile(authorize, { city: "Denied city" }),
+      replaceUserProfile(authorize, emptyUserProfile),
+    ]) {
+      // Each operation must independently evaluate the same live authorization effect.
+      // oxlint-disable-next-line eslint/no-await-in-loop
+      await assert.rejects(serverRuntime.runPromise(operation), {
+        reason: "unauthenticated",
+      });
+    }
+    const result = await owner.sql.query<{ city: string | null }>(
+      "SELECT city FROM user_profiles WHERE workspace_id = $1",
+      [owner.scope.workspaceId]
+    );
+    assert.equal(result.rows[0]?.city, "Authorized city");
+  } finally {
+    await owner.close();
+  }
+});
+
+test("profile read retains authorization in its own transaction while blocked on storage", async () => {
+  const owner = await fixture();
+  const blocker = new Client({ connectionString: owner.databaseUrl });
+  await blocker.connect();
+  let pending: Promise<unknown> | undefined;
+  let revoked: Promise<unknown> | undefined;
+  try {
+    await owner.update.execute({ city: "Authorized city" }, owner.execution);
+    await blocker.query("BEGIN");
+    await blocker.query("LOCK TABLE user_profiles IN ACCESS EXCLUSIVE MODE");
+    const pid = (
+      await blocker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")
+    ).rows[0]?.pid;
+    assert.ok(pid);
+    const read = serverRuntime.runPromise(
+      readUserProfile(
+        authorizePersonalMemoryPrincipal(owner.context.session.auth.current)
+      )
+    );
+    pending = read;
+    const readerPid = await waitForBlocked(
+      owner.sql,
+      pid,
+      "%SELECT%FROM user_profiles%"
+    );
+    revoked = owner.revoke();
+    await waitForBlocked(
+      owner.sql,
+      readerPid,
+      "%SELECT id FROM public.channel_identity%FOR UPDATE%"
+    );
+    await blocker.query("COMMIT");
+    assert.equal((await read).city, "Authorized city");
+    await revoked;
+    await assert.rejects(
+      serverRuntime.runPromise(
+        readUserProfile(
+          authorizePersonalMemoryPrincipal(owner.context.session.auth.current)
+        )
+      ),
+      { reason: "unauthenticated" }
+    );
+  } finally {
+    await blocker.query("ROLLBACK");
+    await Promise.allSettled([pending, revoked]);
     await blocker.end();
     await owner.close();
   }

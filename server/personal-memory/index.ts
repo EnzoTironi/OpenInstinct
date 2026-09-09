@@ -51,7 +51,9 @@ const makePersonalMemory = Effect.gen(function* () {
   const inspect = Effect.fn("PersonalMemory.inspect")(
     function* (scope: AccessScope) {
       yield* requirePersonalMemoryMembership(scope);
-      const profile = yield* readUserProfile(scope).pipe(
+      const profile = yield* readUserProfile(
+        requirePersonalMemoryMembership(scope)
+      ).pipe(
         Effect.mapError(
           () => new PersonalMemoryError({ reason: "unavailable" })
         )

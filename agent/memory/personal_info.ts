@@ -7,7 +7,7 @@ import {
 } from "eve/memory";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { scopeFromPrincipal } from "@agent/lib/principal-scope";
+import { scopeFromPrincipal } from "@shared/identity/principal-scope";
 import {
   recallPersonalProfile,
   updatePersonalProfile,
