@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as SessionService from "@db/services/sessions";
 import { accessScopeForUser } from "@shared/identity/access-scope";
+import type { SessionAuthContext } from "eve/context";
 import * as LiveAuthority from "@agent/subagents/browser-agent/lib/live-authority";
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
 
@@ -113,7 +114,7 @@ function principalFor(
   userId: string,
   overrides: {
     authenticator?: string;
-    attributes?: Record<string, unknown>;
+    attributes?: SessionAuthContext["attributes"];
   } = {}
 ) {
   return {
