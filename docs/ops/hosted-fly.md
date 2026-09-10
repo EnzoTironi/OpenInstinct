@@ -146,7 +146,8 @@ Repo files:
 | File                                                                                             | Role                                                                                     |
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | [`fly.toml`](../../fly.toml)                                                                     | Always-on HTTP on :3000 (`gru`); TCP `checks.alive` (avoid HTTP 307 health fails)        |
-| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next build; runtime `--hostname ::` (Fly IPv6 health)           |
+| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next build; `CMD` → `scripts/fly-entrypoint.sh` then `pnpm start` |
+| [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh)                                   | Materialize Codex/ChatGPT auth secrets then `exec pnpm start`                            |
 | [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh)                                     | `validate` / `status` / `deploy-dry` / `secrets-check`                                   |
 | [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh)                                   | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify` |
 | [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) | Alchemy stack: Fly.App + Machine + volume (not MPG)                                      |
@@ -177,6 +178,9 @@ table):
 | `KAPSO_*`                                        | Existing Kapso phone / webhook secrets                                                      |
 | `WORKFLOW_LOCAL_BASE_URL`                        | `http://127.0.0.1:4274` (Eve stays loopback in the Machine)                                 |
 | Model / Blob / Google / Kernel                   | As required by the install profile                                                          |
+| `CHATGPT_AUTH_JSON`                              | ChatGPT/Codex auth JSON → `/root/.eve/auth/chatgpt.json` (mode 600) via entrypoint          |
+| `CODEX_AUTH_JSON`                                | Codex CLI auth JSON → `/root/.codex/auth.json` (mode 600) via entrypoint                    |
+| `COMPANION_MODEL_PROVIDER`                       | Live Spark: `codex-local` (model `gpt-5.3-codex-spark`)                                     |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`    | Optional hosted billing ([consumer-billing](../consumer-billing.md))                        |
 | `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ORG_SEAT`     | Stripe Price ids for Pro / Org seat                                                         |
 
@@ -203,6 +207,32 @@ pnpm workflow:migrate
 Prefer **`deploy-dry` + PR** before the first live `fly deploy`. Keep Mac
 `launch-companion-prod` / cloudflared LaunchAgents loaded until ingress is
 retargeted and health-checked.
+
+
+## Codex / ChatGPT auth on Fly (Spark)
+
+Live Companion on Fly can use **`codex-local`** with model **`gpt-5.3-codex-spark`**.
+Auth must exist on the Machine filesystem before `pnpm start`; do **not** bake tokens
+into the image.
+
+| Secret name         | Written by [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh) |
+| ------------------- | ------------------------------------------------------------------------- |
+| `CHATGPT_AUTH_JSON` | `/root/.eve/auth/chatgpt.json` (chmod 600)                                |
+| `CODEX_AUTH_JSON`   | `/root/.codex/auth.json` (chmod 600)                                      |
+
+Refresh from the Mac operator machine (values never committed / never printed):
+
+```sh
+# Shape only — run locally; do not paste JSON into git/PRs/chat:
+# fly secrets set -a companion-tironi \
+#   CHATGPT_AUTH_JSON="$(cat ~/.eve/auth/chatgpt.json)" \
+#   CODEX_AUTH_JSON="$(cat ~/.codex/auth.json)"
+# Prefer sourcing from Mac ~/.codex/auth.json (and Eve chatgpt.json if present).
+./scripts/fly-companion.sh secrets-check   # names only
+```
+
+A plain `CMD ["pnpm", "start", …]` without the entrypoint drops these files on
+redeploy even when the Fly secrets remain set.
 
 ## Cutover Mac → Fly (keep `companion.tironi.xyz`)
 
