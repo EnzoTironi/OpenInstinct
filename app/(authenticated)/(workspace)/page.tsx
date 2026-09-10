@@ -11,19 +11,34 @@ import { readGoogleWorkspaceConnection } from "../../../server/google-workspace"
 import { requireRequestScope } from "@web/auth/request-scope";
 import { GoogleWorkspaceAction } from "./_components/google-workspace-action";
 import { HomeOverview } from "./_components/home-overview";
+import { FirstRunStatus } from "./_components/first-run-status";
 import { ModelSelector } from "./_components/model-selector";
+import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
+import { headers } from "next/headers";
 
 export default async function Page({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
   const google = params.google;
+  const welcomeParam = params.welcome;
+  const welcomeValue = Array.isArray(welcomeParam)
+    ? welcomeParam[0]
+    : welcomeParam;
+  const welcome = welcomeValue === "1" || welcomeValue === "true";
   const returnTo = googleWorkspaceReturnTo(params.returnTo);
   const scope = await requireRequestScope();
-  const [googleWorkspace, gatewayModel] = await Promise.all([
+  const requestHeaders = await headers();
+  const [googleWorkspace, gatewayModel, linkedChannels] = await Promise.all([
     serverRuntime.runPromise(
       readGoogleWorkspaceConnection(scope).pipe(Effect.result)
     ),
     getGatewayModel(scope),
+    serverRuntime.runPromise(
+      readLinkedChannelIdentities(requestHeaders).pipe(Effect.result)
+    ),
   ]);
+  const identities = Result.isSuccess(linkedChannels)
+    ? linkedChannels.success
+    : [];
 
   return (
     <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
@@ -37,6 +52,7 @@ export default async function Page({ searchParams }: PageProps<"/">) {
           Return to conversation
         </Button>
       ) : null}
+      <FirstRunStatus identities={identities} welcome={welcome} />
       <HomeOverview />
 
       {google === "unavailable" ? (

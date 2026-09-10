@@ -6,6 +6,7 @@ export async function proxy(request: NextRequest) {
   if (
     pathname === "/sign-in" ||
     pathname === "/sign-in/device" ||
+    pathname === "/get-started" ||
     pathname.startsWith("/api/auth/") ||
     pathname === "/api/channels/telegram" ||
     pathname === "/api/channels/kapso" ||
