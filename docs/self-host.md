@@ -129,38 +129,38 @@ pnpm build
 Copy from [`.env.example`](../.env.example). Documented names only — never put
 real secrets in this file or in commits.
 
-| Name                                   | Role                                                |
-| -------------------------------------- | --------------------------------------------------- |
-| `BETTER_AUTH_SECRET`                   | Auth signing secret                                 |
-| `BETTER_AUTH_URL`                      | Public application origin                           |
-| `COMPANION_PUBLIC_BASE_URL`            | Public HTTPS origin (webhooks; prefer named tunnel) |
-| `DATABASE_URL`                         | App Postgres URL                                    |
-| `DATABASE_URL_UNPOOLED`                | Unpooled / migrate-friendly Postgres URL            |
-| `WORKFLOW_POSTGRES_URL`                | Optional Eve Workflow DB (else `DATABASE_URL`)      |
-| `WORKFLOW_LOCAL_BASE_URL`              | Internal Eve origin for Workflow callbacks          |
-| `WORKFLOW_POSTGRES_MAX_POOL_SIZE`      | Workflow pool size                                  |
-| `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` | Workflow worker concurrency                         |
-| `SECRET_ENCRYPTION_KEY`                | Installation encryption (base64 32-byte)            |
-| `KERNEL_API_KEY`                       | Optional; required when browser execution runs      |
-| `AI_GATEWAY_API_KEY`                   | Gateway model profile outside Vercel                |
-| `COMPANION_MODEL_PROVIDER`             | `gateway` \| `codex-local` \| `openrouter-free`     |
-| `OPENROUTER_API_KEY`                   | OpenRouter profile                                  |
-| `TELEGRAM_BOT_ID`                      | Telegram bot identity                               |
-| `TELEGRAM_BOT_USERNAME`                | Telegram bot username                               |
-| `TELEGRAM_BOT_TOKEN`                   | Telegram Bot API token                              |
-| `TELEGRAM_WEBHOOK_SECRET`              | Telegram webhook verification                       |
-| `KAPSO_PHONE_NUMBER_ID`                | Kapso / WhatsApp phone number id                    |
-| `KAPSO_PHONE_NUMBER`                   | Kapso / WhatsApp E.164 number                       |
-| `KAPSO_API_KEY`                        | Kapso API key                                       |
-| `KAPSO_WEBHOOK_SECRET`                 | Kapso webhook HMAC secret                           |
-| `BLOB_STORE_ID`                        | Optional Blob store id                              |
-| `BLOB_READ_WRITE_TOKEN`                | Blob token outside Vercel OIDC                      |
-| `GOOGLE_CLIENT_ID`                     | Self-hosted Google OAuth client id                  |
-| `GOOGLE_CLIENT_SECRET`                 | Self-hosted Google OAuth client secret              |
-| `LINQ_CONNECTOR`                       | Optional Vercel Connect Linq connector              |
-| `LINQ_PHONE_NUMBER`                    | Optional Linq click-to-message (E.164)              |
-| `BROWSER_BENCH_LABEL`                  | Dev benchmark label only                            |
-| `BROWSER_BENCH_REPETITIONS`            | Dev benchmark repetitions only                      |
+| Name                                   | Role                                                                         |
+| -------------------------------------- | ---------------------------------------------------------------------------- |
+| `BETTER_AUTH_SECRET`                   | Auth signing secret                                                          |
+| `BETTER_AUTH_URL`                      | Public application origin                                                    |
+| `COMPANION_PUBLIC_BASE_URL`            | Public HTTPS origin (webhooks; interim live: `https://companion.tironi.xyz`) |
+| `DATABASE_URL`                         | App Postgres URL                                                             |
+| `DATABASE_URL_UNPOOLED`                | Unpooled / migrate-friendly Postgres URL                                     |
+| `WORKFLOW_POSTGRES_URL`                | Optional Eve Workflow DB (else `DATABASE_URL`)                               |
+| `WORKFLOW_LOCAL_BASE_URL`              | Internal Eve origin for Workflow callbacks                                   |
+| `WORKFLOW_POSTGRES_MAX_POOL_SIZE`      | Workflow pool size                                                           |
+| `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` | Workflow worker concurrency                                                  |
+| `SECRET_ENCRYPTION_KEY`                | Installation encryption (base64 32-byte)                                     |
+| `KERNEL_API_KEY`                       | Optional; required when browser execution runs                               |
+| `AI_GATEWAY_API_KEY`                   | Gateway model profile outside Vercel                                         |
+| `COMPANION_MODEL_PROVIDER`             | `gateway` \| `codex-local` \| `openrouter-free`                              |
+| `OPENROUTER_API_KEY`                   | OpenRouter profile                                                           |
+| `TELEGRAM_BOT_ID`                      | Telegram bot identity                                                        |
+| `TELEGRAM_BOT_USERNAME`                | Telegram bot username                                                        |
+| `TELEGRAM_BOT_TOKEN`                   | Telegram Bot API token                                                       |
+| `TELEGRAM_WEBHOOK_SECRET`              | Telegram webhook verification                                                |
+| `KAPSO_PHONE_NUMBER_ID`                | Kapso / WhatsApp phone number id                                             |
+| `KAPSO_PHONE_NUMBER`                   | Kapso / WhatsApp E.164 number                                                |
+| `KAPSO_API_KEY`                        | Kapso API key                                                                |
+| `KAPSO_WEBHOOK_SECRET`                 | Kapso webhook HMAC secret                                                    |
+| `BLOB_STORE_ID`                        | Optional Blob store id                                                       |
+| `BLOB_READ_WRITE_TOKEN`                | Blob token outside Vercel OIDC                                               |
+| `GOOGLE_CLIENT_ID`                     | Self-hosted Google OAuth client id                                           |
+| `GOOGLE_CLIENT_SECRET`                 | Self-hosted Google OAuth client secret                                       |
+| `LINQ_CONNECTOR`                       | Optional Vercel Connect Linq connector                                       |
+| `LINQ_PHONE_NUMBER`                    | Optional Linq click-to-message (E.164)                                       |
+| `BROWSER_BENCH_LABEL`                  | Dev benchmark label only                                                     |
+| `BROWSER_BENCH_REPETITIONS`            | Dev benchmark repetitions only                                               |
 
 Infrastructure-only (under `infrastructure/.env` / `infrastructure/ingress/.env`, not the app file):
 
@@ -248,12 +248,15 @@ blocker notes:
 
 → **[infrastructure/ingress/README.md](../infrastructure/ingress/README.md)**
 
-`app.zoen.space` may already exist as Fly DNS for Zoen product traffic. Until
-Enzo points a Companion hostname at the named tunnel, treat live DNS/tunnel
-credentials as a **blocker**: ship docs/scripts/config, keep provider webhooks
-on their prior targets, and do not force-redirect production channels. Enzo
-checklist: [enzo-live-actions.md](ops/enzo-live-actions.md) (DNS + `@ZoenOSBot`
-group mention for live G03).
+**Current interim public base (2026-09-10):** `https://companion.tironi.xyz`
+(named Cloudflare Tunnel on the EnzoTironi account). Telegram + Kapso standing
+webhooks already target that origin via `pnpm ingress:set-webhooks`. Set
+`COMPANION_PUBLIC_BASE_URL=https://companion.tironi.xyz` on the Mac runtime.
+
+`app.zoen.space` remains **Fly DNS for the Zoen product site** — do **not**
+point it at the Companion tunnel. A zoen.space Companion hostname cutover is
+**deferred**. Enzo checklist: [enzo-live-actions.md](ops/enzo-live-actions.md)
+(DNS status + `@ZoenOSBot` group mention for live G03).
 
 ## 6. Graphile lease fencing / SIGKILL
 

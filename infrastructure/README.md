@@ -241,6 +241,8 @@ Sources: [Docker provider](https://alchemy.run/docker/),
 Alchemy here provisions Postgres only. For always-on public HTTPS to
 `/api/channels/telegram` and `/api/channels/kapso`, use the named Cloudflare
 Tunnel + LaunchAgent recipe under [`ingress/`](ingress/README.md) (D01). Prefer
-that path over ephemeral `trycloudflare` tunnels. Webhook URL updates:
+that path over ephemeral `trycloudflare` tunnels. Interim Enzo live public base
+(2026-09-10): `https://companion.tironi.xyz` (zoen.space Companion cutover
+deferred; Fly `app.zoen.space` product DNS stays). Webhook URL updates:
 `pnpm ingress:set-webhooks` → `scripts/set-channel-webhooks.sh` (env names only;
 never prints secrets).

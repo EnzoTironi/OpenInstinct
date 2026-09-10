@@ -14,11 +14,12 @@ webhooks.** Prefer `pnpm start`, which pairs Eve + Next in one Effect scope.
 
 ## What already exists in this repo
 
-| Piece                         | Role                                                                 |
-| ----------------------------- | -------------------------------------------------------------------- |
-| Alchemy (`../alchemy.run.ts`) | **Preferred** Postgres for `local` → `dev` → `staging` → `prod`      |
-| Named Cloudflare Tunnel       | **Preferred** durable public HTTPS on Mac (not `trycloudflare`)      |
-| Fly DNS (`app.zoen.space`)    | Exists for Zoen product DNS; **not** automatically Companion ingress |
+| Piece                         | Role                                                                  |
+| ----------------------------- | --------------------------------------------------------------------- |
+| Alchemy (`../alchemy.run.ts`) | **Preferred** Postgres for `local` → `dev` → `staging` → `prod`       |
+| Named Cloudflare Tunnel       | **Preferred** durable public HTTPS on Mac (not `trycloudflare`)       |
+| Fly DNS (`app.zoen.space`)    | Zoen **product** site DNS only — leave alone; not Companion ingress   |
+| Interim Companion hostname    | `https://companion.tironi.xyz` (live TG+Kapso; zoen cutover deferred) |
 
 Alchemy in this package provisions Postgres only. Public HTTPS uses a
 **Cloudflare named tunnel** (token file + KeepAlive LaunchAgent). Do **not** use
@@ -29,16 +30,16 @@ webhooks — R1 left Telegram/Kapso pointed at dead quick tunnels.
 
 App (`.env.local`):
 
-| Name                        | Role                                           |
-| --------------------------- | ---------------------------------------------- |
-| `COMPANION_PUBLIC_BASE_URL` | Public HTTPS origin, no trailing slash         |
-| `BETTER_AUTH_URL`           | Should match the same public origin            |
-| `TELEGRAM_BOT_TOKEN`        | Telegram Bot API token                         |
-| `TELEGRAM_WEBHOOK_SECRET`   | Telegram `secret_token` verification           |
-| `KAPSO_PHONE_NUMBER_ID`     | Kapso / Meta phone number id                   |
-| `KAPSO_API_KEY`             | Kapso platform API key                         |
-| `KAPSO_WEBHOOK_SECRET`      | Kapso HMAC secret (`x-webhook-signature`)      |
-| `KAPSO_WEBHOOK_ID`          | Optional; when set, PATCH this webhook id only |
+| Name                        | Role                                                          |
+| --------------------------- | ------------------------------------------------------------- |
+| `COMPANION_PUBLIC_BASE_URL` | Public HTTPS origin (interim: `https://companion.tironi.xyz`) |
+| `BETTER_AUTH_URL`           | Should match the same public origin                           |
+| `TELEGRAM_BOT_TOKEN`        | Telegram Bot API token                                        |
+| `TELEGRAM_WEBHOOK_SECRET`   | Telegram `secret_token` verification                          |
+| `KAPSO_PHONE_NUMBER_ID`     | Kapso / Meta phone number id                                  |
+| `KAPSO_API_KEY`             | Kapso platform API key                                        |
+| `KAPSO_WEBHOOK_SECRET`      | Kapso HMAC secret (`x-webhook-signature`)                     |
+| `KAPSO_WEBHOOK_ID`          | Optional; when set, PATCH this webhook id only                |
 
 Ingress helper (`infrastructure/ingress/.env` — local only, chmod `600`):
 
@@ -94,20 +95,24 @@ first; then keep Next+Eve paired on every standing host (see
 4. Confirm public HTTPS reaches Next (unsigned webhook POSTs should **401**, not
    hang or 525). Then set provider webhooks (next section).
 
-### DNS / tunnel blocker (Enzo)
+### DNS / tunnel status (Enzo)
 
-As of R2 worker D01, public DNS for `app.zoen.space` still resolves to **Fly**,
-while the Mac named-tunnel LaunchAgent cannot receive that hostname until DNS
-(or an orange-cloud hostname) is pointed at the Companion tunnel. If live
-tunnel credentials / DNS for the Companion hostname are missing, ship this
-docs+scripts+config path and leave provider webhooks on their prior targets
-until Enzo completes DNS.
+**Interim live hostname (2026-09-10):** `companion.tironi.xyz` on the EnzoTironi
+Cloudflare account (named tunnel `openinstinct-companion`, LaunchAgent
+`com.openinstinct.companion-cloudflared`). Standing Telegram + Kapso webhooks
+already target `https://companion.tironi.xyz`. Set Mac
+`COMPANION_PUBLIC_BASE_URL=https://companion.tironi.xyz`.
 
-**Do not** redirect production Telegram/Kapso webhooks until:
+Public DNS for `app.zoen.space` still resolves to **Fly** for the Zoen product
+site — **do not** point Fly `app.zoen.space` at this Companion tunnel. A
+zoen.space Companion hostname cutover is **deferred**.
 
-- named tunnel HTTPS is stable for `COMPANION_PUBLIC_BASE_URL`,
+Before changing the public base again:
+
+- named tunnel HTTPS is stable for the new `COMPANION_PUBLIC_BASE_URL`,
 - `pnpm start` (or equivalent paired KeepAlive) is always-on,
-- ownership binding for _this_ install is understood.
+- ownership binding for _this_ install is understood,
+- then re-run `pnpm ingress:set-webhooks` (never `*.trycloudflare.com`).
 
 ## Set provider webhook URLs (env names only)
 

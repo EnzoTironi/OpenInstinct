@@ -5,14 +5,18 @@ Ship docs/scripts; Enzo executes.
 
 ## 1. DNS — Companion hostname → named tunnel
 
-As of D01: public DNS for `app.zoen.space` may still resolve to **Fly** (Zoen
-product), while the Mac `companion-cloudflared` LaunchAgent only receives traffic
-after a Companion hostname is routed to the **named Cloudflare Tunnel**.
+**Done (interim, 2026-09-10):** Companion channel ingress is live at
+`https://companion.tironi.xyz` (named tunnel `openinstinct-companion`, LaunchAgent
+`com.openinstinct.companion-cloudflared`). Telegram + Kapso webhooks already use
+that origin. Mac runtime: `COMPANION_PUBLIC_BASE_URL=https://companion.tironi.xyz`.
 
-Enzo:
+`app.zoen.space` still resolves to **Fly** for the Zoen **product** site — leave
+it alone. A zoen.space Companion hostname cutover is **deferred**.
 
-1. Choose Companion hostname (may be a dedicated name under the Zoen zone, not
-   necessarily reusing Fly `app.zoen.space`).
+If / when replacing the interim hostname:
+
+1. Choose the next Companion hostname (dedicated name; do **not** hijack Fly
+   `app.zoen.space` product DNS unless intentionally migrating that site).
 2. In Cloudflare Zero Trust / DNS: point that hostname (orange-cloud / tunnel
    route) at the Companion named tunnel → `COMPANION_INGRESS_SERVICE`
    (default `http://127.0.0.1:3000`).

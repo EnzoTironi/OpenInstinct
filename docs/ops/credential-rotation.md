@@ -37,7 +37,7 @@ unless the bot or WhatsApp number itself changes (identity, not a secret).
 
 Optional identity / URL names (usually unchanged on secret rotation):
 
-- `COMPANION_PUBLIC_BASE_URL`, `BETTER_AUTH_URL`
+- `COMPANION_PUBLIC_BASE_URL`, `BETTER_AUTH_URL` (interim public base: `https://companion.tironi.xyz`; zoen.space deferred)
 - `COMPANION_INGRESS_HOSTNAME`, `COMPANION_INGRESS_SERVICE`
 - `WORKFLOW_LOCAL_BASE_URL`, `WORKFLOW_POSTGRES_URL`
 - `BLOB_STORE_ID`, `LINQ_CONNECTOR`, `LINQ_PHONE_NUMBER`

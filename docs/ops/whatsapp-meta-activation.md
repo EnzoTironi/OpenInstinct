@@ -55,8 +55,9 @@ Do **not** paste template secrets, API keys, or full live payloads into PRs.
 Companion public path: `/api/channels/kapso` → Eve `/channels/kapso`.
 
 1. Confirm named Cloudflare Tunnel HTTPS for `COMPANION_PUBLIC_BASE_URL`
-   ([ingress README](../../infrastructure/ingress/README.md)). **Not**
-   `*.trycloudflare.com`.
+   ([ingress README](../../infrastructure/ingress/README.md)). Interim live:
+   `https://companion.tironi.xyz`. **Not** `*.trycloudflare.com`, and **not**
+   Fly `app.zoen.space` (product site; zoen Companion cutover deferred).
 2. Dry-run the D01 setter (prints channel + hostname + path only):
 
    ```sh
@@ -86,5 +87,5 @@ Even after display name + one UTILITY template:
 
 - [ ] Meta display name **approved** for the Kapso number
 - [ ] ≥1 **UTILITY** template **APPROVED**
-- [ ] Kapso webhook aimed at durable `COMPANION_PUBLIC_BASE_URL` via D01 script
-      (or explicitly deferred until Enzo DNS is complete)
+- [x] Kapso webhook aimed at durable interim `https://companion.tironi.xyz`
+      via D01 script (zoen.space Companion hostname deferred)
