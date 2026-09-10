@@ -27,8 +27,8 @@ export function GetStartedPanel({
         <p className="type-caption text-muted-foreground">Companion</p>
         <h1 className="type-page-title">Get started in one flow</h1>
         <p className="type-supporting-body text-muted-foreground">
-          Create your account, land in your workspace, and bind Telegram or
-          WhatsApp without installing anything yourself.
+          Create your personal account, land in your workspace, and bind
+          Telegram or WhatsApp — no install, no card on Free.
         </p>
       </header>
 
@@ -59,7 +59,8 @@ export function GetStartedPanel({
         <Link className="underline underline-offset-4" href="/sign-in">
           Sign in
         </Link>{" "}
-        with a linked messenger.
+        with a linked messenger. After signup, home shows your channels and
+        plan.
       </p>
     </section>
   );

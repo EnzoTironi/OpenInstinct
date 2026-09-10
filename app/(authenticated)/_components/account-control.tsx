@@ -26,7 +26,7 @@ export function AuthenticatedAccountControl() {
       <SidebarMenuItem>
         <SidebarMenuButton
           render={<Link href="/account" />}
-          tooltip="Manage account"
+          tooltip="Account, channels, and plan"
         >
           <UserIcon />
           <span>{accountLabel}</span>
