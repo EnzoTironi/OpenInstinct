@@ -53,7 +53,7 @@ export default async function Page({ searchParams }: PageProps<"/">) {
         </Button>
       ) : null}
       <FirstRunStatus identities={identities} welcome={welcome} />
-      <HomeOverview />
+      <HomeOverview identities={identities} />
 
       {google === "unavailable" ? (
         <Alert>

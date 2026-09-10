@@ -57,7 +57,7 @@ export function AccountBillingSection({
     <section
       aria-labelledby="billing-heading"
       className="space-y-4"
-      id="billing"
+      id="plan"
     >
       <div className="space-y-2">
         <h2 id="billing-heading" className="type-section-title">

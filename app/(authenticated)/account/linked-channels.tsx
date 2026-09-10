@@ -44,7 +44,8 @@ export function LinkedChannels({
       ) : null}
       {identities.length === 0 ? (
         <p className="type-supporting-body text-muted-foreground">
-          No linked messenger accounts were found.
+          No messengers linked yet. Use “Link another channel” below to connect
+          Telegram or WhatsApp.
         </p>
       ) : (
         <ul className="divide-y rounded-xl border">

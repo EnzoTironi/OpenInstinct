@@ -2,6 +2,7 @@ import { Effect, Result } from "effect";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthSession } from "@db/services/auth/session";
+import { readEntitlement } from "@db/services/billing";
 import { ChannelAuthForm } from "@web/auth/channel/form";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { serverRuntime } from "../../../server/runtime";
@@ -9,7 +10,6 @@ import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 import { LinkedChannels } from "./linked-channels";
 import { PersonalMemorySection } from "./personal-memory";
 import { AccountBillingSection } from "./_components/billing-section";
-import { readEntitlement } from "@db/services/billing";
 
 export default async function AccountPage() {
   const requestHeaders = await headers();
@@ -26,7 +26,8 @@ export default async function AccountPage() {
       <header className="space-y-2">
         <h1 className="type-page-title">Your account</h1>
         <p className="type-supporting-body text-muted-foreground">
-          Signed in as {session.user.name || "your Companion account"}.
+          Signed in as {session.user.name || "your Companion account"}. This is
+          your personal workspace — messengers, plan, and memory live here.
         </p>
       </header>
       {Result.isFailure(result) ? (
@@ -45,8 +46,8 @@ export default async function AccountPage() {
                 Linked channels
               </h2>
               <p className="type-supporting-body text-muted-foreground">
-                These messenger accounts can reach your assistant and sign in to
-                this Companion account.
+                Messengers linked here can reach Companion and sign you in to
+                this personal account.
               </p>
             </div>
             <LinkedChannels identities={result.success} />
@@ -60,9 +61,9 @@ export default async function AccountPage() {
                 Link another channel
               </h2>
               <p className="type-supporting-body text-muted-foreground">
-                Link a messenger account to{" "}
-                {session.user.name || "your current Companion account"}. Confirm
-                the request from the messenger account you want to add.
+                Add Telegram or WhatsApp to{" "}
+                {session.user.name || "this personal account"}. Confirm the
+                request in that messenger, then return here.
               </p>
             </div>
             <ChannelAuthForm purpose="link" callbackUrl="/account" />
