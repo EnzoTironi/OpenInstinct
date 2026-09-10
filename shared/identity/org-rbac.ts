@@ -1,11 +1,11 @@
 import { Effect, Schema } from "effect";
 
 /** Company control-plane roles (org + company workspace). */
-export const companyRoleSchema = Schema.Literals(["admin", "member"]);
+const companyRoleSchema = Schema.Literals(["admin", "member"]);
 export type CompanyRole = typeof companyRoleSchema.Type;
 
 /** Workspace membership roles including personal `owner`. */
-export const workspaceRoleSchema = Schema.Literals([
+const workspaceRoleSchema = Schema.Literals([
   "owner",
   "admin",
   "member",
