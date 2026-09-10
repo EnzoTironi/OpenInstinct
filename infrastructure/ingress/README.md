@@ -16,7 +16,7 @@ webhooks.** Prefer `pnpm start`, which pairs Eve + Next in one Effect scope.
 
 | Piece                         | Role                                                                 |
 | ----------------------------- | -------------------------------------------------------------------- |
-| Alchemy (`../alchemy.run.ts`) | **Preferred** Postgres for `local` / `dev` / `staging`               |
+| Alchemy (`../alchemy.run.ts`) | **Preferred** Postgres for `local` → `dev` → `staging` → `prod`      |
 | Named Cloudflare Tunnel       | **Preferred** durable public HTTPS on Mac (not `trycloudflare`)      |
 | Fly DNS (`app.zoen.space`)    | Exists for Zoen product DNS; **not** automatically Companion ingress |
 
@@ -53,6 +53,15 @@ checked into git. Use the token **file** path in LaunchAgents.
 
 ## Always-on Next + Eve pairing
 
+Promote Alchemy stages (`local` → `dev` → `staging` → `prod`) and migrations
+first; then keep Next+Eve paired on every standing host (see
+[`../README.md`](../README.md) promotion section).
+
+| Process | Default | Must match                                                          |
+| ------- | ------- | ------------------------------------------------------------------- |
+| Eve     | `4274`  | `EVE_NEXT_PRODUCTION_PORT` at **build** and `--eve-port` at start   |
+| Next    | `3000`  | `pnpm start --port` and tunnel origin (`COMPANION_INGRESS_SERVICE`) |
+
 1. Build with the Eve port you will run:  
    `EVE_NEXT_PRODUCTION_PORT=4274 pnpm build` (default `4274`).
 2. Start the **paired** launcher: `pnpm start --port 3000 --eve-port 4274`.  
@@ -67,6 +76,9 @@ checked into git. Use the token **file** path in LaunchAgents.
    (`~/.local/bin`). Missing `codex` on PATH breaks model turns under launchd.
 5. Do **not** leave Eve KeepAlive on a port that no longer matches a rebuild,
    and do **not** front standing webhooks with a throwaway trycloudflare URL.
+6. After HTTPS is stable, use the D01 webhook script
+   (`pnpm ingress:set-webhooks` → `scripts/set-channel-webhooks.sh`). Dry-run
+   prints channel + public path + hostname only — never secrets.
 
 ## Named tunnel setup (automated as far as credentials allow)
 

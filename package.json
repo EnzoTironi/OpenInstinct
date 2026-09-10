@@ -130,6 +130,7 @@
     "infra:deploy:local": "pnpm --dir infrastructure run deploy --stage local --yes",
     "infra:deploy:dev": "pnpm --dir infrastructure run deploy --stage dev --yes",
     "infra:deploy:staging": "pnpm --dir infrastructure run deploy --stage staging --yes",
+    "infra:deploy:prod": "pnpm --dir infrastructure run deploy --stage prod --yes",
     "ingress:set-webhooks": "bash ./scripts/set-channel-webhooks.sh"
   },
   "version": "0.0.0",

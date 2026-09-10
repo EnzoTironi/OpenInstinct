@@ -12,21 +12,25 @@ a local Docker context selected before deploy.
 Do **not** commit `.env*`, paste secrets into docs/PRs/logs, or redirect an
 existing Telegram/Kapso webhook to an unqualified installation.
 
-## 1. Alchemy Postgres (`local` / `dev` / `staging`)
+## 1. Alchemy Postgres (`local` → `dev` → `staging` → `prod`)
 
 Preferred Postgres for documented stages is the Alchemy + Effect stack under
-[`infrastructure/`](../infrastructure/README.md). Stages are isolated:
+[`infrastructure/`](../infrastructure/README.md). Stages are isolated; staging and
+prod share one composition with an Effect stage-policy layer (prod retains the
+data volume on destroy):
 
-| Stage     | Database name           | Notes                                      |
-| --------- | ----------------------- | ------------------------------------------ |
-| `local`   | `open_instinct_local`   | Day-to-day operator / developer            |
-| `dev`     | `open_instinct_dev`     | Separate stack; does not share Docker vols |
-| `staging` | `open_instinct_staging` | Local Docker only (no paid cloud staging)  |
+| Stage     | Database name           | Tier           | Notes                                      |
+| --------- | ----------------------- | -------------- | ------------------------------------------ |
+| `local`   | `open_instinct_local`   | ephemeral      | Day-to-day operator / developer            |
+| `dev`     | `open_instinct_dev`     | ephemeral      | Separate stack; does not share Docker vols |
+| `staging` | `open_instinct_staging` | shared-preprod | Pre-prod validation on local Docker        |
+| `prod`    | `open_instinct_prod`    | production     | Retain-on-destroy for the data volume      |
 
 Each `--stage` gets its own Alchemy state under `infrastructure/.alchemy`, and
 Docker container/volume **physical names** include the stage. Destroying one
 stage does not touch another. Always pass an explicit `--stage`. Do not run two
-deploys of the same stage concurrently.
+deploys of the same stage concurrently. **Promotion does not copy volumes** —
+redeploy + migrate on the target stage (see infra README promotion section).
 
 ```sh
 pnpm install --frozen-lockfile
@@ -41,9 +45,10 @@ Plan / deploy / destroy:
 ```sh
 pnpm --dir infrastructure plan --stage local
 pnpm --dir infrastructure run deploy --stage local --yes
-# Root shortcuts: pnpm infra:deploy:local | infra:deploy:dev | infra:deploy:staging
+# Root shortcuts: infra:deploy:local | :dev | :staging | :prod
 
 pnpm --dir infrastructure destroy --stage local --yes
+# prod destroy retains the Docker volume; see infrastructure/README.md
 ```
 
 Confirm readiness with
@@ -53,7 +58,7 @@ healthcheck. The published port binds to `127.0.0.1` and is chosen by Docker;
 update application URLs if a container replacement changes the port.
 
 Legacy `compose.yaml` remains available for disposable Compose databases
-(benchmarks / older loops). Prefer Alchemy stages for Release-1 ops.
+(benchmarks / older loops). Prefer Alchemy stages for Release-1/R2 ops.
 
 ## 2. Install, migrate, run
 
@@ -85,6 +90,14 @@ the baked rewrite port cannot serve Telegram or Kapso.** Prefer `pnpm start`,
 which launches both in one Effect scope, waits for Eve health, and stops the
 sibling if either exits.
 
+Default paired ports: Next `3000`, Eve `4274`. Keep them matched across build
+and start:
+
+```sh
+EVE_NEXT_PRODUCTION_PORT=4274 pnpm build
+pnpm start --port 3000 --eve-port 4274
+```
+
 For a Mac that must survive logout/reboot:
 
 1. Keep Eve's listen port identical to `EVE_NEXT_PRODUCTION_PORT` used at
@@ -95,6 +108,9 @@ For a Mac that must survive logout/reboot:
 3. Put `pnpm`, Node 24, and (for `codex-local`) the `codex` CLI on the agent's
    `PATH`, and set `HOME`. Ephemeral `*.trycloudflare.com` URLs are not durable
    ingress — R1 left webhooks on dead quick tunnels.
+4. After durable HTTPS is up, set provider webhooks with the D01 script
+   (`pnpm ingress:set-webhooks`, env names only — never prints secrets). Dry-run
+   first: `pnpm ingress:set-webhooks -- --dry-run`.
 
 Workflow state defaults to `DATABASE_URL` unless `WORKFLOW_POSTGRES_URL` is set.
 Run `pnpm workflow:migrate` against that database before workers start.
@@ -219,7 +235,7 @@ Preferred stack for Release-1 self-host on Mac:
 
 | Layer        | Choice                                                               |
 | ------------ | -------------------------------------------------------------------- |
-| Postgres     | **Alchemy** stages (`local` / `dev` / `staging`) — already in-repo   |
+| Postgres     | **Alchemy** stages (`local` → `dev` → `staging` → `prod`) — in-repo  |
 | Public HTTPS | **Cloudflare named tunnel** + KeepAlive LaunchAgent (token **file**) |
 | App process  | **`pnpm start`** pairing Next + Eve (see above)                      |
 | Webhook URLs | `pnpm ingress:set-webhooks` from env **names** only                  |
