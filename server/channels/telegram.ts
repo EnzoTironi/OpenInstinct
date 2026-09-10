@@ -21,6 +21,11 @@ import {
   type InboundEvent,
 } from "./inbound";
 import {
+  detectTelegramChatKind,
+  evaluateGroupMentionPolicy,
+  telegramTextMentionsBot,
+} from "./group-policy";
+import {
   boundRetryAfterSeconds,
   ProviderInputError,
   ProviderRejected,
@@ -49,6 +54,12 @@ const file = Schema.Struct({
   mime_type: Schema.optionalKey(ProviderReferenceSchema),
   file_name: Schema.optionalKey(ProviderReferenceSchema),
 });
+const messageEntity = Schema.Struct({
+  type: Schema.String,
+  offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  length: Schema.Int.check(Schema.isGreaterThan(0)),
+  user: Schema.optionalKey(user),
+});
 const message = Schema.Struct({
   message_id: positiveId,
   date: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -62,8 +73,17 @@ const message = Schema.Struct({
   voice: Schema.optionalKey(file),
   video: Schema.optionalKey(file),
   sticker: Schema.optionalKey(file),
+  entities: Schema.optionalKey(
+    Schema.Array(messageEntity).check(Schema.isMaxLength(100))
+  ),
+  caption_entities: Schema.optionalKey(
+    Schema.Array(messageEntity).check(Schema.isMaxLength(100))
+  ),
   reply_to_message: Schema.optionalKey(
-    Schema.Struct({ message_id: positiveId })
+    Schema.Struct({
+      message_id: positiveId,
+      from: Schema.optionalKey(user),
+    })
   ),
 });
 const callback = Schema.Struct({
@@ -97,10 +117,30 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
   if (incoming.message && incoming.callback_query) return yield* malformed();
   const source = incoming.callback_query?.message ?? incoming.message;
   const sender = incoming.callback_query?.from ?? incoming.message?.from;
-  if (!source || !sender || sender.is_bot || source.chat.type !== "private")
-    return [];
-  if (source.chat.id !== sender.id || String(sender.id) === installation.botId)
-    return [];
+  if (!source || !sender || sender.is_bot) return [];
+  if (String(sender.id) === installation.botId) return [];
+  const chatKind = detectTelegramChatKind(source.chat.type);
+  if (chatKind === "unsupported") return [];
+  // Callbacks / login confirmations remain private-only.
+  if (incoming.callback_query && chatKind !== "private") return [];
+  if (chatKind === "private") {
+    if (source.chat.id !== sender.id) return [];
+  } else {
+    const botUsername = installation.botUsername.replace(/^@/, "");
+    const bodyText = source.text ?? source.caption;
+    const entities = source.entities ?? source.caption_entities;
+    const mentionedBot = telegramTextMentionsBot(
+      bodyText,
+      botUsername,
+      entities,
+      installation.botId
+    );
+    const replyFrom = source.reply_to_message?.from;
+    const replyToBot = Boolean(
+      replyFrom?.is_bot && String(replyFrom.id) === installation.botId
+    );
+    if (!evaluateGroupMentionPolicy({ mentionedBot, replyToBot })) return [];
+  }
   const occurredAt = yield* validateEventAge("telegram", source.date, nowMs);
   const coordinates: InboundCoordinates = {
     channel: "telegram",
@@ -109,6 +149,8 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
     senderId: String(sender.id),
     messageId: String(source.message_id),
     occurredAt,
+    chatKind,
+    chatId: String(source.chat.id),
   };
   const query = incoming.callback_query;
   if (query) {

@@ -17,6 +17,8 @@ const base = {
   senderId: ProviderReferenceSchema,
   messageId: ProviderReferenceSchema,
   occurredAt: Schema.String,
+  chatKind: Schema.optionalKey(Schema.Literals(["private", "group"])),
+  chatId: Schema.optionalKey(ProviderReferenceSchema),
 };
 const InboundEventSchema = Schema.Union([
   Schema.Struct({
@@ -70,8 +72,12 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
   botUsername?: string
 ): Effect.fn.Return<InboundEvent | null, ProviderInputError> {
   const text = payload.text?.trim() ?? "";
+  if (coordinates.chatKind === "group") {
+    // Auth challenges stay private-only; groups never mint login/link commands.
+    if (/^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) return null;
+  }
   const command =
-    coordinates.channel === "telegram"
+    coordinates.channel === "telegram" && coordinates.chatKind !== "group"
       ? /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text)
       : null;
   if (command?.[2] && command[2].toLowerCase() !== botUsername?.toLowerCase())

@@ -49,6 +49,8 @@ test("preserves update and sender IDs and separates login tokens from messages",
       senderId: "789012",
       messageId: "51",
       occurredAt: "2027-01-15T08:00:00.000Z",
+      chatKind: "private",
+      chatId: "789012",
       kind: "command",
       command: "start",
       token,
@@ -102,7 +104,7 @@ test("normalizes text and opaque media without downloading or retaining URLs", a
   ).toMatchObject({ kind: "message", payload: { text: "hello" } });
 });
 
-test("ignores bots, groups, edited updates, mismatched private senders and other bot commands", async () => {
+test("ignores bots, unmentioned groups, edited updates, mismatched private senders and other bot commands", async () => {
   const ignored: Schema.Json[] = [
     {
       update_id: 1,
@@ -230,5 +232,69 @@ describe("telegram private send failure classification", () => {
     expect(telegramSendFailure({ error_code: 408 })).toBeInstanceOf(
       ProviderUncertain
     );
+  });
+});
+
+test("group mention foundation accepts @mention and reply-to-bot; private still works", async () => {
+  const groupChat = { id: -100123, type: "supergroup" as const };
+  const mentioned = await parse({
+    update_id: 200,
+    message: {
+      ...baseMessage,
+      chat: groupChat,
+      text: "hey @CompanionBot summarize",
+      entities: [{ type: "mention", offset: 4, length: 14 }],
+    },
+  });
+  expect(mentioned).toHaveLength(1);
+  expect(mentioned[0]).toMatchObject({
+    kind: "message",
+    chatKind: "group",
+    chatId: "-100123",
+    senderId: "789012",
+    payload: { text: "hey @CompanionBot summarize" },
+  });
+
+  const replied = await parse({
+    update_id: 201,
+    message: {
+      ...baseMessage,
+      chat: groupChat,
+      text: "follow up",
+      reply_to_message: {
+        message_id: 9,
+        from: { id: 123456, is_bot: true },
+      },
+    },
+  });
+  expect(replied[0]).toMatchObject({
+    kind: "message",
+    chatKind: "group",
+    chatId: "-100123",
+    payload: { text: "follow up" },
+  });
+
+  // Login commands never mint from groups even when mentioned.
+  expect(
+    await parse({
+      update_id: 202,
+      message: {
+        ...baseMessage,
+        chat: groupChat,
+        text: `/start@CompanionBot ${token}`,
+      },
+    })
+  ).toEqual([]);
+
+  // Private regression still emits chatKind/chatId.
+  const privateMessage = await parse({
+    update_id: 203,
+    message: { ...baseMessage, text: "still private" },
+  });
+  expect(privateMessage[0]).toMatchObject({
+    kind: "message",
+    chatKind: "private",
+    chatId: "789012",
+    payload: { text: "still private" },
   });
 });
