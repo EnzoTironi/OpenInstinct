@@ -1,7 +1,10 @@
 import { Effect } from "effect";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { expect, test } from "vitest";
-import { runTelegramGroupMentionHarness } from "./groups-e2e-harness";
+import {
+  runTelegramGroupMentionHarness,
+  type TelegramGroupHarnessResult,
+} from "./groups-e2e-harness";
 import { parseKapsoWebhook } from "./kapso";
 import { bindGroupChannelIdentity } from "./group-policy";
 
@@ -23,7 +26,7 @@ test("telegram group mention fixture → accept → bind (artifact)", async () =
   );
   // Fixture date must be within validateEventAge window relative to nowMs.
   update.message.date = Math.floor(nowMs / 1000);
-  const result = await Effect.runPromise(
+  const result: TelegramGroupHarnessResult = await Effect.runPromise(
     runTelegramGroupMentionHarness({
       update,
       installation,
