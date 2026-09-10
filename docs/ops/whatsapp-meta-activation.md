@@ -88,12 +88,12 @@ Even after display name + one UTILITY template:
 Evidence from Kapso Platform phone GET + Meta Proxy templates list (operator
 Mac; secret values not logged):
 
-| Gate | Result |
-| ---- | ------ |
-| Phone connection | `CONNECTED` · quality `GREEN` · account mode `LIVE` |
-| Display name | `name_status=AVAILABLE_WITHOUT_REVIEW` · verified name present (`Zoen`) |
+| Gate              | Result                                                                            |
+| ----------------- | --------------------------------------------------------------------------------- |
+| Phone connection  | `CONNECTED` · quality `GREEN` · account mode `LIVE`                               |
+| Display name      | `name_status=AVAILABLE_WITHOUT_REVIEW` · verified name present (`Zoen`)           |
 | UTILITY templates | `companion_account_notice_v1` (`pt_BR`) still **`PENDING`** — none `APPROVED` yet |
-| Durable webhook | Interim `https://companion.tironi.xyz` (unsigned POST → 401) |
+| Durable webhook   | Interim `https://companion.tironi.xyz` (unsigned POST → 401)                      |
 
 Re-check with Kapso (env **names** only): Platform
 `GET /whatsapp/phone_numbers/{KAPSO_PHONE_NUMBER_ID}` for `status` /

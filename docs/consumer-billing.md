@@ -99,7 +99,6 @@ Optional: leave all Stripe names unset — Free still works; Checkout/Portal ret
 - Customer Portal opens for an existing Stripe customer.
 - Secret **values** never appear in git, PR bodies, or docs.
 
-
 ## Trust copy
 
 - Free never requires a card (see Acceptance).
