@@ -1,5 +1,6 @@
-# Companion compute on Fly (H01). Postgres is Alchemy Docker — not Fly Managed
-# Postgres (MPG / alchemy Fly.Postgres). See docs/ops/hosted-fly.md.
+# Companion compute on Fly (H01). Postgres is Alchemy unmanaged (Docker A/B or
+# Fly.Machine+volume option C) — not Fly Managed Postgres / alchemy Fly.Postgres
+# MPG. See docs/ops/hosted-fly.md and scripts/fly-alchemy-pg.sh.
 #
 # Replace `app` after `fly apps create <name> --org personal` (or keep this name).
 # Do not point app.zoen.space product DNS at this app.
