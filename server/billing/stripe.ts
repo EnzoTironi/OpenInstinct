@@ -11,12 +11,6 @@ export class StripeNotConfiguredError extends Error {
   }
 }
 
-export function stripeConfigured() {
-  return Boolean(
-    env.STRIPE_SECRET_KEY && Redacted.value(env.STRIPE_SECRET_KEY)
-  );
-}
-
 export function requireStripe(): Stripe {
   const key = env.STRIPE_SECRET_KEY;
   if (!key) throw new StripeNotConfiguredError();

@@ -1,5 +1,4 @@
 import { and, eq, isNotNull } from "drizzle-orm";
-import { Effect, Schema } from "effect";
 import { randomUUID } from "node:crypto";
 import { billingEntitlements, db } from "@db";
 import {
@@ -15,14 +14,6 @@ export type BillingEntitlementStatus =
   | "past_due"
   | "canceled"
   | "incomplete";
-
-export class BillingEntitlementMissing extends Schema.TaggedError<BillingEntitlementMissing>()(
-  "BillingEntitlementMissing",
-  {
-    subjectType: Schema.Literals(["user", "organization"]),
-    subjectId: Schema.String,
-  }
-) {}
 
 export interface ResolvedEntitlement {
   plan: BillingPlanId;
@@ -83,32 +74,6 @@ export async function readEntitlement(
   const row = rows[0];
   return row ? toResolved(row) : freeEntitlement();
 }
-
-export const resolveUserEntitlement = Effect.fn("resolveUserEntitlement")(
-  function* (userId: string) {
-    return yield* Effect.tryPromise({
-      try: () => readEntitlement("user", userId),
-      catch: () =>
-        new BillingEntitlementMissing({
-          subjectType: "user",
-          subjectId: userId,
-        }),
-    });
-  }
-);
-
-export const resolveOrganizationEntitlement = Effect.fn(
-  "resolveOrganizationEntitlement"
-)(function* (organizationId: string) {
-  return yield* Effect.tryPromise({
-    try: () => readEntitlement("organization", organizationId),
-    catch: () =>
-      new BillingEntitlementMissing({
-        subjectType: "organization",
-        subjectId: organizationId,
-      }),
-  });
-});
 
 export async function upsertEntitlement(input: {
   subjectType: BillingSubjectType;

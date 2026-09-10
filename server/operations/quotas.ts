@@ -297,7 +297,7 @@ function decodeDemand(demand: QuotaDemand) {
 export const admitQuota = Effect.fn("admitQuota")(function* (
   usage: QuotaUsage,
   demand: QuotaDemand,
-  limits: Release1QuotaLimits = release1QuotaLimits
+  limits: Release1QuotaLimits = admissionLimitsForPlan()
 ) {
   const decodedUsage = yield* decodeUsage(usage);
   const decodedDemand = yield* decodeDemand(demand);

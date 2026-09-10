@@ -170,20 +170,3 @@ export function AccountBillingSection({
     </section>
   );
 }
-
-export function UpgradeQuotaCta({ message }: { readonly message?: string }) {
-  return (
-    <Alert>
-      <AlertTitle>Quota reached</AlertTitle>
-      <AlertDescription className="space-y-3">
-        <p>
-          {message ??
-            "This account hit its plan quota. Upgrade to Pro or Org seats for higher limits."}
-        </p>
-        <Button render={<Link href="/pricing" />} size="sm">
-          See plans
-        </Button>
-      </AlertDescription>
-    </Alert>
-  );
-}

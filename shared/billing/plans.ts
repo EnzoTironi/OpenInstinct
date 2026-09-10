@@ -3,7 +3,7 @@
  * Price objects — configure real Price IDs via env; never commit secret keys.
  */
 
-export const billingPlanIds = ["free", "pro", "org"] as const;
+const billingPlanIds = ["free", "pro", "org"] as const;
 export type BillingPlanId = (typeof billingPlanIds)[number];
 
 /** Mirrors `Release1QuotaLimits` so UI + admission share one catalog. */
@@ -63,9 +63,6 @@ export const billingPlanCatalog = {
     ],
   },
 } as const;
-
-export type BillingPlanCatalogEntry =
-  (typeof billingPlanCatalog)[BillingPlanId];
 
 /** Free matches self-host Release-1 floors; paid plans raise user ceilings. */
 export const planQuotaLimits: Record<BillingPlanId, PlanQuotaLimits> = {
