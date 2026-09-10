@@ -4,9 +4,28 @@
 **environment variable names**, **rotation order**, and **verify steps**.
 **Never print, paste, commit, or log secret values.**
 
-**Live rotation (2026-09-10):** **Deferred** — do not execute F01 until Enzo
-explicitly authorizes a live rotation this session. Inventory + verify docs may
-be updated; secrets must not be rotated, printed, or pasted into PRs/chat.
+**Live rotation (2026-09-10):** **Partial execute** (Enzo-authorized). Fly app
+`companion-tironi` + local `.env.prod` / `.env.local` (worktree
+`companion-tironi-prod`) updated for rotatable families below. **Never print,
+paste, commit, or log secret values.**
+
+| Family | Result |
+| ------ | ------ |
+| `BETTER_AUTH_SECRET` | **Rotated** (Fly + local env); sessions invalidated |
+| `TELEGRAM_WEBHOOK_SECRET` | **Rotated**; `setWebhook` re-applied to `companion.tironi.xyz` |
+| `KAPSO_WEBHOOK_SECRET` | **Rotated**; Kapso webhook patched (id retained) |
+| `SECRET_ENCRYPTION_KEY` | **Retained** — rotating would break ciphertext without re-encrypt |
+| `TELEGRAM_BOT_TOKEN` | **Skipped** — needs BotFather `/revoke` (interactive) |
+| `KAPSO_API_KEY` | **Skipped** — dashboard-only project key rotation |
+| `GOOGLE_CLIENT_SECRET` | **Skipped** — `gcloud` not authenticated this session |
+| `OPENROUTER_API_KEY` / `KERNEL_API_KEY` / `OPENCODE_API_KEY` | **Skipped** — provider console / management key required |
+| Postgres (`DATABASE_URL*`) | **Skipped** — no backup+cutover this session |
+| Named tunnel token | **Skipped** — Mac `~/.cloudflared/openinstinct-companion.token` retained |
+| Stripe | **Ignored** (out of scope) |
+
+Post-rotation verify (2026-09-10): `https://companion.tironi.xyz/welcome` → 200;
+unsigned Telegram/Kapso channel POST → 401; Telegram `getMe` → `ZoenOSBot`;
+Kapso phone GET → CONNECTED; Fly machine health check passing.
 
 Scope: Companion self-host on Mac (Alchemy Postgres + named Cloudflare Tunnel +
 `pnpm start`). See [self-host](../self-host.md) and
