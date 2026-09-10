@@ -25,15 +25,16 @@ auto_start_machines = true
 min_machines_running = 1
 processes = ["app"]
 
-[[http_service.checks]]
-interval = "15s"
-timeout = "5s"
-grace_period = "90s"
-method = "GET"
-# Prefer a static 200 over `/` (auth redirect 307) for proxy health.
-path = "/icon"
 
 [[vm]]
 size = "shared-cpu-2x"
 memory = "2048mb"
 cpus = 2
+
+[checks]
+[checks.alive]
+type = "tcp"
+port = 3000
+interval = "15s"
+timeout = "5s"
+grace_period = "60s"
