@@ -16,9 +16,11 @@ minimumReleaseAgeExclude:
   - systeminformation
 allowBuilds:
   "@google/genai": false
+  "@mongodb-js/zstd": false
   cbor-extract: false
   esbuild: true
   msgpackr-extract: false
+  node-liblzma: false
   protobufjs: false
   sharp: true
 patchedDependencies:
