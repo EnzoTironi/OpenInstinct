@@ -77,6 +77,25 @@ sibling. To change Eve's port, set `EVE_NEXT_PRODUCTION_PORT` at **build** and
 the same value at start (`--eve-port`); mismatches against the compiled route
 manifest are rejected.
 
+### Always-on Next + Eve pairing
+
+Channel webhooks are rewritten from Next to Eve at build time
+(`/api/channels/telegram|kapso` → Eve `/channels/...`). **Next without Eve on
+the baked rewrite port cannot serve Telegram or Kapso.** Prefer `pnpm start`,
+which launches both in one Effect scope, waits for Eve health, and stops the
+sibling if either exits.
+
+For a Mac that must survive logout/reboot:
+
+1. Keep Eve's listen port identical to `EVE_NEXT_PRODUCTION_PORT` used at
+   **build** (default `4274`; `scripts/start.ts` rejects mismatches).
+2. Install the KeepAlive LaunchAgent examples under
+   [`infrastructure/ingress/`](../infrastructure/ingress/README.md)
+   (`companion-runtime` → `pnpm start`, `companion-cloudflared` → named tunnel).
+3. Put `pnpm`, Node 24, and (for `codex-local`) the `codex` CLI on the agent's
+   `PATH`, and set `HOME`. Ephemeral `*.trycloudflare.com` URLs are not durable
+   ingress — R1 left webhooks on dead quick tunnels.
+
 Workflow state defaults to `DATABASE_URL` unless `WORKFLOW_POSTGRES_URL` is set.
 Run `pnpm workflow:migrate` against that database before workers start.
 
@@ -94,43 +113,48 @@ pnpm build
 Copy from [`.env.example`](../.env.example). Documented names only — never put
 real secrets in this file or in commits.
 
-| Name                                   | Role                                            |
-| -------------------------------------- | ----------------------------------------------- |
-| `BETTER_AUTH_SECRET`                   | Auth signing secret                             |
-| `BETTER_AUTH_URL`                      | Public application origin                       |
-| `DATABASE_URL`                         | App Postgres URL                                |
-| `DATABASE_URL_UNPOOLED`                | Unpooled / migrate-friendly Postgres URL        |
-| `WORKFLOW_POSTGRES_URL`                | Optional Eve Workflow DB (else `DATABASE_URL`)  |
-| `WORKFLOW_LOCAL_BASE_URL`              | Internal Eve origin for Workflow callbacks      |
-| `WORKFLOW_POSTGRES_MAX_POOL_SIZE`      | Workflow pool size                              |
-| `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` | Workflow worker concurrency                     |
-| `SECRET_ENCRYPTION_KEY`                | Installation encryption (base64 32-byte)        |
-| `KERNEL_API_KEY`                       | Optional; required when browser execution runs  |
-| `AI_GATEWAY_API_KEY`                   | Gateway model profile outside Vercel            |
-| `COMPANION_MODEL_PROVIDER`             | `gateway` \| `codex-local` \| `openrouter-free` |
-| `OPENROUTER_API_KEY`                   | OpenRouter profile                              |
-| `TELEGRAM_BOT_ID`                      | Telegram bot identity                           |
-| `TELEGRAM_BOT_USERNAME`                | Telegram bot username                           |
-| `TELEGRAM_BOT_TOKEN`                   | Telegram Bot API token                          |
-| `TELEGRAM_WEBHOOK_SECRET`              | Telegram webhook verification                   |
-| `KAPSO_PHONE_NUMBER_ID`                | Kapso / WhatsApp phone number id                |
-| `KAPSO_PHONE_NUMBER`                   | Kapso / WhatsApp E.164 number                   |
-| `KAPSO_API_KEY`                        | Kapso API key                                   |
-| `KAPSO_WEBHOOK_SECRET`                 | Kapso webhook HMAC secret                       |
-| `BLOB_STORE_ID`                        | Optional Blob store id                          |
-| `BLOB_READ_WRITE_TOKEN`                | Blob token outside Vercel OIDC                  |
-| `GOOGLE_CLIENT_ID`                     | Self-hosted Google OAuth client id              |
-| `GOOGLE_CLIENT_SECRET`                 | Self-hosted Google OAuth client secret          |
-| `LINQ_CONNECTOR`                       | Optional Vercel Connect Linq connector          |
-| `LINQ_PHONE_NUMBER`                    | Optional Linq click-to-message (E.164)          |
-| `BROWSER_BENCH_LABEL`                  | Dev benchmark label only                        |
-| `BROWSER_BENCH_REPETITIONS`            | Dev benchmark repetitions only                  |
+| Name                                   | Role                                                |
+| -------------------------------------- | --------------------------------------------------- |
+| `BETTER_AUTH_SECRET`                   | Auth signing secret                                 |
+| `BETTER_AUTH_URL`                      | Public application origin                           |
+| `COMPANION_PUBLIC_BASE_URL`            | Public HTTPS origin (webhooks; prefer named tunnel) |
+| `DATABASE_URL`                         | App Postgres URL                                    |
+| `DATABASE_URL_UNPOOLED`                | Unpooled / migrate-friendly Postgres URL            |
+| `WORKFLOW_POSTGRES_URL`                | Optional Eve Workflow DB (else `DATABASE_URL`)      |
+| `WORKFLOW_LOCAL_BASE_URL`              | Internal Eve origin for Workflow callbacks          |
+| `WORKFLOW_POSTGRES_MAX_POOL_SIZE`      | Workflow pool size                                  |
+| `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` | Workflow worker concurrency                         |
+| `SECRET_ENCRYPTION_KEY`                | Installation encryption (base64 32-byte)            |
+| `KERNEL_API_KEY`                       | Optional; required when browser execution runs      |
+| `AI_GATEWAY_API_KEY`                   | Gateway model profile outside Vercel                |
+| `COMPANION_MODEL_PROVIDER`             | `gateway` \| `codex-local` \| `openrouter-free`     |
+| `OPENROUTER_API_KEY`                   | OpenRouter profile                                  |
+| `TELEGRAM_BOT_ID`                      | Telegram bot identity                               |
+| `TELEGRAM_BOT_USERNAME`                | Telegram bot username                               |
+| `TELEGRAM_BOT_TOKEN`                   | Telegram Bot API token                              |
+| `TELEGRAM_WEBHOOK_SECRET`              | Telegram webhook verification                       |
+| `KAPSO_PHONE_NUMBER_ID`                | Kapso / WhatsApp phone number id                    |
+| `KAPSO_PHONE_NUMBER`                   | Kapso / WhatsApp E.164 number                       |
+| `KAPSO_API_KEY`                        | Kapso API key                                       |
+| `KAPSO_WEBHOOK_SECRET`                 | Kapso webhook HMAC secret                           |
+| `BLOB_STORE_ID`                        | Optional Blob store id                              |
+| `BLOB_READ_WRITE_TOKEN`                | Blob token outside Vercel OIDC                      |
+| `GOOGLE_CLIENT_ID`                     | Self-hosted Google OAuth client id                  |
+| `GOOGLE_CLIENT_SECRET`                 | Self-hosted Google OAuth client secret              |
+| `LINQ_CONNECTOR`                       | Optional Vercel Connect Linq connector              |
+| `LINQ_PHONE_NUMBER`                    | Optional Linq click-to-message (E.164)              |
+| `BROWSER_BENCH_LABEL`                  | Dev benchmark label only                            |
+| `BROWSER_BENCH_REPETITIONS`            | Dev benchmark repetitions only                      |
 
-Infrastructure-only (under `infrastructure/.env`, not the app file):
+Infrastructure-only (under `infrastructure/.env` / `infrastructure/ingress/.env`, not the app file):
 
-| Name                          | Role                      |
-| ----------------------------- | ------------------------- |
-| `COMPANION_POSTGRES_PASSWORD` | Alchemy Postgres password |
+| Name                            | Role                                             |
+| ------------------------------- | ------------------------------------------------ |
+| `COMPANION_POSTGRES_PASSWORD`   | Alchemy Postgres password                        |
+| `CLOUDFLARED_TUNNEL_TOKEN_FILE` | Path to named-tunnel token file (mode 600)       |
+| `COMPANION_INGRESS_HOSTNAME`    | Optional Cloudflare hostname for this install    |
+| `COMPANION_INGRESS_SERVICE`     | Tunnel origin (default `http://127.0.0.1:3000`)  |
+| `KAPSO_WEBHOOK_ID`              | Optional Kapso webhook id for PATCH-only updates |
 
 ## 4. Channel / IdP setup pointers
 
@@ -146,7 +170,11 @@ Infrastructure-only (under `infrastructure/.env`, not the app file):
    **private** bot chat. See [accounts README](../server/accounts/README.md)
    and [native onboarding](native-onboarding.md).
 4. Bot API reference: [Telegram Bot API](https://core.telegram.org/bots/api).
-5. **Do not** point an existing production webhook at this host until ownership
+5. Set the Bot API webhook only after durable HTTPS is up:
+   `pnpm ingress:set-webhooks -- --telegram` (uses
+   `COMPANION_PUBLIC_BASE_URL` + `TELEGRAM_*`; never prints secrets). See
+   [durable ingress](../infrastructure/ingress/README.md).
+6. **Do not** point an existing production webhook at this host until ownership
    binding and durable ingress are wired for _this_ install. Credential
    `getMe` / `getWebhookInfo` checks are not e2e delivery evidence
    ([local runtime setup](local-runtime-setup.md#credential-readiness)).
@@ -176,12 +204,38 @@ Infrastructure-only (under `infrastructure/.env`, not the app file):
    [webhook security](https://docs.kapso.ai/docs/platform/webhooks/security),
    [phone numbers](https://docs.kapso.ai/api/platform/v1/phone-numbers/get-phone-number),
    [personal agent](https://docs.kapso.ai/docs/whatsapp/personal-agent).
-4. Release-1 adapter path decision:
+4. Set / update the Kapso WhatsApp webhook only after durable HTTPS is up:
+   `pnpm ingress:set-webhooks -- --kapso` (uses `COMPANION_PUBLIC_BASE_URL` +
+   `KAPSO_*`; optional `KAPSO_WEBHOOK_ID` for PATCH-only). See
+   [durable ingress](../infrastructure/ingress/README.md).
+5. Release-1 adapter path decision:
    [ADR Kapso path R1](decisions/adr-kapso-path-r1.md). Adapter/webhook private
    delivery may proceed; full WhatsApp product activation (templates, messaging
    window, live redirect, login parity) remains follow-up work.
 
-## 5. Graphile lease fencing / SIGKILL
+## 5. Durable public HTTPS ingress (not trycloudflare)
+
+Preferred stack for Release-1 self-host on Mac:
+
+| Layer        | Choice                                                               |
+| ------------ | -------------------------------------------------------------------- |
+| Postgres     | **Alchemy** stages (`local` / `dev` / `staging`) — already in-repo   |
+| Public HTTPS | **Cloudflare named tunnel** + KeepAlive LaunchAgent (token **file**) |
+| App process  | **`pnpm start`** pairing Next + Eve (see above)                      |
+| Webhook URLs | `pnpm ingress:set-webhooks` from env **names** only                  |
+
+Do **not** use ephemeral `cloudflared tunnel --url` / `*.trycloudflare.com` for
+standing Telegram or Kapso webhooks. Full recipe, plist examples, and DNS
+blocker notes:
+
+→ **[infrastructure/ingress/README.md](../infrastructure/ingress/README.md)**
+
+`app.zoen.space` may already exist as Fly DNS for Zoen product traffic. Until
+Enzo points a Companion hostname at the named tunnel, treat live DNS/tunnel
+credentials as a **blocker**: ship docs/scripts/config, keep provider webhooks
+on their prior targets, and do not force-redirect production channels.
+
+## 6. Graphile lease fencing / SIGKILL
 
 Native `@workflow/world-postgres` uses renewable worker leases with **generation
 fencing** and owner-aware Graphile completion. Expired generations are retired
@@ -198,7 +252,7 @@ qualified path. Groups remain paused.
 
 Defaults (package): `workerLease: { leaseMs: 30000, heartbeatMs: 10000, reclaimIntervalMs: 5000 }`.
 
-## 6. Quotas (Release-1 admission)
+## 7. Quotas (Release-1 admission)
 
 Fail-closed minimum quotas live in `server/operations/quotas.ts`. Over-limit work
 must not proceed (`QuotaAdmissionError`). Full decision record and limit table:
@@ -223,7 +277,7 @@ Media attachment byte caps remain in `server/channels/media/policy.ts`. Usage
 meter persistence / dispatch wiring may still be landing; the gate itself is
 tested.
 
-## 7. Account export / delete limits
+## 8. Account export / delete limits
 
 Routes (browser session + canonical membership required; fail closed):
 
@@ -244,7 +298,7 @@ schedules, unbound memory documents, channel identities, backups, workspace row,
 or user row. Restore reconciliation and a deletion ledger remain separate P06
 gates. Do **not** claim full account deletion or backup erasure to users.
 
-## 8. Live qualification gaps (honest)
+## 9. Live qualification gaps (honest)
 
 These remain **unqualified** for Release-1 admission even when local installs
 build and synthetic tests pass:
@@ -263,6 +317,7 @@ and [product direction](product-direction.md).
 ## Related
 
 - [Infrastructure / Alchemy README](../infrastructure/README.md)
+- [Durable ingress (named tunnel + webhooks)](../infrastructure/ingress/README.md)
 - [Local runtime setup & evidence](local-runtime-setup.md)
 - [Companion blueprint](companion-blueprint.md)
 - [Quotas ADR](decisions/adr-quotas-admission-r1.md)

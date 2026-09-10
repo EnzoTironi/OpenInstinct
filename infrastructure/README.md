@@ -140,3 +140,11 @@ cloud deployment, backup, concurrent-deployment, or production qualification.
 Sources: [Docker provider](https://alchemy.run/docker/),
 [stages](https://alchemy.run/environments/stages),
 [published package manifest](https://github.com/alchemy-run/alchemy/blob/v2.0.0-beta.76/packages/alchemy/package.json).
+
+## Durable public HTTPS (Telegram / Kapso)
+
+Alchemy here provisions Postgres only. For always-on public HTTPS to
+`/api/channels/telegram` and `/api/channels/kapso`, use the named Cloudflare
+Tunnel + LaunchAgent recipe under [`ingress/`](ingress/README.md). Prefer that
+path over ephemeral `trycloudflare` tunnels. Webhook URL updates:
+`pnpm ingress:set-webhooks` (env names only; never prints secrets).

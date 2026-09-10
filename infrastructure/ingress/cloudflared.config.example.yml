@@ -1,0 +1,16 @@
+# Example named-tunnel ingress for Companion.
+# Prefer dashboard-managed routes with a token file + LaunchAgent when possible.
+# Do not put tunnel tokens or credentials in this file or in git.
+#
+# Token-mode LaunchAgents can omit this file. Use it when running with a local
+# credentials-file / tunnel UUID instead of TUNNEL_TOKEN.
+#
+# Replace COMPANION_INGRESS_HOSTNAME and keep the catch-all 404 last.
+
+tunnel: REPLACE_TUNNEL_UUID
+credentials-file: /Users/REPLACE/.cloudflared/REPLACE_TUNNEL_UUID.json
+
+ingress:
+  - hostname: companion.example.com
+    service: http://127.0.0.1:3000
+  - service: http_status:404
