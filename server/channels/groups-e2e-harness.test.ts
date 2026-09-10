@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import {
   runTelegramGroupMentionHarness,
@@ -7,6 +7,8 @@ import {
 } from "./groups-e2e-harness";
 import { parseKapsoWebhook } from "./kapso";
 import { bindGroupChannelIdentity } from "./group-policy";
+import telegramGroupMentionFixture from "./fixtures/telegram-group-mention.redacted.json";
+import kapsoGroupMentionFixture from "./fixtures/kapso-group-mention.redacted.json";
 
 const ARTIFACT_DIR = "/tmp/companion-groups-live-e2e";
 const installation = { botId: "123456", botUsername: "CompanionBot" };
@@ -15,17 +17,14 @@ const nowMs = 1_788_895_784_000;
 
 test("telegram group mention fixture → accept → bind (artifact)", async () => {
   mkdirSync(ARTIFACT_DIR, { recursive: true });
-  const update = JSON.parse(
-    readFileSync(
-      new URL(
-        "./fixtures/telegram-group-mention.redacted.json",
-        import.meta.url
-      ),
-      "utf8"
-    )
-  );
   // Fixture date must be within validateEventAge window relative to nowMs.
-  update.message.date = Math.floor(nowMs / 1000);
+  const update = {
+    ...telegramGroupMentionFixture,
+    message: {
+      ...telegramGroupMentionFixture.message,
+      date: Math.floor(nowMs / 1000),
+    },
+  };
   const result: TelegramGroupHarnessResult = await Effect.runPromise(
     runTelegramGroupMentionHarness({
       update,
@@ -84,7 +83,7 @@ test("telegram bare group chatter stays dropped", async () => {
       text: "casual chatter without a mention",
     },
   };
-  const result = await Effect.runPromise(
+  const result: TelegramGroupHarnessResult = await Effect.runPromise(
     runTelegramGroupMentionHarness({
       update,
       installation,
@@ -98,13 +97,13 @@ test("telegram bare group chatter stays dropped", async () => {
 
 test("kapso group opens only when mention signals exist; else stays closed", async () => {
   mkdirSync(ARTIFACT_DIR, { recursive: true });
-  const mentioned = JSON.parse(
-    readFileSync(
-      new URL("./fixtures/kapso-group-mention.redacted.json", import.meta.url),
-      "utf8"
-    )
-  );
-  mentioned.message.timestamp = String(Math.floor(nowMs / 1000));
+  const mentioned = {
+    ...kapsoGroupMentionFixture,
+    message: {
+      ...kapsoGroupMentionFixture.message,
+      timestamp: String(Math.floor(nowMs / 1000)),
+    },
+  };
   const kapsoInstallation = {
     phoneNumberId: "123456789",
     phoneNumber: "15550001111",
@@ -113,30 +112,30 @@ test("kapso group opens only when mention signals exist; else stays closed", asy
     parseKapsoWebhook(mentioned, kapsoInstallation, nowMs)
   );
   expect(opened).toHaveLength(1);
-  expect(opened[0]).toMatchObject({
+  const openedEvent = opened[0];
+  expect(openedEvent).toMatchObject({
     kind: "message",
     chatKind: "group",
     chatId: "group-id-redacted",
     senderId: "15550002222",
   });
+  if (openedEvent?.kind !== "message" || openedEvent.chatId === undefined) {
+    throw new Error("expected opened kapso group message with chatId");
+  }
   const binding = await Effect.runPromise(
     bindGroupChannelIdentity({
       identityId,
       channel: "kapso",
-      installationId: opened[0]!.installationId,
-      senderId: opened[0]!.senderId,
-      chatId: opened[0]!.chatId!,
+      installationId: openedEvent.installationId,
+      senderId: openedEvent.senderId,
+      chatId: openedEvent.chatId,
     })
   );
   expect(binding.conversationScope).toBe(
     "group:kapso:123456789:group-id-redacted"
   );
 
-  const {
-    mentions: _mentions,
-    mentioned_ids: _mentionedIds,
-    ...messageWithoutMentions
-  } = mentioned.message;
+  const { mentions: _mentions, ...messageWithoutMentions } = mentioned.message;
   const closed = await Effect.runPromise(
     parseKapsoWebhook(
       {

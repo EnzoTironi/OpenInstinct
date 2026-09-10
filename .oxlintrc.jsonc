@@ -22,7 +22,11 @@
     "suspicious": "error",
     "perf": "error"
   },
-  "ignorePatterns": ["tools/oxlint/anti-slop/**"],
+  "ignorePatterns": [
+    "tools/oxlint/anti-slop/**",
+    // Manual live TG Bot API probe; fixture harness is the CI proof.
+    "scripts/groups-live-e2e.ts"
+  ],
   "jsPlugins": [
     "./tools/oxlint/architecture/index.ts",
     "./tools/oxlint/anti-slop/index.ts",
