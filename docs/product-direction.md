@@ -14,8 +14,9 @@ decision, and receive a useful result. The product remembers enough to make the
 next interaction easier. It stays quiet when it has nothing useful to add.
 
 WhatsApp and Telegram are the front door. The same assistant works through both.
-Effect, Eve, Kernel, MCP and ontology are implementation choices supporting that
-promise. They should not become the onboarding curriculum.
+Effect, Eve, Kernel and MCP are implementation choices supporting that promise.
+They should not become the onboarding curriculum. Operational ontology (Worlds)
+lives in [Operon](https://github.com/EnzoTironi/operon), not Companion.
 
 ## The critique of our plan
 
