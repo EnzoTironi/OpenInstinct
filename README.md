@@ -17,7 +17,7 @@ patterns.
 
 ## Run locally
 
-**Self-host / ops (Release-1):** see [docs/self-host.md](docs/self-host.md) for
+**Self-host / ops (Release-1):** see [docs/self-host.md](docs/self-host.md) and R2 checklists under [docs/ops/](docs/ops/README.md) for
 Alchemy `local`/`dev`/`staging`, install/migrate/run, `.env.local` **names**,
 Telegram/Google/Kapso pointers, Graphile fencing / SIGKILL, quotas ADR, account
 delete limits, and live qualification gaps.

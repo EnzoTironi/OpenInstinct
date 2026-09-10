@@ -228,6 +228,8 @@ Infrastructure-only (under `infrastructure/.env` / `infrastructure/ingress/.env`
    [ADR Kapso path R1](decisions/adr-kapso-path-r1.md). Adapter/webhook private
    delivery may proceed; full WhatsApp product activation (templates, messaging
    window, live redirect, login parity) remains follow-up work.
+6. R2 Meta gates (Enzo): display-name approval + ≥1 APPROVED **UTILITY**
+   template via Kapso — see [O02 checklist](ops/whatsapp-meta-activation.md).
 
 ## 5. Durable public HTTPS ingress (not trycloudflare)
 
@@ -249,7 +251,9 @@ blocker notes:
 `app.zoen.space` may already exist as Fly DNS for Zoen product traffic. Until
 Enzo points a Companion hostname at the named tunnel, treat live DNS/tunnel
 credentials as a **blocker**: ship docs/scripts/config, keep provider webhooks
-on their prior targets, and do not force-redirect production channels.
+on their prior targets, and do not force-redirect production channels. Enzo
+checklist: [enzo-live-actions.md](ops/enzo-live-actions.md) (DNS + `@ZoenOSBot`
+group mention for live G03).
 
 ## 6. Graphile lease fencing / SIGKILL
 
@@ -330,6 +334,19 @@ live channels, hosted billing/entitlements, and any claim of production pilot
 readiness. Track evidence in [local-runtime-setup.md](local-runtime-setup.md)
 and [product direction](product-direction.md).
 
+## 10. R2 ops checklists (O01 / O02)
+
+Remaining R2 operator work toward 100% (Enzo executes secrets / Meta / DNS):
+
+| ID  | Doc                                                                 | What |
+| --- | -------------------------------------------------------------------- | ---- |
+| O01 | [Credential rotation (F01)](ops/credential-rotation.md)              | Env **names**, rotate order, verify — never secret values |
+| O02 | [WhatsApp Meta + Kapso](ops/whatsapp-meta-activation.md)             | Display-name approval, ≥1 UTILITY template, D01 webhook script |
+| —   | [Enzo live blockers](ops/enzo-live-actions.md)                       | DNS hostname→named tunnel; add `@ZoenOSBot` + mention for live G03 |
+
+Index: [docs/ops/](ops/README.md). ADR:
+[adr-o01-o02-ops-r2.md](decisions/adr-o01-o02-ops-r2.md).
+
 ## Related
 
 - [Infrastructure / Alchemy README](../infrastructure/README.md)
@@ -338,5 +355,8 @@ and [product direction](product-direction.md).
 - [Companion blueprint](companion-blueprint.md)
 - [Quotas ADR](decisions/adr-quotas-admission-r1.md)
 - [Kapso path ADR](decisions/adr-kapso-path-r1.md)
+- [R2 ops checklists (O01/O02)](ops/README.md)
+- [Ops ADR O01/O02](decisions/adr-o01-o02-ops-r2.md)
+- [G03 groups live e2e ADR](decisions/adr-g03-groups-live-e2e.md)
 - [Account controls](../server/accounts/README.md)
 - Root [README](../README.md) quickstart
