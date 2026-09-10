@@ -168,3 +168,16 @@ mutating memory tool result is present without a pending refresh. A later
   memory tool callbacks and tool loop (`PendingMemoryToolRefresh`).
 
 Evidence: `agent/lib/tests/personal-memory-recall-refresh.test.ts`.
+
+## Group vs personal memory boundary (G02)
+
+Group-scoped sessions use G01 `conversationScope =
+group:<channel>:<installation>:<chatId>`. Those sessions **must not** freely
+read or bind personal profile memory. Gates live in
+`group-memory-policy.ts` and are wired into `authorizePersonalMemoryContext`,
+profile recall/update controls, the native inspect tool, and personal wipe.
+
+Shared-group memory is a **stub** keyed by `conversationScope` (empty
+projection, `personalProjection: null`). Personal wipe covers only
+structured profile + bound profile notes and explicitly never shared-group
+keys. See `docs/decisions/adr-g02-groups-memory-policy.md`.
