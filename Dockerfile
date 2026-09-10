@@ -41,7 +41,9 @@ RUN corepack enable && corepack prepare pnpm@11.24.0 --activate \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app /app
-RUN chmod +x /app/scripts/fly-entrypoint.sh
+RUN chmod +x /app/scripts/fly-entrypoint.sh \
+  && node -e "require.resolve('just-bash')"
+# Eve optional peer: just-bash (bash tool / sandbox). Fail the image build if missing.
 # Next binds all families for Fly proxy/health (IPv6); Eve stays on loopback.
 # Entrypoint materializes CHATGPT_AUTH_JSON / CODEX_AUTH_JSON then pnpm start.
 EXPOSE 3000

@@ -146,7 +146,7 @@ Repo files:
 | File                                                                                             | Role                                                                                       |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | [`fly.toml`](../../fly.toml)                                                                     | Always-on HTTP on :3000 (`gru`); TCP `checks.alive` (avoid HTTP 307 health fails)          |
-| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next build; `CMD` → `scripts/fly-entrypoint.sh` then `pnpm start` |
+| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next; `just-bash` resolve check; `CMD` → `fly-entrypoint.sh`      |
 | [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh)                                   | Materialize Codex/ChatGPT auth secrets then `exec pnpm start`                              |
 | [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh)                                     | `validate` / `status` / `deploy-dry` / `secrets-check`                                     |
 | [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh)                                   | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify`   |
@@ -232,6 +232,21 @@ Refresh from the Mac operator machine (values never committed / never printed):
 
 A plain `CMD ["pnpm", "start", …]` without the entrypoint drops these files on
 redeploy even when the Fly secrets remain set.
+
+If a Machine still has an inline `init.cmd` override (e.g. from a one-off
+`fly machine update -C '…'`), clear it after deploying an image that includes
+`scripts/fly-entrypoint.sh` so the image `CMD` wins:
+
+```sh
+fly machine update <machine-id> -a companion-tironi -C '' -y
+```
+
+### Eve bash sandbox (`just-bash`)
+
+Eve treats `just-bash` as an **optional peer**. Without it, the agent `bash`
+tool fails at runtime (`Cannot find package 'just-bash'`). Companion installs
+`just-bash` as a runtime dependency; the Dockerfile runner stage asserts
+`require.resolve('just-bash')` so a missing peer fails the image build.
 
 ## Cutover Mac → Fly (keep `companion.tironi.xyz`)
 
