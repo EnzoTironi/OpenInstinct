@@ -15,7 +15,8 @@ Usage: scripts/fly-companion.sh <validate|status|deploy-dry|secrets-check>
   secrets-check  list Fly secret *names* only (fly secrets list)
 
 Does not migrate live traffic, destroy Mac LaunchAgents, or rotate F01.
-Postgres remains Alchemy Docker (see docs/ops/hosted-fly.md) — not Fly MPG.
+Postgres: Alchemy Docker (A/B) or Alchemy Fly.Machine unmanaged PG (C);
+see docs/ops/hosted-fly.md + scripts/fly-alchemy-pg.sh — not Fly MPG.
 USAGE
 }
 

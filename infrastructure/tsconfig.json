@@ -9,5 +9,9 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["alchemy.run.ts", "companion-stage.ts"]
+  "include": [
+    "alchemy.run.ts",
+    "alchemy.fly-postgres.run.ts",
+    "companion-stage.ts"
+  ]
 }

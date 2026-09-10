@@ -238,12 +238,23 @@ Sources: [Docker provider](https://alchemy.run/docker/),
 
 ## Hosted Fly compute (H01)
 
-Alchemy in this package still provisions **Docker Postgres only** (no Fly
-Managed Postgres). For always-on **Next+Eve on Fly** while keeping these
-Alchemy stages, follow
+Two Alchemy Postgres providers share `CompanionStagePolicy` database names
+(`open_instinct_<stage>`). **Neither** is Fly Managed Postgres / Alchemy
+`Fly.Postgres` MPG:
+
+| Path                     | Entry                                                        | When                                                |
+| ------------------------ | ------------------------------------------------------------ | --------------------------------------------------- |
+| Docker (A/B)             | [`alchemy.run.ts`](alchemy.run.ts)                           | Mac / prosumer / WireGuard host                     |
+| Fly.Machine + volume (C) | [`alchemy.fly-postgres.run.ts`](alchemy.fly-postgres.run.ts) | Off-Mac; private `.internal` for `companion-tironi` |
+
+Option C operator script: [`../scripts/fly-alchemy-pg.sh`](../scripts/fly-alchemy-pg.sh)
+(`plan` / `deploy` / `status` / `url-shape` / `verify`). Root shortcuts:
+`pnpm infra:fly-pg:plan:prod`, `pnpm infra:fly-pg:deploy:prod`.
+
+For always-on **Next+Eve on Fly**, follow
 [`docs/ops/hosted-fly.md`](../docs/ops/hosted-fly.md) (`fly.toml`, root
-`Dockerfile`, `scripts/fly-companion.sh`). Mac LaunchAgent + this stack remain
-valid for optional local/prosumer mode.
+`Dockerfile`, `scripts/fly-companion.sh`). Mac LaunchAgent + Docker Alchemy
+remain valid for optional local/prosumer mode.
 
 ## Durable public HTTPS (Telegram / Kapso)
 

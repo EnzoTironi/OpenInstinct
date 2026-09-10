@@ -4,12 +4,12 @@ Operator recipe so Companion can leave **Mac-only** hosting for consumer /
 prosumer installs, while keeping the **Mac LaunchAgent** path as an optional
 local / prosumer mode.
 
-| Layer              | Choice                                                                                                                  |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Compute            | **Fly Machines** (`fly.toml` + root `Dockerfile`) running `pnpm start`                                                  |
-| Postgres           | **Alchemy Docker** (`infrastructure/alchemy.run.ts` + stage policy) — **not** Fly Managed Postgres / `Fly.Postgres` MPG |
-| Public HTTPS / DNS | **Cloudflare** named tunnel for `companion.tironi.xyz` (TG + Kapso)                                                     |
-| Local optional     | Mac LaunchAgent + Alchemy on Docker Desktop (`scripts/launch-companion-prod.sh`)                                        |
+| Layer              | Choice                                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Compute            | **Fly Machines** (`fly.toml` + root `Dockerfile`) running `pnpm start`                                                                                                         |
+| Postgres           | **Alchemy unmanaged** — Docker (`alchemy.run.ts`) **or** Fly.Machine+volume (`alchemy.fly-postgres.run.ts`) + stage policy — **not** Fly Managed Postgres / `Fly.Postgres` MPG |
+| Public HTTPS / DNS | **Cloudflare** named tunnel for `companion.tironi.xyz` (TG + Kapso)                                                                                                            |
+| Local optional     | Mac LaunchAgent + Alchemy on Docker Desktop (`scripts/launch-companion-prod.sh`)                                                                                               |
 
 Never commit secrets, print secret values, force-push `main`, destroy Mac prod
 blindly, or rotate F01 from this recipe.
@@ -36,7 +36,8 @@ Fly Machine (this repo Dockerfile)
   Next :3000 (0.0.0.0)  ──rewrite──►  Eve :4274 (127.0.0.1)
        │
        ▼
-DATABASE_URL ──► Alchemy Docker Postgres (stage prod/staging/…)
+DATABASE_URL ──► Alchemy unmanaged Postgres
+                 (Docker A/B on host, or Fly.Machine+volume option C)
 ```
 
 - Channel webhooks still hit Next `/api/channels/{telegram,kapso}` and rewrite
@@ -78,22 +79,77 @@ Same Alchemy program; Docker context is a VPS/host near `gru` (or your
 `primary_region`). Publish Postgres only on a private interface / WireGuard /
 Tailscale — not the public Internet. Wire `DATABASE_URL*` the same way.
 
-### C) Not in this PR — Alchemy `Fly.Machine` + volume
+### C) Preferred for true off-Mac — Alchemy `Fly.Machine` + volume
 
-A future option is Alchemy-managed **unmanaged** Postgres via `Fly.App` +
-`Fly.Machine` (`postgres:17-alpine`) + volume mounts, still matching
-`CompanionStagePolicy` database names. That is **not** MPG. Until that stack
-lands, use A/B with the existing `alchemy.run.ts` Docker provider.
+Alchemy-managed **unmanaged** Postgres on the Fly private network:
+
+| Piece          | Choice                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Stack entry    | [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts)                                     |
+| Resources      | `Fly.App` + `Fly.Secret(POSTGRES_PASSWORD)` + `Fly.Machine` (`postgres:17-alpine`) + volume mount at `/data` (`PGDATA=/data/pgdata`) |
+| Database names | Same `CompanionStagePolicy` as Docker (`open_instinct_<stage>`)                                                                      |
+| Network        | **No** public proxy services — reachable only via 6PN / `.internal`                                                                  |
+| Explicitly not | Fly Managed Postgres / `fly mpg` / Alchemy `Fly.Postgres` MPG                                                                        |
+
+Operator commands (secrets never printed):
+
+```sh
+# One-time: infrastructure/.env has COMPANION_POSTGRES_PASSWORD (name only in docs).
+# Auth: FLY_API_TOKEN or `alchemy login` / `fly auth`.
+# Optional overrides: COMPANION_FLY_PG_REGION=gru (default), COMPANION_FLY_PG_VOLUME_GB=10,
+# COMPANION_FLY_PG_APP_NAME=companion-pg-prod (default companion-pg-<stage>).
+
+pnpm --dir infrastructure install --frozen-lockfile
+./scripts/fly-alchemy-pg.sh plan --stage prod
+./scripts/fly-alchemy-pg.sh deploy --stage prod
+# or: pnpm infra:fly-pg:deploy:prod
+
+./scripts/fly-alchemy-pg.sh status --stage prod
+./scripts/fly-alchemy-pg.sh url-shape --stage prod
+# → DATABASE_URL shape:
+# postgresql://postgres:<url-encoded-password>@companion-pg-prod.internal:5432/open_instinct_prod?sslmode=disable
+
+# After companion-tironi Machines exist (same Fly org):
+./scripts/fly-alchemy-pg.sh verify --stage prod
+```
+
+Wire compute secrets (values from your store — do not paste into git/PRs):
+
+```sh
+# Shape only — replace password locally; host/db from url-shape:
+# fly secrets set -a companion-tironi \
+#   DATABASE_URL='postgresql://postgres:<url-encoded-password>@companion-pg-prod.internal:5432/open_instinct_prod?sslmode=disable' \
+#   DATABASE_URL_UNPOOLED='postgresql://postgres:<url-encoded-password>@companion-pg-prod.internal:5432/open_instinct_prod?sslmode=disable'
+./scripts/fly-companion.sh secrets-check
+```
+
+Migrate from a host that can reach the PG app (WireGuard peer, or `fly ssh`
+on compute after secrets are set):
+
+```sh
+pnpm db:migrate
+pnpm workflow:migrate
+```
+
+**A/B remain valid** for prosumer / Mac-local Docker. Use C when Fly compute
+must not depend on Mac `127.0.0.1` and you want Alchemy stage naming without MPG.
+
+Honest limits: this is a single-node unmanaged Postgres Machine (you operate
+restarts/disk). Alchemy `RemovalPolicy.retain` applies on destroy for `prod`
+the same policy idea as Docker volumes — still treat destroy as dangerous.
+Scheduled Fly volume snapshots default on for the mount.
 
 ## Fly app recipe (compute)
 
 Repo files:
 
-| File                                                         | Role                                                   |
-| ------------------------------------------------------------ | ------------------------------------------------------ |
-| [`fly.toml`](../../fly.toml)                                 | Always-on HTTP service on port 3000, region `gru`      |
-| [`Dockerfile`](../../Dockerfile)                             | Multi-stage Node 24; `pnpm build` then `pnpm start`    |
-| [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh) | `validate` / `status` / `deploy-dry` / `secrets-check` |
+| File                                                                                             | Role                                                                                     |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| [`fly.toml`](../../fly.toml)                                                                     | Always-on HTTP service on port 3000, region `gru`                                        |
+| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; `pnpm build` then `pnpm start`                                      |
+| [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh)                                     | `validate` / `status` / `deploy-dry` / `secrets-check`                                   |
+| [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh)                                   | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify` |
+| [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) | Alchemy stack: Fly.App + Machine + volume (not MPG)                                      |
 
 ### One-time app create (operator)
 
@@ -109,18 +165,18 @@ fly apps create companion-tironi --org personal
 Minimum for a standing Companion (see [self-host](../self-host.md) for the full
 table):
 
-| Secret name                                      | Notes                                                             |
-| ------------------------------------------------ | ----------------------------------------------------------------- |
-| `DATABASE_URL`                                   | Alchemy stage DB (reachable host, not Mac-only loopback from Fly) |
-| `DATABASE_URL_UNPOOLED`                          | Same DB; migrate-friendly                                         |
-| `BETTER_AUTH_SECRET`                             | ≥32 chars                                                         |
-| `BETTER_AUTH_URL`                                | `https://companion.tironi.xyz` (keep hostname through cutover)    |
-| `COMPANION_PUBLIC_BASE_URL`                      | Same public origin                                                |
-| `SECRET_ENCRYPTION_KEY`                          | base64 32-byte; **do not rotate casually** (F01)                  |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` | Existing bot                                                      |
-| `KAPSO_*`                                        | Existing Kapso phone / webhook secrets                            |
-| `WORKFLOW_LOCAL_BASE_URL`                        | `http://127.0.0.1:4274` (Eve stays loopback in the Machine)       |
-| Model / Blob / Google / Kernel                   | As required by the install profile                                |
+| Secret name                                      | Notes                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                   | Alchemy stage DB — for option C use `<pg-app>.internal` (see `url-shape`); not Mac loopback |
+| `DATABASE_URL_UNPOOLED`                          | Same DB; migrate-friendly                                                                   |
+| `BETTER_AUTH_SECRET`                             | ≥32 chars                                                                                   |
+| `BETTER_AUTH_URL`                                | `https://companion.tironi.xyz` (keep hostname through cutover)                              |
+| `COMPANION_PUBLIC_BASE_URL`                      | Same public origin                                                                          |
+| `SECRET_ENCRYPTION_KEY`                          | base64 32-byte; **do not rotate casually** (F01)                                            |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` | Existing bot                                                                                |
+| `KAPSO_*`                                        | Existing Kapso phone / webhook secrets                                                      |
+| `WORKFLOW_LOCAL_BASE_URL`                        | `http://127.0.0.1:4274` (Eve stays loopback in the Machine)                                 |
+| Model / Blob / Google / Kernel                   | As required by the install profile                                                          |
 
 ```sh
 # Example shape only — values come from your secret store, not this doc:
@@ -151,7 +207,7 @@ retargeted and health-checked.
 Goal: **same** public hostname so Telegram + Kapso webhooks do not need a URL
 change if the tunnel origin alone moves.
 
-1. **Prep** — Alchemy `prod` (or `staging` rehearsal) healthy; Fly secrets set;
+1. **Prep** — Alchemy unmanaged `prod` PG healthy (option C `deploy` + `verify`, or A/B reachable); Fly secrets set;
    `./scripts/fly-companion.sh validate` OK; optional `deploy-dry` OK.
 2. **Deploy compute** — `fly deploy` once; confirm `https://<app>.fly.dev`
    returns the app (unsigned channel POST → **401**, not 502).
@@ -192,6 +248,11 @@ must sleep or leave the critical path.
 ./scripts/fly-companion.sh status          # after app exists
 ./scripts/fly-companion.sh secrets-check   # names only
 ./scripts/fly-companion.sh deploy-dry      # remote build only
+
+# Option C Postgres (unmanaged Alchemy Fly.Machine — not MPG):
+./scripts/fly-alchemy-pg.sh status --stage prod
+./scripts/fly-alchemy-pg.sh url-shape --stage prod
+./scripts/fly-alchemy-pg.sh verify --stage prod
 ```
 
 ## Related
