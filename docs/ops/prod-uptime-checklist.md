@@ -30,7 +30,6 @@ traffic. Prefer Fly `companion-cf-tunnel` for the named-tunnel connector (see
 [ingress README](../../infrastructure/ingress/README.md)); keep the Mac
 `companion-cloudflared` plist on disk for rollback only.
 
-
 ## External uptime + push alert (required)
 
 **Manual curl / `fly status` alone is not enough.** Prod needs something that
@@ -38,11 +37,11 @@ watches the public path and **pushes** on failure (phone / email / chat).
 
 ### What we chose (no new paid SaaS)
 
-| Option | Status |
-| ------ | ------ |
-| Fly.io native notify on machine health failure | **Unavailable** — Fly has no `fly notifications` / push on failing `[checks]`; health checks affect routing only |
-| Better Stack / UptimeRobot free API | **Blocked** — no API tokens / account credentials present in this environment; do not invent accounts from a worker |
-| Tiny probe + schedule + push sink | **Shipped** — see below |
+| Option                                         | Status                                                                                                              |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Fly.io native notify on machine health failure | **Unavailable** — Fly has no `fly notifications` / push on failing `[checks]`; health checks affect routing only    |
+| Better Stack / UptimeRobot free API            | **Blocked** — no API tokens / account credentials present in this environment; do not invent accounts from a worker |
+| Tiny probe + schedule + push sink              | **Shipped** — see below                                                                                             |
 
 ### Probe
 
@@ -55,12 +54,12 @@ Checks `https://companion.tironi.xyz/welcome` → **200** and unsigned Telegram 
 Kapso channel POSTs → **401**. On failure exits **1** and pushes if a sink is
 configured:
 
-| Env name (value never in git) | Sink |
-| ----------------------------- | ---- |
-| `COMPANION_UPTIME_ALERT_URL` | Generic `POST` text/plain webhook |
-| `COMPANION_UPTIME_NTFY_TOPIC` | Free [ntfy.sh](https://ntfy.sh) topic (subscribe in the ntfy app) |
-| (Darwin, no env) | macOS Notification Center fallback |
-| (none) | Rely on process exit — cron mail / GitHub Actions failure notification |
+| Env name (value never in git) | Sink                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `COMPANION_UPTIME_ALERT_URL`  | Generic `POST` text/plain webhook                                      |
+| `COMPANION_UPTIME_NTFY_TOPIC` | Free [ntfy.sh](https://ntfy.sh) topic (subscribe in the ntfy app)      |
+| (Darwin, no env)              | macOS Notification Center fallback                                     |
+| (none)                        | Rely on process exit — cron mail / GitHub Actions failure notification |
 
 ### Schedulers (install at least one external)
 

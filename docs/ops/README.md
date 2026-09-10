@@ -4,13 +4,13 @@ Operator-facing checklists for remaining Release-2 (R2) ops toward 100%.
 **Enzo executes secrets / Meta / DNS / live Telegram group actions.** Workers ship
 docs and scripts only — never secret values in git, PRs, logs, or chat.
 
-| ID  | Checklist                                                                    | Owner             |
-| --- | ---------------------------------------------------------------------------- | ----------------- |
+| ID  | Checklist                                                                                                              | Owner             |
+| --- | ---------------------------------------------------------------------------------------------------------------------- | ----------------- |
 | O01 | [Credential rotation (F01)](credential-rotation.md) — names, order, verify; **SECRET_ENCRYPTION_KEY plan (docs only)** | Enzo (secrets)    |
-| O02 | [WhatsApp Meta + Kapso activation](whatsapp-meta-activation.md)              | Enzo (Meta/Kapso) |
-| —   | [Enzo live blockers](enzo-live-actions.md) (DNS + G03 Telegram group)        | Enzo only         |
-| H01 | [Hosted Fly cutover](hosted-fly.md) — Alchemy Docker PG + Fly compute        | Enzo (deploy/DNS) |
-| —   | [Prod uptime + backup](prod-uptime-checklist.md) — **push alert** + health, pg_dump, rollback | Ops / Enzo        |
+| O02 | [WhatsApp Meta + Kapso activation](whatsapp-meta-activation.md)                                                        | Enzo (Meta/Kapso) |
+| —   | [Enzo live blockers](enzo-live-actions.md) (DNS + G03 Telegram group)                                                  | Enzo only         |
+| H01 | [Hosted Fly cutover](hosted-fly.md) — Alchemy Docker PG + Fly compute                                                  | Enzo (deploy/DNS) |
+| —   | [Prod uptime + backup](prod-uptime-checklist.md) — **push alert** + health, pg_dump, rollback                          | Ops / Enzo        |
 
 **Ingress status (2026-09-10 ~16:50 PT):** Companion channel public base is interim
 `https://companion.tironi.xyz` (named tunnel still Mac `companion-cloudflared`;

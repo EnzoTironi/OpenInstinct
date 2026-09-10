@@ -128,13 +128,13 @@ is the standing operator plan for when Enzo authorizes a real cutover.
 
 ### Current crypto shape (as of 2026-09-10)
 
-| Fact | Detail |
-| ---- | ------ |
-| Key env | `SECRET_ENCRYPTION_KEY` — base64 → **exactly 32 bytes** (`shared/environment/env.ts`) |
-| Algorithm | AES-256-GCM via `db/services/vault.ts` (`encryptVaultSecret` / `decryptVaultSecret`) |
-| Ciphertext format | `v1.<iv_b64url>.<tag_b64url>.<ciphertext_b64url>` — `v1` is **format** version, **not** a key id |
-| AAD | `workspaceId \0 vault \0 id` |
-| Storage | Postgres table `encrypted_secrets` (`namespace = 'vault'` only today) |
+| Fact               | Detail                                                                                               |
+| ------------------ | ---------------------------------------------------------------------------------------------------- |
+| Key env            | `SECRET_ENCRYPTION_KEY` — base64 → **exactly 32 bytes** (`shared/environment/env.ts`)                |
+| Algorithm          | AES-256-GCM via `db/services/vault.ts` (`encryptVaultSecret` / `decryptVaultSecret`)                 |
+| Ciphertext format  | `v1.<iv_b64url>.<tag_b64url>.<ciphertext_b64url>` — `v1` is **format** version, **not** a key id     |
+| AAD                | `workspaceId \0 vault \0 id`                                                                         |
+| Storage            | Postgres table `encrypted_secrets` (`namespace = 'vault'` only today)                                |
 | Dual-key / keyring | **Not implemented** — runtime loads a single key from env (or Blob-provisioned installation secrets) |
 
 Consequence: flipping the env to a new key **without** rewriting every
@@ -185,7 +185,6 @@ Consequence: flipping the env to a new key **without** rewriting every
 - No live `fly secrets set SECRET_ENCRYPTION_KEY=…`
 - No ciphertext rewrite
 - No dual-key code in this change
-
 
 ## Related Enzo blockers
 
