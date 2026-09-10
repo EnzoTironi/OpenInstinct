@@ -5,11 +5,7 @@ const companyRoleSchema = Schema.Literals(["admin", "member"]);
 export type CompanyRole = typeof companyRoleSchema.Type;
 
 /** Workspace membership roles including personal `owner`. */
-const workspaceRoleSchema = Schema.Literals([
-  "owner",
-  "admin",
-  "member",
-]);
+const workspaceRoleSchema = Schema.Literals(["owner", "admin", "member"]);
 export type WorkspaceRole = typeof workspaceRoleSchema.Type;
 
 export class RbacDenied extends Schema.TaggedError<RbacDenied>()("RbacDenied", {
