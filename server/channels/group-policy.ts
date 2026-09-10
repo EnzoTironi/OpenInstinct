@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { ProviderReferenceSchema } from "./inbound";
 
-export const ChatKindSchema = Schema.Literals(["private", "group"]);
+const ChatKindSchema = Schema.Literals(["private", "group"]);
 export type ChatKind = typeof ChatKindSchema.Type;
 
 export interface GroupMentionSignals {
@@ -70,7 +70,7 @@ export const telegramTextMentionsBot = (
   return false;
 };
 
-export const GroupIdentityBindingSchema = Schema.Struct({
+const GroupIdentityBindingSchema = Schema.Struct({
   identityId: Schema.String.check(Schema.isUUID()),
   channel: Schema.Literals(["telegram", "kapso"]),
   installationId: ProviderReferenceSchema,
@@ -85,7 +85,6 @@ export const GroupIdentityBindingSchema = Schema.Struct({
   /** Outbound target is the group chat, never the private sender DM. */
   deliveryTargetId: ProviderReferenceSchema,
 });
-export type GroupIdentityBinding = typeof GroupIdentityBindingSchema.Type;
 
 /**
  * Bind a group conversation to an already-linked private `channel_identity`.
