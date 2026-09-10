@@ -28,7 +28,7 @@ processes = ["app"]
 [[http_service.checks]]
 interval = "15s"
 timeout = "5s"
-grace_period = "90s"
+grace_period = "60s"
 method = "GET"
 # Prefer a static 200 over `/` (auth redirect 307) for proxy health.
 path = "/icon"
