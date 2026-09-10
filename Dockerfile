@@ -41,6 +41,8 @@ RUN corepack enable && corepack prepare pnpm@11.24.0 --activate \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app /app
+RUN chmod +x /app/scripts/fly-entrypoint.sh
 # Next binds all families for Fly proxy/health (IPv6); Eve stays on loopback.
+# Entrypoint materializes CHATGPT_AUTH_JSON / CODEX_AUTH_JSON then pnpm start.
 EXPOSE 3000
-CMD ["pnpm", "start", "--port", "3000", "--hostname", "::", "--eve-port", "4274"]
+CMD ["/app/scripts/fly-entrypoint.sh"]
