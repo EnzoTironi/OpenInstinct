@@ -17,7 +17,7 @@ import { CompanionStagePolicy } from "./companion-stage.ts";
  * `postgresql://postgres:<password>@<appName>.internal:5432/<database>?sslmode=disable`.
  *
  * Never log or return secret values — only stage metadata, app/machine
- * names, and URL *shapes* with placeholders.
+ * names, and DATABASE_URL templates with placeholders.
  */
 export default Alchemy.Stack(
   "CompanionFlyPostgres",
@@ -87,8 +87,9 @@ export default Alchemy.Stack(
       },
     }).pipe(RemovalPolicy.retain(policy.retainPostgresData));
 
-    const internalHost = `${app.appName}.internal`;
-    const urlShape = `postgresql://postgres:<url-encoded-password>@${internalHost}:5432/${policy.database}?sslmode=disable`;
+    // Use the plain configured app name (not Alchemy Output) for DNS templates.
+    const internalHost = `${appName}.internal`;
+    const databaseUrlTemplate = `postgresql://postgres:<url-encoded-password>@${internalHost}:5432/${policy.database}?sslmode=disable`;
 
     return {
       provider: "fly-machine-unmanaged-postgres",
@@ -99,7 +100,7 @@ export default Alchemy.Stack(
       database: policy.database,
       envFileHint: policy.envFileHint,
       retainPostgresData: policy.retainPostgresData,
-      appName: app.appName,
+      appName,
       region,
       machineId: machine.machineId,
       machineState: machine.state,
@@ -107,8 +108,8 @@ export default Alchemy.Stack(
       volumeSizeGb,
       internalHost,
       internalPort: 5432,
-      databaseUrlShape: urlShape,
-      databaseUrlUnpooledShape: urlShape,
+      databaseUrlTemplate,
+      databaseUrlUnpooledTemplate: databaseUrlTemplate,
     };
   }).pipe(Effect.provide(CompanionStagePolicy.layer))
 );
