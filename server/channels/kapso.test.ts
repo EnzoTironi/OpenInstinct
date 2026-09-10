@@ -93,7 +93,7 @@ test("normalizes media references and login commands without media URLs or raw t
   expect(command[0]).not.toHaveProperty("token");
 });
 
-test("ignores status/outbound/group/system events and rejects unsupported ID-only identity", async () => {
+test("ignores status/outbound/unmentioned-group/system events and rejects unsupported ID-only identity", async () => {
   expect(
     await parse({
       ...base,
@@ -261,4 +261,45 @@ test("accepts the live inbound delivery with null context and delivered status",
     senderId: "15550002222",
     installationId: "123456789",
   });
+});
+
+test("kapso group mention signals open ingress; bare group stays closed", async () => {
+  const { phone_number: _peerPhone, ...groupConversation } = base.conversation;
+  const groupBase = {
+    ...base,
+    conversation: {
+      ...groupConversation,
+      id: "conv-group",
+      is_group: true,
+      type: "group",
+    },
+    message: {
+      ...baseMessage,
+      group_id: "wa-group-1",
+      to: installation.phoneNumber,
+      kapso: {
+        ...baseMessage.kapso,
+        mentioned_business: true,
+      },
+    },
+  };
+  const opened = await parse(groupBase);
+  expect(opened).toHaveLength(1);
+  expect(opened[0]).toMatchObject({
+    chatKind: "group",
+    chatId: "wa-group-1",
+  });
+  expect(
+    await parse({
+      ...groupBase,
+      message: {
+        ...groupBase.message,
+        kapso: {
+          direction: "inbound",
+          status: "received",
+          origin: "cloud_api",
+        },
+      },
+    })
+  ).toEqual([]);
 });

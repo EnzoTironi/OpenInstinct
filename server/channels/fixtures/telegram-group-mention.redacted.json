@@ -1,0 +1,11 @@
+{
+  "update_id": 900001,
+  "message": {
+    "message_id": 42,
+    "date": 1788895784,
+    "from": { "id": 789012, "is_bot": false },
+    "chat": { "id": -1001234567890, "type": "supergroup" },
+    "text": "hey @CompanionBot summarize this thread",
+    "entities": [{ "type": "mention", "offset": 4, "length": 14 }]
+  }
+}

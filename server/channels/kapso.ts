@@ -18,7 +18,11 @@ import {
   validateEventAge,
   type InboundEvent,
 } from "./inbound";
-import { detectKapsoChatKind } from "./group-policy";
+import {
+  detectKapsoChatKind,
+  evaluateGroupMentionPolicy,
+  extractKapsoGroupMentionSignals,
+} from "./group-policy";
 import {
   ProviderInputError,
   ProviderUncertain,
@@ -50,7 +54,21 @@ const message = Schema.Struct({
   from: Schema.optionalKey(Schema.String),
   to: Schema.optionalKey(Schema.String),
   text: Schema.optionalKey(Schema.Struct({ body: Schema.String })),
-  context: Schema.optionalKey(Schema.NullOr(Schema.Struct({ id: messageId }))),
+  context: Schema.optionalKey(
+    Schema.NullOr(
+      Schema.Struct({
+        id: messageId,
+        from_me: Schema.optionalKey(Schema.Boolean),
+      })
+    )
+  ),
+  group_id: Schema.optionalKey(ProviderReferenceSchema),
+  mentions: Schema.optionalKey(
+    Schema.Array(Schema.String).check(Schema.isMaxLength(32))
+  ),
+  mentioned_ids: Schema.optionalKey(
+    Schema.Array(Schema.String).check(Schema.isMaxLength(32))
+  ),
   image: Schema.optionalKey(media),
   document: Schema.optionalKey(media),
   audio: Schema.optionalKey(media),
@@ -60,6 +78,9 @@ const message = Schema.Struct({
     direction: Schema.String,
     status: Schema.String,
     origin: Schema.optionalKey(Schema.String),
+    mentioned: Schema.optionalKey(Schema.Boolean),
+    mentioned_business: Schema.optionalKey(Schema.Boolean),
+    reply_to_business: Schema.optionalKey(Schema.Boolean),
     media_data: Schema.optionalKey(
       Schema.Struct({
         filename: Schema.optionalKey(ProviderReferenceSchema),
@@ -72,6 +93,7 @@ const envelope = Schema.Struct({
   phone_number_id: phoneId,
   message: Schema.optionalKey(message),
   conversation: Schema.Struct({
+    id: Schema.optionalKey(ProviderReferenceSchema),
     phone_number_id: phoneId,
     phone_number: Schema.optionalKey(Schema.String),
     type: Schema.optionalKey(Schema.String),
@@ -119,10 +141,9 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
     incoming.kapso.origin !== "business_app"
   )
     return null;
-  // Kapso/WA group mention signals are not yet provider-normalized (G03).
-  // Detect group scope explicitly, then keep ingress closed to avoid spam.
+  // Groups stay closed unless provider mention / reply-to-business signals exist.
   const chatKind = detectKapsoChatKind(item.conversation);
-  if (chatKind === "group" || incoming.type === "system") return null;
+  if (incoming.type === "system") return null;
   const sender = yield* Schema.decodeUnknownEffect(phone)(incoming.from).pipe(
     Effect.mapError(
       () =>
@@ -135,10 +156,26 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
   const senderId = digits(sender);
   if (senderId === digits(installation.phoneNumber)) return null;
   if (
-    (incoming.to !== undefined &&
-      digits(incoming.to) !== digits(installation.phoneNumber)) ||
-    (item.conversation.phone_number !== undefined &&
-      digits(item.conversation.phone_number) !== senderId)
+    incoming.to !== undefined &&
+    digits(incoming.to) !== digits(installation.phoneNumber)
+  ) {
+    return yield* new ProviderInputError({
+      provider: "kapso",
+      reason: "wrong_installation",
+    });
+  }
+  if (chatKind === "group") {
+    const mentionSignals = extractKapsoGroupMentionSignals({
+      installationPhoneDigits: digits(installation.phoneNumber),
+      mentions: incoming.mentions,
+      mentionedIds: incoming.mentioned_ids,
+      kapso: incoming.kapso,
+      contextFromMe: incoming.context?.from_me === true,
+    });
+    if (!evaluateGroupMentionPolicy(mentionSignals)) return null;
+  } else if (
+    item.conversation.phone_number !== undefined &&
+    digits(item.conversation.phone_number) !== senderId
   ) {
     return yield* new ProviderInputError({
       provider: "kapso",
@@ -198,8 +235,14 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       messageId: incoming.id,
       senderId,
       occurredAt,
-      chatKind: "private",
-      chatId: senderId,
+      chatKind,
+      chatId:
+        chatKind === "group"
+          ? (incoming.group_id ??
+            item.conversation.id ??
+            item.conversation.phone_number ??
+            senderId)
+          : senderId,
     },
     payload
   );

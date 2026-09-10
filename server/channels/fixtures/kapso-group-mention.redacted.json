@@ -1,0 +1,26 @@
+{
+  "phone_number_id": "123456789",
+  "message": {
+    "id": "wamid.group-mention-redacted",
+    "from": "15550002222",
+    "to": "15550001111",
+    "timestamp": "1788895784",
+    "type": "text",
+    "text": { "body": "@business please summarize" },
+    "context": null,
+    "mentions": ["15550001111"],
+    "group_id": "group-id-redacted",
+    "kapso": {
+      "direction": "inbound",
+      "status": "received",
+      "origin": "cloud_api",
+      "mentioned_business": true
+    }
+  },
+  "conversation": {
+    "id": "conv-group-redacted",
+    "phone_number_id": "123456789",
+    "is_group": true,
+    "type": "group"
+  }
+}

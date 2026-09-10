@@ -112,3 +112,33 @@ export const bindGroupChannelIdentity = Effect.fn("bindGroupChannelIdentity")(
     });
   }
 );
+
+const digitsOnly = (value: string) => value.replace(/^\+/, "");
+
+/**
+ * Kapso/WA group mention signals are optional and not in current Kapso docs.
+ * When a future payload carries explicit mention / reply-to-business flags,
+ * evaluate with the same no-spam policy as Telegram. Otherwise callers keep
+ * groups closed.
+ */
+export const extractKapsoGroupMentionSignals = (input: {
+  readonly installationPhoneDigits: string;
+  readonly mentions?: readonly string[];
+  readonly mentionedIds?: readonly string[];
+  readonly kapso?: {
+    readonly mentioned?: boolean;
+    readonly mentioned_business?: boolean;
+    readonly reply_to_business?: boolean;
+  };
+  readonly contextFromMe?: boolean;
+}): GroupMentionSignals => {
+  const biz = digitsOnly(input.installationPhoneDigits);
+  const mentionedBot =
+    input.kapso?.mentioned === true ||
+    input.kapso?.mentioned_business === true ||
+    Boolean(input.mentions?.some((m) => digitsOnly(m) === biz)) ||
+    Boolean(input.mentionedIds?.some((m) => digitsOnly(m) === biz));
+  const replyToBot =
+    input.kapso?.reply_to_business === true || input.contextFromMe === true;
+  return { mentionedBot, replyToBot };
+};

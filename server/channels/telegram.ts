@@ -219,8 +219,12 @@ const readInstallation = Config.all({
       new ProviderInputError({ provider: "telegram", reason: "configuration" })
   )
 );
+/** Private peers are positive; Telegram groups/supergroups use negative chat ids. */
+const chatTargetId = Schema.String.check(
+  Schema.isPattern(/^-?[1-9][0-9]{0,15}$/)
+);
 const sendInput = Schema.Struct({
-  targetId: stringId,
+  targetId: chatTargetId,
   text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
   reply: Schema.optional(stringId),
 });
@@ -229,7 +233,10 @@ const response = Schema.Union([
     ok: Schema.Literal(true),
     result: Schema.Struct({
       message_id: positiveId,
-      chat: Schema.Struct({ id: positiveId, type: Schema.Literal("private") }),
+      chat: Schema.Struct({
+        id: Schema.Int,
+        type: Schema.Literals(["private", "group", "supergroup"]),
+      }),
     }),
   }),
   Schema.Struct({

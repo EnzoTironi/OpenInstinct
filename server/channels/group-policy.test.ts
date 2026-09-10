@@ -5,6 +5,7 @@ import {
   detectKapsoChatKind,
   detectTelegramChatKind,
   evaluateGroupMentionPolicy,
+  extractKapsoGroupMentionSignals,
   telegramTextMentionsBot,
 } from "./group-policy";
 
@@ -76,4 +77,38 @@ test("bindGroupChannelIdentity scopes conversation to group chat", async () => {
     conversationScope: "group:telegram:123456:-100123",
     deliveryTargetId: "-100123",
   });
+});
+
+test("kapso mention extract requires explicit provider signals", () => {
+  expect(
+    evaluateGroupMentionPolicy(
+      extractKapsoGroupMentionSignals({
+        installationPhoneDigits: "15550001111",
+      })
+    )
+  ).toBe(false);
+  expect(
+    evaluateGroupMentionPolicy(
+      extractKapsoGroupMentionSignals({
+        installationPhoneDigits: "15550001111",
+        kapso: { mentioned_business: true },
+      })
+    )
+  ).toBe(true);
+  expect(
+    evaluateGroupMentionPolicy(
+      extractKapsoGroupMentionSignals({
+        installationPhoneDigits: "15550001111",
+        mentions: ["+15550001111"],
+      })
+    )
+  ).toBe(true);
+  expect(
+    evaluateGroupMentionPolicy(
+      extractKapsoGroupMentionSignals({
+        installationPhoneDigits: "15550001111",
+        contextFromMe: true,
+      })
+    )
+  ).toBe(true);
 });
