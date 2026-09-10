@@ -94,6 +94,28 @@ export const env = createEnv({
         })
       )
     ),
+
+    // Optional Stripe (hosted consumer billing). Free plan works without these.
+    STRIPE_SECRET_KEY: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.NonEmptyString, {
+          disallowEncode: true,
+        })
+      )
+    ),
+    STRIPE_WEBHOOK_SECRET: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.NonEmptyString, {
+          disallowEncode: true,
+        })
+      )
+    ),
+    STRIPE_PRICE_PRO: Schema.toStandardSchemaV1(
+      Schema.optional(Schema.NonEmptyString.check(Schema.isTrimmed()))
+    ),
+    STRIPE_PRICE_ORG_SEAT: Schema.toStandardSchemaV1(
+      Schema.optional(Schema.NonEmptyString.check(Schema.isTrimmed()))
+    ),
     LINQ_CONNECTOR: requiredValue.optional(),
     LINQ_PHONE_NUMBER: requiredValue
       .refine(

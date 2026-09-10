@@ -177,6 +177,8 @@ table):
 | `KAPSO_*`                                        | Existing Kapso phone / webhook secrets                                                      |
 | `WORKFLOW_LOCAL_BASE_URL`                        | `http://127.0.0.1:4274` (Eve stays loopback in the Machine)                                 |
 | Model / Blob / Google / Kernel                   | As required by the install profile                                                          |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`    | Optional hosted billing ([consumer-billing](../consumer-billing.md))                        |
+| `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ORG_SEAT`     | Stripe Price ids for Pro / Org seat                                                         |
 
 ```sh
 # Example shape only — values come from your secret store, not this doc:

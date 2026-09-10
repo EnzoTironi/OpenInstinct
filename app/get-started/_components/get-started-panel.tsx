@@ -59,7 +59,11 @@ export function GetStartedPanel({
         <Link className="underline underline-offset-4" href="/sign-in">
           Sign in
         </Link>{" "}
-        with a linked messenger.
+        with a linked messenger. Free needs no card — see{" "}
+        <Link className="underline underline-offset-4" href="/pricing">
+          pricing
+        </Link>
+        .
       </p>
     </section>
   );
