@@ -8,6 +8,7 @@ class ScopeAccessDenied extends Schema.TaggedError<ScopeAccessDenied>()(
   {}
 ) {}
 
+/** Personal install path: creates workspace + owner membership when missing. */
 export async function ensureScope(scope: AccessScope) {
   const createdAt = new Date();
   await db.transaction(async (transaction) => {

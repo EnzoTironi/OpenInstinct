@@ -204,6 +204,13 @@
       "when": 1788963311398,
       "tag": "0028_outbox-uncertain-resolve",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1789046897097,
+      "tag": "0029_org-workspace-rbac",
+      "breakpoints": true
     }
   ]
 }

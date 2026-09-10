@@ -29,6 +29,7 @@ describe("database services", () => {
     await applySchemaAdoptionMigration(client);
     await applyNativeTypesMigration(client);
     await applyChatChannelMigration(client);
+    await applyOrgWorkspaceRbacMigration(client);
 
     const pgliteDatabase = drizzle(client, { schema });
     // SAFETY: PGlite implements the query-builder surface exercised by these services despite using a different Drizzle driver.
@@ -418,6 +419,18 @@ async function applyNativeTypesMigration(database: PGlite) {
 async function applyChatChannelMigration(database: PGlite) {
   const migration = await readFile(
     new URL("../migrations/0011_faulty_unicorn.sql", import.meta.url),
+    "utf8"
+  );
+  /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
+  for (const statement of migration.split("--> statement-breakpoint")) {
+    if (statement.trim()) await database.exec(statement);
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
+}
+
+async function applyOrgWorkspaceRbacMigration(database: PGlite) {
+  const migration = await readFile(
+    new URL("../migrations/0029_org-workspace-rbac.sql", import.meta.url),
     "utf8"
   );
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */

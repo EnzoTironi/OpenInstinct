@@ -5,6 +5,7 @@ export * from "./channels";
 export * from "./chats";
 export * from "./messaging";
 export * from "./memory";
+export * from "./organizations";
 export * from "./schedules";
 export * from "./sessions";
 export * from "./vault";

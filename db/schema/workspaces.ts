@@ -8,17 +8,30 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import { organizations } from "./organizations";
 
-export const workspaces = pgTable("workspaces", {
-  id: text("id").primaryKey(),
-  createdAt: timestamp("created_at", {
-    mode: "date",
-    precision: 3,
-    withTimezone: true,
-  })
-    .defaultNow()
-    .notNull(),
-});
+export const workspaces = pgTable(
+  "workspaces",
+  {
+    id: text("id").primaryKey(),
+    createdAt: timestamp("created_at", {
+      mode: "date",
+      precision: 3,
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+    /** NULL = personal workspace; set for company-linked workspaces. */
+    organizationId: text("organization_id"),
+  },
+  (table) => [
+    foreignKey({
+      name: "workspaces_organization_id_fkey",
+      columns: [table.organizationId],
+      foreignColumns: [organizations.id],
+    }).onDelete("restrict"),
+  ]
+);
 
 export const userProfiles = pgTable(
   "user_profiles",
@@ -56,12 +69,18 @@ export const userProfiles = pgTable(
   ]
 );
 
+/**
+ * Workspace roles:
+ * - `owner` — personal install sole controller (`organization_id` NULL)
+ * - `admin` — company workspace; may manage members
+ * - `member` — company workspace; cannot elevate roles
+ */
 export const workspaceMemberships = pgTable(
   "workspace_memberships",
   {
     workspaceId: text("workspace_id").notNull(),
     userId: text("user_id").notNull(),
-    role: text("role", { enum: ["owner"] }).notNull(),
+    role: text("role", { enum: ["owner", "admin", "member"] }).notNull(),
     createdAt: timestamp("created_at", {
       mode: "date",
       precision: 3,
@@ -80,7 +99,10 @@ export const workspaceMemberships = pgTable(
       columns: [table.workspaceId],
       foreignColumns: [workspaces.id],
     }).onDelete("cascade"),
-    check("workspace_memberships_role_check", sql`${table.role} = 'owner'`),
+    check(
+      "workspace_memberships_role_check",
+      sql`${table.role} IN ('owner', 'admin', 'member')`
+    ),
   ]
 );
 
@@ -109,6 +131,10 @@ export const workspacesRelations = relations(workspaces, ({ many, one }) => ({
   memberships: many(workspaceMemberships),
   profile: one(userProfiles),
   settings: many(settings),
+  organization: one(organizations, {
+    fields: [workspaces.organizationId],
+    references: [organizations.id],
+  }),
 }));
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
