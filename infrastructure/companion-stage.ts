@@ -46,7 +46,7 @@ function companionEnvFileHint(stage: string): string {
 function isDocumentedCompanionStage(
   stage: string
 ): stage is DocumentedCompanionStage {
-  return (DOCUMENTED_COMPANION_STAGES as readonly string[]).includes(stage);
+  return DOCUMENTED_COMPANION_STAGES.some((documented) => documented === stage);
 }
 
 /** Retain the Postgres data volume on destroy only for production. */
