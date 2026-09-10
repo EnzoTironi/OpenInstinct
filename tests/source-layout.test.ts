@@ -35,6 +35,7 @@ describe("source layout", () => {
     ]);
     expect(files("web")).toEqual([]);
     expect(directories("shared")).toEqual([
+      "billing",
       "browser",
       "chat",
       "environment",
