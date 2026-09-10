@@ -9,6 +9,7 @@ import { channelProviderSchema } from "@shared/identity/channel-auth";
 import { requireChannelPrincipal } from "../../server/channels/principal";
 import { resolveModeValue } from "../lib/mode";
 import { PersonalMemoryError } from "../../server/personal-memory/access";
+import { admitPersonalMemoryFromSession } from "../../server/personal-memory/group-memory-policy";
 
 export const inspectStoredPersonalMemory = defineTool({
   description:
@@ -23,6 +24,8 @@ export const inspectStoredPersonalMemory = defineTool({
           !resolveModeValue(context, { interactive: true })
         )
           return yield* new PersonalMemoryError({ reason: "unauthenticated" });
+        // G02: group conversationScope must not inspect personal memory.
+        yield* admitPersonalMemoryFromSession(context.session.auth.current);
         const channel = yield* Schema.decodeUnknownEffect(
           channelProviderSchema
         )(context.session.auth.current.attributes.conversationChannel);

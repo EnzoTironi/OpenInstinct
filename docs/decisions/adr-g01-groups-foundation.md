@@ -49,7 +49,7 @@
 
 ## Follow-ups
 
-- **G02** shared-memory / workspace membership for group scopes.
+- **G02** shared-memory / workspace membership for group scopes (policy + stub landed in `adr-g02-groups-memory-policy.md`).
 - **G03** live Telegram group e2e + Kapso/WA group mention/participant ingress.
 - Outbound send schemas for negative Telegram chat ids / WA group JIDs.
 - Principal `conversationId` currently equals `identity.id` (private); group

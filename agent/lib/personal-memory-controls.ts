@@ -3,6 +3,7 @@ import type { MemoryOperationContext, MemoryToolsContext } from "eve/memory";
 import { readUserProfile, patchUserProfile } from "@db/services/user-profile";
 import type { UserProfilePatch } from "@shared/user-profile/schema";
 import { PersonalMemoryError } from "../../server/personal-memory/access";
+import { admitPersonalMemoryFromSession } from "../../server/personal-memory/group-memory-policy";
 import { authorizePersonalMemoryPrincipal } from "../../server/personal-memory/principal";
 import { resolveModeValue } from "./mode";
 
@@ -12,6 +13,7 @@ const requireProfileScope = Effect.fn("requireProfileScope")(function* (
     "session" | "memory"
   >
 ) {
+  yield* admitPersonalMemoryFromSession(context.session.auth.current);
   const scope = yield* authorizePersonalMemoryPrincipal(
     context.session.auth.current
   );

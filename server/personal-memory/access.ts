@@ -12,6 +12,7 @@ export class PersonalMemoryError extends Schema.TaggedError<PersonalMemoryError>
       "unauthenticated",
       "invalid_binding",
       "unavailable",
+      "cross_scope",
     ]),
   }
 ) {}

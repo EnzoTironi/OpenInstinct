@@ -5,6 +5,7 @@ import { readUserProfile } from "@db/services/user-profile";
 import type { AccessScope } from "@shared/identity/access-scope";
 import { storedNoteSchema, type PersonalMemorySnapshot } from "./model";
 import { PersonalMemoryError, requirePersonalMemoryMembership } from "./access";
+import { admitPersonalWipeTarget } from "./group-memory-policy";
 
 const bindingSchema = Schema.Struct({
   key: Schema.String.check(
@@ -101,6 +102,11 @@ const makePersonalMemory = Effect.gen(function* () {
 
   const wipe = Effect.fn("PersonalMemory.wipe")(
     function* (scope: AccessScope) {
+      // G02: personal wipe is private-workspace only; never addresses group scope.
+      const coverage = yield* admitPersonalWipeTarget({
+        conversationScope: null,
+        chatKind: "private",
+      });
       yield* requirePersonalMemoryMembership(scope);
       // Bound profile documents only — unbound keys are intentionally out of coverage.
       yield* sql`DELETE FROM memory_document d
@@ -113,7 +119,8 @@ const makePersonalMemory = Effect.gen(function* () {
       yield* sql`DELETE FROM user_profiles WHERE workspace_id = ${scope.workspaceId}`;
       yield* requirePersonalMemoryMembership(scope);
       return {
-        wiped: ["structured-profile", "bound-profile-notes"] as const,
+        wiped: coverage.wiped,
+        neverWiped: coverage.neverWiped,
       };
     },
     sql.withTransaction,
