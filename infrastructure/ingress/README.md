@@ -145,3 +145,4 @@ Telegram: Bot API `setWebhook` with `secret_token` from
 - [Alchemy Postgres](../README.md)
 - [Local runtime evidence](../../docs/local-runtime-setup.md)
 - [Kapso path ADR](../../docs/decisions/adr-kapso-path-r1.md)
+- [R2 ops checklists O01/O02](../../docs/ops/README.md)
