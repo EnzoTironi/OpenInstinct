@@ -24,7 +24,14 @@ export default async function SignInPage({
           <h1 className="type-page-title">Pick up the conversation</h1>
           <p className="type-supporting-body text-muted-foreground">
             Sign in through the messenger you use with your assistant. New here?
-            Start with{" "}
+            See the{" "}
+            <Link
+              className="text-foreground underline underline-offset-4"
+              href="/welcome"
+            >
+              product overview
+            </Link>{" "}
+            or start with{" "}
             <Link
               className="text-foreground underline underline-offset-4"
               href="/get-started"

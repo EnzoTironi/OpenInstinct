@@ -56,6 +56,24 @@ describe("auth proxy matcher", () => {
     expect(getAuthSession).not.toHaveBeenCalled();
   });
 
+  it("allows marketing welcome, pricing, and docs without a browser session", async () => {
+    for (const path of ["/welcome", "/pricing", "/docs"] as const) {
+      const response = await proxy(
+        new NextRequest(`https://example.com${path}`)
+      );
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    }
+    expect(getAuthSession).not.toHaveBeenCalled();
+  });
+
+  it("sends unauthenticated home visitors to the marketing landing", async () => {
+    const response = await proxy(new NextRequest("https://example.com/"));
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://example.com/welcome"
+    );
+  });
+
   it("allows the schedule dispatcher without a browser session in development", async () => {
     const response = await proxy(
       new NextRequest("http://localhost:3000/eve/v1/dev/schedules/dynamic")
