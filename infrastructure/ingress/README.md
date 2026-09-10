@@ -1,12 +1,17 @@
 # Durable public HTTPS ingress (Telegram + Kapso)
 
 Operator recipe for **always-on** public HTTPS that terminates on this Mac (or
-another self-host) and forwards to Companion Next, which rewrites:
+another self-host / **Fly** compute) and forwards to Companion Next, which rewrites:
 
 | Public path              | Eve destination      |
 | ------------------------ | -------------------- |
 | `/api/channels/telegram` | `/channels/telegram` |
 | `/api/channels/kapso`    | `/channels/kapso`    |
+
+Mac LaunchAgent pairing remains the default **prosumer/local** always-on path.
+For consumer always-on **off-Mac**, use Fly compute + Alchemy Docker Postgres
+([hosted-fly.md](../../docs/ops/hosted-fly.md)); keep this tunnel hostname
+(`companion.tironi.xyz`) so TG+Kapso webhooks do not need a URL change.
 
 Rewrites are generated at build time (`next.config.ts` + `scripts/start.ts`
 route checks). **Next alone without Eve on the baked rewrite port fails channel
@@ -14,12 +19,13 @@ webhooks.** Prefer `pnpm start`, which pairs Eve + Next in one Effect scope.
 
 ## What already exists in this repo
 
-| Piece                         | Role                                                                  |
-| ----------------------------- | --------------------------------------------------------------------- |
-| Alchemy (`../alchemy.run.ts`) | **Preferred** Postgres for `local` → `dev` → `staging` → `prod`       |
-| Named Cloudflare Tunnel       | **Preferred** durable public HTTPS on Mac (not `trycloudflare`)       |
-| Fly DNS (`app.zoen.space`)    | Zoen **product** site DNS only — leave alone; not Companion ingress   |
-| Interim Companion hostname    | `https://companion.tironi.xyz` (live TG+Kapso; zoen cutover deferred) |
+| Piece                         | Role                                                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Alchemy (`../alchemy.run.ts`) | **Preferred** Postgres for `local` → `dev` → `staging` → `prod`                                                                        |
+| Named Cloudflare Tunnel       | **Preferred** durable public HTTPS on Mac (not `trycloudflare`)                                                                        |
+| Fly DNS (`app.zoen.space`)    | Zoen **product** site DNS only — leave alone; not Companion ingress                                                                    |
+| Interim Companion hostname    | `https://companion.tironi.xyz` (live TG+Kapso; zoen cutover deferred)                                                                  |
+| Fly compute (H01)             | Optional always-on **off-Mac** Next+Eve (`fly.toml` + Dockerfile); Alchemy Docker PG — [`hosted-fly.md`](../../docs/ops/hosted-fly.md) |
 
 Alchemy in this package provisions Postgres only. Public HTTPS uses a
 **Cloudflare named tunnel** (token file + KeepAlive LaunchAgent). Do **not** use
@@ -146,6 +152,7 @@ Telegram: Bot API `setWebhook` with `secret_token` from
 
 ## Related
 
+- [Hosted Fly cutover (H01)](../../docs/ops/hosted-fly.md)
 - [Self-host / ops](../../docs/self-host.md)
 - [Alchemy Postgres](../README.md)
 - [Local runtime evidence](../../docs/local-runtime-setup.md)

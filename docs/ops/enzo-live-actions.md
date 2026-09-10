@@ -27,6 +27,9 @@ If / when replacing the interim hostname:
 
 Details: [infrastructure/ingress/README.md](../../infrastructure/ingress/README.md).
 
+Off-Mac always-on compute (Fly + Alchemy Docker PG, keep this hostname):
+[hosted-fly.md](hosted-fly.md).
+
 ## 2. Telegram — add `@ZoenOSBot` to group + mention (live G03)
 
 For live G03 group mention → accept → bind proof:

@@ -231,7 +231,17 @@ Infrastructure-only (under `infrastructure/.env` / `infrastructure/ingress/.env`
 6. R2 Meta gates (Enzo): display-name approval + ≥1 APPROVED **UTILITY**
    template via Kapso — see [O02 checklist](ops/whatsapp-meta-activation.md).
 
-## 5. Durable public HTTPS ingress (not trycloudflare)
+## 5. Always-on hosting modes (Mac vs Fly)
+
+| Mode                                          | When                                   | Postgres                                                                           | Public HTTPS                                               |
+| --------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **Mac LaunchAgent** (optional prosumer/local) | Desktop stays on; trusted local Docker | Alchemy Docker stages                                                              | Named Cloudflare tunnel → `127.0.0.1:3000`                 |
+| **Fly compute** (H01 consumer always-on)      | Mac may sleep; off-Mac critical path   | Alchemy Docker (reachable via WireGuard / colocated Docker host) — **not** Fly MPG | Same `companion.tironi.xyz` tunnel; retarget origin to Fly |
+
+Full Fly cutover (secrets names, validate/deploy-dry, rollback):
+→ **[docs/ops/hosted-fly.md](ops/hosted-fly.md)**
+
+## 6. Durable public HTTPS ingress (not trycloudflare)
 
 Preferred stack for Release-1 self-host on Mac:
 
@@ -258,7 +268,7 @@ point it at the Companion tunnel. A zoen.space Companion hostname cutover is
 **deferred**. Enzo checklist: [enzo-live-actions.md](ops/enzo-live-actions.md)
 (DNS status + `@ZoenOSBot` group mention for live G03).
 
-## 6. Graphile lease fencing / SIGKILL
+## 7. Graphile lease fencing / SIGKILL
 
 Native `@workflow/world-postgres` uses renewable worker leases with **generation
 fencing** and owner-aware Graphile completion. Expired generations are retired
@@ -275,7 +285,7 @@ qualified path. Groups remain paused.
 
 Defaults (package): `workerLease: { leaseMs: 30000, heartbeatMs: 10000, reclaimIntervalMs: 5000 }`.
 
-## 7. Quotas (Release-1 admission)
+## 8. Quotas (Release-1 admission)
 
 Fail-closed minimum quotas live in `server/operations/quotas.ts`. Over-limit work
 must not proceed (`QuotaAdmissionError`). Full decision record and limit table:
@@ -300,7 +310,7 @@ Media attachment byte caps remain in `server/channels/media/policy.ts`. Usage
 meter persistence / dispatch wiring may still be landing; the gate itself is
 tested.
 
-## 8. Account export / delete limits
+## 9. Account export / delete limits
 
 Routes (browser session + canonical membership required; fail closed):
 
@@ -321,7 +331,7 @@ schedules, unbound memory documents, channel identities, backups, workspace row,
 or user row. Restore reconciliation and a deletion ledger remain separate P06
 gates. Do **not** claim full account deletion or backup erasure to users.
 
-## 9. Live qualification gaps (honest)
+## 10. Live qualification gaps (honest)
 
 These remain **unqualified** for Release-1 admission even when local installs
 build and synthetic tests pass:
@@ -337,7 +347,7 @@ live channels, hosted billing/entitlements, and any claim of production pilot
 readiness. Track evidence in [local-runtime-setup.md](local-runtime-setup.md)
 and [product direction](product-direction.md).
 
-## 10. R2 ops checklists (O01 / O02)
+## 11. R2 ops checklists (O01 / O02)
 
 Remaining R2 operator work toward 100% (Enzo executes secrets / Meta / DNS):
 
@@ -352,6 +362,7 @@ Index: [docs/ops/](ops/README.md). ADR:
 
 ## Related
 
+- [Hosted Fly cutover (H01)](ops/hosted-fly.md)
 - [Infrastructure / Alchemy README](../infrastructure/README.md)
 - [Durable ingress (named tunnel + webhooks)](../infrastructure/ingress/README.md)
 - [Local runtime setup & evidence](local-runtime-setup.md)

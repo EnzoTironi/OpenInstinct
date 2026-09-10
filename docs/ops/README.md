@@ -9,6 +9,7 @@ docs and scripts only — never secret values in git, PRs, logs, or chat.
 | O01 | [Credential rotation (F01)](credential-rotation.md) — names, order, verify | Enzo (secrets)    |
 | O02 | [WhatsApp Meta + Kapso activation](whatsapp-meta-activation.md)            | Enzo (Meta/Kapso) |
 | —   | [Enzo live blockers](enzo-live-actions.md) (DNS + G03 Telegram group)      | Enzo only         |
+| H01 | [Hosted Fly cutover](hosted-fly.md) — Alchemy Docker PG + Fly compute      | Enzo (deploy/DNS) |
 
 **Ingress status (2026-09-10):** Companion channel public base is interim
 `https://companion.tironi.xyz` (TG+Kapso webhooks live). Fly `app.zoen.space`
@@ -16,6 +17,7 @@ product DNS unchanged; zoen Companion cutover deferred.
 
 Related:
 
+- [Hosted Fly cutover (H01)](hosted-fly.md)
 - [Self-host / ops](../self-host.md)
 - [Durable ingress (D01)](../../infrastructure/ingress/README.md)
 - [Kapso path ADR](../decisions/adr-kapso-path-r1.md)
