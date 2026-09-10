@@ -47,6 +47,15 @@ describe("auth proxy matcher", () => {
     expect(getAuthSession).not.toHaveBeenCalled();
   });
 
+  it("allows consumer get-started without a browser session", async () => {
+    const response = await proxy(
+      new NextRequest("https://example.com/get-started")
+    );
+
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(getAuthSession).not.toHaveBeenCalled();
+  });
+
   it("allows the schedule dispatcher without a browser session in development", async () => {
     const response = await proxy(
       new NextRequest("http://localhost:3000/eve/v1/dev/schedules/dynamic")

@@ -64,7 +64,7 @@ First contact must do useful work that needs no connection. When a request does
 need access, ask for that connection at the point of need, explain its purpose,
 and resume the original task when the grant arrives. No mandatory dashboard tour,
 provider key form, model picker or broad “connect everything” screen for end users.
-Operator installation remains explicit, documented and secure.
+Operator installation remains explicit, documented and secure. Hosted consumers use the short [first-run](consumer-first-run.md) path (`/get-started`) instead of self-host docs.
 
 ### 2. Make conversation the primary control
 

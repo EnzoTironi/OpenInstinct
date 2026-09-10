@@ -1,6 +1,7 @@
 # Companion Release-1 self-host / ops
 
 Operator recipe for running Companion (this OpenInstinct fork) on your own host.
+End users on the hosted product should follow [consumer first-run](consumer-first-run.md), not this page.
 This is an **implementation-in-progress** install path, not a finished release or
 admitted user pilot. For deeper evidence and limits, see
 [local runtime setup](local-runtime-setup.md). Product contracts live in the

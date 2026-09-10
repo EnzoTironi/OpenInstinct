@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { ChannelAuthForm } from "@web/auth/channel/form";
 import { safeCallbackUrl } from "@web/auth/channel/client";
 import { getAuthSession } from "@db/services/auth/session";
@@ -22,7 +23,15 @@ export default async function SignInPage({
           </p>
           <h1 className="type-page-title">Pick up the conversation</h1>
           <p className="type-supporting-body text-muted-foreground">
-            Sign in through the messenger you use with your assistant.
+            Sign in through the messenger you use with your assistant. New here?
+            Start with{" "}
+            <Link
+              className="text-foreground underline underline-offset-4"
+              href="/get-started"
+            >
+              Get started
+            </Link>{" "}
+            to create your account and bind a channel in one flow.
           </p>
         </div>
         {params.reason === "channel-unlinked" ? (

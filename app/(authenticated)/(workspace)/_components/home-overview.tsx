@@ -55,8 +55,8 @@ export function HomeOverview() {
           Start a conversation
         </Button>
         <p className="max-w-xl type-caption text-muted-foreground">
-          Chat here on the web, or continue through Telegram or WhatsApp when
-          messaging is set up for your account.
+          Chat here on the web, or continue in Telegram or WhatsApp once a
+          messenger is linked on your account.
         </p>
       </header>
 
