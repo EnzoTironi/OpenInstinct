@@ -143,14 +143,14 @@ Scheduled Fly volume snapshots default on for the mount.
 
 Repo files:
 
-| File                                                                                             | Role                                                                                       |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| [`fly.toml`](../../fly.toml)                                                                     | Always-on HTTP on :3000 (`gru`); TCP `checks.alive` (avoid HTTP 307 health fails)          |
-| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next; `just-bash` resolve check; `CMD` → `fly-entrypoint.sh`      |
-| [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh)                                   | Materialize Codex/ChatGPT auth secrets then `exec pnpm start`                              |
-| [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh)                                     | `validate` / `status` / `deploy-dry` / `secrets-check`                                     |
-| [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh)                                   | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify`   |
-| [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) | Alchemy stack: Fly.App + Machine + volume (not MPG)                                        |
+| File                                                                                             | Role                                                                                     |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| [`fly.toml`](../../fly.toml)                                                                     | Always-on HTTP on :3000 (`gru`); TCP `checks.alive` (avoid HTTP 307 health fails)        |
+| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next; `just-bash` resolve check; `CMD` → `fly-entrypoint.sh`    |
+| [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh)                                   | Materialize Codex/ChatGPT auth secrets then `exec pnpm start`                            |
+| [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh)                                     | `validate` / `status` / `deploy-dry` / `secrets-check`                                   |
+| [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh)                                   | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify` |
+| [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) | Alchemy stack: Fly.App + Machine + volume (not MPG)                                      |
 
 ### One-time app create (operator)
 
