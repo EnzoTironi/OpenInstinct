@@ -1,0 +1,36 @@
+# External uptime probe for Companion prod.
+# Manual curl checklists are NOT enough alone — this schedule fails the job
+# (GitHub Actions failure notification) and optionally posts to a webhook/ntfy
+# when repo secrets are configured. Never print secret values.
+name: Companion uptime
+
+on:
+  schedule:
+    # GitHub may delay cron under load; Mac LaunchAgent is the local backup.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: companion-uptime
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe companion.tironi.xyz
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Run uptime probe
+        env:
+          # Optional push sinks (names only in docs). Leave unset to rely on
+          # GitHub workflow-failure notifications for the workflow author.
+          COMPANION_UPTIME_ALERT_URL: ${{ secrets.COMPANION_UPTIME_ALERT_URL }}
+          COMPANION_UPTIME_NTFY_TOPIC: ${{ secrets.COMPANION_UPTIME_NTFY_TOPIC }}
+          COMPANION_UPTIME_BASE_URL: https://companion.tironi.xyz
+        run: bash scripts/companion-uptime-probe.sh --quiet
