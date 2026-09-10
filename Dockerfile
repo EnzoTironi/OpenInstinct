@@ -18,12 +18,18 @@ COPY . .
 # Channel rewrites bake Eve's loopback port at build time — keep start args matched.
 ENV EVE_NEXT_PRODUCTION_PORT=4274
 ENV NEXT_TELEMETRY_DISABLED=1
+# Depot remote builders OOM (exit 137) on default heap + Next/TS peak RSS.
+# Cap V8 heap so GC stays aggressive on small Depot RAM; split Eve/Next.
+ENV NODE_OPTIONS=--max-old-space-size=2048
+ENV OPEN_INSTINCT_LOW_MEM_BUILD=1
 # Build-time placeholders only; runtime secrets come from Fly (never bake .env*).
 ENV BETTER_AUTH_URL=http://127.0.0.1:3000
 ENV COMPANION_PUBLIC_BASE_URL=http://127.0.0.1:3000
 ENV DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/open_instinct_prod
 ENV DATABASE_URL_UNPOOLED=postgresql://postgres:postgres@127.0.0.1:5432/open_instinct_prod
-RUN pnpm build
+# Skip turbo daemon; run Eve then Next in separate layers (RSS reclaim between).
+RUN pnpm exec eve build
+RUN pnpm exec next build
 
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app

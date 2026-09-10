@@ -255,6 +255,26 @@ must sleep or leave the critical path.
 ./scripts/fly-alchemy-pg.sh verify --stage prod
 ```
 
+## Remote build memory (Depot OOM)
+
+`deploy-dry` / `fly deploy` build on Fly **Depot** by default. Companion’s
+`eve build` + `next build` peak RSS can OOM the default builder (**exit 137**)
+during the Next/TypeScript phase.
+
+Mitigations already in-repo:
+
+- [`Dockerfile`](../../Dockerfile) sets `NODE_OPTIONS=--max-old-space-size=2048`,
+  `OPEN_INSTINCT_LOW_MEM_BUILD=1`, and runs Eve then Next in **separate** `RUN`
+  layers (avoids turbo + stacked peaks).
+- Low-mem Next flags (Docker-only): `experimental.cpus=1`,
+  `webpackMemoryOptimizations`, skip TS in `next build` (CI still typechecks).
+
+`scripts/fly-companion.sh deploy-dry` defaults to **classic** remote builders
+(`--depot=false`, typically ~8GB). Depot still OOMs on the default org builder
+for this image; resize at
+[Fly dashboard → App Builders](https://fly.io/dashboard/personal/builders)
+before `COMPANION_FLY_DEPOT=true`.
+
 ## Related
 
 - [Self-host / ops](../self-host.md)

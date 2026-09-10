@@ -12,6 +12,7 @@ Usage: scripts/fly-companion.sh <validate|status|deploy-dry|secrets-check>
   validate       fly config validate against fly.toml (no deploy)
   status         fly status for the configured app (read-only)
   deploy-dry     fly deploy --build-only (build image; do not replace machines)
+                 Uses classic remote builders by default; COMPANION_FLY_DEPOT=true for Depot
   secrets-check  list Fly secret *names* only (fly secrets list)
 
 Does not migrate live traffic, destroy Mac LaunchAgents, or rotate F01.
@@ -48,7 +49,13 @@ case "$cmd" in
   deploy-dry)
     need_fly
     # Build only — does not update running machines / live traffic.
-    "$(fly_bin)" deploy -c "$ROOT/fly.toml" --build-only --remote-only
+    # Default: classic remote builders (--depot=false). Depot OOMs (SIGKILL/137)
+    # on Eve+Next for this image; set COMPANION_FLY_DEPOT=true to opt back in.
+    if [[ "${COMPANION_FLY_DEPOT:-false}" == "true" ]]; then
+      "$(fly_bin)" deploy -c "$ROOT/fly.toml" --build-only --remote-only
+    else
+      "$(fly_bin)" deploy -c "$ROOT/fly.toml" --build-only --remote-only --depot=false
+    fi
     ;;
   secrets-check)
     need_fly
