@@ -1,8 +1,22 @@
 import { Effect, Schema } from "effect";
 import { withEve, type EveNextRewriteSections } from "eve/next";
 import type { NextConfig } from "next";
+import { openInstinctLowMemBuild } from "@shared/environment/env/low-mem-build";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = openInstinctLowMemBuild
+  ? {
+      // Fly Depot / constrained builders: cut Next+TS peak RSS (exit 137).
+      // CI still runs types:check:app; ignoreBuildErrors is Docker-only.
+      typescript: { ignoreBuildErrors: true },
+      productionBrowserSourceMaps: false,
+      enablePrerenderSourceMaps: false,
+      experimental: {
+        cpus: 1,
+        webpackMemoryOptimizations: true,
+        serverSourceMaps: false,
+      },
+    }
+  : {};
 const frameworkConfig = withEve(nextConfig);
 const eveRoute = "/eve/v1/:path+";
 

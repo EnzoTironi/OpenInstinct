@@ -18,12 +18,18 @@ COPY . .
 # Channel rewrites bake Eve's loopback port at build time — keep start args matched.
 ENV EVE_NEXT_PRODUCTION_PORT=4274
 ENV NEXT_TELEMETRY_DISABLED=1
+# Depot remote builders OOM (exit 137) on default heap + Next/TS peak RSS.
+# Cap V8 heap so GC stays aggressive on small Depot RAM; split Eve/Next.
+ENV NODE_OPTIONS=--max-old-space-size=2048
+ENV OPEN_INSTINCT_LOW_MEM_BUILD=1
 # Build-time placeholders only; runtime secrets come from Fly (never bake .env*).
 ENV BETTER_AUTH_URL=http://127.0.0.1:3000
 ENV COMPANION_PUBLIC_BASE_URL=http://127.0.0.1:3000
 ENV DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/open_instinct_prod
 ENV DATABASE_URL_UNPOOLED=postgresql://postgres:postgres@127.0.0.1:5432/open_instinct_prod
-RUN pnpm build
+# Skip turbo daemon; run Eve then Next in separate layers (RSS reclaim between).
+RUN pnpm exec eve build
+RUN pnpm exec next build
 
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
@@ -35,6 +41,6 @@ RUN corepack enable && corepack prepare pnpm@11.24.0 --activate \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app /app
-# Next binds publicly for Fly proxy; Eve stays on loopback (scripts/start.ts).
+# Next binds all families for Fly proxy/health (IPv6); Eve stays on loopback.
 EXPOSE 3000
-CMD ["pnpm", "start", "--port", "3000", "--hostname", "0.0.0.0", "--eve-port", "4274"]
+CMD ["pnpm", "start", "--port", "3000", "--hostname", "::", "--eve-port", "4274"]

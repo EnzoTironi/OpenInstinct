@@ -39,10 +39,14 @@ describe("Turbo configuration", () => {
 
     expect(turbo).not.toHaveProperty("globalEnv");
     expect(turbo.tasks["build:app"].env).toEqual(
-      expect.arrayContaining([...applicationEnvironment, "EVE_NEXT_*"])
+      expect.arrayContaining([
+        ...applicationEnvironment,
+        "EVE_NEXT_*",
+        "OPEN_INSTINCT_LOW_MEM_BUILD",
+      ])
     );
     expect(turbo.tasks["build:app"].env).toHaveLength(
-      applicationEnvironment.length + 1
+      applicationEnvironment.length + 2
     );
     expect(turbo.tasks["build:vercel"].env).toEqual(applicationEnvironment);
     expect(turbo.tasks["dev:app"].passThroughEnv).toEqual(runtimeEnvironment);

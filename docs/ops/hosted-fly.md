@@ -146,7 +146,7 @@ Repo files:
 | File                                                                                             | Role                                                                                     |
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | [`fly.toml`](../../fly.toml)                                                                     | Always-on HTTP service on port 3000, region `gru`                                        |
-| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; `pnpm build` then `pnpm start`                                      |
+| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next build; runtime `--hostname ::` (Fly IPv6 health)           |
 | [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh)                                     | `validate` / `status` / `deploy-dry` / `secrets-check`                                   |
 | [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh)                                   | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify` |
 | [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) | Alchemy stack: Fly.App + Machine + volume (not MPG)                                      |
@@ -256,6 +256,26 @@ must sleep or leave the critical path.
 ./scripts/fly-alchemy-pg.sh url-shape --stage prod
 ./scripts/fly-alchemy-pg.sh verify --stage prod
 ```
+
+## Remote build memory (Depot OOM)
+
+`deploy-dry` / `fly deploy` build on Fly **Depot** by default. Companion’s
+`eve build` + `next build` peak RSS can OOM the default builder (**exit 137**)
+during the Next/TypeScript phase.
+
+Mitigations already in-repo:
+
+- [`Dockerfile`](../../Dockerfile) sets `NODE_OPTIONS=--max-old-space-size=2048`,
+  `OPEN_INSTINCT_LOW_MEM_BUILD=1`, and runs Eve then Next in **separate** `RUN`
+  layers (avoids turbo + stacked peaks).
+- Low-mem Next flags (Docker-only): `experimental.cpus=1`,
+  `webpackMemoryOptimizations`, skip TS in `next build` (CI still typechecks).
+
+`scripts/fly-companion.sh deploy-dry` defaults to **classic** remote builders
+(`--depot=false`, typically ~8GB). Depot still OOMs on the default org builder
+for this image; resize at
+[Fly dashboard → App Builders](https://fly.io/dashboard/personal/builders)
+before `COMPANION_FLY_DEPOT=true`.
 
 ## Related
 
