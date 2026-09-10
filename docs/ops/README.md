@@ -15,6 +15,11 @@ docs and scripts only — never secret values in git, PRs, logs, or chat.
 `https://companion.tironi.xyz` (TG+Kapso webhooks live). Fly `app.zoen.space`
 product DNS unchanged; zoen Companion cutover deferred.
 
+**O02 / Meta (2026-09-10 Kapso API):** Display name `AVAILABLE_WITHOUT_REVIEW`
+(verified name present). UTILITY template `companion_account_notice_v1` still
+`PENDING` — O02 not complete. **F01 credential rotation remains deferred**
+(checklist only; do not rotate until Enzo authorizes live rotation).
+
 Related:
 
 - [Hosted Fly cutover (H01)](hosted-fly.md)

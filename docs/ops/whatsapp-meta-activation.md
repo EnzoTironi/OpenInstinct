@@ -83,9 +83,27 @@ Even after display name + one UTILITY template:
 - WA group mention gate remains limited by provider signals
   ([G03 ADR](../decisions/adr-g03-groups-live-e2e.md)).
 
+## Status snapshot (2026-09-10, Kapso API — no secrets)
+
+Evidence from Kapso Platform phone GET + Meta Proxy templates list (operator
+Mac; secret values not logged):
+
+| Gate              | Result                                                                            |
+| ----------------- | --------------------------------------------------------------------------------- |
+| Phone connection  | `CONNECTED` · quality `GREEN` · account mode `LIVE`                               |
+| Display name      | `name_status=AVAILABLE_WITHOUT_REVIEW` · verified name present (`Zoen`)           |
+| UTILITY templates | `companion_account_notice_v1` (`pt_BR`) still **`PENDING`** — none `APPROVED` yet |
+| Durable webhook   | Interim `https://companion.tironi.xyz` (unsigned POST → 401)                      |
+
+Re-check with Kapso (env **names** only): Platform
+`GET /whatsapp/phone_numbers/{KAPSO_PHONE_NUMBER_ID}` for `status` /
+`name_status`; Meta Proxy
+`GET /{business_account_id}/message_templates?name=companion_account_notice_v1`.
+
 ## Done when
 
-- [ ] Meta display name **approved** for the Kapso number
-- [ ] ≥1 **UTILITY** template **APPROVED**
+- [x] Meta display name usable for the Kapso number (`AVAILABLE_WITHOUT_REVIEW`)
+- [ ] ≥1 **UTILITY** template **APPROVED** (still blocked on Meta review of
+      `companion_account_notice_v1`)
 - [x] Kapso webhook aimed at durable interim `https://companion.tironi.xyz`
       via D01 script (zoen.space Companion hostname deferred)
