@@ -20,7 +20,7 @@ paste, commit, or log secret values.**
 | `GOOGLE_CLIENT_SECRET`                                       | **Skipped** — `gcloud` not authenticated this session                    |
 | `OPENROUTER_API_KEY` / `KERNEL_API_KEY` / `OPENCODE_API_KEY` | **Skipped** — provider console / management key required                 |
 | Postgres (`DATABASE_URL*`)                                   | **Skipped** — no backup+cutover this session                             |
-| Named tunnel token                                           | **Skipped** — Mac `~/.cloudflared/openinstinct-companion.token` retained |
+| Named tunnel token                                           | **Skipped** — Mac file retained; also Fly secret `TUNNEL_TOKEN` on `companion-cf-tunnel` |
 | Stripe                                                       | **Ignored** (out of scope)                                               |
 
 Post-rotation verify (2026-09-10): `https://companion.tironi.xyz/welcome` → 200;

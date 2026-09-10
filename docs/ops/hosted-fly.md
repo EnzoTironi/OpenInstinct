@@ -8,7 +8,7 @@ local / prosumer mode.
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Compute            | **Fly Machines** (`fly.toml` + root `Dockerfile`) running `pnpm start`                                                                                                         |
 | Postgres           | **Alchemy unmanaged** — Docker (`alchemy.run.ts`) **or** Fly.Machine+volume (`alchemy.fly-postgres.run.ts`) + stage policy — **not** Fly Managed Postgres / `Fly.Postgres` MPG |
-| Public HTTPS / DNS | **Cloudflare** named tunnel for `companion.tironi.xyz` (TG + Kapso)                                                                                                            |
+| Public HTTPS / DNS | **Cloudflare** named tunnel for `companion.tironi.xyz` (TG + Kapso); connector on Fly `companion-cf-tunnel` (not Mac)                                                         |
 | Local optional     | Mac LaunchAgent + Alchemy on Docker Desktop (`scripts/launch-companion-prod.sh`)                                                                                               |
 
 Never commit secrets, print secret values, force-push `main`, destroy Mac prod
@@ -29,10 +29,13 @@ Alchemy's `Fly.Postgres` resource is **Managed Postgres (MPG)** and is
 Telegram / Kapso
        │
        ▼
-Cloudflare named tunnel  →  companion.tironi.xyz
+Cloudflare edge  →  companion.tironi.xyz
        │
        ▼
-Fly Machine (this repo Dockerfile)
+cloudflared connector (Fly app companion-cf-tunnel)
+       │  origin: https://companion-tironi.fly.dev
+       ▼
+Fly Machine companion-tironi (this repo Dockerfile)
   Next :3000 (0.0.0.0)  ──rewrite──►  Eve :4274 (127.0.0.1)
        │
        ▼
@@ -247,19 +250,22 @@ change if the tunnel origin alone moves.
    `http://127.0.0.1:3000`. Options:
    - Tunnel origin → `http://<fly-private-ipv6>:3000` / Flycast, or
    - Origin → public `https://<app>.fly.dev` (extra hop; fine for first cut), or
-   - Run `cloudflared` **inside** the Fly Machine (heavier; not required for H01).
+   - Run `cloudflared` as a **separate** Fly app (`companion-cf-tunnel`) with
+     secret `TUNNEL_TOKEN` — see [`infrastructure/ingress/fly-tunnel/fly.toml`](../../infrastructure/ingress/fly-tunnel/fly.toml)
+     and `./scripts/fly-companion-tunnel.sh` (**done 2026-09-10**; Mac connector unloaded).
 4. **Verify hostname** — `https://companion.tironi.xyz` → Next; unsigned
-   `/api/channels/telegram` POST → **401**.
+   `/api/channels/telegram` POST → **401**; `/welcome` → **200**. Confirm this
+   still works **after** Mac `companion-cloudflared` is stopped.
 5. **Webhooks** — if `COMPANION_PUBLIC_BASE_URL` unchanged, providers can stay.
    Still dry-run: `pnpm ingress:set-webhooks -- --dry-run`. Apply only if the
    public origin or paths changed.
 6. **Drain Mac compute** — after soak, unload Mac runtime LaunchAgent
-   (`companion-runtime`). Keep `companion-cloudflared` only if the tunnel still
-   terminates on the Mac; if the tunnel moved fully to Fly/CF dashboard routing,
-   unload cloudflared too.
-7. **Rollback** — retarget tunnel origin back to Mac `127.0.0.1:3000`, ensure
-   Mac LaunchAgents + Alchemy PG are healthy. Do **not** destroy Alchemy
-   `prod` volume.
+   (`companion-runtime`). Unload `companion-cloudflared` only after the Fly
+   connector (`companion-cf-tunnel`) is registered and hostname verified.
+7. **Rollback** — reload Mac `com.openinstinct.companion-cloudflared` LaunchAgent
+   (token file unchanged); optionally stop `companion-cf-tunnel` Machines after
+   Mac is healthy. Origin can stay on `https://companion-tironi.fly.dev`. Do
+   **not** destroy Alchemy `prod` volume.
 
 ## Mac path (optional prosumer / local)
 
