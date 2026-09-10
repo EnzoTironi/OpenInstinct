@@ -4,6 +4,10 @@
 **environment variable names**, **rotation order**, and **verify steps**.
 **Never print, paste, commit, or log secret values.**
 
+**Live rotation (2026-09-10):** **Deferred** — do not execute F01 until Enzo
+explicitly authorizes a live rotation this session. Inventory + verify docs may
+be updated; secrets must not be rotated, printed, or pasted into PRs/chat.
+
 Scope: Companion self-host on Mac (Alchemy Postgres + named Cloudflare Tunnel +
 `pnpm start`). See [self-host](../self-host.md) and
 [durable ingress](../../infrastructure/ingress/README.md).

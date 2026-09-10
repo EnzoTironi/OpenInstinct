@@ -99,6 +99,15 @@ Optional: leave all Stripe names unset — Free still works; Checkout/Portal ret
 - Customer Portal opens for an existing Stripe customer.
 - Secret **values** never appear in git, PR bodies, or docs.
 
+
+## Trust copy
+
+- Free never requires a card (see Acceptance).
+- Manage / cancel only through Stripe Customer Portal — no in-app card vault UI.
+- Privacy export/delete limits for the same Account surface:
+  [consumer first-run → Consumer trust](consumer-first-run.md#consumer-trust-c-trust)
+  and [self-host §9](self-host.md#9-account-export--delete-limits).
+
 ## Out of scope (this slice)
 
 - Full billing admin console / invoices UI.
