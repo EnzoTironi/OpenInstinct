@@ -4,6 +4,7 @@ import {
   admitQuota,
   emptyQuotaUsage,
   quotaFailureMessage,
+  admissionLimitsForPlan,
   release1QuotaLimits,
   reserveQuota,
   settleConcurrentTurns,
@@ -12,6 +13,13 @@ import {
 } from "./quotas";
 
 describe("Release-1 minimum quota admission", () => {
+  it("bridges hosted Free entitlements to Release-1 floors", () => {
+    expect(admissionLimitsForPlan("free")).toEqual(release1QuotaLimits);
+    expect(admissionLimitsForPlan("pro").user.dailyModelTokens).toBeGreaterThan(
+      release1QuotaLimits.user.dailyModelTokens
+    );
+  });
+
   it("documents the chosen self-host limits", () => {
     expect(release1QuotaLimits).toEqual({
       user: {

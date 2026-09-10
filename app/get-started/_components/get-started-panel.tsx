@@ -60,7 +60,11 @@ export function GetStartedPanel({
           Sign in
         </Link>{" "}
         with a linked messenger. After signup, home shows your channels and
-        plan.
+        plan. Free needs no card — see{" "}
+        <Link className="underline underline-offset-4" href="/pricing">
+          pricing
+        </Link>
+        .
       </p>
     </section>
   );

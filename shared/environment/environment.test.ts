@@ -21,6 +21,10 @@ describe("environment", () => {
     vi.stubEnv("LINQ_PHONE_NUMBER", "");
     vi.stubEnv("GOOGLE_CLIENT_ID", "");
     vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
+    vi.stubEnv("STRIPE_SECRET_KEY", "");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
+    vi.stubEnv("STRIPE_PRICE_PRO", "");
+    vi.stubEnv("STRIPE_PRICE_ORG_SEAT", "");
   });
 
   afterEach(() => {

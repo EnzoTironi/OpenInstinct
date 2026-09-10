@@ -2,13 +2,14 @@ import { Effect, Result } from "effect";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthSession } from "@db/services/auth/session";
+import { readEntitlement } from "@db/services/billing";
 import { ChannelAuthForm } from "@web/auth/channel/form";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { serverRuntime } from "../../../server/runtime";
 import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 import { LinkedChannels } from "./linked-channels";
 import { PersonalMemorySection } from "./personal-memory";
-import { AccountPlanSection } from "./_components/plan-section";
+import { AccountBillingSection } from "./_components/billing-section";
 
 export default async function AccountPage() {
   const requestHeaders = await headers();
@@ -19,6 +20,7 @@ export default async function AccountPage() {
   );
   if (Result.isFailure(result) && result.failure.reason === "unauthenticated")
     redirect("/sign-in?callbackUrl=%2Faccount");
+  const entitlement = await readEntitlement("user", session.user.id);
   return (
     <main className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-8 px-4 py-6 sm:p-8">
       <header className="space-y-2">
@@ -68,7 +70,11 @@ export default async function AccountPage() {
           </section>
         </>
       )}
-      <AccountPlanSection />
+      <AccountBillingSection
+        plan={entitlement.plan}
+        seatCount={entitlement.seatCount}
+        status={entitlement.status}
+      />
       <PersonalMemorySection />
     </main>
   );

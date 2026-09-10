@@ -31,14 +31,15 @@ extra channel uses **Account → Link another channel** (`purpose: "link"`).
 - **Account** groups channels, plan/billing entry, and personal memory. Copy
   treats this as a **personal** workspace; Org seats are a separate team plan,
   not a rename of the personal account.
-- Hosted Stripe checkout / `/pricing` ship on the billing track (C-BILL). This
-  UX only needs a coherent plan entry until that lands.
+- Hosted Stripe checkout / `/pricing` and Account billing CTAs ship on C-BILL
+  ([consumer billing](consumer-billing.md)).
 
 ## What this is not
 
 - Not Docker, Fly, Alchemy, tunnel, or webhook setup.
 - Not the full billing purchase flow — Free starts here without a card; hosted
-  Free / Pro / Org checkout is a separate track (`/pricing` when enabled).
+  Free / Pro / Org seats are documented in [consumer billing](consumer-billing.md)
+  (`/pricing`).
 - Not org SSO or multi-seat onboarding (C01/C02).
 - Not an account merge between two separately provisioned identities.
 - Not the public marketing site (Poke/Town packaging) — leftover for product

@@ -293,6 +293,8 @@ must not proceed (`QuotaAdmissionError`). Full decision record and limit table:
 
 → **[ADR: Release-1 minimum quotas / admission](decisions/adr-quotas-admission-r1.md)**
 
+Hosted plan entitlements (Free / Pro / Org seats): **[consumer billing](consumer-billing.md)**.
+
 Summary (operators may raise later; unlimited usage is not claimed):
 
 | Scope        | Resource                     | Limit     |

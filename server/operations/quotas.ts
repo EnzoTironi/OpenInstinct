@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { type BillingPlanId, quotaLimitsForPlan } from "@shared/billing/plans";
 
 /**
  * Release-1 self-host minimum quotas (P11 admission).
@@ -22,7 +23,33 @@ export const release1QuotaLimits = {
   },
 } as const;
 
-export type Release1QuotaLimits = typeof release1QuotaLimits;
+export interface Release1QuotaLimits {
+  user: {
+    concurrentTurns: number;
+    dailyModelTokens: number;
+    dailyToolCalls: number;
+    dailyProactiveMessages: number;
+    storageBytes: number;
+    sandboxActiveSecondsPerDay: number;
+  };
+  installation: {
+    concurrentTurns: number;
+    dailyModelTokens: number;
+    activeUsersPerDay: number;
+  };
+}
+
+/** Resolve admission limits for a hosted entitlement plan (defaults Free). */
+export function admissionLimitsForPlan(
+  plan: BillingPlanId = "free",
+  seatCount = 1
+): Release1QuotaLimits {
+  const limits = quotaLimitsForPlan(plan, seatCount);
+  return {
+    user: { ...limits.user },
+    installation: { ...limits.installation },
+  };
+}
 
 const quotaResourceSchema = Schema.Literals([
   "concurrent_turns",
@@ -133,7 +160,7 @@ export function quotaFailureMessage(error: QuotaAdmissionError) {
       : resource === "storage_bytes"
         ? "for this account"
         : "for today";
-  return `This ${scope} has reached its ${unit} limit ${horizon} (${String(used)} used of ${String(limit)}; requested ${String(requested)}). Try again later or ask the operator to raise Release-1 quotas.`;
+  return `This ${scope} has reached its ${unit} limit ${horizon} (${String(used)} used of ${String(limit)}; requested ${String(requested)}). Try again later, upgrade at /pricing, or ask the operator to raise quotas.`;
 }
 
 interface Check {
@@ -270,7 +297,7 @@ function decodeDemand(demand: QuotaDemand) {
 export const admitQuota = Effect.fn("admitQuota")(function* (
   usage: QuotaUsage,
   demand: QuotaDemand,
-  limits: Release1QuotaLimits = release1QuotaLimits
+  limits: Release1QuotaLimits = admissionLimitsForPlan()
 ) {
   const decodedUsage = yield* decodeUsage(usage);
   const decodedDemand = yield* decodeDemand(demand);
