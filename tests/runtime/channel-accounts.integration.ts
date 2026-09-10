@@ -81,6 +81,7 @@ test("channel identities, browser binding, races and revocation against migrated
         );
         const browserSecret = secret();
         const challenge = yield* accounts.issueChallenge({
+          purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
@@ -248,10 +249,12 @@ test("channel identities, browser binding, races and revocation against migrated
         yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp() - interval '11 minutes' WHERE id = ${sessionId}`;
         yield* rejected(
           accounts.issueChallenge({
+            purpose: "link" as const,
+            userId: link.userId,
+            sessionId: link.sessionId,
             channel: "telegram",
             installationId,
             browserSecret,
-            link,
           }),
           "session_invalid"
         );
@@ -260,10 +263,12 @@ test("channel identities, browser binding, races and revocation against migrated
         assert.equal(rejectedLinks.length, 0);
         yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp() WHERE id = ${sessionId}`;
         const conflict = yield* accounts.issueChallenge({
+          purpose: "link" as const,
+          userId: link.userId,
+          sessionId: link.sessionId,
           channel: "telegram",
           installationId,
           browserSecret,
-          link,
         });
         yield* rejected(
           accounts.previewChallenge({
@@ -285,10 +290,12 @@ test("channel identities, browser binding, races and revocation against migrated
           senderId: "5511999999999",
         } as const;
         const linking = yield* accounts.issueChallenge({
+          purpose: "link" as const,
+          userId: link.userId,
+          sessionId: link.sessionId,
           channel: "kapso",
           installationId,
           browserSecret,
-          link,
         });
         assert.deepEqual(
           yield* accounts.previewChallenge({
@@ -329,10 +336,12 @@ test("channel identities, browser binding, races and revocation against migrated
         assert.equal(linked.userId, first.userId);
         const staleSender = { ...sender, senderId: "stale-link-proof" };
         const staleLink = yield* accounts.issueChallenge({
+          purpose: "link" as const,
+          userId: link.userId,
+          sessionId: link.sessionId,
           channel: "telegram",
           installationId,
           browserSecret,
-          link,
         });
         yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp() - interval '11 minutes' WHERE id = ${sessionId}`;
         yield* rejected(
@@ -399,6 +408,7 @@ test("channel identities, browser binding, races and revocation against migrated
           senderId: "new-login-at-consumption",
         };
         const newLogin = yield* accounts.issueChallenge({
+          purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
@@ -425,6 +435,7 @@ test("channel identities, browser binding, races and revocation against migrated
           senderId: "abandoned-login-proof",
         };
         const abandoned = yield* accounts.issueChallenge({
+          purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
@@ -468,6 +479,7 @@ test("channel identities, browser binding, races and revocation against migrated
           "identity_inactive"
         );
         const expiring = yield* accounts.issueChallenge({
+          purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
@@ -482,6 +494,7 @@ test("channel identities, browser binding, races and revocation against migrated
           "invalid_challenge"
         );
         const expiredConsumption = yield* accounts.issueChallenge({
+          purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
@@ -506,6 +519,7 @@ test("channel identities, browser binding, races and revocation against migrated
           { status: "expired" }
         );
         const pending = yield* accounts.issueChallenge({
+          purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
@@ -542,6 +556,7 @@ test("channel identities, browser binding, races and revocation against migrated
           "invalid_challenge"
         );
         const revokedLogin = yield* accounts.issueChallenge({
+          purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
@@ -590,6 +605,7 @@ test("session issuance serializes with revocation across real PostgreSQL connect
         const installationId = `issuance-${randomUUID()}`;
         const browserSecret = secret();
         const challenge = yield* accounts.issueChallenge({
+          purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,

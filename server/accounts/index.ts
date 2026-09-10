@@ -17,14 +17,22 @@ export const VerifiedSender = Schema.Struct({
   installationId: Identifier,
   senderId: Identifier,
 });
-const IssueChallenge = Schema.Struct({
-  channel: channelProviderSchema,
-  installationId: Identifier,
-  browserSecret: Secret,
-  link: Schema.optionalKey(
-    Schema.Struct({ userId: Identifier, sessionId: Identifier })
-  ),
-});
+const IssueChallenge = Schema.Union([
+  Schema.Struct({
+    purpose: Schema.Literal("login"),
+    channel: channelProviderSchema,
+    installationId: Identifier,
+    browserSecret: Secret,
+  }),
+  Schema.Struct({
+    purpose: Schema.Literal("link"),
+    channel: channelProviderSchema,
+    installationId: Identifier,
+    browserSecret: Secret,
+    userId: Identifier,
+    sessionId: Identifier,
+  }),
+]);
 const ConfirmChallenge = Schema.Struct({
   token: Secret,
   sender: VerifiedSender,
@@ -245,21 +253,21 @@ export class ChannelAccounts extends Context.Service<
           const request = yield* decode(IssueChallenge, input);
           return yield* transaction(
             Effect.gen(function* () {
-              if (request.link)
-                yield* requireSession(
-                  request.link.userId,
-                  request.link.sessionId,
-                  true
-                );
+              if (request.purpose === "link")
+                yield* requireSession(request.userId, request.sessionId, true);
               const id = randomUUID();
               const token = randomBytes(32).toString("base64url");
+              const targetUserId =
+                request.purpose === "link" ? request.userId : null;
+              const requestingSessionId =
+                request.purpose === "link" ? request.sessionId : null;
               const issued = yield* sql<{
                 expiresAt: string;
               }>`INSERT INTO public.channel_auth_challenge
           (id, purpose, token_hash, browser_secret_hash, target_user_id, requesting_session_id,
            channel, installation_id, expires_at, created_at)
-          VALUES (${id}, ${request.link ? "link" : "login"}, ${hash(token)}, ${hash(request.browserSecret)},
-            ${request.link?.userId ?? null}, ${request.link?.sessionId ?? null}, ${request.channel},
+          VALUES (${id}, ${request.purpose}, ${hash(token)}, ${hash(request.browserSecret)},
+            ${targetUserId}, ${requestingSessionId}, ${request.channel},
             ${request.installationId}, clock_timestamp() + interval '5 minutes', clock_timestamp())
           RETURNING to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "expiresAt"`;
               const expiry = issued[0];

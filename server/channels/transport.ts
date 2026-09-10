@@ -15,6 +15,51 @@ import { InputDeliveryReferenceSchema } from "../messaging/model";
 import { Kapso, KapsoInstallationSchema } from "./kapso";
 import { Telegram, TelegramInstallationSchema } from "./telegram";
 
+/** Outbox drain terminal states — mutually exclusive; no bag of optional counters. */
+export type DrainOutboxResult =
+  | {
+      readonly state: "idle";
+      readonly sent: number;
+      readonly failed: number;
+      readonly uncertain: number;
+    }
+  | {
+      readonly state: "sent";
+      readonly sent: number;
+      readonly failed: number;
+      readonly uncertain: number;
+    }
+  | {
+      readonly state: "failed";
+      readonly sent: number;
+      readonly failed: number;
+      readonly uncertain: number;
+    }
+  | {
+      readonly state: "deferred";
+      readonly sent: number;
+      readonly failed: number;
+      readonly uncertain: number;
+    }
+  | {
+      readonly state: "uncertain";
+      readonly sent: number;
+      readonly failed: number;
+      readonly uncertain: number;
+    }
+  | {
+      readonly state: "blocked";
+      readonly sent: number;
+      readonly failed: number;
+      readonly uncertain: number;
+    }
+  | {
+      readonly state: "limit";
+      readonly sent: number;
+      readonly failed: number;
+      readonly uncertain: number;
+    };
+
 export class ChannelTransportError extends Schema.TaggedError<ChannelTransportError>()(
   "ChannelTransportError",
   {
@@ -447,19 +492,29 @@ const makeTransport = Effect.gen(function* () {
             remaining.counts.find((count) => count.status === "uncertain")
               ?.count ?? 0;
           if (uncertain > 0)
-            return { state: "uncertain" as const, sent, failed: 0, uncertain };
+            return {
+              state: "uncertain",
+              sent,
+              failed: 0,
+              uncertain,
+            } satisfies DrainOutboxResult;
           const blocked = remaining.counts.some(
             (count) =>
               count.status === "queued" || count.status === "dispatching"
           );
           if (blocked)
-            return { state: "blocked" as const, sent, failed: 0, uncertain: 0 };
+            return {
+              state: "blocked",
+              sent,
+              failed: 0,
+              uncertain: 0,
+            } satisfies DrainOutboxResult;
           return {
-            state: sent > 0 ? ("sent" as const) : ("idle" as const),
+            state: sent > 0 ? "sent" : "idle",
             sent,
             failed: 0,
             uncertain: 0,
-          };
+          } satisfies DrainOutboxResult;
         }
         const state = yield* dispatch(claim);
         if (state !== "sent")
@@ -468,10 +523,15 @@ const makeTransport = Effect.gen(function* () {
             sent,
             failed: state === "failed" ? 1 : 0,
             uncertain: state === "uncertain" ? 1 : 0,
-          };
+          } satisfies DrainOutboxResult;
         sent += 1;
       }
-      return { state: "limit" as const, sent, failed: 0, uncertain: 0 };
+      return {
+        state: "limit",
+        sent,
+        failed: 0,
+        uncertain: 0,
+      } satisfies DrainOutboxResult;
     }),
   };
 });

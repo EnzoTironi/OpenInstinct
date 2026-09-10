@@ -208,18 +208,22 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                 const browserSecret = yield* Effect.sync(() =>
                   randomBytes(32).toString("base64url")
                 );
-                const issueInput = {
-                  channel: ctx.body.channel,
-                  installationId: destination.installationId,
-                  browserSecret,
-                };
                 const challenge = yield* accounts.issueChallenge(
                   current
                     ? {
-                        ...issueInput,
-                        link: current,
+                        purpose: "link" as const,
+                        channel: ctx.body.channel,
+                        installationId: destination.installationId,
+                        browserSecret,
+                        userId: current.userId,
+                        sessionId: current.sessionId,
                       }
-                    : issueInput
+                    : {
+                        purpose: "login" as const,
+                        channel: ctx.body.channel,
+                        installationId: destination.installationId,
+                        browserSecret,
+                      }
                 );
                 const message = challenge.token;
                 const response = yield* Schema.decodeUnknownEffect(

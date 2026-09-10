@@ -59,6 +59,7 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         senderId: "private-sender",
       };
       const issue = accounts.issueChallenge({
+        purpose: "login" as const,
         channel: "telegram",
         installationId,
         browserSecret: randomBytes(32).toString("base64url"),
@@ -368,10 +369,12 @@ test("prompt preparation delegates revoked link rejection to account preview", a
         yield* sql`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
         VALUES (${sessionId}, ${randomBytes(32).toString("base64url")}, ${owner.userId}, clock_timestamp() + interval '1 hour', clock_timestamp(), clock_timestamp())`;
         const challenge = yield* accounts.issueChallenge({
+          purpose: "link" as const,
           channel: "telegram",
           installationId,
           browserSecret: randomBytes(32).toString("base64url"),
-          link: { userId: owner.userId, sessionId },
+          userId: owner.userId,
+          sessionId,
         });
         yield* prompts
           .prepare({ token: challenge.token, sender, eventId: randomUUID() })
