@@ -9,8 +9,12 @@ secrets.** F01 rotation is **Partial** (2026-09-10 authorized execute); remainin
 TG / Kapso webhooks
        │
        ▼
-Cloudflare named tunnel (Mac LaunchAgent companion-cloudflared)
+Cloudflare named tunnel
   companion.tironi.xyz
+       │
+       ▼
+Fly app companion-cf-tunnel (cloudflared)   ← preferred always-on connector
+  (Mac LaunchAgent companion-cloudflared = rollback only)
        │
        ▼
 Fly app companion-tironi (Next :3000 + Eve :4274)
@@ -22,8 +26,58 @@ Alchemy unmanaged PG — Fly app companion-pg-prod
 ```
 
 Mac `companion-runtime` LaunchAgent should stay **unloaded** while Fly serves
-traffic. Keep `companion-cloudflared` loaded while the tunnel still terminates
-on the Mac.
+traffic. Prefer Fly `companion-cf-tunnel` for the named-tunnel connector (see
+[ingress README](../../infrastructure/ingress/README.md)); keep the Mac
+`companion-cloudflared` plist on disk for rollback only.
+
+
+## External uptime + push alert (required)
+
+**Manual curl / `fly status` alone is not enough.** Prod needs something that
+watches the public path and **pushes** on failure (phone / email / chat).
+
+### What we chose (no new paid SaaS)
+
+| Option | Status |
+| ------ | ------ |
+| Fly.io native notify on machine health failure | **Unavailable** — Fly has no `fly notifications` / push on failing `[checks]`; health checks affect routing only |
+| Better Stack / UptimeRobot free API | **Blocked** — no API tokens / account credentials present in this environment; do not invent accounts from a worker |
+| Tiny probe + schedule + push sink | **Shipped** — see below |
+
+### Probe
+
+```sh
+./scripts/companion-uptime-probe.sh
+# expect: welcome=200, tg=401, kapso=401, exit 0
+```
+
+Checks `https://companion.tironi.xyz/welcome` → **200** and unsigned Telegram /
+Kapso channel POSTs → **401**. On failure exits **1** and pushes if a sink is
+configured:
+
+| Env name (value never in git) | Sink |
+| ----------------------------- | ---- |
+| `COMPANION_UPTIME_ALERT_URL` | Generic `POST` text/plain webhook |
+| `COMPANION_UPTIME_NTFY_TOPIC` | Free [ntfy.sh](https://ntfy.sh) topic (subscribe in the ntfy app) |
+| (Darwin, no env) | macOS Notification Center fallback |
+| (none) | Rely on process exit — cron mail / GitHub Actions failure notification |
+
+### Schedulers (install at least one external)
+
+1. **GitHub Actions (primary external)** — workflow
+   [`.github/workflows/companion-uptime.yml`](../../.github/workflows/companion-uptime.yml)
+   runs every ~10 minutes + `workflow_dispatch`. A red run notifies the workflow
+   author via GitHub. Optional repo secrets (names only):
+   `COMPANION_UPTIME_ALERT_URL`, `COMPANION_UPTIME_NTFY_TOPIC`.
+2. **Mac LaunchAgent (local backup)** — copy
+   [`com.openinstinct.companion-uptime.plist.example`](../../infrastructure/ingress/com.openinstinct.companion-uptime.plist.example)
+   to `~/Library/LaunchAgents/`, replace `REPLACE` paths, optionally set an
+   alert env, then:
+   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.openinstinct.companion-uptime.plist`
+
+Operator one-time: confirm GitHub → Settings → Notifications includes Actions
+failures, **or** set a ntfy/webhook secret so failures reach a phone even when
+email is quiet.
 
 ## Minimal uptime / health (every check)
 
@@ -52,13 +106,19 @@ curl -sS -o /dev/null -w "kapso=%{http_code}\n" \
 fly ssh console -a companion-pg-prod -C "pg_isready -U postgres"
 # expect: accepting connections
 
-# 5) Mac tunnel agent (only while CF tunnel terminates on Mac)
-launchctl print "gui/$(id -u)/com.openinstinct.companion-cloudflared" | head -8
-# expect: state = running
-# companion-runtime should NOT be loaded when Fly owns compute
+# 5) Tunnel connector
+fly status -a companion-cf-tunnel
+# expect: machine started (preferred)
+# Mac companion-cloudflared should be unloaded when Fly owns the connector;
+# companion-runtime must stay unloaded while Fly owns compute
+
+# 6) External probe (same checks the scheduler runs)
+./scripts/companion-uptime-probe.sh
+# expect: exit 0
 ```
 
-Helpers: `./scripts/fly-companion.sh status`, `./scripts/fly-alchemy-pg.sh verify --stage prod`.
+Helpers: `./scripts/fly-companion.sh status`, `./scripts/fly-alchemy-pg.sh verify --stage prod`,
+`./scripts/companion-uptime-probe.sh`.
 
 ## Backup — companion-pg-prod
 
@@ -149,3 +209,5 @@ apply live webhook URL changes (dry-run only), or invent Stripe keys.
 - [WhatsApp Meta activation (O02)](whatsapp-meta-activation.md)
 - [Credential rotation (F01 / O01)](credential-rotation.md)
 - [Ingress](../../infrastructure/ingress/README.md)
+- Probe script: [`scripts/companion-uptime-probe.sh`](../../scripts/companion-uptime-probe.sh)
+- Workflow: [`.github/workflows/companion-uptime.yml`](../../.github/workflows/companion-uptime.yml)

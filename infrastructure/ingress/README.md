@@ -143,6 +143,8 @@ TUNNEL_TOKEN_FILE="$HOME/.cloudflared/openinstinct-companion.token" \
 
 # Verify public hostname (unsigned channel POST → 401; /welcome → 200):
 curl -sS -o /dev/null -w '%{http_code}\n' https://companion.tironi.xyz/welcome
+# Preferred recurring probe (push alert on fail — see docs/ops/prod-uptime-checklist.md):
+# ./scripts/companion-uptime-probe.sh
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://companion.tironi.xyz/api/channels/telegram \
   -H 'content-type: application/json' -d '{}'
 

@@ -6,11 +6,11 @@ docs and scripts only — never secret values in git, PRs, logs, or chat.
 
 | ID  | Checklist                                                                    | Owner             |
 | --- | ---------------------------------------------------------------------------- | ----------------- |
-| O01 | [Credential rotation (F01)](credential-rotation.md) — names, order, verify   | Enzo (secrets)    |
+| O01 | [Credential rotation (F01)](credential-rotation.md) — names, order, verify; **SECRET_ENCRYPTION_KEY plan (docs only)** | Enzo (secrets)    |
 | O02 | [WhatsApp Meta + Kapso activation](whatsapp-meta-activation.md)              | Enzo (Meta/Kapso) |
 | —   | [Enzo live blockers](enzo-live-actions.md) (DNS + G03 Telegram group)        | Enzo only         |
 | H01 | [Hosted Fly cutover](hosted-fly.md) — Alchemy Docker PG + Fly compute        | Enzo (deploy/DNS) |
-| —   | [Prod uptime + backup](prod-uptime-checklist.md) — health, pg_dump, rollback | Ops / Enzo        |
+| —   | [Prod uptime + backup](prod-uptime-checklist.md) — **push alert** + health, pg_dump, rollback | Ops / Enzo        |
 
 **Ingress status (2026-09-10 ~16:50 PT):** Companion channel public base is interim
 `https://companion.tironi.xyz` (named tunnel still Mac `companion-cloudflared`;
@@ -25,7 +25,7 @@ cutover deferred.
 Related:
 
 - [Hosted Fly cutover (H01)](hosted-fly.md)
-- [Prod uptime + backup](prod-uptime-checklist.md)
+- [Prod uptime + backup](prod-uptime-checklist.md) (external probe + push alert)
 - [Self-host / ops](../self-host.md)
 - [Durable ingress (D01)](../../infrastructure/ingress/README.md)
 - [Kapso path ADR](../decisions/adr-kapso-path-r1.md)

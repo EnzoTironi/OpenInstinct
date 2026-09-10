@@ -121,6 +121,72 @@ openssl rand -base64 32   # → paste into .env.local as SECRET_ENCRYPTION_KEY
 
 Must be base64 decoding to **exactly 32 bytes** (see `shared/environment/env.ts`).
 
+## `SECRET_ENCRYPTION_KEY` rotation plan (P1 crypto — docs only)
+
+**Do not rotate `SECRET_ENCRYPTION_KEY` in this change / session.** This section
+is the standing operator plan for when Enzo authorizes a real cutover.
+
+### Current crypto shape (as of 2026-09-10)
+
+| Fact | Detail |
+| ---- | ------ |
+| Key env | `SECRET_ENCRYPTION_KEY` — base64 → **exactly 32 bytes** (`shared/environment/env.ts`) |
+| Algorithm | AES-256-GCM via `db/services/vault.ts` (`encryptVaultSecret` / `decryptVaultSecret`) |
+| Ciphertext format | `v1.<iv_b64url>.<tag_b64url>.<ciphertext_b64url>` — `v1` is **format** version, **not** a key id |
+| AAD | `workspaceId \0 vault \0 id` |
+| Storage | Postgres table `encrypted_secrets` (`namespace = 'vault'` only today) |
+| Dual-key / keyring | **Not implemented** — runtime loads a single key from env (or Blob-provisioned installation secrets) |
+
+Consequence: flipping the env to a new key **without** rewriting every
+`encrypted_secrets.encrypted_value` makes vault secrets permanently unreadable.
+
+### Preconditions (gate before any live rotate)
+
+1. **Authorized** by Enzo for a maintenance window.
+2. **Backup** companion-pg-prod: Fly volume snapshot **and** logical `pg_dump`
+   (see [prod-uptime-checklist.md](prod-uptime-checklist.md)). Verify restore to
+   a scratch DB once.
+3. **Inventory** (status only — never print ciphertext or plaintext):
+   `SELECT count(*) FROM encrypted_secrets WHERE namespace = 'vault';`
+4. **Tooling** — prefer shipping (separate PR) either:
+   - **(A) Dual-key read** — env `SECRET_ENCRYPTION_KEY` (new) +
+     `SECRET_ENCRYPTION_KEY_PREVIOUS` (old) so decrypt tries new then previous; or
+   - **(B) Offline re-encrypt** — one-shot operator script that decrypts with old
+     key and rewrites `v1…` rows with new key **before** Fly secret cutover.
+5. Until (4) exists, treat rotation as **blocked** except on empty vaults /
+   disposable installs.
+
+### Recommended procedure (when tooling exists)
+
+1. Generate new key offline: `openssl rand -base64 32` → keep only in a `chmod 600`
+   temp file (never chat / PR / CI logs).
+2. Take PG snapshot + `pg_dump`; record row count.
+3. Prefer path **A** (dual-key):
+   1. Set Fly secret `SECRET_ENCRYPTION_KEY_PREVIOUS` = current key (if/when
+      code supports it), then `SECRET_ENCRYPTION_KEY` = new key; restart
+      `companion-tironi`.
+   2. Run re-encrypt job / script to rewrite all vault rows under the new key.
+   3. Confirm sample vault reads (browser login vault item or known test item).
+   4. Remove `SECRET_ENCRYPTION_KEY_PREVIOUS` after soak; shred temp files.
+4. Path **B** (offline, single-key):
+   1. Quiesce writers (maintenance / scale to zero briefly).
+   2. Re-encrypt all rows with old→new using the offline tool against a
+      connection that never logs secret values.
+   3. Set Fly `SECRET_ENCRYPTION_KEY` (and matching local `.env.prod` /
+      `.env.local` if used) to the new key; restart compute.
+   4. Verify vault decrypt; only then revoke/shred the old key material.
+5. **Verify** (no secret output): app boots; welcome → 200; unsigned channel
+   POST → 401; at least one previously stored vault secret decrypts in-product.
+6. **Rollback** — restore volume / `pg_dump` **and** put the previous key back
+   on Fly if verify fails before shredding the old key.
+
+### Explicit non-goals for this docs PR
+
+- No live `fly secrets set SECRET_ENCRYPTION_KEY=…`
+- No ciphertext rewrite
+- No dual-key code in this change
+
+
 ## Related Enzo blockers
 
 Secret rotation does **not** unblock DNS or Meta product gates. See

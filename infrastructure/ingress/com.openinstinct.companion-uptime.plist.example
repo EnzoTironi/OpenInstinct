@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Local backup probe (every 5 minutes) while GitHub Actions cron is the
+  primary external watcher. Replace REPLACE paths. Optional alert env:
+  COMPANION_UPTIME_ALERT_URL or COMPANION_UPTIME_NTFY_TOPIC (never commit values).
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.openinstinct.companion-uptime</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/REPLACE/path/to/OpenInstinct/scripts/companion-uptime-probe.sh</string>
+    <string>--quiet</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/REPLACE/path/to/OpenInstinct</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/REPLACE</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <!-- Optional: set one push sink (do not commit real values into a live plist in git).
+    <key>COMPANION_UPTIME_NTFY_TOPIC</key>
+    <string>REPLACE-private-topic</string>
+    -->
+  </dict>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/REPLACE/Library/Logs/companion-uptime.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/REPLACE/Library/Logs/companion-uptime.log</string>
+</dict>
+</plist>
