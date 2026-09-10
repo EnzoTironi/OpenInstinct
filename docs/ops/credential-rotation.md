@@ -1,8 +1,9 @@
 # O01 — Credential rotation checklist (F01)
 
-**Status:** Checklist only (R2). Enzo rotates live secrets; this document lists
-**environment variable names**, **rotation order**, and **verify steps**.
-**Never print, paste, commit, or log secret values.**
+**Status:** **Partial** live rotation (2026-09-10, Enzo-authorized) — not Deferred.
+Checklist remains the operator source of truth for **environment variable names**,
+**rotation order**, and **verify steps**. **Never print, paste, commit, or log
+secret values.**
 
 **Live rotation (2026-09-10):** **Partial execute** (Enzo-authorized). Fly app
 `companion-tironi` + local `.env.prod` / `.env.local` (worktree

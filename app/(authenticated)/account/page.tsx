@@ -9,7 +9,12 @@ import { serverRuntime } from "../../../server/runtime";
 import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 import { LinkedChannels } from "./linked-channels";
 import { PersonalMemorySection } from "./personal-memory";
+import {
+  isStripeBillingConfigured,
+  isStripePortalConfigured,
+} from "../../../server/billing/stripe";
 import { AccountBillingSection } from "./_components/billing-section";
+import { AccountPrivacyWipeSection } from "./_components/privacy-wipe-section";
 
 export default async function AccountPage() {
   const requestHeaders = await headers();
@@ -74,8 +79,11 @@ export default async function AccountPage() {
         plan={entitlement.plan}
         seatCount={entitlement.seatCount}
         status={entitlement.status}
+        stripeCheckoutConfigured={isStripeBillingConfigured()}
+        stripePortalConfigured={isStripePortalConfigured()}
       />
       <PersonalMemorySection />
+      <AccountPrivacyWipeSection />
     </main>
   );
 }

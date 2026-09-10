@@ -20,8 +20,7 @@ cutover deferred.
 
 **O02 / Meta (2026-09-10 Kapso API):** Display name `AVAILABLE_WITHOUT_REVIEW`
 (verified name present). UTILITY template `companion_account_notice_v1` still
-`PENDING` — O02 not complete. **F01 credential rotation remains deferred**
-(checklist only; do not rotate until Enzo authorizes live rotation).
+`PENDING` — O02 not complete. **F01 credential rotation is Partial** (2026-09-10 Enzo-authorized execute for rotatable families; remaining skipped — see [credential-rotation.md](credential-rotation.md)). Not Deferred.
 
 Related:
 

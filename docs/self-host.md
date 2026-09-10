@@ -323,7 +323,9 @@ Routes (browser session + canonical membership required; fail closed):
 | `/api/account/delete` | POST   | Online personal-memory wipe + browser session invalidate |
 
 **Not full account deletion.** Export and delete cover stored personal memory
-only. See [`server/accounts/README.md`](../server/accounts/README.md) and
+only. Account UI → **Privacy export and online wipe** links the same
+`POST /api/account/delete` flow and lists `partial_online_wipe` exclusions.
+See [`server/accounts/README.md`](../server/accounts/README.md) and
 `server/accounts/privacy.ts`.
 
 Delete **does wipe:** personal-memory surface for the scope; Better Auth

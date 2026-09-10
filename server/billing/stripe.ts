@@ -32,3 +32,21 @@ export function stripeWebhookSecret() {
   if (!secret) throw new StripeNotConfiguredError();
   return Redacted.value(secret);
 }
+
+/** True when Checkout can run for a paid plan (secret + that plan's Price id). */
+export function isStripeCheckoutConfigured(plan: "pro" | "org"): boolean {
+  if (!env.STRIPE_SECRET_KEY) return false;
+  return plan === "pro"
+    ? Boolean(env.STRIPE_PRICE_PRO)
+    : Boolean(env.STRIPE_PRICE_ORG_SEAT);
+}
+
+/** True when any paid Checkout CTA may be offered (secret + at least one Price). */
+export function isStripeBillingConfigured(): boolean {
+  return isStripeCheckoutConfigured("pro") || isStripeCheckoutConfigured("org");
+}
+
+/** Customer Portal needs the Stripe secret; CTAs should stay off without it. */
+export function isStripePortalConfigured(): boolean {
+  return Boolean(env.STRIPE_SECRET_KEY);
+}

@@ -37,9 +37,11 @@ function formatPrice(planId: BillingPlanId, amount: number) {
 export function PricingPanel({
   signedIn,
   currentPlan,
+  stripeConfigured,
 }: {
   readonly signedIn: boolean;
   readonly currentPlan: BillingPlanId;
+  readonly stripeConfigured: boolean;
 }) {
   const [busyPlan, setBusyPlan] = useState<BillingPlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,11 @@ export function PricingPanel({
       const decoded = Schema.decodeUnknownOption(checkoutResponseSchema)(raw);
       const body = Option.isSome(decoded) ? decoded.value : {};
       if (!response.ok || !body.url) {
-        if (body.reason === "org_required") {
+        if (body.reason === "stripe_not_configured") {
+          setError(
+            "Paid Checkout is disabled on this deployment (Stripe not configured). Free still works."
+          );
+        } else if (body.reason === "org_required") {
           setError(
             "Org seats need an organization first. Create one under Account, then retry with that org."
           );
@@ -93,6 +99,18 @@ export function PricingPanel({
           dashboard.
         </p>
       </header>
+
+      {!stripeConfigured ? (
+        <Alert variant="information">
+          <AlertTitle>Paid upgrades disabled</AlertTitle>
+          <AlertDescription>
+            Stripe Checkout is not configured on this deployment (
+            <code className="type-caption">STRIPE_*</code> unset). Free still
+            works with no card. Upgrade and Customer Portal CTAs stay off so
+            Checkout cannot start broken.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {error ? (
         <Alert variant="destructive">
@@ -150,6 +168,10 @@ export function PricingPanel({
                     variant={isCurrent ? "secondary" : "outline"}
                   >
                     {isCurrent ? "Current plan" : "Start free"}
+                  </Button>
+                ) : !stripeConfigured ? (
+                  <Button className="w-full" disabled variant="secondary">
+                    Checkout unavailable
                   </Button>
                 ) : !signedIn ? (
                   <Button
@@ -209,8 +231,9 @@ export function PricingPanel({
       </div>
 
       <p className="text-center type-caption text-muted-foreground">
-        Already paying? Manage payment method and cancellation in Account via
-        Stripe Customer Portal. Self-host stays on operator quotas — see docs.
+        {stripeConfigured
+          ? "Already paying? Manage payment method and cancellation in Account via Stripe Customer Portal. Self-host stays on operator quotas — see docs."
+          : "Paid billing stays off until an operator configures Stripe. Self-host stays on operator quotas — see docs."}
       </p>
     </section>
   );

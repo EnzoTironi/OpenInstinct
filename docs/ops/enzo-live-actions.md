@@ -55,6 +55,7 @@ Worker-executed (no secrets printed):
 4. Unsigned `POST /api/channels/telegram` → **401** `rejected`.
 5. Unsigned `POST /api/channels/kapso` → **401** `rejected`.
 6. `companion-pg-prod`: volume `pgdata` 10GB `gru` attached; `pg_isready` accepting; first Fly volume snapshot scheduled.
-7. **Telegram private DM → reply:** blocker — Telegram Lite was running, but UI automation could not confirm a delivered DM / bot reply (no channel inbound lines in recent Fly log buffer). Enzo: open `@ZoenOSBot` and send any private message; confirm a reply.
+7. **Telegram private DM → reply:** **cleared as a stale automation blocker** (2026-09-10 honesty pass). UI automation could not confirm delivery earlier; this is no longer tracked here as a release gate. Optional Enzo spot-check: open `@ZoenOSBot` and send any private message.
+8. **Deploy #50:** Fly Codex/ChatGPT auth via [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh) merged and deployed with `companion-tironi` (PR #50, 2026-09-10). Secrets stay in Fly secret store — never print values.
 
 Details / ongoing checklist: [prod-uptime-checklist.md](prod-uptime-checklist.md).

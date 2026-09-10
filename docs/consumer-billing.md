@@ -65,7 +65,9 @@ admitQuota(..., admissionLimitsForPlan(plan, seats))
 | `BETTER_AUTH_URL`       | Public origin for Checkout success/cancel + Portal return |
 
 Optional: leave all Stripe names unset — Free still works; Checkout/Portal return
-503 `stripe_not_configured`.
+503 `stripe_not_configured`. **Product honesty:** `/pricing` and Account billing
+CTAs detect unset `STRIPE_*` and show a clear disabled state (no broken Checkout
+redirect).
 
 ```sh
 # Names only — values from your secret store:

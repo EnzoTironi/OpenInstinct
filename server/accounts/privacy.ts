@@ -2,6 +2,12 @@ import { PgClient } from "@effect/sql-pg";
 import { Effect, Schema } from "effect";
 import { readAuthSession } from "@db/services/auth/session";
 import { accessScopeForUser } from "@shared/identity/access-scope";
+import {
+  accountOnlineWipeLimits,
+  accountOnlineWipeNotWiped,
+  accountPrivacyExportExcluded,
+  accountPrivacyExportLimits,
+} from "@shared/identity/account-privacy-limits";
 import { PersonalMemory } from "../personal-memory";
 import { requirePersonalMemoryWebSession } from "../personal-memory/access";
 import type { PersonalMemoryError } from "../personal-memory/access";
@@ -20,29 +26,6 @@ export class AccountPrivacyError extends Schema.TaggedError<AccountPrivacyError>
     reason: Schema.Literals(["unauthenticated", "unavailable"]),
   }
 ) {}
-
-const accountExportExcluded = [
-  "conversation-history",
-  "artifacts",
-  "connected-accounts",
-  "schedules",
-  "unbound-memory-documents",
-  "channel-identities",
-  "browser-sessions",
-  "backups",
-] as const;
-
-const accountDeleteNotWiped = [
-  "conversation-history",
-  "artifacts",
-  "connected-accounts",
-  "schedules",
-  "unbound-memory-documents",
-  "channel-identities",
-  "backups",
-  "workspace-row",
-  "user-row",
-] as const;
 
 const requirePrivacySession = Effect.fn("requirePrivacySession")(function* (
   headers: Headers
@@ -76,9 +59,8 @@ export const exportAccountPrivacy = Effect.fn("exportAccountPrivacy")(
       personalMemory: snapshot,
       coverage: {
         included: snapshot.coverage.included,
-        excluded: accountExportExcluded,
-        limits:
-          "Partial online export of stored personal memory only. Not a full-account backup or restore contract.",
+        excluded: accountPrivacyExportExcluded,
+        limits: accountPrivacyExportLimits,
       },
     };
   }
@@ -107,9 +89,8 @@ export const deleteAccountOnlineData = Effect.fn("deleteAccountOnlineData")(
     return {
       status: "partial_online_wipe" as const,
       wiped: wiped.wiped,
-      notWiped: accountDeleteNotWiped,
-      limits:
-        "Online personal-memory wipe and browser session invalidation only. Channel identities, schedules, artifacts, conversation history, backups and the user/workspace rows are not erased. Do not claim full account deletion or backup erasure.",
+      notWiped: accountOnlineWipeNotWiped,
+      limits: accountOnlineWipeLimits,
     };
   },
   Effect.catchTag(

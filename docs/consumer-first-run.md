@@ -38,12 +38,12 @@ extra channel uses **Account → Link another channel** (`purpose: "link"`).
 
 Honest limits consumers should see before we claim “full account control”:
 
-| Topic                        | Where                                                                                                             | Honest claim                                                                                                   |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Privacy export / wipe        | Account → Personal memory (download) + API routes in [self-host §9](self-host.md#9-account-export--delete-limits) | Partial personal-memory export/wipe only — **not** full account, history, backups, or channel-identity erasure |
-| Billing trust                | Account → Plan and billing · [consumer billing](consumer-billing.md)                                              | Free never requires a card; paid uses Stripe Checkout + Customer Portal                                        |
-| Operator secrets (F01)       | [Credential rotation](ops/credential-rotation.md)                                                                 | Checklist only — **live rotation deferred** until Enzo authorizes                                              |
-| WhatsApp product gates (O02) | [Meta activation](ops/whatsapp-meta-activation.md)                                                                | Display name usable; UTILITY template approval still **PENDING** as of 2026-09-10                              |
+| Topic                        | Where                                                                                                                                      | Honest claim                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Privacy export / wipe        | Account → Privacy export and online wipe (CTA → `POST /api/account/delete`) + [self-host §9](self-host.md#9-account-export--delete-limits) | `partial_online_wipe` only — **not** full account, history, backups, or channel-identity erasure            |
+| Billing trust                | Account → Plan and billing · [consumer billing](consumer-billing.md)                                                                       | Free never requires a card; paid uses Stripe Checkout + Customer Portal                                     |
+| Operator secrets (F01)       | [Credential rotation](ops/credential-rotation.md)                                                                                          | **Partial** live rotation executed 2026-09-10 (Enzo-authorized); remaining families skipped — see checklist |
+| WhatsApp product gates (O02) | [Meta activation](ops/whatsapp-meta-activation.md)                                                                                         | Display name usable; UTILITY template approval still **PENDING** as of 2026-09-10                           |
 
 Do **not** market full deletion, backup erasure, or WhatsApp proactive templates
 until O02’s APPROVED UTILITY gate and the privacy limits above are clear in UI
