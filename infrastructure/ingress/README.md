@@ -120,6 +120,50 @@ Before changing the public base again:
 - ownership binding for _this_ install is understood,
 - then re-run `pnpm ingress:set-webhooks` (never `*.trycloudflare.com`).
 
+## Always-on connector on Fly (remove Mac SPOF)
+
+As of **2026-09-10**, the `openinstinct-companion` named tunnel **origin** already
+points at `https://companion-tironi.fly.dev`. The remaining Mac dependency was the
+**cloudflared connector** (`com.openinstinct.companion-cloudflared` LaunchAgent).
+
+**Preferred off-Mac path:** run the same tunnel token on Fly app
+`companion-cf-tunnel` (image `cloudflare/cloudflared`, region `gru`):
+
+| Piece                                                                      | Role                                                                              |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [`fly-tunnel/fly.toml`](fly-tunnel/fly.toml)                               | Connector-only Fly app (no HTTP service)                                          |
+| [`scripts/fly-companion-tunnel.sh`](../../scripts/fly-companion-tunnel.sh) | `validate` / `status` / `deploy` / `set-token-from-file`                          |
+| Fly secret `TUNNEL_TOKEN`                                                  | Same named-tunnel token as Mac file `~/.cloudflared/openinstinct-companion.token` |
+
+```sh
+# One-time (token file mode 600; value never printed):
+TUNNEL_TOKEN_FILE="$HOME/.cloudflared/openinstinct-companion.token" \
+  ./scripts/fly-companion-tunnel.sh set-token-from-file
+./scripts/fly-companion-tunnel.sh deploy
+
+# Verify public hostname (unsigned channel POST → 401; /welcome → 200):
+curl -sS -o /dev/null -w '%{http_code}\n' https://companion.tironi.xyz/welcome
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://companion.tironi.xyz/api/channels/telegram \
+  -H 'content-type: application/json' -d '{}'
+
+# Only after verify: unload Mac connector (plist file may stay for rollback):
+launchctl bootout "gui/$(id -u)/com.openinstinct.companion-cloudflared"
+```
+
+**Option B (DNS CNAME → `companion-tironi.fly.dev`, retire tunnel)** was not used:
+hostname already rides the named tunnel; CF API/wrangler OAuth was unavailable for
+a safe DNS rewrite during this cutover. Revisit if you want to drop the tunnel hop.
+
+### Rollback (restore Mac connector)
+
+1. Keep Fly compute `companion-tironi` running (origin still `https://companion-tironi.fly.dev`).
+2. Reload Mac LaunchAgent (plist still on disk):  
+   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.openinstinct.companion-cloudflared.plist`
+3. Confirm Mac `cloudflared` registers; optional: `fly machines stop -a companion-cf-tunnel` only after Mac is healthy.
+4. Verify `https://companion.tironi.xyz/welcome` → 200 and unsigned telegram POST → 401.
+
+Do **not** delete the named tunnel or change webhook URLs for rollback.
+
 ## Set provider webhook URLs (env names only)
 
 From the repo root, with secrets already in `.env.local` (never printed):

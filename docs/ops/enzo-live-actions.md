@@ -6,9 +6,12 @@ Ship docs/scripts; Enzo executes.
 ## 1. DNS — Companion hostname → named tunnel
 
 **Done (interim, 2026-09-10):** Companion channel ingress is live at
-`https://companion.tironi.xyz` (named tunnel `openinstinct-companion`, LaunchAgent
-`com.openinstinct.companion-cloudflared`). Telegram + Kapso webhooks already use
-that origin. Mac runtime: `COMPANION_PUBLIC_BASE_URL=https://companion.tironi.xyz`.
+`https://companion.tironi.xyz` (named tunnel `openinstinct-companion`, origin
+`https://companion-tironi.fly.dev`). **Connector SPOF removed (same day):** Fly
+app `companion-cf-tunnel` runs `cloudflared`; Mac LaunchAgent
+`com.openinstinct.companion-cloudflared` unloaded after verify. Telegram + Kapso
+webhooks already use that origin. Public base:
+`COMPANION_PUBLIC_BASE_URL=https://companion.tironi.xyz`.
 
 `app.zoen.space` still resolves to **Fly** for the Zoen **product** site — leave
 it alone. A zoen.space Companion hostname cutover is **deferred**.

@@ -1,0 +1,25 @@
+# Named-tunnel connector for companion.tironi.xyz — always-on off-Mac (removes
+# Mac LaunchAgent SPOF). Origin is managed in Cloudflare Zero Trust and already
+# points at https://companion-tironi.fly.dev. This app only runs cloudflared.
+#
+# Secret (set once; never commit):
+#   fly secrets set -a companion-cf-tunnel TUNNEL_TOKEN=- < ~/.cloudflared/openinstinct-companion.token
+#
+# Deploy:
+#   fly deploy -a companion-cf-tunnel -c infrastructure/ingress/fly-tunnel/fly.toml --ha=false
+#
+# Rollback to Mac connector: see infrastructure/ingress/README.md
+
+app = "companion-cf-tunnel"
+primary_region = "gru"
+
+[build]
+image = "cloudflare/cloudflared:latest"
+
+[processes]
+app = "tunnel --no-autoupdate run"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "256mb"
+cpus = 1
