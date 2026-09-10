@@ -4,11 +4,11 @@ Operator-facing checklists for remaining Release-2 (R2) ops toward 100%.
 **Enzo executes secrets / Meta / DNS / live Telegram group actions.** Workers ship
 docs and scripts only — never secret values in git, PRs, logs, or chat.
 
-| ID  | Checklist                                                                 | Owner              |
-| --- | ------------------------------------------------------------------------- | ------------------ |
-| O01 | [Credential rotation (F01)](credential-rotation.md) — names, order, verify | Enzo (secrets)     |
-| O02 | [WhatsApp Meta + Kapso activation](whatsapp-meta-activation.md)           | Enzo (Meta/Kapso)  |
-| —   | [Enzo live blockers](enzo-live-actions.md) (DNS + G03 Telegram group)     | Enzo only          |
+| ID  | Checklist                                                                  | Owner             |
+| --- | -------------------------------------------------------------------------- | ----------------- |
+| O01 | [Credential rotation (F01)](credential-rotation.md) — names, order, verify | Enzo (secrets)    |
+| O02 | [WhatsApp Meta + Kapso activation](whatsapp-meta-activation.md)            | Enzo (Meta/Kapso) |
+| —   | [Enzo live blockers](enzo-live-actions.md) (DNS + G03 Telegram group)      | Enzo only         |
 
 Related:
 

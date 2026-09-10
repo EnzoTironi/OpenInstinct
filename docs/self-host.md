@@ -338,11 +338,11 @@ and [product direction](product-direction.md).
 
 Remaining R2 operator work toward 100% (Enzo executes secrets / Meta / DNS):
 
-| ID  | Doc                                                                 | What |
-| --- | -------------------------------------------------------------------- | ---- |
-| O01 | [Credential rotation (F01)](ops/credential-rotation.md)              | Env **names**, rotate order, verify — never secret values |
-| O02 | [WhatsApp Meta + Kapso](ops/whatsapp-meta-activation.md)             | Display-name approval, ≥1 UTILITY template, D01 webhook script |
-| —   | [Enzo live blockers](ops/enzo-live-actions.md)                       | DNS hostname→named tunnel; add `@ZoenOSBot` + mention for live G03 |
+| ID  | Doc                                                      | What                                                               |
+| --- | -------------------------------------------------------- | ------------------------------------------------------------------ |
+| O01 | [Credential rotation (F01)](ops/credential-rotation.md)  | Env **names**, rotate order, verify — never secret values          |
+| O02 | [WhatsApp Meta + Kapso](ops/whatsapp-meta-activation.md) | Display-name approval, ≥1 UTILITY template, D01 webhook script     |
+| —   | [Enzo live blockers](ops/enzo-live-actions.md)           | DNS hostname→named tunnel; add `@ZoenOSBot` + mention for live G03 |
 
 Index: [docs/ops/](ops/README.md). ADR:
 [adr-o01-o02-ops-r2.md](decisions/adr-o01-o02-ops-r2.md).

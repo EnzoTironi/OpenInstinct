@@ -21,16 +21,16 @@ Scope: Companion self-host on Mac (Alchemy Postgres + named Cloudflare Tunnel +
 
 Rotate in this order so dependents break in a controlled, recoverable way.
 
-| Step | Family                         | Env **names** (rotate these)                                                                 | Notes                                                                                          |
-| ---- | ------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| 1    | Model / optional SaaS keys     | `AI_GATEWAY_API_KEY`, `OPENROUTER_API_KEY`, `KERNEL_API_KEY`, `BLOB_READ_WRITE_TOKEN`         | Lowest blast radius; optional until those features run                                         |
-| 2    | Google OAuth client secret     | `GOOGLE_CLIENT_SECRET` (keep `GOOGLE_CLIENT_ID` unless client is recreated)                  | Users must re-consent / refresh after secret change                                            |
-| 3    | Telegram Bot API               | `TELEGRAM_BOT_TOKEN`, then `TELEGRAM_WEBHOOK_SECRET`                                         | Regenerate via BotFather / setWebhook; coordinate with durable HTTPS                           |
-| 4    | Kapso / WhatsApp               | `KAPSO_API_KEY`, then `KAPSO_WEBHOOK_SECRET` (ids `KAPSO_PHONE_NUMBER_ID`, `KAPSO_WEBHOOK_ID`) | Update Kapso dashboard + webhook HMAC together; see O02                                        |
-| 5    | Auth signing                   | `BETTER_AUTH_SECRET`                                                                         | Invalidates browser sessions                                                                   |
-| 6    | Installation encryption          | `SECRET_ENCRYPTION_KEY`                                                                      | **High risk** — encrypted-at-rest installation payloads become unreadable without re-encrypt   |
-| 7    | Postgres (Alchemy)             | `COMPANION_POSTGRES_PASSWORD` → rewrite `DATABASE_URL` / `DATABASE_URL_UNPOOLED`             | Stage-scoped; take a backup story before prod                                                  |
-| 8    | Named tunnel token             | contents of file named by `CLOUDFLARED_TUNNEL_TOKEN_FILE`                                    | File mode 600; never inline in LaunchAgent plists in git                                       |
+| Step | Family                     | Env **names** (rotate these)                                                                   | Notes                                                                                        |
+| ---- | -------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 1    | Model / optional SaaS keys | `AI_GATEWAY_API_KEY`, `OPENROUTER_API_KEY`, `KERNEL_API_KEY`, `BLOB_READ_WRITE_TOKEN`          | Lowest blast radius; optional until those features run                                       |
+| 2    | Google OAuth client secret | `GOOGLE_CLIENT_SECRET` (keep `GOOGLE_CLIENT_ID` unless client is recreated)                    | Users must re-consent / refresh after secret change                                          |
+| 3    | Telegram Bot API           | `TELEGRAM_BOT_TOKEN`, then `TELEGRAM_WEBHOOK_SECRET`                                           | Regenerate via BotFather / setWebhook; coordinate with durable HTTPS                         |
+| 4    | Kapso / WhatsApp           | `KAPSO_API_KEY`, then `KAPSO_WEBHOOK_SECRET` (ids `KAPSO_PHONE_NUMBER_ID`, `KAPSO_WEBHOOK_ID`) | Update Kapso dashboard + webhook HMAC together; see O02                                      |
+| 5    | Auth signing               | `BETTER_AUTH_SECRET`                                                                           | Invalidates browser sessions                                                                 |
+| 6    | Installation encryption    | `SECRET_ENCRYPTION_KEY`                                                                        | **High risk** — encrypted-at-rest installation payloads become unreadable without re-encrypt |
+| 7    | Postgres (Alchemy)         | `COMPANION_POSTGRES_PASSWORD` → rewrite `DATABASE_URL` / `DATABASE_URL_UNPOOLED`               | Stage-scoped; take a backup story before prod                                                |
+| 8    | Named tunnel token         | contents of file named by `CLOUDFLARED_TUNNEL_TOKEN_FILE`                                      | File mode 600; never inline in LaunchAgent plists in git                                     |
 
 Do **not** rotate `TELEGRAM_BOT_ID` / `TELEGRAM_BOT_USERNAME` / `KAPSO_PHONE_NUMBER`
 unless the bot or WhatsApp number itself changes (identity, not a secret).
@@ -69,18 +69,18 @@ For each row above:
 
 ## Verify steps (no secret output)
 
-| After rotating…              | Verify (operator)                                                                                                                                 |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model / Kernel / Blob        | Feature smoke that needs that key; confirm HTTP 200/401 expected — do not log Authorization headers                                               |
-| `GOOGLE_CLIENT_SECRET`       | OAuth redirect to `{BETTER_AUTH_URL}/api/auth/callback/google` completes for a test account                                                       |
-| `TELEGRAM_BOT_TOKEN`         | Bot API `getMe` returns expected username (e.g. ZoenOSBot); do not log the token                                                                  |
-| `TELEGRAM_WEBHOOK_SECRET`    | `getWebhookInfo` shows HTTPS URL under `COMPANION_PUBLIC_BASE_URL`; unsigned POST → 401                                                           |
-| `KAPSO_API_KEY`              | Kapso phone-number GET for `KAPSO_PHONE_NUMBER_ID` → HTTP 200 / CONNECTED ([docs](https://docs.kapso.ai/api/platform/v1/phone-numbers/get-phone-number)) |
-| `KAPSO_WEBHOOK_SECRET`       | Unsigned/wrong-signature POST to `/api/channels/kapso` → 401; dry-run webhook script prints hostname only                                         |
-| `BETTER_AUTH_SECRET`         | Old browser sessions fail closed; new sign-in works                                                                                               |
-| `SECRET_ENCRYPTION_KEY`      | App boots; installation-encrypted paths that you **re-encrypted** still decrypt; expect failure if old ciphertext was not migrated                |
-| `COMPANION_POSTGRES_PASSWORD`| `pnpm db:check`; Alchemy container health `healthy`; migrate if needed                                                                            |
-| Tunnel token file            | Public HTTPS to Next returns channel webhook 401 (not 525/hang); LaunchAgent stays loaded                                                         |
+| After rotating…               | Verify (operator)                                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model / Kernel / Blob         | Feature smoke that needs that key; confirm HTTP 200/401 expected — do not log Authorization headers                                                      |
+| `GOOGLE_CLIENT_SECRET`        | OAuth redirect to `{BETTER_AUTH_URL}/api/auth/callback/google` completes for a test account                                                              |
+| `TELEGRAM_BOT_TOKEN`          | Bot API `getMe` returns expected username (e.g. ZoenOSBot); do not log the token                                                                         |
+| `TELEGRAM_WEBHOOK_SECRET`     | `getWebhookInfo` shows HTTPS URL under `COMPANION_PUBLIC_BASE_URL`; unsigned POST → 401                                                                  |
+| `KAPSO_API_KEY`               | Kapso phone-number GET for `KAPSO_PHONE_NUMBER_ID` → HTTP 200 / CONNECTED ([docs](https://docs.kapso.ai/api/platform/v1/phone-numbers/get-phone-number)) |
+| `KAPSO_WEBHOOK_SECRET`        | Unsigned/wrong-signature POST to `/api/channels/kapso` → 401; dry-run webhook script prints hostname only                                                |
+| `BETTER_AUTH_SECRET`          | Old browser sessions fail closed; new sign-in works                                                                                                      |
+| `SECRET_ENCRYPTION_KEY`       | App boots; installation-encrypted paths that you **re-encrypted** still decrypt; expect failure if old ciphertext was not migrated                       |
+| `COMPANION_POSTGRES_PASSWORD` | `pnpm db:check`; Alchemy container health `healthy`; migrate if needed                                                                                   |
+| Tunnel token file             | Public HTTPS to Next returns channel webhook 401 (not 525/hang); LaunchAgent stays loaded                                                                |
 
 ## `SECRET_ENCRYPTION_KEY` caution
 
