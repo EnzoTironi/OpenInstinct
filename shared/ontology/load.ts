@@ -36,7 +36,7 @@ const uniqueIds = (ids: readonly string[]): boolean =>
  * Worlds and future packs share this gate before Companion registration.
  */
 export const validateOntologyPack = (
-  manifest: unknown
+  manifest: OntologyPackManifest
 ): Effect.Effect<OntologyPackManifest, OntologyPackInvalid> =>
   Effect.gen(function* () {
     const decoded = yield* Schema.decodeUnknownEffect(
@@ -116,7 +116,7 @@ export const validateOntologyPack = (
   });
 
 export const loadOntologyPack = (
-  manifest: unknown,
+  manifest: OntologyPackManifest,
   hooks: OntologyPackHooks
 ): Effect.Effect<LoadedOntologyPack, OntologyPackInvalid> =>
   Effect.gen(function* () {

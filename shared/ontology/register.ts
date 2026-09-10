@@ -1,8 +1,8 @@
 import { Effect, Layer } from "effect";
 import {
   loadOntologyPack,
-  OntologyPackInvalid,
   type LoadedOntologyPack,
+  type OntologyPackInvalid,
 } from "./load";
 import { worldsPackV0Hooks, worldsPackV0Manifest } from "./pack-v0";
 

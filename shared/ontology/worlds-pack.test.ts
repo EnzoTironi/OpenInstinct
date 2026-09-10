@@ -42,8 +42,8 @@ describe("W01 Worlds pack v0", () => {
   });
 
   it("exposes Effect schemas for planes, nouns, verbs, and pack ids", () => {
-    const noun = worldsPackV0Manifest.nouns[0]!;
-    const verb = worldsPackV0Manifest.verbs[0]!;
+    const noun = worldsPackV0Manifest.nouns[0];
+    const verb = worldsPackV0Manifest.verbs[0];
     expect(Schema.is(OntologyPlaneSchema)("language")).toBe(true);
     expect(Schema.is(NounDefinitionSchema)(noun)).toBe(true);
     expect(Schema.is(VerbDefinitionSchema)(verb)).toBe(true);
@@ -144,12 +144,15 @@ describe("W01 Worlds pack v0", () => {
     const first = await Effect.runPromise(registerWorldsPackV0);
     const second = await Effect.runPromise(registerWorldsPackV0);
     expect(first).toBe(second);
-    expect(getRegisteredOntologyPack()?.manifest.id).toBe(WORLDS_PACK_V0_ID);
+    const registered = getRegisteredOntologyPack();
+    expect(registered?.manifest.id).toBe(WORLDS_PACK_V0_ID);
     // Hook surface stays empty — Companion private chat tools unchanged.
+    expect(registered).not.toBeNull();
+    if (registered === null) {
+      throw new Error("expected Worlds pack v0 to be registered");
+    }
     await expect(
-      Effect.runPromise(
-        getRegisteredOntologyPack()!.hooks.mcp.listToolDescriptors()
-      )
+      Effect.runPromise(registered.hooks.mcp.listToolDescriptors())
     ).resolves.toEqual([]);
   });
 
