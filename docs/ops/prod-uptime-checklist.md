@@ -1,7 +1,7 @@
 # Prod uptime + backup (companion.tironi.xyz)
 
 Operator checklist after Mac → Fly compute cutover (H01 option C). **Never print
-secrets.** F01 rotation is deferred to a separate authorized pass.
+secrets.** F01 rotation is **Partial** (2026-09-10 authorized execute); remaining families stay Enzo-gated — see [credential-rotation.md](credential-rotation.md).
 
 ## Live topology (ponytail)
 
@@ -126,17 +126,21 @@ Forward cutover (Mac → Fly) remains documented in [hosted-fly.md](hosted-fly.m
 
 ## Remaining human gates (not worker-executable)
 
-| Gate                                                    | Status                                                                          | Who                     |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------- |
-| **F01 credential rotation**                             | Deferred — sibling/authorized pass only; do not start from this checklist       | Enzo                    |
-| **Meta / Kapso template** `companion_account_notice_v1` | Still **PENDING** (O02 incomplete)                                              | Enzo + Meta review      |
-| **Live Telegram private reply proof**                   | Manual DM to `@ZoenOSBot` from a logged-in client; confirm bot reply            | Enzo                    |
-| **G03 group mention**                                   | Live add `@ZoenOSBot` + mention (see [enzo-live-actions](enzo-live-actions.md)) | Enzo                    |
-| Billing / Stripe secrets                                | Out of scope for this hardening pass (ignored per operator)                     | Enzo / Stripe dashboard |
+| Gate                                                    | Status                                                                                                                | Who                     |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| **F01 credential rotation**                             | **Partial** (2026-09-10) — see [credential-rotation.md](credential-rotation.md); do not re-rotate from this checklist | Enzo                    |
+| **Meta / Kapso template** `companion_account_notice_v1` | Still **PENDING** (O02 incomplete)                                                                                    | Enzo + Meta review      |
+| **Live Telegram private reply proof**                   | Optional spot-check — cleared as stale automation blocker in [enzo-live-actions](enzo-live-actions.md)                | Enzo                    |
+| **G03 group mention**                                   | Live add `@ZoenOSBot` + mention (see [enzo-live-actions](enzo-live-actions.md))                                       | Enzo                    |
+| Billing / Stripe secrets                                | Out of scope for this hardening pass (ignored per operator)                                                           | Enzo / Stripe dashboard |
 
 Workers may update this doc and run unsigned 401 / welcome / Fly status checks.
 Workers must **not** rotate F01, unload `companion-cloudflared`, destroy volumes,
 apply live webhook URL changes (dry-run only), or invent Stripe keys.
+
+## Deploy note
+
+- Fly Codex/ChatGPT auth persistence via entrypoint merged as **#50** (2026-09-10) on `companion-tironi`.
 
 ## Related
 

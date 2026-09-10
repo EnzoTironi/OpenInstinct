@@ -75,11 +75,12 @@ supplies a user ID. Missing, expired or revoked credentials fail closed as
 `AccountPrivacyError` with `unauthenticated` (HTTP 401) or `unavailable`
 (HTTP 503).
 
-| Route                                 | Method | Behavior                                                   |
-| ------------------------------------- | ------ | ---------------------------------------------------------- |
-| `/api/account/export`                 | GET    | Partial privacy export (stored personal memory envelope)   |
-| `/api/account/personal-memory/export` | GET    | Existing personal-memory JSON download                     |
-| `/api/account/delete`                 | POST   | Online personal-memory wipe + browser session invalidation |
+| Route                                       | Method | Behavior                                                          |
+| ------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| `/api/account/export`                       | GET    | Partial privacy export (stored personal memory envelope)          |
+| `/api/account/personal-memory/export`       | GET    | Existing personal-memory JSON download                            |
+| `/api/account/delete`                       | POST   | Online personal-memory wipe + browser session invalidation        |
+| Account UI → Privacy export and online wipe | —      | Same `partial_online_wipe` honesty + CTA to `/api/account/delete` |
 
 ### Limits (documented, not claimed complete)
 

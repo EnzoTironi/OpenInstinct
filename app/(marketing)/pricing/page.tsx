@@ -4,6 +4,7 @@ import { getAuthSession } from "@db/services/auth/session";
 import { readEntitlement } from "@db/services/billing";
 import type { BillingPlanId } from "@shared/billing/plans";
 import { MarketingShell } from "../_components/marketing-shell";
+import { isStripeBillingConfigured } from "../../../server/billing/stripe";
 import { PricingPanel } from "./_components/pricing-panel";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default async function PricingPage() {
       <PricingPanel
         currentPlan={currentPlan}
         signedIn={Boolean(session?.user)}
+        stripeConfigured={isStripeBillingConfigured()}
       />
     </MarketingShell>
   );
