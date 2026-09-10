@@ -5,6 +5,7 @@ import { Effect } from "effect";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Database from "@db";
+import { RbacDenied } from "@shared/identity/org-rbac";
 import * as schema from "../schema";
 
 const databases: PGlite[] = [];
@@ -67,8 +68,12 @@ describe("C01 organizations service", () => {
         })
         .pipe(Effect.flip)
     );
-    expect(denied._tag).toBe("RbacDenied");
-    expect(denied).toMatchObject({ reason: "not_admin" });
+    expect(denied).toEqual(
+      new RbacDenied({
+        reason: "not_admin",
+        message: "Only an admin (or personal owner) can manage members.",
+      })
+    );
 
     await Effect.runPromise(
       organizations.setWorkspaceMemberRole({
@@ -89,7 +94,12 @@ describe("C01 organizations service", () => {
         })
         .pipe(Effect.flip)
     );
-    expect(workspaceDenied._tag).toBe("RbacDenied");
+    expect(workspaceDenied).toEqual(
+      new RbacDenied({
+        reason: "not_admin",
+        message: "Only an admin (or personal owner) can manage members.",
+      })
+    );
   }, 15_000);
 });
 
