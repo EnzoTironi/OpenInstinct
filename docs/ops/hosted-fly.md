@@ -279,6 +279,7 @@ before `COMPANION_FLY_DEPOT=true`.
 
 ## Related
 
+- [Prod uptime + backup checklist](prod-uptime-checklist.md)
 - [Self-host / ops](../self-host.md)
 - [Durable ingress](../../infrastructure/ingress/README.md)
 - [Alchemy Postgres](../../infrastructure/README.md)
