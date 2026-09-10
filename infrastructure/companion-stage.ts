@@ -5,23 +5,22 @@ import { Context, Effect, Layer } from "effect";
  * Documented Companion application stages for Release-2 ops.
  * Alchemy also accepts other `--stage` names; prefer these for promotion.
  */
-export const DOCUMENTED_COMPANION_STAGES = [
+const DOCUMENTED_COMPANION_STAGES = [
   "local",
   "dev",
   "staging",
   "prod",
 ] as const;
 
-export type DocumentedCompanionStage =
-  (typeof DOCUMENTED_COMPANION_STAGES)[number];
+type DocumentedCompanionStage = (typeof DOCUMENTED_COMPANION_STAGES)[number];
 
 export type CompanionStageTier = "ephemeral" | "shared-preprod" | "production";
 
-export function companionDatabaseName(stage: string): string {
+function companionDatabaseName(stage: string): string {
   return `open_instinct_${stage.replaceAll("-", "_")}`;
 }
 
-export function companionStageTier(stage: string): CompanionStageTier {
+function companionStageTier(stage: string): CompanionStageTier {
   if (stage === "prod") {
     return "production";
   }
@@ -31,7 +30,7 @@ export function companionStageTier(stage: string): CompanionStageTier {
   return "ephemeral";
 }
 
-export function companionEnvFileHint(stage: string): string {
+function companionEnvFileHint(stage: string): string {
   switch (stage) {
     case "prod":
       return ".env.prod";
@@ -44,14 +43,14 @@ export function companionEnvFileHint(stage: string): string {
   }
 }
 
-export function isDocumentedCompanionStage(
+function isDocumentedCompanionStage(
   stage: string
 ): stage is DocumentedCompanionStage {
   return (DOCUMENTED_COMPANION_STAGES as readonly string[]).includes(stage);
 }
 
 /** Retain the Postgres data volume on destroy only for production. */
-export function retainPostgresDataOnDestroy(stage: string): boolean {
+function retainPostgresDataOnDestroy(stage: string): boolean {
   return stage === "prod";
 }
 
