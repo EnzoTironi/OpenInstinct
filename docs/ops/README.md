@@ -10,6 +10,10 @@ docs and scripts only — never secret values in git, PRs, logs, or chat.
 | O02 | [WhatsApp Meta + Kapso activation](whatsapp-meta-activation.md)            | Enzo (Meta/Kapso) |
 | —   | [Enzo live blockers](enzo-live-actions.md) (DNS + G03 Telegram group)      | Enzo only         |
 
+**Ingress status (2026-09-10):** Companion channel public base is interim
+`https://companion.tironi.xyz` (TG+Kapso webhooks live). Fly `app.zoen.space`
+product DNS unchanged; zoen Companion cutover deferred.
+
 Related:
 
 - [Self-host / ops](../self-host.md)

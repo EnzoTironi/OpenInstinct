@@ -6,11 +6,13 @@
 # credentials-file / tunnel UUID instead of TUNNEL_TOKEN.
 #
 # Replace COMPANION_INGRESS_HOSTNAME and keep the catch-all 404 last.
+# Interim Enzo live hostname example: companion.tironi.xyz (zoen.space deferred;
+# do not route Fly app.zoen.space product DNS here unless intentionally migrating).
 
 tunnel: REPLACE_TUNNEL_UUID
 credentials-file: /Users/REPLACE/.cloudflared/REPLACE_TUNNEL_UUID.json
 
 ingress:
-  - hostname: companion.example.com
+  - hostname: companion.tironi.xyz
     service: http://127.0.0.1:3000
   - service: http_status:404
