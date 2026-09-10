@@ -44,3 +44,17 @@ For live G03 group mention → accept → bind proof:
    when executed with local env — **never commit secrets or raw live dumps**).
 
 Workers may ship harness/docs; Enzo performs the live add + mention.
+
+## 3. Live smoke after Fly cutover (2026-09-10 ~16:50 PT)
+
+Worker-executed (no secrets printed):
+
+1. **Mac runtime unloaded** — `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.openinstinct.companion-runtime.plist` — service gone.
+2. **Kept** `com.openinstinct.companion-cloudflared` **running** (tunnel still terminates on Mac).
+3. `https://companion.tironi.xyz/welcome` → **200** with `via: fly.io` + `fly-request-id`.
+4. Unsigned `POST /api/channels/telegram` → **401** `rejected`.
+5. Unsigned `POST /api/channels/kapso` → **401** `rejected`.
+6. `companion-pg-prod`: volume `pgdata` 10GB `gru` attached; `pg_isready` accepting; first Fly volume snapshot scheduled.
+7. **Telegram private DM → reply:** blocker — Telegram Lite was running, but UI automation could not confirm a delivered DM / bot reply (no channel inbound lines in recent Fly log buffer). Enzo: open `@ZoenOSBot` and send any private message; confirm a reply.
+
+Details / ongoing checklist: [prod-uptime-checklist.md](prod-uptime-checklist.md).
