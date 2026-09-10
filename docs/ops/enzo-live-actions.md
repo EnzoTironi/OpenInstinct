@@ -45,7 +45,6 @@ For live G03 group mention → accept → bind proof:
 
 Workers may ship harness/docs; Enzo performs the live add + mention.
 
-
 ## 3. Live smoke after Fly cutover (2026-09-10 ~16:50 PT)
 
 Worker-executed (no secrets printed):
