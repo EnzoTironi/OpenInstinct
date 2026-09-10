@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["alchemy.run.ts"]
+  "include": ["alchemy.run.ts", "companion-stage.ts"]
 }
