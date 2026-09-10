@@ -20,6 +20,8 @@ import {
   userProfiles,
   vaultItems,
   verification,
+  organizationMemberships,
+  organizations,
   workspaceMemberships,
   workspaces,
 } from "../schema";
@@ -30,6 +32,8 @@ describe("database schema", () => {
       [
         workspaces,
         workspaceMemberships,
+        organizations,
+        organizationMemberships,
         vaultItems,
         settings,
         agentSessions,
@@ -50,6 +54,8 @@ describe("database schema", () => {
     ).toEqual([
       "workspaces",
       "workspace_memberships",
+      "organizations",
+      "organization_memberships",
       "vault_items",
       "settings",
       "agent_sessions",
@@ -122,6 +128,26 @@ describe("database schema", () => {
         "user_id",
       ]);
     }
+  });
+
+  it("widens workspace membership roles for company admin|member while keeping owner", () => {
+    expect(getTableConfig(organizations).name).toBe("organizations");
+    expect(getTableConfig(organizationMemberships).name).toBe(
+      "organization_memberships"
+    );
+    expect(
+      getTableConfig(workspaces).columns.map((column) => column.name)
+    ).toContain("organization_id");
+    expect(
+      getTableConfig(workspaces).foreignKeys.map((foreignKey) =>
+        foreignKey.getName()
+      )
+    ).toContain("workspaces_organization_id_fkey");
+    expect(
+      getTableConfig(organizationMemberships).foreignKeys.map((foreignKey) =>
+        foreignKey.getName()
+      )
+    ).toContain("organization_memberships_organization_id_fkey");
   });
 
   it("keeps every workspace-owned table connected to the workspace root", () => {
