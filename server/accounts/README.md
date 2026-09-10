@@ -92,6 +92,11 @@ supplies a user ID. Missing, expired or revoked credentials fail closed as
   backups. Do not claim full account deletion or backup erasure.
 - Restore reconciliation and a deletion ledger remain separate P06 gates.
 
+Org-scoped wipe/delete is **out of scope** for these personal routes. See
+`docs/decisions/adr-c02-sso-audit-erasure.md` and
+`shared/identity/org-erasure.ts` for fail-closed company erasure gates and
+append-only audit receipts.
+
 Delete hooks `PersonalMemory.wipe` when that service is present in the runtime
 (registered from `server/runtime.ts`). Fixture proof:
 `server/accounts/privacy.test.ts` (fail-closed without auth; wipe never runs).

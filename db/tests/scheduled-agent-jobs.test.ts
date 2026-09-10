@@ -33,6 +33,7 @@ describe("scheduled agent jobs", () => {
       "0011_faulty_unicorn.sql",
       "0012_harsh_domino.sql",
       "0029_org-workspace-rbac.sql",
+      "0030_org-sso-audit-erasure.sql",
     ]) {
       await applyMigration(client, migration);
     }

@@ -30,6 +30,7 @@ describe("database services", () => {
     await applyNativeTypesMigration(client);
     await applyChatChannelMigration(client);
     await applyOrgWorkspaceRbacMigration(client);
+    await applyOrgSsoAuditErasureMigration(client);
 
     const pgliteDatabase = drizzle(client, { schema });
     // SAFETY: PGlite implements the query-builder surface exercised by these services despite using a different Drizzle driver.
@@ -431,6 +432,18 @@ async function applyChatChannelMigration(database: PGlite) {
 async function applyOrgWorkspaceRbacMigration(database: PGlite) {
   const migration = await readFile(
     new URL("../migrations/0029_org-workspace-rbac.sql", import.meta.url),
+    "utf8"
+  );
+  /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
+  for (const statement of migration.split("--> statement-breakpoint")) {
+    if (statement.trim()) await database.exec(statement);
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
+}
+
+async function applyOrgSsoAuditErasureMigration(database: PGlite) {
+  const migration = await readFile(
+    new URL("../migrations/0030_org-sso-audit-erasure.sql", import.meta.url),
     "utf8"
   );
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
