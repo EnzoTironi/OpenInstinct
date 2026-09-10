@@ -3,7 +3,7 @@ import * as Docker from "alchemy/Docker";
 import * as Provider from "alchemy/Provider";
 import * as RemovalPolicy from "alchemy/RemovalPolicy";
 import { Config, Effect, Layer } from "effect";
-import { CompanionStagePolicy } from "./companion-stage";
+import { CompanionStagePolicy } from "./companion-stage.ts";
 
 const providers = Layer.effect(
   Docker.Providers,
