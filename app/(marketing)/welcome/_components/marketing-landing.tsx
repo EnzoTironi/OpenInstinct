@@ -77,8 +77,8 @@ const planOrder = [
 
 function priceLabel(planId: "free" | "pro" | "org", amount: number) {
   if (planId === "free") return "$0";
-  if (planId === "org") return `$${amount}/seat`;
-  return `$${amount}`;
+  if (planId === "org") return `$${String(amount)}/seat`;
+  return `$${String(amount)}`;
 }
 
 export function MarketingLanding() {

@@ -57,10 +57,12 @@ describe("auth proxy matcher", () => {
   });
 
   it("allows marketing welcome, pricing, and docs without a browser session", async () => {
-    for (const path of ["/welcome", "/pricing", "/docs"] as const) {
-      const response = await proxy(
-        new NextRequest(`https://example.com${path}`)
-      );
+    const responses = await Promise.all(
+      (["/welcome", "/pricing", "/docs"] as const).map((path) =>
+        proxy(new NextRequest(`https://example.com${path}`))
+      )
+    );
+    for (const response of responses) {
       expect(response.headers.get("x-middleware-next")).toBe("1");
     }
     expect(getAuthSession).not.toHaveBeenCalled();
