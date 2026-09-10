@@ -57,8 +57,8 @@ copy.
   (`/pricing`).
 - Not org SSO or multi-seat onboarding (C01/C02).
 - Not an account merge between two separately provisioned identities.
-- Not the public marketing site (Poke/Town packaging) — leftover for product
-  packaging outside this app shell.
+- Public marketing packaging lives at `/welcome`, `/pricing`, and `/docs`
+  (C-PACK). Unauthenticated `/` redirects to `/welcome`.
 
 ## Acceptance (product)
 
