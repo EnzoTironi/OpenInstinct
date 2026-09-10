@@ -129,7 +129,8 @@
     "test:account-channels": "node --env-file=.env.local --env-file=.env.runtime.local node_modules/tsx/dist/cli.mjs server/accounts/controls.integration.ts",
     "infra:deploy:local": "pnpm --dir infrastructure run deploy --stage local --yes",
     "infra:deploy:dev": "pnpm --dir infrastructure run deploy --stage dev --yes",
-    "infra:deploy:staging": "pnpm --dir infrastructure run deploy --stage staging --yes"
+    "infra:deploy:staging": "pnpm --dir infrastructure run deploy --stage staging --yes",
+    "ingress:set-webhooks": "bash ./scripts/set-channel-webhooks.sh"
   },
   "version": "0.0.0",
   "type": "module"
