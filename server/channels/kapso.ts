@@ -18,6 +18,7 @@ import {
   validateEventAge,
   type InboundEvent,
 } from "./inbound";
+import { detectKapsoChatKind } from "./group-policy";
 import {
   ProviderInputError,
   ProviderUncertain,
@@ -118,12 +119,10 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
     incoming.kapso.origin !== "business_app"
   )
     return null;
-  if (
-    item.conversation.is_group ||
-    item.conversation.type === "group" ||
-    incoming.type === "system"
-  )
-    return null;
+  // Kapso/WA group mention signals are not yet provider-normalized (G03).
+  // Detect group scope explicitly, then keep ingress closed to avoid spam.
+  const chatKind = detectKapsoChatKind(item.conversation);
+  if (chatKind === "group" || incoming.type === "system") return null;
   const sender = yield* Schema.decodeUnknownEffect(phone)(incoming.from).pipe(
     Effect.mapError(
       () =>
@@ -199,6 +198,8 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       messageId: incoming.id,
       senderId,
       occurredAt,
+      chatKind: "private",
+      chatId: senderId,
     },
     payload
   );
