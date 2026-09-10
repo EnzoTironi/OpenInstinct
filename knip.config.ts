@@ -30,6 +30,8 @@ export default {
         "server/google-workspace/membership.integration.ts",
         // Standalone real account/channel controls check invoked by test:account-channels.
         "server/accounts/controls.integration.ts",
+        // Live TG group mention e2e (manual /env.local); fixture harness is CI proof.
+        "scripts/groups-live-e2e.ts",
       ],
       ignoreDependencies: [
         // Type owners referenced by the Eve declaration patch, which Knip does not parse.

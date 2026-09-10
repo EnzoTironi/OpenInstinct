@@ -42,5 +42,10 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "evals/browser/dashboard", "infrastructure"]
+  "exclude": [
+    "node_modules",
+    "evals/browser/dashboard",
+    "infrastructure",
+    "scripts/groups-live-e2e.ts"
+  ]
 }

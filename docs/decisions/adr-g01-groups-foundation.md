@@ -50,7 +50,7 @@
 ## Follow-ups
 
 - **G02** shared-memory / workspace membership for group scopes (policy + stub landed in `adr-g02-groups-memory-policy.md`).
-- **G03** live Telegram group e2e + Kapso/WA group mention/participant ingress.
-- Outbound send schemas for negative Telegram chat ids / WA group JIDs.
+- **G03** see `adr-g03-groups-live-e2e.md` (TG harness/live; Kapso open-if-mention; WA gap).
+- Outbound WA group JID send still deferred after G03.
 - Principal `conversationId` currently equals `identity.id` (private); group
   delivery must switch to `conversationScope` when enqueue is wired.
