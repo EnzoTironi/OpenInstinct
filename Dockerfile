@@ -1,0 +1,40 @@
+# Companion always-on image: paired Next + Eve via `pnpm start`.
+# Alchemy Docker Postgres stays outside this image (see docs/ops/hosted-fly.md).
+# syntax=docker/dockerfile:1
+
+FROM node:24-bookworm-slim AS deps
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@11.24.0 --activate
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
+RUN pnpm install --frozen-lockfile
+
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@11.24.0 --activate
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+COPY . .
+# Channel rewrites bake Eve's loopback port at build time — keep start args matched.
+ENV EVE_NEXT_PRODUCTION_PORT=4274
+ENV NEXT_TELEMETRY_DISABLED=1
+# Build-time placeholders only; runtime secrets come from Fly (never bake .env*).
+ENV BETTER_AUTH_URL=http://127.0.0.1:3000
+ENV COMPANION_PUBLIC_BASE_URL=http://127.0.0.1:3000
+ENV DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/open_instinct_prod
+ENV DATABASE_URL_UNPOOLED=postgresql://postgres:postgres@127.0.0.1:5432/open_instinct_prod
+RUN pnpm build
+
+FROM node:24-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV EVE_NEXT_PRODUCTION_PORT=4274
+RUN corepack enable && corepack prepare pnpm@11.24.0 --activate \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app /app
+# Next binds publicly for Fly proxy; Eve stays on loopback (scripts/start.ts).
+EXPOSE 3000
+CMD ["pnpm", "start", "--port", "3000", "--hostname", "0.0.0.0", "--eve-port", "4274"]

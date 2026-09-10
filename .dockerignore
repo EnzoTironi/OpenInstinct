@@ -1,0 +1,32 @@
+# Build / install artifacts
+node_modules
+infrastructure/node_modules
+.next
+.output
+.eve
+.turbo
+.vercel
+dist
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets and local state — never bake into the image
+.env
+.env.*
+!.env.example
+infrastructure/.env
+infrastructure/.alchemy
+infrastructure/ingress/.env
+
+# VCS / IDE / OS
+.git
+.github
+.DS_Store
+**/.DS_Store
+
+# Local-only / non-runtime
+evals
+docs
+*.md
+!AGENTS.md
+openinstinct-wt

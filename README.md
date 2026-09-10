@@ -18,9 +18,11 @@ patterns.
 ## Run locally
 
 **Self-host / ops (Release-1):** see [docs/self-host.md](docs/self-host.md) and R2 checklists under [docs/ops/](docs/ops/README.md) for
-Alchemy `local`/`dev`/`staging`, install/migrate/run, `.env.local` **names**,
+Alchemy `local`/`dev`/`staging`/`prod`, install/migrate/run, `.env.local` **names**,
 Telegram/Google/Kapso pointers, Graphile fencing / SIGKILL, quotas ADR, account
-delete limits, and live qualification gaps.
+delete limits, and live qualification gaps. Always-on **off-Mac** Fly compute +
+Alchemy Docker Postgres (Mac LaunchAgent remains optional):
+[docs/ops/hosted-fly.md](docs/ops/hosted-fly.md).
 
 Use Node.js 24 and pnpm 11.24.0. PostgreSQL stores application records and the
 compatible Workflow world. Start with:

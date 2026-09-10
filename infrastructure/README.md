@@ -236,6 +236,15 @@ Sources: [Docker provider](https://alchemy.run/docker/),
 [stages](https://alchemy.run/environments/stages),
 [published package manifest](https://github.com/alchemy-run/alchemy/blob/v2.0.0-beta.76/packages/alchemy/package.json).
 
+## Hosted Fly compute (H01)
+
+Alchemy in this package still provisions **Docker Postgres only** (no Fly
+Managed Postgres). For always-on **Next+Eve on Fly** while keeping these
+Alchemy stages, follow
+[`docs/ops/hosted-fly.md`](../docs/ops/hosted-fly.md) (`fly.toml`, root
+`Dockerfile`, `scripts/fly-companion.sh`). Mac LaunchAgent + this stack remain
+valid for optional local/prosumer mode.
+
 ## Durable public HTTPS (Telegram / Kapso)
 
 Alchemy here provisions Postgres only. For always-on public HTTPS to
