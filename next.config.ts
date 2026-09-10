@@ -1,10 +1,9 @@
 import { Effect, Schema } from "effect";
 import { withEve, type EveNextRewriteSections } from "eve/next";
 import type { NextConfig } from "next";
+import { openInstinctLowMemBuild } from "@shared/environment/env/low-mem-build";
 
-const lowMemBuild = process.env.OPEN_INSTINCT_LOW_MEM_BUILD === "1";
-
-const nextConfig: NextConfig = lowMemBuild
+const nextConfig: NextConfig = openInstinctLowMemBuild
   ? {
       // Fly Depot / constrained builders: cut Next+TS peak RSS (exit 137).
       // CI still runs types:check:app; ignoreBuildErrors is Docker-only.

@@ -146,7 +146,7 @@ Repo files:
 | File                                                                                             | Role                                                                                     |
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | [`fly.toml`](../../fly.toml)                                                                     | Always-on HTTP service on port 3000, region `gru`                                        |
-| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; `pnpm build` then `pnpm start`                                      |
+| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next build; runtime `--hostname ::` (Fly IPv6 health)           |
 | [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh)                                     | `validate` / `status` / `deploy-dry` / `secrets-check`                                   |
 | [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh)                                   | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify` |
 | [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) | Alchemy stack: Fly.App + Machine + volume (not MPG)                                      |

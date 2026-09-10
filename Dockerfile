@@ -41,6 +41,6 @@ RUN corepack enable && corepack prepare pnpm@11.24.0 --activate \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app /app
-# Next binds publicly for Fly proxy; Eve stays on loopback (scripts/start.ts).
+# Next binds all families for Fly proxy/health (IPv6); Eve stays on loopback.
 EXPOSE 3000
-CMD ["pnpm", "start", "--port", "3000", "--hostname", "0.0.0.0", "--eve-port", "4274"]
+CMD ["pnpm", "start", "--port", "3000", "--hostname", "::", "--eve-port", "4274"]
