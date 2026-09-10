@@ -42,9 +42,8 @@ export function FirstRunStatus({
         <AlertTitle>You&apos;re set up</AlertTitle>
         <AlertDescription className="space-y-3">
           <p>
-            {describeLinkedChannels(identities)} Message the assistant there, or
-            start a conversation on the web. Manage channels anytime from your
-            account.
+            {describeLinkedChannels(identities)} Message Companion there, or
+            start on the web. Manage messengers anytime from Account.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -73,7 +72,8 @@ export function FirstRunStatus({
       <AlertDescription className="space-y-3">
         <p>
           Link Telegram or WhatsApp so Companion can reach you where you already
-          chat. Your workspace is ready; this last step binds a channel.
+          chat. Your personal workspace is ready — this last step binds a
+          messenger.
         </p>
         <Button
           nativeButton={false}

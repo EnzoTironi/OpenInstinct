@@ -15,24 +15,41 @@ the **web** first-run that creates the same account, workspace, and channel bind
 3. Confirm the browser request in that messenger chat.
 4. Return to the tab and continue. Companion creates your account, provisions the
    personal workspace, and binds that channel in one flow.
-5. You land on home with a success state (`/?welcome=1`). Message the assistant
-   in chat or start a web conversation. Manage channels later under **Account**.
+5. You land on **home** with a success state (`/?welcome=1`). Home is the
+   post-signup landing: channel status, next steps, personal plan badge, and
+   conversation entry — without reading ops docs.
+6. Message the assistant in the linked chat or start a web conversation. Manage
+   messengers and plan under **Account**.
 
 Returning users use **`/sign-in`** with an already linked messenger. Linking an
 extra channel uses **Account → Link another channel** (`purpose: "link"`).
 
+## After get-started (home + account)
+
+- **Home** shows linked Telegram/WhatsApp (or an empty-state CTA), next actions,
+  and a **Free · Personal** plan entry that deep-links to Account → Plan.
+- **Account** groups channels, plan/billing entry, and personal memory. Copy
+  treats this as a **personal** workspace; Org seats are a separate team plan,
+  not a rename of the personal account.
+- Hosted Stripe checkout / `/pricing` ship on the billing track (C-BILL). This
+  UX only needs a coherent plan entry until that lands.
+
 ## What this is not
 
 - Not Docker, Fly, Alchemy, tunnel, or webhook setup.
-- Not billing or plan purchase (quotas exist; hosted entitlements/billing are a
-  separate track).
+- Not the full billing purchase flow — Free starts here without a card; hosted
+  Free / Pro / Org checkout is a separate track (`/pricing` when enabled).
 - Not org SSO or multi-seat onboarding (C01/C02).
 - Not an account merge between two separately provisioned identities.
+- Not the public marketing site (Poke/Town packaging) — leftover for product
+  packaging outside this app shell.
 
 ## Acceptance (product)
 
 - A new person can complete signup → workspace → at least one channel bind without
   reading self-host docs.
 - After confirmation, home shows a clear success state naming the linked
-  messenger family (Telegram and/or WhatsApp).
+  messenger family (Telegram and/or WhatsApp), plus ongoing channel/plan status
+  on later visits.
+- Account makes personal vs org intent obvious and surfaces a plan section.
 - Sign-in still works for people who already completed the flow.
