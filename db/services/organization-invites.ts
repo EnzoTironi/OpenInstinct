@@ -11,12 +11,10 @@ import {
   assertCanAcceptOrgInvite,
   assertEmailDomainAllowed,
   type GoogleLinkedIdentity,
-  OrgSsoDenied,
+  type OrgSsoDenied,
 } from "@shared/identity/org-sso";
-import {
-  appendOrganizationAuditReceipt,
-  OrganizationAuditAppendFailed,
-} from "./organization-audit";
+import { appendOrganizationAuditReceipt } from "./organization-audit";
+import type { OrganizationAuditAppendFailed } from "./organization-audit";
 import { OrganizationMembershipMissing } from "./organizations";
 
 export class OrganizationInviteMissing extends Schema.TaggedError<OrganizationInviteMissing>()(

@@ -51,20 +51,20 @@ export const orgRetentionPolicy = {
   personalOnlineWipeScope: "personal_memory_and_browser_sessions_only",
 } as const;
 
-export type OrgErasureRequest = {
+export interface OrgErasureRequest {
   organizationId: string;
   actorUserId: string;
   actorRole: CompanyRole;
   /** When true, refuse erase because a legal/compliance hold is active. */
   retentionHold?: boolean;
-};
+}
 
-export type OrgErasureDecision = {
+export interface OrgErasureDecision {
   status: "denied";
   reason: OrgErasureDenied["reason"];
   notErased: readonly OrgErasureSurface[];
   limits: string;
-};
+}
 
 /**
  * Fail-closed org erase gate. Always denies cascade until a future worker

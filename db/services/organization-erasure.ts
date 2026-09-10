@@ -5,10 +5,8 @@ import {
   assertOrgErasureAllowed,
   type OrgErasureDecision,
 } from "@shared/identity/org-erasure";
-import {
-  appendOrganizationAuditReceipt,
-  OrganizationAuditAppendFailed,
-} from "./organization-audit";
+import { appendOrganizationAuditReceipt } from "./organization-audit";
+import type { OrganizationAuditAppendFailed } from "./organization-audit";
 import { OrganizationMembershipMissing } from "./organizations";
 
 /**

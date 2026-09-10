@@ -28,21 +28,21 @@ export class OrgSsoDenied extends Schema.TaggedError<OrgSsoDenied>()(
   }
 ) {}
 
-export type GoogleLinkedIdentity = {
+export interface GoogleLinkedIdentity {
   userId: string;
   email: string;
   emailVerified: boolean;
   hasGoogleAccount: boolean;
-};
+}
 
-export type OrganizationInviteView = {
+export interface OrganizationInviteView {
   id: string;
   organizationId: string;
   email: string;
   role: CompanyRole;
   status: "pending" | "accepted" | "revoked" | "expired";
   expiresAt: Date;
-};
+}
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();

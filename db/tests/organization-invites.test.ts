@@ -145,7 +145,7 @@ describe("C02 organization invites + audit + erasure", () => {
     expect(decision.reason).toBe("cascade_unimplemented");
 
     const receipts = await audit.listOrganizationAuditReceipts("org-acme");
-    const actions = receipts.map((row) => row.action).sort();
+    const actions = receipts.map((row) => row.action).toSorted();
     expect(actions).toEqual(
       [
         "invite_accepted",
@@ -156,7 +156,7 @@ describe("C02 organization invites + audit + erasure", () => {
         "member_role_changed",
         "org_erasure_denied",
         "org_erasure_requested",
-      ].sort()
+      ].toSorted()
     );
   }, 20_000);
 });

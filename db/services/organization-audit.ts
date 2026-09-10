@@ -1,6 +1,10 @@
 import { desc, eq } from "drizzle-orm";
 import { Effect, Schema } from "effect";
-import { db, organizationAuditReceipts } from "@db";
+import {
+  db,
+  organizationAuditReceipts,
+  type OrganizationAuditMetadata,
+} from "@db";
 
 export const organizationAuditActions = [
   "invite_created",
@@ -29,7 +33,7 @@ export function appendOrganizationAuditReceipt(input: {
   action: OrganizationAuditAction;
   targetUserId?: string | null;
   targetEmail?: string | null;
-  metadata?: Record<string, unknown>;
+  metadata?: OrganizationAuditMetadata;
   createdAt?: Date;
 }): Effect.Effect<void, OrganizationAuditAppendFailed> {
   return Effect.tryPromise({

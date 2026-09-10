@@ -10,6 +10,15 @@ import {
 } from "drizzle-orm/pg-core";
 import { organizations } from "./organizations";
 
+/** Owner-typed audit metadata (no unknown dictionary escape hatch). */
+export interface OrganizationAuditMetadata {
+  inviteId?: string;
+  role?: string;
+  retentionHold?: boolean;
+  reason?: string;
+  notErased?: readonly string[];
+}
+
 /**
  * Append-only receipts for sensitive org admin actions.
  * Application code must INSERT only — never UPDATE or DELETE rows.
@@ -33,7 +42,7 @@ export const organizationAuditReceipts = pgTable(
     }).notNull(),
     targetUserId: text("target_user_id"),
     targetEmail: text("target_email"),
-    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(),
+    metadata: jsonb("metadata").$type<OrganizationAuditMetadata>().notNull(),
     createdAt: timestamp("created_at", {
       mode: "date",
       precision: 3,
