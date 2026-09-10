@@ -54,11 +54,7 @@ export function AccountBillingSection({
   const seatLabel = String(seatCount);
 
   return (
-    <section
-      aria-labelledby="billing-heading"
-      className="space-y-4"
-      id="plan"
-    >
+    <section aria-labelledby="billing-heading" className="space-y-4" id="plan">
       <div className="space-y-2">
         <h2 id="billing-heading" className="type-section-title">
           Plan and billing

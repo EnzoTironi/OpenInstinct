@@ -38,7 +38,7 @@ extra channel uses **Account → Link another channel** (`purpose: "link"`).
 
 - Not Docker, Fly, Alchemy, tunnel, or webhook setup.
 - Not the full billing purchase flow — Free starts here without a card; hosted
-Free / Pro / Org seats are documented in [consumer billing](consumer-billing.md)
+  Free / Pro / Org seats are documented in [consumer billing](consumer-billing.md)
   (`/pricing`).
 - Not org SSO or multi-seat onboarding (C01/C02).
 - Not an account merge between two separately provisioned identities.
