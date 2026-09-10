@@ -119,8 +119,8 @@ test("kapso group opens only when mention signals exist; else stays closed", asy
     chatId: "group-id-redacted",
     senderId: "15550002222",
   });
-  if (openedEvent?.kind !== "message" || openedEvent.chatId === undefined) {
-    throw new Error("expected opened kapso group message with chatId");
+  if (openedEvent?.kind !== "message" || openedEvent.chatKind !== "group") {
+    throw new Error("expected opened kapso group message");
   }
   const binding = await Effect.runPromise(
     bindGroupChannelIdentity({

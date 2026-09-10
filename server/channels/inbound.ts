@@ -17,8 +17,8 @@ const base = {
   senderId: ProviderReferenceSchema,
   messageId: ProviderReferenceSchema,
   occurredAt: Schema.String,
-  chatKind: Schema.optionalKey(Schema.Literals(["private", "group"])),
-  chatId: Schema.optionalKey(ProviderReferenceSchema),
+  chatKind: Schema.Literals(["private", "group"]),
+  chatId: ProviderReferenceSchema,
 };
 const InboundEventSchema = Schema.Union([
   Schema.Struct({

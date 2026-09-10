@@ -26,63 +26,64 @@ export interface TelegramGroupHarnessResult {
  * Fixture/e2e harness: parse Telegram update → require group message →
  * bindGroupChannelIdentity. Pure Effect; no network.
  */
-export const runTelegramGroupMentionHarness = (input: {
+export const runTelegramGroupMentionHarness = Effect.fn(
+  "runTelegramGroupMentionHarness"
+)(function* (input: {
   readonly update: Schema.Json;
   readonly installation: TelegramInstallation;
   readonly nowMs: number;
   readonly identityId: string;
-}): Effect.Effect<TelegramGroupHarnessResult> =>
-  Effect.gen(function* () {
-    const events = yield* parseTelegramUpdate(
-      input.update,
-      input.installation,
-      input.nowMs
-    ).pipe(Effect.orElseSucceed(() => [] as const));
-    const event = events[0];
-    if (!event) {
-      return {
-        accepted: false,
-        events,
-        binding: null,
-        reason: "dropped_by_mention_policy_or_empty",
-      } satisfies TelegramGroupHarnessResult;
-    }
-    if (event.chatKind !== "group" || event.chatId === undefined) {
-      return {
-        accepted: false,
-        events,
-        binding: null,
-        reason: "not_group_event",
-      } satisfies TelegramGroupHarnessResult;
-    }
-    const binding = yield* bindGroupChannelIdentity({
-      identityId: input.identityId,
-      channel: "telegram",
-      installationId: event.installationId,
-      senderId: event.senderId,
-      chatId: event.chatId,
-    }).pipe(Effect.orElseSucceed(() => null));
-    if (binding?.channel !== "telegram") {
-      return {
-        accepted: false,
-        events,
-        binding: null,
-        reason: "dropped_by_mention_policy_or_empty",
-      } satisfies TelegramGroupHarnessResult;
-    }
+}): Effect.fn.Return<TelegramGroupHarnessResult> {
+  const events = yield* parseTelegramUpdate(
+    input.update,
+    input.installation,
+    input.nowMs
+  ).pipe(Effect.orElseSucceed(() => [] as const));
+  const event = events[0];
+  if (!event) {
     return {
-      accepted: true,
+      accepted: false,
       events,
-      binding: {
-        identityId: binding.identityId,
-        channel: "telegram",
-        installationId: binding.installationId,
-        senderId: binding.senderId,
-        chatId: binding.chatId,
-        chatKind: "group",
-        conversationScope: binding.conversationScope,
-        deliveryTargetId: binding.deliveryTargetId,
-      },
-      reason: "accepted_and_bound",
+      binding: null,
+      reason: "dropped_by_mention_policy_or_empty",
     } satisfies TelegramGroupHarnessResult;
-  });
+  }
+  if (event.chatKind !== "group") {
+    return {
+      accepted: false,
+      events,
+      binding: null,
+      reason: "not_group_event",
+    } satisfies TelegramGroupHarnessResult;
+  }
+  const binding = yield* bindGroupChannelIdentity({
+    identityId: input.identityId,
+    channel: "telegram",
+    installationId: event.installationId,
+    senderId: event.senderId,
+    chatId: event.chatId,
+  }).pipe(Effect.orElseSucceed(() => null));
+  if (binding?.channel !== "telegram") {
+    return {
+      accepted: false,
+      events,
+      binding: null,
+      reason: "dropped_by_mention_policy_or_empty",
+    } satisfies TelegramGroupHarnessResult;
+  }
+  return {
+    accepted: true,
+    events,
+    binding: {
+      identityId: binding.identityId,
+      channel: "telegram",
+      installationId: binding.installationId,
+      senderId: binding.senderId,
+      chatId: binding.chatId,
+      chatKind: "group",
+      conversationScope: binding.conversationScope,
+      deliveryTargetId: binding.deliveryTargetId,
+    },
+    reason: "accepted_and_bound",
+  } satisfies TelegramGroupHarnessResult;
+});

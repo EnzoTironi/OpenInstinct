@@ -394,13 +394,12 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     const browserSecret = randomBytes(32).toString("base64url");
     const link = await serverRuntime.runPromise(
       accounts.issueChallenge({
+        purpose: "link" as const,
+        userId: owner.identity.userId,
+        sessionId: secondSession.session.id,
         channel: "telegram",
         installationId,
         browserSecret,
-        link: {
-          userId: owner.identity.userId,
-          sessionId: secondSession.session.id,
-        },
       })
     );
     const linkedSender = {
