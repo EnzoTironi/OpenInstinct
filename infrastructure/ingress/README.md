@@ -129,11 +129,11 @@ points at `https://companion-tironi.fly.dev`. The remaining Mac dependency was t
 **Preferred off-Mac path:** run the same tunnel token on Fly app
 `companion-cf-tunnel` (image `cloudflare/cloudflared`, region `gru`):
 
-| Piece | Role |
-| ----- | ---- |
-| [`fly-tunnel/fly.toml`](fly-tunnel/fly.toml) | Connector-only Fly app (no HTTP service) |
-| [`scripts/fly-companion-tunnel.sh`](../../scripts/fly-companion-tunnel.sh) | `validate` / `status` / `deploy` / `set-token-from-file` |
-| Fly secret `TUNNEL_TOKEN` | Same named-tunnel token as Mac file `~/.cloudflared/openinstinct-companion.token` |
+| Piece                                                                      | Role                                                                              |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [`fly-tunnel/fly.toml`](fly-tunnel/fly.toml)                               | Connector-only Fly app (no HTTP service)                                          |
+| [`scripts/fly-companion-tunnel.sh`](../../scripts/fly-companion-tunnel.sh) | `validate` / `status` / `deploy` / `set-token-from-file`                          |
+| Fly secret `TUNNEL_TOKEN`                                                  | Same named-tunnel token as Mac file `~/.cloudflared/openinstinct-companion.token` |
 
 ```sh
 # One-time (token file mode 600; value never printed):

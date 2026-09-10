@@ -8,7 +8,7 @@ local / prosumer mode.
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Compute            | **Fly Machines** (`fly.toml` + root `Dockerfile`) running `pnpm start`                                                                                                         |
 | Postgres           | **Alchemy unmanaged** — Docker (`alchemy.run.ts`) **or** Fly.Machine+volume (`alchemy.fly-postgres.run.ts`) + stage policy — **not** Fly Managed Postgres / `Fly.Postgres` MPG |
-| Public HTTPS / DNS | **Cloudflare** named tunnel for `companion.tironi.xyz` (TG + Kapso); connector on Fly `companion-cf-tunnel` (not Mac)                                                         |
+| Public HTTPS / DNS | **Cloudflare** named tunnel for `companion.tironi.xyz` (TG + Kapso); connector on Fly `companion-cf-tunnel` (not Mac)                                                          |
 | Local optional     | Mac LaunchAgent + Alchemy on Docker Desktop (`scripts/launch-companion-prod.sh`)                                                                                               |
 
 Never commit secrets, print secret values, force-push `main`, destroy Mac prod
