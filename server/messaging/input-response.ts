@@ -20,6 +20,40 @@ type ResponseRow = Pick<
   status: "attempted" | "accepted" | "uncertain";
 };
 
+
+function isActiveIdentity(row: { readonly active: boolean } | undefined) {
+  return row?.active === true;
+}
+
+function isUniqueSource(sources: readonly { readonly id: string }[]) {
+  return sources.length === 1 && sources[0] !== undefined;
+}
+
+function isSameInputResponse(
+  previous: {
+    readonly identityId: string;
+    readonly sourceMessageId: string;
+    readonly revision: string;
+    readonly decision: string;
+    readonly turnId: string;
+  },
+  value: {
+    readonly identityId: string;
+    readonly sourceMessageId: string;
+    readonly revision: string;
+    readonly decision: string;
+    readonly turnId: string;
+  }
+) {
+  return (
+    previous.identityId === value.identityId &&
+    previous.sourceMessageId === value.sourceMessageId &&
+    previous.revision === value.revision &&
+    previous.decision === value.decision &&
+    previous.turnId === value.turnId
+  );
+}
+
 export function createInputResponses(sql: PgClient.PgClient) {
   const claim = Effect.fn("Messaging.claimChannelInputResponse")(function* (
     input: ClaimChannelInputResponse
@@ -31,7 +65,7 @@ export function createInputResponses(sql: PgClient.PgClient) {
     }>`SELECT revoked_at IS NULL AS active
       FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
 
-    if (!identities[0]?.active)
+    if (!isActiveIdentity(identities[0]))
       return yield* new IdentityInactive({ identityId: value.identityId });
 
     const sources = yield* sql<{ id: string }>`SELECT id FROM channel_inbox
@@ -40,7 +74,7 @@ export function createInputResponses(sql: PgClient.PgClient) {
 
     const source = sources[0];
 
-    if (!source || sources.length !== 1) {
+    if (!isUniqueSource(sources) || !source) {
       return yield* new InvalidMessage({
         message:
           "Response requires one accepted source message in this session.",
@@ -73,15 +107,10 @@ export function createInputResponses(sql: PgClient.PgClient) {
         message: "Response claim disappeared.",
       });
 
-    const same =
-      previous.identityId === value.identityId &&
-      previous.sourceMessageId === value.sourceMessageId &&
-      previous.revision === value.revision &&
-      previous.decision === value.decision &&
-      previous.turnId === value.turnId;
-
     return {
-      kind: same ? ("duplicate" as const) : ("conflict" as const),
+      kind: isSameInputResponse(previous, value)
+        ? ("duplicate" as const)
+        : ("conflict" as const),
       id: previous.id,
       status: previous.status,
     };
