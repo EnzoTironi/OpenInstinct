@@ -42,5 +42,44 @@ export default defineConfig({
       "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*",
       "tools/oxlint/anti-slop/**",
     ],
+    coverage: {
+      provider: "v8",
+      reportsDirectory: "./coverage",
+      reporter: ["text", "text-summary", "json-summary", "html", "lcov"],
+      // Production source only — generated/vendor/scripts probes stay out of the gate.
+      include: [
+        "agent/**/*.{ts,tsx}",
+        "app/**/*.{ts,tsx}",
+        "server/**/*.{ts,tsx}",
+        "db/**/*.{ts,tsx}",
+        "web/**/*.{ts,tsx}",
+        "shared/**/*.{ts,tsx}",
+      ],
+      exclude: [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.integration.ts",
+        "**/tests/**",
+        "**/_tests/**",
+        "tools/oxlint/anti-slop/**",
+        "scripts/**",
+        "evals/**",
+        "infrastructure/**",
+        "tools/**",
+        "**/*.d.ts",
+        "**/node_modules/**",
+        // UI primitives / generated dashboard surfaces — not product logic.
+        "web/components/ui/**",
+        "web/components/ai-elements/**",
+        "evals/browser/dashboard/**",
+      ],
+      // NASA gate: 100% on scoped production source (enforce via test:coverage).
+      thresholds: {
+        lines: 100,
+        functions: 100,
+        branches: 100,
+        statements: 100,
+      },
+    },
   },
 });
