@@ -10,7 +10,8 @@ import {
   reserveQuota,
   settleConcurrentTurns,
   type QuotaUsage,
-  QuotaAdmissionError } from "./quotas";
+  QuotaAdmissionError,
+} from "./quotas";
 
 it("bridges hosted Free entitlements to Release-1 floors", () => {
   expect(admissionLimitsForPlan("free")).toEqual(release1QuotaLimits);
@@ -27,11 +28,14 @@ it("documents the chosen self-host limits", () => {
       dailyToolCalls: 200,
       dailyProactiveMessages: 24,
       storageBytes: 100 * 1024 * 1024,
-      sandboxActiveSecondsPerDay: 900 },
+      sandboxActiveSecondsPerDay: 900,
+    },
     installation: {
       concurrentTurns: 20,
       dailyModelTokens: 5_000_000,
-      activeUsersPerDay: 100 } });
+      activeUsersPerDay: 100,
+    },
+  });
 });
 
 it("admits work within limits and reserves usage", async () => {
@@ -40,7 +44,8 @@ it("admits work within limits and reserves usage", async () => {
   const demand = {
     concurrentTurns: 1,
     modelTokens: 1_000,
-    activeUser: 1 as const };
+    activeUser: 1 as const,
+  };
 
   await expect(Effect.runPromise(admitQuota(usage, demand))).resolves.toEqual(
     demand
@@ -66,7 +71,8 @@ it("fails closed when a user exceeds concurrent turns", async () => {
       resource: "concurrent_turns",
       limit: 2,
       used: 2,
-      requested: 1 })
+      requested: 1,
+    })
   );
   expect(quotaFailureMessage(error)).toContain("concurrent turns");
 });
@@ -84,12 +90,14 @@ it("fails closed when installation concurrent turns would starve fairness", asyn
     reason: "exceeded",
     scope: "installation",
     resource: "concurrent_turns",
-    limit: release1QuotaLimits.installation.concurrentTurns });
+    limit: release1QuotaLimits.installation.concurrentTurns,
+  });
 });
 
 it("fails closed on daily model-token exhaustion (user then installation)", async () => {
   const atUserCap = withUser({
-    dailyModelTokens: release1QuotaLimits.user.dailyModelTokens });
+    dailyModelTokens: release1QuotaLimits.user.dailyModelTokens,
+  });
 
   await expect(
     Effect.runPromise(
@@ -98,7 +106,8 @@ it("fails closed on daily model-token exhaustion (user then installation)", asyn
   ).resolves.toMatchObject({
     reason: "exceeded",
     scope: "user",
-    resource: "model_tokens" });
+    resource: "model_tokens",
+  });
 
   const atInstallCap = emptyQuotaUsage();
   atInstallCap.installation.dailyModelTokens =
@@ -110,7 +119,8 @@ it("fails closed on daily model-token exhaustion (user then installation)", asyn
   ).resolves.toMatchObject({
     reason: "exceeded",
     scope: "installation",
-    resource: "model_tokens" });
+    resource: "model_tokens",
+  });
 });
 
 it("enforces tool, proactive, storage, sandbox and active-user caps", async () => {
@@ -125,27 +135,32 @@ it("enforces tool, proactive, storage, sandbox and active-user caps", async () =
   await expect(
     Effect.runPromise(
       admitQuota(withUser({ dailyProactiveMessages: 24 }), {
-        proactiveMessages: 1 }).pipe(Effect.flip)
+        proactiveMessages: 1,
+      }).pipe(Effect.flip)
     )
   ).resolves.toMatchObject({
     resource: "proactive_messages",
-    reason: "exceeded" });
+    reason: "exceeded",
+  });
 
   await expect(
     Effect.runPromise(
       admitQuota(withUser({ storageBytes: 100 * 1024 * 1024 }), {
-        storageBytes: 1 }).pipe(Effect.flip)
+        storageBytes: 1,
+      }).pipe(Effect.flip)
     )
   ).resolves.toMatchObject({ resource: "storage_bytes", reason: "exceeded" });
 
   await expect(
     Effect.runPromise(
       admitQuota(withUser({ sandboxActiveSecondsPerDay: 900 }), {
-        sandboxSeconds: 1 }).pipe(Effect.flip)
+        sandboxSeconds: 1,
+      }).pipe(Effect.flip)
     )
   ).resolves.toMatchObject({
     resource: "sandbox_seconds",
-    reason: "exceeded" });
+    reason: "exceeded",
+  });
 
   const usage = emptyQuotaUsage();
   usage.installation.activeUsersPerDay = 100;
@@ -168,7 +183,8 @@ it("rejects invalid usage snapshots as typed Effect errors", async () => {
       admitQuota(
         {
           ...emptyQuotaUsage(),
-          user: { ...emptyQuotaUsage().user, concurrentTurns: -1 } },
+          user: { ...emptyQuotaUsage().user, concurrentTurns: -1 },
+        },
         { concurrentTurns: 1 }
       ).pipe(Effect.flip)
     )

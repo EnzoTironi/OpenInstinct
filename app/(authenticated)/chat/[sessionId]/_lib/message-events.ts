@@ -15,20 +15,25 @@ const decodeSendMessageToolResultSchema = Schema.decodeUnknownResult(
   sendMessageToolResultSchema
 );
 
+type ActionResultEvent = Extract<MessageStreamEvent, { type: "action.result" }>;
+
+interface SentDelivery {
+  id: string;
+  parts: EveMessagePart[];
+  timestamp: string;
+}
+
+type DeliveryOutput = NonNullable<
+  ReturnType<typeof completedSendMessageOutput>
+>;
+
+type ReactionOutput = NonNullable<ReturnType<typeof completedReactionOutput>>;
+
 export function messageTimestamps(events: readonly MessageStreamEvent[]) {
   const timestamps = new Map<string, string>();
 
   for (const event of events) {
-    if (event.type === "message.received") {
-      timestamps.set(`${event.data.turnId}:user`, event.meta.at);
-    }
-
-    if (
-      event.type === "message.completed" &&
-      event.data.finishReason !== "tool-calls"
-    ) {
-      timestamps.set(`${event.data.turnId}:assistant`, event.meta.at);
-    }
+    recordMessageTimestamp(timestamps, event);
   }
 
   return timestamps;
@@ -38,9 +43,7 @@ export function imessageTimestamps(events: readonly MessageStreamEvent[]) {
   const timestamps = new Map<string, string>();
 
   for (const event of events) {
-    if (event.type === "message.received") {
-      timestamps.set(`${event.data.turnId}:user`, event.meta.at);
-    }
+    recordImessageTimestamp(timestamps, event);
   }
 
   return timestamps;
@@ -48,11 +51,7 @@ export function imessageTimestamps(events: readonly MessageStreamEvent[]) {
 
 export function sentMessages(events: readonly MessageStreamEvent[]) {
   const delivered = new Set<string>();
-
-  const messagesByTurn = new Map<
-    string,
-    { id: string; parts: EveMessagePart[]; timestamp: string }[]
-  >();
+  const messagesByTurn = new Map<string, SentDelivery[]>();
 
   for (const event of events) {
     if (event.type !== "action.result") continue;
@@ -62,68 +61,152 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
   return messagesByTurn;
 }
 
+function recordMessageTimestamp(
+  timestamps: Map<string, string>,
+  event: MessageStreamEvent
+) {
+  if (event.type === "message.received") {
+    timestamps.set(`${event.data.turnId}:user`, event.meta.at);
+  }
+
+  if (
+    event.type === "message.completed" &&
+    event.data.finishReason !== "tool-calls"
+  ) {
+    timestamps.set(`${event.data.turnId}:assistant`, event.meta.at);
+  }
+}
+
+function recordImessageTimestamp(
+  timestamps: Map<string, string>,
+  event: MessageStreamEvent
+) {
+  if (event.type === "message.received") {
+    timestamps.set(`${event.data.turnId}:user`, event.meta.at);
+  }
+}
+
 function recordSentMessage(
-  event: Extract<MessageStreamEvent, { type: "action.result" }>,
+  event: ActionResultEvent,
   delivered: Set<string>,
-  messagesByTurn: Map<
-    string,
-    { id: string; parts: EveMessagePart[]; timestamp: string }[]
-  >
+  messagesByTurn: Map<string, SentDelivery[]>
 ) {
   const delivery = completedSendMessageOutput(event);
   const reaction = completedReactionOutput(event);
   const completed = delivery ?? reaction;
 
   if (!completed) return;
-  const deliveryId = delivery?.output.deliveryId ?? completed.callId;
 
-  if (delivery?.output.deliveryId) {
-    if (delivered.has(delivery.output.deliveryId)) return;
-    delivered.add(delivery.output.deliveryId);
-  }
+  if (shouldSkipDuplicateDelivery(delivered, delivery)) return;
 
-  const turnMessageId = `${event.data.turnId}:assistant`;
-  const parts: EveMessagePart[] = [];
+  appendSentDelivery(
+    messagesByTurn,
+    event,
+    deliveryIdFor(delivery, completed.callId),
+    partsForSentMessage(event, delivery, reaction)
+  );
+}
 
-  if (reaction) {
-    parts.push({
+function shouldSkipDuplicateDelivery(
+  delivered: Set<string>,
+  delivery: DeliveryOutput | undefined
+): boolean {
+  const deliveryId = delivery?.output.deliveryId;
+
+  if (!deliveryId) return false;
+
+  if (delivered.has(deliveryId)) return true;
+
+  delivered.add(deliveryId);
+
+  return false;
+}
+
+function deliveryIdFor(
+  delivery: DeliveryOutput | undefined,
+  fallbackCallId: string
+): string {
+  return delivery?.output.deliveryId ?? fallbackCallId;
+}
+
+function partsForSentMessage(
+  event: ActionResultEvent,
+  delivery: DeliveryOutput | undefined,
+  reaction: ReactionOutput | undefined
+): EveMessagePart[] {
+  if (reaction) return reactionParts(event, reaction);
+
+  if (delivery) return deliveryParts(event, delivery);
+
+  return [];
+}
+
+function reactionParts(
+  event: ActionResultEvent,
+  reaction: ReactionOutput
+): EveMessagePart[] {
+  return [
+    {
       state: "done",
       stepIndex: event.data.stepIndex,
       text: reactionTextFor(reaction.output.type),
       type: "text",
+    },
+  ];
+}
+
+function deliveryParts(
+  event: ActionResultEvent,
+  delivery: DeliveryOutput
+): EveMessagePart[] {
+  const parts: EveMessagePart[] = [];
+  const text = deliveryText(delivery.output);
+
+  if (text) {
+    parts.push({
+      state: "done",
+      stepIndex: event.data.stepIndex,
+      text,
+      type: "text",
     });
-  } else if (delivery) {
-    const { output } = delivery;
-
-    // Delivered text is plain and reaches the user verbatim. The chat view
-    // renders text parts as Markdown, so keep every line break as a hard break.
-    const text =
-      output.kind === "link"
-        ? output.url
-        : output.text?.replaceAll("\n", "  \n");
-
-    if (text) {
-      parts.push({
-        state: "done",
-        stepIndex: event.data.stepIndex,
-        text,
-        type: "text",
-      });
-    }
-
-    const attachments = output.kind === "message" ? output.attachments : [];
-
-    for (const attachment of attachments ?? []) {
-      parts.push({
-        filename: attachment.name,
-        mediaType: attachment.mimeType ?? defaultMediaType[attachment.kind],
-        stepIndex: event.data.stepIndex,
-        type: "file",
-        url: attachment.url,
-      });
-    }
   }
 
+  appendAttachmentParts(parts, event, delivery.output);
+
+  return parts;
+}
+
+function deliveryText(output: DeliveryOutput["output"]): string | undefined {
+  if (output.kind === "link") return output.url;
+
+  return output.text?.replaceAll("\n", "  \n");
+}
+
+function appendAttachmentParts(
+  parts: EveMessagePart[],
+  event: ActionResultEvent,
+  output: DeliveryOutput["output"]
+) {
+  const attachments = output.kind === "message" ? output.attachments : [];
+
+  for (const attachment of attachments ?? []) {
+    parts.push({
+      filename: attachment.name,
+      mediaType: attachment.mimeType ?? defaultMediaType[attachment.kind],
+      stepIndex: event.data.stepIndex,
+      type: "file",
+      url: attachment.url,
+    });
+  }
+}
+
+function appendSentDelivery(
+  messagesByTurn: Map<string, SentDelivery[]>,
+  event: ActionResultEvent,
+  deliveryId: string,
+  parts: EveMessagePart[]
+) {
+  const turnMessageId = `${event.data.turnId}:assistant`;
   const messages = messagesByTurn.get(turnMessageId) ?? [];
   messages.push({
     id: `${turnMessageId}:${deliveryId}`,
@@ -140,9 +223,11 @@ function completedReactionOutput(event: MessageStreamEvent) {
 
   const result = decodeReactToMessageToolResultSchema(event.data.result);
 
-  return Result.isSuccess(result) && result.success.output.operation === "add"
-    ? { callId: event.data.result.callId, output: result.success.output }
-    : undefined;
+  if (!Result.isSuccess(result)) return undefined;
+
+  if (result.success.output.operation !== "add") return undefined;
+
+  return { callId: event.data.result.callId, output: result.success.output };
 }
 
 function completedSendMessageOutput(event: MessageStreamEvent) {
@@ -152,9 +237,9 @@ function completedSendMessageOutput(event: MessageStreamEvent) {
 
   const result = decodeSendMessageToolResultSchema(event.data.result);
 
-  return Result.isSuccess(result)
-    ? { callId: event.data.result.callId, output: result.success.output }
-    : undefined;
+  if (!Result.isSuccess(result)) return undefined;
+
+  return { callId: event.data.result.callId, output: result.success.output };
 }
 
 const defaultMediaType = {

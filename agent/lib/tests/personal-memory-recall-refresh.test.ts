@@ -15,7 +15,8 @@ import {
   recalledProjectionFrom,
   RecallRefreshError,
   requireCleanProjectionForNextModelStep,
-  type RecalledProjection } from "../personal-memory-recall-refresh";
+  type RecalledProjection,
+} from "../personal-memory-recall-refresh";
 import { executeErasedTool } from "./_lib/execute-erased-tool";
 
 const forgottenText = "My favorite color is orange.";
@@ -29,19 +30,23 @@ function memoryContext(key: string): MemoryTurnStartedContext {
     principalId: "user-1",
     principalType: "user" as const,
     authenticator: "authjs",
-    attributes: {} };
+    attributes: {},
+  };
 
   return {
     memory: {
       scope: {
         key,
         namespace: "recall-refresh-test",
-        value: "workspace-1" },
-      slot: "profile" },
+        value: "workspace-1",
+      },
+      slot: "profile",
+    },
     session: {
       id: sessionId,
       auth: { current: principal, initiator: principal },
-      turn: { id: randomUUID(), sequence: 1 } },
+      turn: { id: randomUUID(), sequence: 1 },
+    },
     turn: { id: randomUUID(), sequence: 1, input: [] },
     operationId: randomUUID(),
     messages: [],
@@ -51,7 +56,8 @@ function memoryContext(key: string): MemoryTurnStartedContext {
     },
     getSkill() {
       throw new Error("file memory must not load skills.");
-    } };
+    },
+  };
 }
 
 function toolExecution(
@@ -67,7 +73,8 @@ function toolExecution(
     },
     requireAuth() {
       throw new Error("unused");
-    } };
+    },
+  };
 }
 
 it("identifies Eve fileMemory mutating tools", () => {
@@ -82,12 +89,14 @@ it("supersedes stable recall ids for the next model step", () => {
   const prior: RecalledProjection = {
     messages: [
       { id: "file-memory-document", content: `keep ${forgottenText}` },
-    ] };
+    ],
+  };
 
   const refreshed: RecalledProjection = {
     messages: [
       { id: "file-memory-document", content: `keep ${keptText} only` },
-    ] };
+    ],
+  };
 
   const next = projectNotesForNextModelStep(prior, refreshed);
   expect(projectionContainsNote(next, forgottenText)).toBe(false);
@@ -102,7 +111,8 @@ it("after remove, refresh then next model step cannot see stale notes", async ()
 
   const tools = await provider.tools?.({
     ...context,
-    channel: { kind: "eve" } });
+    channel: { kind: "eve" },
+  });
 
   assert.ok(tools?.save_memory && tools.remove_memory);
   const saveMemory = tools.save_memory;
@@ -141,7 +151,8 @@ it("after remove, refresh then next model step cannot see stale notes", async ()
         ),
       recall: (ctx) => provider.recall["turn.started"](ctx),
       context,
-      priorProjection: prior })
+      priorProjection: prior,
+    })
   );
 
   const forNextModelStep = await Effect.runPromise(
@@ -161,7 +172,8 @@ it("fails closed when storage succeeded but refresh did not", async () => {
 
   const tools = await provider.tools?.({
     ...context,
-    channel: { kind: "eve" } });
+    channel: { kind: "eve" },
+  });
 
   assert.ok(tools?.save_memory && tools.remove_memory);
   const saveMemory = tools.save_memory;
@@ -199,7 +211,8 @@ it("fails closed when storage succeeded but refresh did not", async () => {
           throw new Error("simulated crash before refresh");
         },
         context,
-        priorProjection: prior })
+        priorProjection: prior,
+      })
     )
   ).rejects.toMatchObject({ reason: "refresh-failed" });
 
@@ -211,7 +224,8 @@ it("fails closed when storage succeeded but refresh did not", async () => {
     Effect.runPromise(
       requireCleanProjectionForNextModelStep({
         kind: "dirty",
-        reason: "mutation-pending-refresh" })
+        reason: "mutation-pending-refresh",
+      })
     )
   ).rejects.toBeInstanceOf(RecallRefreshError);
 
@@ -229,7 +243,8 @@ it("forgets every unstructured note without resurrecting prior projection text",
 
   const tools = await provider.tools?.({
     ...context,
-    channel: { kind: "eve" } });
+    channel: { kind: "eve" },
+  });
 
   assert.ok(tools?.save_memory && tools.remove_memory);
   const saveMemory = tools.save_memory;
@@ -255,7 +270,8 @@ it("forgets every unstructured note without resurrecting prior projection text",
               )
             ),
           catch: (cause) =>
-            cause instanceof Error ? cause : new Error(String(cause)) }),
+            cause instanceof Error ? cause : new Error(String(cause)),
+        }),
       { concurrency: 1 }
     )
   );
@@ -291,7 +307,8 @@ it("forgets every unstructured note without resurrecting prior projection text",
               ),
             recall: (ctx) => provider.recall["turn.started"](ctx),
             context,
-            priorProjection: projection });
+            priorProjection: projection,
+          });
 
           projection = yield* requireCleanProjectionForNextModelStep(
             refreshed.phase
@@ -320,7 +337,8 @@ it("drops prior keyed notes that refresh no longer returns (no resurrection)", (
     messages: [
       { id: "file-memory-document", content: forgottenText },
       { content: "unkeyed stale summary mentioning orange" },
-    ] };
+    ],
+  };
 
   const refreshed: RecalledProjection = { messages: [] };
   const next = projectNotesForNextModelStep(prior, refreshed);
@@ -334,7 +352,8 @@ it("fails closed when a mutating tool succeeds without a clean projection phase"
     Effect.runPromise(
       requireCleanProjectionForNextModelStep({
         kind: "dirty",
-        reason: "mutation-pending-refresh" })
+        reason: "mutation-pending-refresh",
+      })
     )
   ).rejects.toMatchObject({ reason: "stale-projection" });
 

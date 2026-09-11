@@ -10,7 +10,8 @@ it("accepts the workspace derived from the authenticated user", () => {
       attributes: { workspaceId: scope.workspaceId },
       authenticator: "authjs",
       principalId: scope.userId,
-      principalType: "user" })
+      principalType: "user",
+    })
   ).toEqual(scope);
 });
 
@@ -21,7 +22,8 @@ it("rejects a workspace attribute that belongs to another user", () => {
       attributes: { workspaceId: victim.workspaceId },
       authenticator: "authjs",
       principalId: "better-auth:attacker",
-      principalType: "user" })
+      principalType: "user",
+    })
   ).toThrow("does not belong to the authenticated user");
 });
 
@@ -32,7 +34,8 @@ it("rejects a foreign workspace regardless of the principal ID prefix", () => {
       attributes: { workspaceId: victim.workspaceId },
       authenticator: "telegram",
       principalId: "telegram:attacker",
-      principalType: "user" })
+      principalType: "user",
+    })
   ).toThrow("does not belong to the authenticated user");
 });
 
@@ -43,7 +46,8 @@ it("accepts a channel-neutral principal with its own workspace", () => {
       attributes: { workspaceId: scope.workspaceId },
       authenticator: "telegram",
       principalId: scope.userId,
-      principalType: "user" })
+      principalType: "user",
+    })
   ).toEqual(scope);
 });
 
@@ -55,7 +59,8 @@ it("rejects ambiguous principal aliases", () => {
     authenticator: "authjs",
     principalType: "user" as const,
     principalId: "better-auth:bob",
-    id: scope.userId };
+    id: scope.userId,
+  };
 
   expect(() => scopeFromPrincipal(principal)).toThrow("unambiguous");
 });
@@ -69,7 +74,8 @@ it.each(["", " ", " better-auth:alice", "better-auth:alice "])(
         attributes: { workspaceId: scope.workspaceId },
         authenticator: "authjs",
         principalType: "user",
-        principalId })
+        principalId,
+      })
     ).toThrow("authenticated workspace user");
   }
 );
@@ -80,6 +86,7 @@ it("accepts the framework connection principal shape", () => {
     scopeFromPrincipal({
       type: "user",
       id: scope.userId,
-      attributes: { workspaceId: scope.workspaceId } })
+      attributes: { workspaceId: scope.workspaceId },
+    })
   ).toEqual(scope);
 });

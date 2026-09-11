@@ -1,8 +1,15 @@
 import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { recordBrowserTraceDomains } from "@db/services/browser-traces";
 import type { AccessScope } from "@shared/identity/access-scope";
+import { z } from "zod";
 
 const maximumTelemetryEvents = 5000;
+
+const pageNavigationDataSchema = z.object({
+  parent_frame_id: z.unknown().optional(),
+  target_type: z.string().optional(),
+  url: z.string(),
+});
 
 export function domainFromUrl(url: string) {
   try {
@@ -18,83 +25,41 @@ export function domainFromUrl(url: string) {
   }
 }
 
-function hasPageNavigationUrl(data: {
-  parent_frame_id?: unknown;
-  target_type?: string;
-  url?: string;
-}): data is { url: string; parent_frame_id?: unknown; target_type?: string } {
-  return Boolean(data.url) && !data.parent_frame_id;
-}
-
-function isPageTarget(data: { target_type?: string }) {
-  return !data.target_type || data.target_type === "page";
-}
-
-function isPageNavigationEvent(event: {
-  data?: {
-    parent_frame_id?: unknown;
-    target_type?: string;
-    url?: string;
-  };
-  type: string;
-}) {
+function navigationUrlFromEvent(event: { data?: unknown; type: string }) {
   if (event.type !== "page_navigation") {
-    return false;
-  }
-
-  const data = event.data;
-
-  if (!data || !hasPageNavigationUrl(data)) {
-    return false;
-  }
-
-  return isPageTarget(data);
-}
-
-function navigationDomain(event: {
-  data?: { url?: string };
-}): string | undefined {
-  const url = event.data?.url;
-
-  if (!url) {
     return undefined;
   }
 
-  return domainFromUrl(url);
+  const parsed = pageNavigationDataSchema.safeParse(event.data);
+
+  if (!parsed.success) {
+    return undefined;
+  }
+
+  const data = parsed.data;
+
+  if (data.parent_frame_id) {
+    return undefined;
+  }
+
+  if (data.target_type && data.target_type !== "page") {
+    return undefined;
+  }
+
+  return data.url;
 }
 
 function maybeAddNavigationDomain(
   domains: Set<string>,
   event: { data?: unknown; type: string }
 ) {
-  if (event.type !== "page_navigation") {
+  const url = navigationUrlFromEvent(event);
+
+  if (!url) {
     return;
   }
 
-  const data = event.data;
-
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    !("url" in data) ||
-    typeof data.url !== "string"
-  ) {
-    return;
-  }
-
-  if ("parent_frame_id" in data && data.parent_frame_id) {
-    return;
-  }
-
-  if (
-    "target_type" in data &&
-    data.target_type &&
-    data.target_type !== "page"
-  ) {
-    return;
-  }
-
-  const domain = domainFromUrl(data.url);
+  const domain = domainFromUrl(url);
 
   if (domain) {
     domains.add(domain);

@@ -153,7 +153,8 @@ function dynamicContext(
           attributes: {},
           authenticator,
           principalId: "user-1",
-          principalType: "user" },
+          principalType: "user",
+        },
         initiator:
           initiatorAuthenticator === undefined
             ? null
@@ -161,6 +162,10 @@ function dynamicContext(
                 attributes: {},
                 authenticator: initiatorAuthenticator,
                 principalId: "user-1",
-                principalType: "user" } },
-      id: "session-1" } } satisfies DynamicResolveContext;
+                principalType: "user",
+              },
+      },
+      id: "session-1",
+    },
+  } satisfies DynamicResolveContext;
 }

@@ -1,13 +1,15 @@
 import {
   preserveProfileMemoryCancellation,
-  resolveProfileMemoryScope } from "@agent/lib/profile-memory";
+  resolveProfileMemoryScope,
+} from "@agent/lib/profile-memory";
 import personalInfoMemory from "@agent/memory/personal_info";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import {
   defineMemoryProvider,
   type MemoryScopeContext,
   type MemoryTurnStartedContext,
-  type MemoryToolsContext } from "eve/memory";
+  type MemoryToolsContext,
+} from "eve/memory";
 import { expect, it } from "vitest";
 
 const derivedWorkspaceId = accessScopeForUser("better-auth:user").workspaceId;
@@ -32,7 +34,8 @@ it("disables memory without an authenticated workspace user", () => {
     resolveProfileMemoryScope(
       memoryContext({
         ...userPrincipal("runtime", derivedWorkspaceId),
-        principalType: "runtime" })
+        principalType: "runtime",
+      })
     )
   ).toBeNull();
   expect(
@@ -48,7 +51,8 @@ it("shares personal information with a worker acting for the user", () => {
           attributes: {},
           authenticator: "runtime",
           principalId: "worker",
-          principalType: "runtime" },
+          principalType: "runtime",
+        },
         userPrincipal("authjs", derivedWorkspaceId)
       )
     )
@@ -85,7 +89,8 @@ it("preserves the turn cancellation reason when recall loses it", async () => {
   );
 
   const cancellation = Object.assign(new Error("The turn was cancelled."), {
-    name: "TurnCancelledError" });
+    name: "TurnCancelledError",
+  });
 
   const controller = new AbortController();
   controller.abort(cancellation);
@@ -95,7 +100,9 @@ it("preserves the turn cancellation reason when recall loses it", async () => {
       recall: {
         async "turn.started"() {
           throw blobAbort;
-        } } })
+        },
+      },
+    })
   );
 
   await expect(
@@ -114,7 +121,9 @@ it("does not hide a recall failure while the turn remains active", async () => {
       recall: {
         async "turn.started"() {
           throw blobAbort;
-        } } })
+        },
+      },
+    })
   );
 
   await expect(
@@ -139,17 +148,22 @@ function memoryOperationContext(
       scope: {
         key: "personal-info-key",
         namespace: "openinstinct-profile-memory-v1",
-        value: "personal:workspace" },
-      slot: "profile" },
+        value: "personal:workspace",
+      },
+      slot: "profile",
+    },
     messages: [],
     operationId: "memory-operation",
     session: {
       auth: {
         current: userPrincipal("authjs", "personal:workspace"),
-        initiator: null },
+        initiator: null,
+      },
       id: "session",
-      turn: { id: "turn", sequence: 1 } },
-    turn: { id: "turn", input: [], sequence: 1 } };
+      turn: { id: "turn", sequence: 1 },
+    },
+    turn: { id: "turn", input: [], sequence: 1 },
+  };
 }
 
 function memoryToolsContext(
@@ -162,13 +176,17 @@ function memoryToolsContext(
       scope: {
         key: "personal-info-key",
         namespace: "openinstinct-personal-info-v1",
-        value: derivedWorkspaceId },
-      slot: "personal_info" },
+        value: derivedWorkspaceId,
+      },
+      slot: "personal_info",
+    },
     messages: [],
     session: {
       auth: { current, initiator },
-      id: "session" },
-    turn: { id: "turn", input: [], sequence: 1 } };
+      id: "session",
+    },
+    turn: { id: "turn", input: [], sequence: 1 },
+  };
 }
 
 function memoryContext(
@@ -180,7 +198,9 @@ function memoryContext(
     channel: {},
     session: {
       auth: { current, initiator },
-      id: "session" } };
+      id: "session",
+    },
+  };
 }
 
 function userPrincipal(
@@ -191,5 +211,6 @@ function userPrincipal(
     attributes: workspaceId === undefined ? {} : { workspaceId },
     authenticator,
     principalId: "better-auth:user",
-    principalType: "user" };
+    principalType: "user",
+  };
 }

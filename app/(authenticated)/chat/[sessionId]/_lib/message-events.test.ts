@@ -4,7 +4,8 @@ import { expect, it } from "vitest";
 import {
   imessageTimestamps,
   messageTimestamps,
-  sentMessages } from "./message-events";
+  sentMessages,
+} from "./message-events";
 
 type ToolResultOutput = Extract<
   Extract<MessageStreamEvent, { type: "action.result" }>["data"]["result"],
@@ -22,10 +23,12 @@ it("projects only successful send_message results", () => {
           {
             kind: "image",
             name: "result.png",
-            url: "https://example.com/result.png" },
+            url: "https://example.com/result.png",
+          },
         ],
         kind: "message",
-        text: "Here is the user-visible result." },
+        text: "Here is the user-visible result.",
+      },
       2,
       "2026-09-01T12:00:02.000Z"
     ),
@@ -39,15 +42,18 @@ it("projects only successful send_message results", () => {
           state: "done",
           stepIndex: 2,
           text: "Here is the user-visible result.",
-          type: "text" },
+          type: "text",
+        },
         {
           filename: "result.png",
           mediaType: "image/*",
           stepIndex: 2,
           type: "file",
-          url: "https://example.com/result.png" },
+          url: "https://example.com/result.png",
+        },
       ],
-      timestamp: "2026-09-01T12:00:02.000Z" },
+      timestamp: "2026-09-01T12:00:02.000Z",
+    },
   ]);
   expect(messageTimestamps(events).get("turn-1:assistant")).toBe(
     "2026-09-01T12:00:00.000Z"
@@ -63,7 +69,8 @@ it("projects a compact reaction for the Eve chat", () => {
   expect(sentMessages(events).get("turn-1:assistant")).toEqual([
     expect.objectContaining({
       id: "turn-1:assistant:call-react_to_message",
-      parts: [expect.objectContaining({ text: "❤️" })] }),
+      parts: [expect.objectContaining({ text: "❤️" })],
+    }),
   ]);
   expect(imessageTimestamps(events).has("turn-1:assistant")).toBe(false);
 });
@@ -94,9 +101,11 @@ it("projects a native link-preview send as its URL", () => {
           state: "done",
           stepIndex: 1,
           text: "https://example.com/article",
-          type: "text" },
+          type: "text",
+        },
       ],
-      timestamp: "2026-09-01T12:00:01.000Z" },
+      timestamp: "2026-09-01T12:00:01.000Z",
+    },
   ]);
 });
 
@@ -114,7 +123,8 @@ it("keeps plain-text line breaks visible in the chat view", () => {
 
   expect(sentMessages(events).get("turn-1:assistant")).toEqual([
     expect.objectContaining({
-      parts: [expect.objectContaining({ text: "line one  \nline two" })] }),
+      parts: [expect.objectContaining({ text: "line one  \nline two" })],
+    }),
   ]);
 });
 
@@ -125,7 +135,8 @@ it("treats reply association as transport metadata in the Eve chat", () => {
       {
         kind: "message",
         replyTo: { kind: "current" },
-        text: "This is still a normal Eve message." },
+        text: "This is still a normal Eve message.",
+      },
       1
     ),
   ];
@@ -134,8 +145,10 @@ it("treats reply association as transport metadata in the Eve chat", () => {
     expect.objectContaining({
       parts: [
         expect.objectContaining({
-          text: "This is still a normal Eve message." }),
-      ] }),
+          text: "This is still a normal Eve message.",
+        }),
+      ],
+    }),
   ]);
 });
 
@@ -162,10 +175,12 @@ it("keeps consecutive sends in the same turn as separate messages", () => {
   expect(sentMessages(events).get("turn-1:assistant")).toEqual([
     expect.objectContaining({
       id: "turn-1:assistant:call-result",
-      parts: [expect.objectContaining({ text: "The useful result." })] }),
+      parts: [expect.objectContaining({ text: "The useful result." })],
+    }),
     expect.objectContaining({
       id: "turn-1:assistant:call-question",
-      parts: [expect.objectContaining({ text: "Want me to book it?" })] }),
+      parts: [expect.objectContaining({ text: "Want me to book it?" })],
+    }),
   ]);
 });
 
@@ -227,7 +242,8 @@ it("does not display an already-delivered task receipt as another message", () =
     sentMessages([
       toolResult("send_message", {
         kind: "task-report-receipt",
-        deliveryId: "report-a" }),
+        deliveryId: "report-a",
+      }),
     ]).size
   ).toBe(0);
 });
@@ -267,13 +283,16 @@ function toolResult(
         callId,
         kind: "tool-result",
         output,
-        toolName },
+        toolName,
+      },
       sequence: stepIndex,
       status,
       stepIndex,
-      turnId: "turn-1" },
+      turnId: "turn-1",
+    },
     meta: { at, id: `event-${toolName}` },
-    type: "action.result" };
+    type: "action.result",
+  };
 }
 
 function completedMessage(message: string, at: string): MessageStreamEvent {
@@ -283,7 +302,9 @@ function completedMessage(message: string, at: string): MessageStreamEvent {
       message,
       sequence: 0,
       stepIndex: 0,
-      turnId: "turn-1" },
+      turnId: "turn-1",
+    },
     meta: { at, id: "event-message" },
-    type: "message.completed" };
+    type: "message.completed",
+  };
 }

@@ -7,7 +7,8 @@ import {
   gmailSendIdempotencyKey,
   gmailSendIdempotencyQuery,
   gmailSendMessageId,
-  sendGmail } from "@agent/lib/google-workspace/gmail";
+  sendGmail,
+} from "@agent/lib/google-workspace/gmail";
 import * as CalendarApi from "@googleapis/calendar";
 import * as GmailApi from "@googleapis/gmail";
 import * as PeopleApi from "@googleapis/people";
@@ -30,7 +31,8 @@ it("strips token-bearing request details from provider failures", () => {
   const failure = googleApiFailure({
     response: { status: 401, data: "private response" },
     config: { headers: { Authorization: "Bearer private-token" } },
-    message: "request included private-token" });
+    message: "request included private-token",
+  });
 
   expect(failure.status).toBe(401);
   expect(JSON.stringify(failure)).not.toContain("private");
@@ -65,10 +67,12 @@ it("sends typed Gmail requests with a stable retry-safe message ID", async () =>
 
   Object.defineProperty(client.users.messages, "list", {
     configurable: true,
-    value: list });
+    value: list,
+  });
   Object.defineProperty(client.users.messages, "send", {
     configurable: true,
-    value: send });
+    value: send,
+  });
   googleClients({ gmail: client });
 
   await sendGmail(ctx, {
@@ -76,7 +80,8 @@ it("sends typed Gmail requests with a stable retry-safe message ID", async () =>
     body: "Hello",
     cc: [],
     subject: "Status",
-    to: ["person@example.com"] });
+    to: ["person@example.com"],
+  });
 
   const idempotencyKey = gmailSendIdempotencyKey(ctx);
   const messageId = gmailSendMessageId(ctx);
@@ -98,7 +103,8 @@ it("sends typed Gmail requests with a stable retry-safe message ID", async () =>
     {
       maxResults: 1,
       q: gmailSendIdempotencyQuery(idempotencyKey),
-      userId: "me" },
+      userId: "me",
+    },
     { signal: ctx.abortSignal }
   );
   expect(send).toHaveBeenCalledWith(
@@ -129,7 +135,8 @@ it("replays an identical Gmail send by recovering the idempotency key without re
       ) => Promise<{ data: { id: string; threadId: string } }>
     >()
     .mockResolvedValue({
-      data: { id: "existing-1", threadId: "thread-existing" } });
+      data: { id: "existing-1", threadId: "thread-existing" },
+    });
 
   const send = vi.fn<() => never>(() => {
     throw new Error(
@@ -139,13 +146,16 @@ it("replays an identical Gmail send by recovering the idempotency key without re
 
   Object.defineProperty(client.users.messages, "list", {
     configurable: true,
-    value: list });
+    value: list,
+  });
   Object.defineProperty(client.users.messages, "get", {
     configurable: true,
-    value: get });
+    value: get,
+  });
   Object.defineProperty(client.users.messages, "send", {
     configurable: true,
-    value: send });
+    value: send,
+  });
   googleClients({ gmail: client });
 
   await expect(
@@ -154,14 +164,16 @@ it("replays an identical Gmail send by recovering the idempotency key without re
       body: "Hello",
       cc: [],
       subject: "Status",
-      to: ["person@example.com"] })
+      to: ["person@example.com"],
+    })
   ).resolves.toEqual({ id: "existing-1", threadId: "thread-existing" });
 
   expect(list).toHaveBeenCalledWith(
     {
       maxResults: 1,
       q: gmailSendIdempotencyQuery(idempotencyKey),
-      userId: "me" },
+      userId: "me",
+    },
     { signal: ctx.abortSignal }
   );
   expect(get).toHaveBeenCalledWith(
@@ -194,7 +206,8 @@ it("reconciles an uncertain Gmail send via idempotency-key lookup instead of fai
       ) => Promise<{ data: { id: string; threadId: string } }>
     >()
     .mockResolvedValue({
-      data: { id: "landed-1", threadId: "thread-landed" } });
+      data: { id: "landed-1", threadId: "thread-landed" },
+    });
 
   const send = vi
     .fn<() => Promise<never>>()
@@ -202,13 +215,16 @@ it("reconciles an uncertain Gmail send via idempotency-key lookup instead of fai
 
   Object.defineProperty(client.users.messages, "list", {
     configurable: true,
-    value: list });
+    value: list,
+  });
   Object.defineProperty(client.users.messages, "get", {
     configurable: true,
-    value: get });
+    value: get,
+  });
   Object.defineProperty(client.users.messages, "send", {
     configurable: true,
-    value: send });
+    value: send,
+  });
   googleClients({ gmail: client });
 
   await expect(
@@ -217,7 +233,8 @@ it("reconciles an uncertain Gmail send via idempotency-key lookup instead of fai
       body: "Hello",
       cc: [],
       subject: "Status",
-      to: ["person@example.com"] })
+      to: ["person@example.com"],
+    })
   ).resolves.toEqual({ id: "landed-1", threadId: "thread-landed" });
 
   expect(send).toHaveBeenCalledOnce();
@@ -227,7 +244,8 @@ it("reconciles an uncertain Gmail send via idempotency-key lookup instead of fai
     {
       maxResults: 1,
       q: gmailSendIdempotencyQuery(idempotencyKey),
-      userId: "me" },
+      userId: "me",
+    },
     { signal: ctx.abortSignal }
   );
   expect(get).toHaveBeenCalledWith(
@@ -255,10 +273,12 @@ it("fails closed on definite Gmail client errors without claiming idempotency su
 
   Object.defineProperty(client.users.messages, "list", {
     configurable: true,
-    value: list });
+    value: list,
+  });
   Object.defineProperty(client.users.messages, "send", {
     configurable: true,
-    value: send });
+    value: send,
+  });
   googleClients({ gmail: client });
 
   await expect(
@@ -267,7 +287,8 @@ it("fails closed on definite Gmail client errors without claiming idempotency su
       body: "Hello",
       cc: [],
       subject: "Status",
-      to: ["person@example.com"] })
+      to: ["person@example.com"],
+    })
   ).rejects.toMatchObject({ status: 400 });
 
   expect(list).toHaveBeenCalledOnce();
@@ -299,7 +320,8 @@ it("recovers a duplicate Calendar insert using the stable event ID", async () =>
       ) => Promise<{ data: { id: string; summary: string } }>
     >()
     .mockResolvedValue({
-      data: { id: "existing-event", summary: "Planning" } });
+      data: { id: "existing-event", summary: "Planning" },
+    });
 
   Object.defineProperty(client.events, "get", { value: get });
   Object.defineProperty(client.events, "insert", { value: insert });
@@ -312,7 +334,8 @@ it("recovers a duplicate Calendar insert using the stable event ID", async () =>
       end: "2026-08-28T11:00:00-04:00",
       start: "2026-08-28T10:00:00-04:00",
       summary: "Planning",
-      timezone: "America/New_York" })
+      timezone: "America/New_York",
+    })
   ).resolves.toEqual({ id: "existing-event", summary: "Planning" });
 
   const eventId = createHash("sha256")
@@ -342,20 +365,24 @@ it("warms the People search cache before the typed contact query", async () => {
     >()
     .mockResolvedValueOnce({ data: {} })
     .mockResolvedValueOnce({
-      data: { results: [{ person: { resourceName: "people/1" } }] } });
+      data: { results: [{ person: { resourceName: "people/1" } }] },
+    });
 
   Object.defineProperty(client.people, "searchContacts", {
-    value: searchContacts });
+    value: searchContacts,
+  });
   googleClients({ people: client });
 
   await expect(searchGoogleContacts(ctx, "Person", 10)).resolves.toEqual({
-    contacts: [{ person: { resourceName: "people/1" } }] });
+    contacts: [{ person: { resourceName: "people/1" } }],
+  });
 
   expect(searchContacts).toHaveBeenNthCalledWith(
     1,
     {
       query: "",
-      readMask: "names,emailAddresses,phoneNumbers,organizations" },
+      readMask: "names,emailAddresses,phoneNumbers,organizations",
+    },
     { signal: ctx.abortSignal }
   );
   expect(searchContacts).toHaveBeenNthCalledWith(
@@ -363,7 +390,8 @@ it("warms the People search cache before the typed contact query", async () => {
     {
       pageSize: 10,
       query: "Person",
-      readMask: "names,emailAddresses,phoneNumbers,organizations" },
+      readMask: "names,emailAddresses,phoneNumbers,organizations",
+    },
     { signal: ctx.abortSignal }
   );
 });
@@ -389,8 +417,10 @@ function toolContext() {
     session: {
       auth: { current: null, initiator: null },
       id: "session-1",
-      turn: { id: "turn-1", sequence: 0 } },
-    toolName: "google-workspace-test" } satisfies ToolContext;
+      turn: { id: "turn-1", sequence: 0 },
+    },
+    toolName: "google-workspace-test",
+  } satisfies ToolContext;
 }
 
 function googleClients(clients: {

@@ -7,7 +7,8 @@ const requiredEnvironment = {
   BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_test",
   DATABASE_URL: "postgresql://user:password@example.com/database",
   KERNEL_API_KEY: "test-kernel-key",
-  SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64") };
+  SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
+};
 
 beforeEach(() => {
   vi.resetModules();
@@ -73,7 +74,8 @@ it("provides stable auth and encryption defaults in local development", async ()
   expect(env).toMatchObject({
     BETTER_AUTH_SECRET: "openinstinct-local-auth-development-secret",
     BETTER_AUTH_URL: "http://localhost:3000",
-    SECRET_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" });
+    SECRET_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  });
 });
 
 it.each([

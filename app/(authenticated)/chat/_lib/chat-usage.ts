@@ -55,7 +55,9 @@ function finalizeStepUsage(acc: StepUsageAcc): ChatUsage {
 export function summarizeChatUsage(
   events: readonly MessageStreamEvent[]
 ): ChatUsage {
-  return finalizeStepUsage(events.reduce(accumulateStepUsage, emptyStepUsage()));
+  return finalizeStepUsage(
+    events.reduce(accumulateStepUsage, emptyStepUsage())
+  );
 }
 
 interface CombinedUsageAcc {

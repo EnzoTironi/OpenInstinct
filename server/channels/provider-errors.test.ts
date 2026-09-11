@@ -5,7 +5,8 @@ import { Effect, Schema } from "effect";
 import {
   FetchHttpClient,
   HttpClient,
-  HttpClientRequest } from "effect/unstable/http";
+  HttpClientRequest,
+} from "effect/unstable/http";
 import { expect, it } from "vitest";
 
 import {
@@ -16,7 +17,8 @@ import {
   ProviderRejected,
   ProviderRetryable,
   ProviderUncertain,
-  requestProviderJson } from "./provider-errors";
+  requestProviderJson,
+} from "./provider-errors";
 
 const decodeSchema_Struct_port_Schema_Number = Schema.decodeUnknownSync(
   Schema.Struct({ port: Schema.Number })
@@ -44,9 +46,7 @@ const call = (url: string) =>
 
 it("bounds missing and malformed delays to the default", () => {
   expect(boundRetryAfterSeconds(undefined)).toBe(DEFAULT_RETRY_AFTER_SECONDS);
-  expect(boundRetryAfterSeconds(Number.NaN)).toBe(
-    DEFAULT_RETRY_AFTER_SECONDS
-  );
+  expect(boundRetryAfterSeconds(Number.NaN)).toBe(DEFAULT_RETRY_AFTER_SECONDS);
   expect(boundRetryAfterSeconds(0)).toBe(DEFAULT_RETRY_AFTER_SECONDS);
   expect(boundRetryAfterSeconds(-3)).toBe(DEFAULT_RETRY_AFTER_SECONDS);
   expect(parseRetryAfterHeader(undefined)).toBeUndefined();
@@ -69,7 +69,8 @@ it("treats HTTP 429 with Retry-After as ProviderRetryable", async () => {
       JSON.stringify({
         ok: false,
         error_code: 429,
-        parameters: { retry_after: 17 } })
+        parameters: { retry_after: 17 },
+      })
     );
   }).listen(0, "127.0.0.1");
 
@@ -79,7 +80,8 @@ it("treats HTTP 429 with Retry-After as ProviderRetryable", async () => {
   ).rejects.toMatchObject({
     status: 429,
     retryAfterSeconds: 17,
-    provider: "telegram" });
+    provider: "telegram",
+  });
 });
 
 it("defaults retry_after when the header is missing and body has no delay", async () => {
@@ -97,7 +99,8 @@ it("defaults retry_after when the header is missing and body has no delay", asyn
   expect(error).toBeInstanceOf(ProviderRetryable);
   expect(error).toMatchObject({
     status: 429,
-    retryAfterSeconds: DEFAULT_RETRY_AFTER_SECONDS });
+    retryAfterSeconds: DEFAULT_RETRY_AFTER_SECONDS,
+  });
 });
 
 it("reads parameters.retry_after from the body when the header is absent", async () => {
@@ -107,7 +110,8 @@ it("reads parameters.retry_after from the body when the header is absent", async
       JSON.stringify({
         ok: false,
         error_code: 429,
-        parameters: { retry_after: 9 } })
+        parameters: { retry_after: 9 },
+      })
     );
   }).listen(0, "127.0.0.1");
 

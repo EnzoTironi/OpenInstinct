@@ -15,6 +15,7 @@ import {
   type MessageStreamEvent,
   type SubagentCalledStreamEvent,
 } from "eve/client";
+import type { EveMessage, EveMessageData } from "eve/react";
 import { BotIcon, LoaderCircleIcon } from "lucide-react";
 import { useMemo } from "react";
 
@@ -43,79 +44,231 @@ export function SubagentTrace({
   readonly status: SubagentStatus;
   readonly target: SubagentCalledStreamEvent["data"];
 }) {
-  const data = useMemo(
-    () =>
-      events.reduce(
-        (current, event) => messageReducer.reduce(current, event),
-        messageReducer.initial()
-      ),
-    [events]
-  );
-
+  const data = useMemo(() => reduceTraceMessages(events), [events]);
   const timestamps = useMemo(() => messageTimestamps(events), [events]);
-  const isRunning = status === "starting" || status === "working";
   const turnFailure = useMemo(() => getLatestTurnFailure(events), [events]);
-  const error = streamError ?? turnFailure;
-  const statusLabel = error ? "Failed" : isRunning ? "Running" : status;
-
-  const badgeVariant = error
-    ? "destructive"
-    : isRunning
-      ? "information"
-      : "secondary";
-
-  const alertVariant = error
-    ? "destructive"
-    : isRunning
-      ? "information"
-      : "default";
+  const presentation = tracePresentation(status, streamError, turnFailure);
 
   return (
     <section className="py-4">
-      <Alert variant={alertVariant}>
-        <BotIcon />
-        <AlertTitle>{target.name} trace</AlertTitle>
-        <AlertAction>
-          <Badge variant={badgeVariant}>{statusLabel}</Badge>
-        </AlertAction>
-      </Alert>
+      <TraceHeader presentation={presentation} targetName={target.name} />
       <div className="space-y-5 py-5">
-        {hasOlder ? (
-          <Button
-            className="mx-auto flex"
-            disabled={isLoadingOlder}
-            onClick={() => void loadOlder()}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            {isLoadingOlder ? (
-              <LoaderCircleIcon className="animate-spin" />
-            ) : null}
-            {isLoadingOlder ? "Loading…" : "Load older messages"}
-          </Button>
-        ) : null}
-        {data.messages.map((message, index) => (
-          <AgentMessage
-            canRespond={false}
-            isStreaming={isRunning && index === data.messages.length - 1}
-            key={message.id}
-            message={message}
-            onInputResponses={() => undefined}
-            timestamp={timestamps.get(message.id)}
-          />
-        ))}
-        {(isLoading || isRunning) && data.messages.length === 0 ? (
-          <Shimmer className="type-supporting-body" duration={1}>
-            Loading task trace
-          </Shimmer>
-        ) : null}
-        {error ? (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : null}
+        <TraceLoadOlderButton
+          hasOlder={hasOlder}
+          isLoadingOlder={isLoadingOlder}
+          loadOlder={loadOlder}
+        />
+        <TraceMessages
+          isRunning={presentation.isRunning}
+          messages={data.messages}
+          timestamps={timestamps}
+        />
+        <TraceLoadingShimmer
+          isLoading={isLoading}
+          isRunning={presentation.isRunning}
+          messageCount={data.messages.length}
+        />
+        <TraceErrorAlert error={presentation.error} />
       </div>
     </section>
+  );
+}
+
+function reduceTraceMessages(
+  events: readonly MessageStreamEvent[]
+): EveMessageData {
+  return events.reduce(
+    (current, event) => messageReducer.reduce(current, event),
+    messageReducer.initial()
+  );
+}
+
+function tracePresentation(
+  status: SubagentStatus,
+  streamError: string | undefined,
+  turnFailure: string | undefined
+) {
+  const isRunning = status === "starting" || status === "working";
+  const error = streamError ?? turnFailure;
+
+  return {
+    alertVariant: resolveAlertVariant(error, isRunning),
+    badgeVariant: resolveBadgeVariant(error, isRunning),
+    error,
+    isRunning,
+    statusLabel: resolveStatusLabel(error, isRunning, status),
+  };
+}
+
+function resolveStatusLabel(
+  error: string | undefined,
+  isRunning: boolean,
+  status: SubagentStatus
+): string {
+  if (error) return "Failed";
+
+  if (isRunning) return "Running";
+
+  return status;
+}
+
+function resolveBadgeVariant(
+  error: string | undefined,
+  isRunning: boolean
+): "destructive" | "information" | "secondary" {
+  if (error) return "destructive";
+
+  if (isRunning) return "information";
+
+  return "secondary";
+}
+
+function resolveAlertVariant(
+  error: string | undefined,
+  isRunning: boolean
+): "destructive" | "information" | "default" {
+  if (error) return "destructive";
+
+  if (isRunning) return "information";
+
+  return "default";
+}
+
+function TraceHeader({
+  presentation,
+  targetName,
+}: {
+  readonly presentation: ReturnType<typeof tracePresentation>;
+  readonly targetName: string;
+}) {
+  return (
+    <Alert variant={presentation.alertVariant}>
+      <BotIcon />
+      <AlertTitle>{targetName} trace</AlertTitle>
+      <AlertAction>
+        <Badge variant={presentation.badgeVariant}>
+          {presentation.statusLabel}
+        </Badge>
+      </AlertAction>
+    </Alert>
+  );
+}
+
+function TraceLoadOlderButton({
+  hasOlder,
+  isLoadingOlder,
+  loadOlder,
+}: {
+  readonly hasOlder: boolean;
+  readonly isLoadingOlder: boolean;
+  readonly loadOlder: () => Promise<void>;
+}) {
+  if (!hasOlder) return null;
+
+  return (
+    <Button
+      className="mx-auto flex"
+      disabled={isLoadingOlder}
+      onClick={createLoadOlderHandler(loadOlder)}
+      size="sm"
+      type="button"
+      variant="ghost"
+    >
+      <TraceLoadOlderLabel isLoadingOlder={isLoadingOlder} />
+    </Button>
+  );
+}
+
+function createLoadOlderHandler(loadOlder: () => Promise<void>) {
+  return () => {
+    void loadOlder();
+  };
+}
+
+function TraceLoadOlderLabel({
+  isLoadingOlder,
+}: {
+  readonly isLoadingOlder: boolean;
+}) {
+  if (isLoadingOlder) {
+    return (
+      <>
+        <LoaderCircleIcon className="animate-spin" />
+        Loading…
+      </>
+    );
+  }
+
+  return "Load older messages";
+}
+
+function TraceMessages({
+  isRunning,
+  messages,
+  timestamps,
+}: {
+  readonly isRunning: boolean;
+  readonly messages: readonly EveMessage[];
+  readonly timestamps: Map<string, string>;
+}) {
+  return (
+    <>
+      {messages.map((message, index) => (
+        <AgentMessage
+          canRespond={false}
+          isStreaming={isTraceMessageStreaming(
+            isRunning,
+            index,
+            messages.length
+          )}
+          key={message.id}
+          message={message}
+          onInputResponses={ignoreInputResponses}
+          timestamp={timestamps.get(message.id)}
+        />
+      ))}
+    </>
+  );
+}
+
+function isTraceMessageStreaming(
+  isRunning: boolean,
+  index: number,
+  messageCount: number
+): boolean {
+  return isRunning && index === messageCount - 1;
+}
+
+function ignoreInputResponses() {
+  return undefined;
+}
+
+function TraceLoadingShimmer({
+  isLoading,
+  isRunning,
+  messageCount,
+}: {
+  readonly isLoading: boolean;
+  readonly isRunning: boolean;
+  readonly messageCount: number;
+}) {
+  if (messageCount > 0) return null;
+
+  if (!isLoading && !isRunning) return null;
+
+  return (
+    <Shimmer className="type-supporting-body" duration={1}>
+      Loading task trace
+    </Shimmer>
+  );
+}
+
+function TraceErrorAlert({ error }: { readonly error: string | undefined }) {
+  if (!error) return null;
+
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>{error}</AlertDescription>
+    </Alert>
   );
 }

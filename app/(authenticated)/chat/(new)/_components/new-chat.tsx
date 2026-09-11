@@ -13,7 +13,13 @@ import { Button } from "@web/components/ui/button";
 import { api } from "@web/trpc/client";
 import { useEveAgent } from "eve/react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import {
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+  useRef,
+  useState,
+} from "react";
 
 import { chatTitle, messageContent } from "../../_lib/message-input";
 import { chatStarters } from "../_lib/starters";
@@ -40,58 +46,33 @@ export function NewChat({
       setSendError(true);
     },
     onSessionChange(session) {
-      if (session === undefined || navigationStarted.current) return;
-      navigationStarted.current = true;
-      const path = `/chat/${encodeURIComponent(session.sessionId)}`;
-      void saveChat({
-        sessionId: session.sessionId,
-        title: pendingTitle.current,
-      })
-        .catch(() => undefined)
-        .then(() => {
-          router.replace(path);
-
-          return undefined;
-        });
-      pendingTitle.current = undefined;
+      navigateToSession(
+        session,
+        navigationStarted,
+        pendingTitle,
+        saveChat,
+        router
+      );
     },
   });
 
-  const handleSubmit = async (message: PromptInputMessage) => {
-    const text = message.text.trim();
-
-    if (
-      (text.length === 0 && message.files.length === 0) ||
-      isSubmitting.current ||
-      navigationStarted.current
-    ) {
-      return;
-    }
-
-    isSubmitting.current = true;
-    setSending(true);
-    setSendError(false);
-    sendFailed.current = false;
-    pendingTitle.current = chatTitle(message);
-
-    try {
-      await agent.send(messageContent(message));
-
-      if (sendFailed.current) {
-        throw new Error("Unable to open the conversation");
-      }
-    } catch (error) {
-      setSendError(true);
-      throw error;
-    } finally {
-      isSubmitting.current = false;
-      setSending(false);
-    }
-  };
-
   return (
     <div className="w-full space-y-4">
-      <PromptInput compact onSubmit={handleSubmit}>
+      <PromptInput
+        compact
+        onSubmit={async (message) => {
+          await submitNewChat(
+            message,
+            agent,
+            isSubmitting,
+            navigationStarted,
+            pendingTitle,
+            sendFailed,
+            setSending,
+            setSendError
+          );
+        }}
+      >
         <PromptInputBody>
           <PromptInputTextarea
             aria-label="Message Companion"
@@ -108,41 +89,176 @@ export function NewChat({
         <PromptInputFooter>
           <PromptInputTools />
           <PromptInputSubmit
-            aria-label={sending ? "Sending message" : "Send message"}
+            aria-label={submitAriaLabel(sending)}
             disabled={sending}
-            status={sending ? "submitted" : undefined}
+            status={submitStatus(sending)}
           />
         </PromptInputFooter>
       </PromptInput>
-      {sendError ? (
-        <p className="type-caption text-destructive" role="alert">
-          We couldn’t open your conversation. Your draft is still here. Check
-          your connection and try again.
-        </p>
-      ) : null}
-      <div
-        aria-label="Ideas to get started"
-        className="flex flex-wrap justify-center gap-2"
-      >
-        {chatStarters.map(({ label, text }) => (
-          <Button
-            key={label}
-            disabled={sending}
-            onClick={() => {
-              setDraft(text);
-              inputRef.current?.focus();
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
+      <SendErrorMessage sendError={sendError} />
+      <StarterIdeas inputRef={inputRef} sending={sending} setDraft={setDraft} />
       <p className="text-center type-caption text-muted-foreground">
         Choose an idea to edit it before sending.
       </p>
     </div>
+  );
+}
+
+function navigateToSession(
+  session: { sessionId: string } | undefined,
+  navigationStarted: { current: boolean },
+  pendingTitle: { current: string | undefined },
+  saveChat: (input: {
+    sessionId: string;
+    title: string | undefined;
+  }) => Promise<void>,
+  router: ReturnType<typeof useRouter>
+) {
+  if (session === undefined || navigationStarted.current) return;
+
+  navigationStarted.current = true;
+  const path = `/chat/${encodeURIComponent(session.sessionId)}`;
+  const title = pendingTitle.current;
+  pendingTitle.current = undefined;
+
+  void saveChat({ sessionId: session.sessionId, title })
+    .catch(ignoreError)
+    .then(() => {
+      router.replace(path);
+
+      return undefined;
+    });
+}
+
+function ignoreError() {
+  return undefined;
+}
+
+async function submitNewChat(
+  message: PromptInputMessage,
+  agent: {
+    send: (content: ReturnType<typeof messageContent>) => Promise<void>;
+  },
+  isSubmitting: { current: boolean },
+  navigationStarted: { current: boolean },
+  pendingTitle: { current: string | undefined },
+  sendFailed: { current: boolean },
+  setSending: Dispatch<SetStateAction<boolean>>,
+  setSendError: Dispatch<SetStateAction<boolean>>
+) {
+  if (shouldSkipNewChatSubmit(message, isSubmitting, navigationStarted)) {
+    return;
+  }
+
+  isSubmitting.current = true;
+  setSending(true);
+  setSendError(false);
+  sendFailed.current = false;
+  pendingTitle.current = chatTitle(message);
+
+  try {
+    await agent.send(messageContent(message));
+    assertSendSucceeded(sendFailed.current);
+  } catch (error) {
+    setSendError(true);
+    throw error;
+  } finally {
+    isSubmitting.current = false;
+    setSending(false);
+  }
+}
+
+function shouldSkipNewChatSubmit(
+  message: PromptInputMessage,
+  isSubmitting: { current: boolean },
+  navigationStarted: { current: boolean }
+): boolean {
+  const text = message.text.trim();
+  const empty = text.length === 0 && message.files.length === 0;
+
+  return empty || isSubmitting.current || navigationStarted.current;
+}
+
+function assertSendSucceeded(failed: boolean) {
+  if (failed) throw new Error("Unable to open the conversation");
+}
+
+function submitAriaLabel(sending: boolean): string {
+  if (sending) return "Sending message";
+
+  return "Send message";
+}
+
+function submitStatus(sending: boolean): "submitted" | undefined {
+  if (sending) return "submitted";
+
+  return undefined;
+}
+
+function SendErrorMessage({ sendError }: { readonly sendError: boolean }) {
+  if (!sendError) return null;
+
+  return (
+    <p className="type-caption text-destructive" role="alert">
+      We couldn’t open your conversation. Your draft is still here. Check your
+      connection and try again.
+    </p>
+  );
+}
+
+function StarterIdeas({
+  inputRef,
+  sending,
+  setDraft,
+}: {
+  readonly inputRef: RefObject<HTMLTextAreaElement | null>;
+  readonly sending: boolean;
+  readonly setDraft: Dispatch<SetStateAction<string>>;
+}) {
+  return (
+    <div
+      aria-label="Ideas to get started"
+      className="flex flex-wrap justify-center gap-2"
+    >
+      {chatStarters.map((starter) => (
+        <StarterButton
+          key={starter.label}
+          inputRef={inputRef}
+          label={starter.label}
+          sending={sending}
+          setDraft={setDraft}
+          text={starter.text}
+        />
+      ))}
+    </div>
+  );
+}
+
+function StarterButton({
+  inputRef,
+  label,
+  sending,
+  setDraft,
+  text,
+}: {
+  readonly inputRef: RefObject<HTMLTextAreaElement | null>;
+  readonly label: string;
+  readonly sending: boolean;
+  readonly setDraft: Dispatch<SetStateAction<string>>;
+  readonly text: string;
+}) {
+  return (
+    <Button
+      disabled={sending}
+      onClick={() => {
+        setDraft(text);
+        inputRef.current?.focus();
+      }}
+      size="sm"
+      type="button"
+      variant="outline"
+    >
+      {label}
+    </Button>
   );
 }

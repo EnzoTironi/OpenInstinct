@@ -5,7 +5,8 @@ import { expect, it } from "vitest";
 import {
   backgroundWorkerDeliveryMessageIds,
   hasPendingBackgroundWorker,
-  messagesForTraceView } from "./trace-view";
+  messagesForTraceView,
+} from "./trace-view";
 
 it.each([
   ["update", "update: Checking availability", false],
@@ -173,7 +174,11 @@ it("recognizes generic task receipts and keeps parked questions pending", () => 
         output: {
           status: "working",
           taskId: "task_generic",
-          agentId: "generic-agent" } } } };
+          agentId: "generic-agent",
+        },
+      },
+    },
+  };
 
   const waiting = receivedMessage(
     "generic-wait",
@@ -187,9 +192,9 @@ it("recognizes generic task receipts and keeps parked questions pending", () => 
 
   expect(hasPendingBackgroundWorker([receipt, waiting])).toBe(true);
   expect(hasPendingBackgroundWorker([receipt, waiting, done])).toBe(false);
-  expect(
-    backgroundWorkerDeliveryMessageIds([receipt, waiting, done])
-  ).toEqual(new Set(["generic-wait:user", "generic-done:user"]));
+  expect(backgroundWorkerDeliveryMessageIds([receipt, waiting, done])).toEqual(
+    new Set(["generic-wait:user", "generic-done:user"])
+  );
   expect(backgroundWorkerDeliveryMessageIds([waiting, done])).toEqual(
     new Set(["generic-wait:user", "generic-done:user"])
   );
@@ -210,9 +215,7 @@ it("tracks a worker only between its receipt and terminal delivery", () => {
 
   expect(hasPendingBackgroundWorker([receipt])).toBe(true);
   expect(hasPendingBackgroundWorker([receipt, update])).toBe(true);
-  expect(hasPendingBackgroundWorker([receipt, update, completed])).toBe(
-    false
-  );
+  expect(hasPendingBackgroundWorker([receipt, update, completed])).toBe(false);
 });
 
 function workerCompletedReceipt(taskId: string): MessageStreamEvent {
@@ -221,9 +224,11 @@ function workerCompletedReceipt(taskId: string): MessageStreamEvent {
       backgroundTask: { status: "working", taskId },
       callId: "call_worker",
       output: `{"status":"working","taskId":"${taskId}"}`,
-      subagentName: "browser-agent" },
+      subagentName: "browser-agent",
+    },
     meta: { at: "2026-08-27T20:00:00.000Z", id: "receipt" },
-    type: "subagent.completed" };
+    type: "subagent.completed",
+  };
 }
 
 function workerActionReceipt(taskId: string): MessageStreamEvent {
@@ -238,20 +243,26 @@ function workerActionReceipt(taskId: string): MessageStreamEvent {
           kind: "parked",
           result: {
             kind: "succeeded",
-            output: { agentId: "agent_worker", status: "working", taskId } },
+            output: { agentId: "agent_worker", status: "working", taskId },
+          },
           usageDelta: {
             cacheReadTokens: 0,
             cacheWriteTokens: 0,
             inputTokens: 1,
-            outputTokens: 1 } },
+            outputTokens: 1,
+          },
+        },
         output: { agentId: "agent_worker", status: "working", taskId },
-        subagentName: "browser-agent" },
+        subagentName: "browser-agent",
+      },
       sequence: 1,
       status: "completed",
       stepIndex: 0,
-      turnId: "turn_worker" },
+      turnId: "turn_worker",
+    },
     meta: { at: "2026-08-27T20:00:00.000Z", id: "worker-receipt" },
-    type: "action.result" };
+    type: "action.result",
+  };
 }
 
 function workerCancellationResult(taskId: string): MessageStreamEvent {
@@ -267,17 +278,23 @@ function workerCancellationResult(taskId: string): MessageStreamEvent {
                 agentId: "agent_worker",
                 kind: "subagent",
                 mode: "local",
-                name: "browser-agent" },
+                name: "browser-agent",
+              },
               status: "cancelled",
-              taskId },
-          ] },
-        toolName: "task_cancel" },
+              taskId,
+            },
+          ],
+        },
+        toolName: "task_cancel",
+      },
       sequence: 2,
       status: "completed",
       stepIndex: 1,
-      turnId: "turn_cancel" },
+      turnId: "turn_cancel",
+    },
     meta: { at: "2026-08-27T20:00:00.500Z", id: "cancel-result" },
-    type: "action.result" };
+    type: "action.result",
+  };
 }
 
 function receivedMessage(
@@ -290,9 +307,11 @@ function receivedMessage(
       message,
       sequence: 0,
       turnId,
-      source: source === "task" ? "task" : undefined },
+      source: source === "task" ? "task" : undefined,
+    },
     meta: { at: "2026-08-27T20:00:01.000Z", id: `event-${turnId}` },
-    type: "message.received" };
+    type: "message.received",
+  };
 }
 
 function userMessage(turnId: string, text: string): EveMessage {
@@ -300,7 +319,8 @@ function userMessage(turnId: string, text: string): EveMessage {
     id: `${turnId}:user`,
     metadata: { status: "complete", turnId },
     parts: [{ state: "done", text, type: "text" }],
-    role: "user" };
+    role: "user",
+  };
 }
 
 function assistantMessage(turnId: string, text: string): EveMessage {
@@ -308,5 +328,6 @@ function assistantMessage(turnId: string, text: string): EveMessage {
     id: `${turnId}:assistant`,
     metadata: { status: "complete", turnId },
     parts: [{ state: "done", stepIndex: 0, text, type: "text" }],
-    role: "assistant" };
+    role: "assistant",
+  };
 }

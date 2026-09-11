@@ -10,7 +10,8 @@ const testSecret = Redacted.make("unit-test-webhook-secret");
 it("rejects Telegram before reading an unauthenticated body", async () => {
   const request = new Request("https://test.invalid/channels/telegram", {
     method: "POST",
-    body: "not json" });
+    body: "not json",
+  });
 
   const result = await Effect.runPromise(
     readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
@@ -29,12 +30,12 @@ it.each(["telegram", "kapso"] as const)(
       headers: {
         "x-webhook-signature": createHmac("sha256", "")
           .update("{}")
-          .digest("hex") } });
+          .digest("hex"),
+      },
+    });
 
     const result = await Effect.runPromise(
-      readVerifiedWebhook(request, channel, Redacted.make("")).pipe(
-        Effect.flip
-      )
+      readVerifiedWebhook(request, channel, Redacted.make("")).pipe(Effect.flip)
     );
 
     expect(result.status).toBe(401);
@@ -50,14 +51,17 @@ it("bounds timeout cleanup even when stream cancellation never settles", async (
       cancellationRequested = true;
 
       return new Promise<never>(() => undefined);
-    } });
+    },
+  });
 
   const options = {
     method: "POST",
     body,
     duplex: "half",
     headers: {
-      "x-telegram-bot-api-secret-token": Redacted.value(testSecret) } };
+      "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
+    },
+  };
 
   const started = performance.now();
 
@@ -85,7 +89,8 @@ it("verifies Kapso over the original bytes, including whitespace", async () => {
   const request = new Request("https://test.invalid/channels/kapso", {
     method: "POST",
     body,
-    headers: { "x-webhook-signature": signature } });
+    headers: { "x-webhook-signature": signature },
+  });
 
   expect(
     await Effect.runPromise(readVerifiedWebhook(request, "kapso", testSecret))
@@ -94,7 +99,8 @@ it("verifies Kapso over the original bytes, including whitespace", async () => {
   const changed = new Request("https://test.invalid/channels/kapso", {
     method: "POST",
     body: '{"message":{"text":"Olá"}}',
-    headers: { "x-webhook-signature": signature } });
+    headers: { "x-webhook-signature": signature },
+  });
 
   expect(
     await Effect.runPromise(
@@ -108,7 +114,9 @@ it("rejects oversized bodies without relying on Content-Length", async () => {
     method: "POST",
     body: "x".repeat(256 * 1024 + 1),
     headers: {
-      "x-telegram-bot-api-secret-token": Redacted.value(testSecret) } });
+      "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
+    },
+  });
 
   expect(
     await Effect.runPromise(
@@ -122,7 +130,9 @@ it("reports authenticated malformed JSON as a bad request", async () => {
     method: "POST",
     body: "{",
     headers: {
-      "x-telegram-bot-api-secret-token": Redacted.value(testSecret) } });
+      "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
+    },
+  });
 
   expect(
     await Effect.runPromise(
@@ -139,13 +149,17 @@ it("accepts Telegram secret-token auth for a private chat JSON body", async () =
       date: 1_800_000_000,
       from: { id: 789012, is_bot: false },
       chat: { id: 789012, type: "private" },
-      text: "hello private" } });
+      text: "hello private",
+    },
+  });
 
   const request = new Request("https://test.invalid/channels/telegram", {
     method: "POST",
     body,
     headers: {
-      "x-telegram-bot-api-secret-token": Redacted.value(testSecret) } });
+      "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
+    },
+  });
 
   expect(
     await Effect.runPromise(
@@ -155,7 +169,9 @@ it("accepts Telegram secret-token auth for a private chat JSON body", async () =
     update_id: 42,
     message: {
       chat: { type: "private" },
-      text: "hello private" } });
+      text: "hello private",
+    },
+  });
 });
 
 it("rejects a wrong Telegram secret-token before reading the body", async () => {
@@ -163,7 +179,9 @@ it("rejects a wrong Telegram secret-token before reading the body", async () => 
     method: "POST",
     body: '{"update_id":1}',
     headers: {
-      "x-telegram-bot-api-secret-token": "not-the-configured-secret" } });
+      "x-telegram-bot-api-secret-token": "not-the-configured-secret",
+    },
+  });
 
   const result = await Effect.runPromise(
     readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
@@ -178,7 +196,9 @@ it("rejects a length-mismatched Telegram secret-token", async () => {
     method: "POST",
     body: "{}",
     headers: {
-      "x-telegram-bot-api-secret-token": `${Redacted.value(testSecret)}x` } });
+      "x-telegram-bot-api-secret-token": `${Redacted.value(testSecret)}x`,
+    },
+  });
 
   expect(
     await Effect.runPromise(
@@ -196,7 +216,9 @@ it("rejects a wrong Kapso HMAC signature after reading the body", async () => {
     headers: {
       "x-webhook-signature": createHmac("sha256", "other-secret")
         .update(body)
-        .digest("hex") } });
+        .digest("hex"),
+    },
+  });
 
   const result = await Effect.runPromise(
     readVerifiedWebhook(request, "kapso", testSecret).pipe(Effect.flip)
@@ -216,7 +238,8 @@ it("rejects a length-mismatched Kapso HMAC signature", async () => {
   const request = new Request("https://test.invalid/channels/kapso", {
     method: "POST",
     body,
-    headers: { "x-webhook-signature": `${signature}00` } });
+    headers: { "x-webhook-signature": `${signature}00` },
+  });
 
   expect(
     await Effect.runPromise(
@@ -237,10 +260,14 @@ it("accepts Kapso HMAC auth for a private inbound JSON body", async () => {
       kapso: {
         direction: "inbound",
         status: "received",
-        origin: "cloud_api" } },
+        origin: "cloud_api",
+      },
+    },
     conversation: {
       phone_number_id: "123456789",
-      phone_number: "+15550002222" } });
+      phone_number: "+15550002222",
+    },
+  });
 
   const signature = createHmac("sha256", Redacted.value(testSecret))
     .update(body)
@@ -249,7 +276,8 @@ it("accepts Kapso HMAC auth for a private inbound JSON body", async () => {
   const request = new Request("https://test.invalid/channels/kapso", {
     method: "POST",
     body,
-    headers: { "x-webhook-signature": signature } });
+    headers: { "x-webhook-signature": signature },
+  });
 
   expect(
     await Effect.runPromise(readVerifiedWebhook(request, "kapso", testSecret))
@@ -257,5 +285,7 @@ it("accepts Kapso HMAC auth for a private inbound JSON body", async () => {
     phone_number_id: "123456789",
     message: {
       text: { body: "hello private" },
-      kapso: { direction: "inbound" } } });
+      kapso: { direction: "inbound" },
+    },
+  });
 });

@@ -83,9 +83,12 @@ async function authoredCapabilities(authenticator: string) {
       scope: {
         key: "personal-info-key",
         namespace: "openinstinct-personal-info-v1",
-        value: accessScopeForUser("user-1").workspaceId },
-      slot: "personal_info" },
-    turn: { id: "turn-1", input: [], sequence: 1 } });
+        value: accessScopeForUser("user-1").workspaceId,
+      },
+      slot: "personal_info",
+    },
+    turn: { id: "turn-1", input: [], sequence: 1 },
+  });
 
   if (personalInfoTools) {
     capabilities.push(
@@ -99,9 +102,12 @@ async function authoredCapabilities(authenticator: string) {
       scope: {
         key: "workstreams-key",
         namespace: "workstreams",
-        value: "personal:workspace" },
-      slot: "workstreams" },
-    turn: { id: "turn-1", input: [], sequence: 1 } });
+        value: "personal:workspace",
+      },
+      slot: "workstreams",
+    },
+    turn: { id: "turn-1", input: [], sequence: 1 },
+  });
 
   if (workstreamTools)
     capabilities.push(
@@ -127,7 +133,11 @@ function dynamicContext(authenticator: string) {
           attributes: { workspaceId: accessScopeForUser("user-1").workspaceId },
           authenticator,
           principalId: "user-1",
-          principalType: "user" },
-        initiator: null },
-      id: "session-1" } } satisfies DynamicResolveContext;
+          principalType: "user",
+        },
+        initiator: null,
+      },
+      id: "session-1",
+    },
+  } satisfies DynamicResolveContext;
 }

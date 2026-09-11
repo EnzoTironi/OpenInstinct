@@ -38,6 +38,84 @@ const traceStatusSchema = z.enum([
   "success",
 ]);
 
+function resolveTraceStatus(status: string) {
+  const parsed = traceStatusSchema.safeParse(status);
+
+  if (parsed.success) return statusText[parsed.data];
+
+  return { label: status, variant: "secondary" as const };
+}
+
+function formatTraceDuration(durationMs: number | null): string {
+  if (durationMs === null) return "Duration unavailable";
+
+  return `${String(Math.round(durationMs / 1000))}s`;
+}
+
+function traceMetaLine(options: {
+  readonly durationMs: number | null;
+  readonly startedAt: string;
+  readonly domains: readonly string[];
+}): string {
+  const parts = [
+    formatTraceDuration(options.durationMs),
+    `Started ${options.startedAt}`,
+  ];
+
+  if (options.domains.length > 0) {
+    parts.push(options.domains.join(", "));
+  }
+
+  return parts.join(" · ");
+}
+
+function TraceResultMessage({ message }: { readonly message: string | null }) {
+  if (!message) return null;
+
+  return (
+    <p className="type-supporting-body mt-1 truncate" title={message}>
+      {message}
+    </p>
+  );
+}
+
+function TraceEventsTable({
+  events,
+}: {
+  readonly events: Awaited<ReturnType<typeof listBrowserTraceEvents>>;
+}) {
+  if (events.length === 0) {
+    return (
+      <TableRow>
+        <TableCell colSpan={3} variant="empty">
+          No events recorded for this trace.
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return (
+    <>
+      {events.map((event) => (
+        <TableRow key={event.id}>
+          <TableCell className="truncate text-muted-foreground">
+            {new Date(event.at).toLocaleTimeString()}
+          </TableCell>
+          <TableCell className="truncate" title={event.label}>
+            {event.label}
+          </TableCell>
+          <TableCell
+            className="truncate text-muted-foreground"
+            title={event.detail}
+          >
+            {event.detail || "—"}
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
 export default async function TraceDetailPage({
   params,
 }: PageProps<"/tasks/[sessionId]">) {
@@ -46,12 +124,8 @@ export default async function TraceDetailPage({
   const trace = await readBrowserTrace(scope, sessionId);
 
   if (!trace) notFound();
-  const traceStatus = traceStatusSchema.safeParse(trace.status);
 
-  const status = traceStatus.success
-    ? statusText[traceStatus.data]
-    : { label: trace.status, variant: "secondary" as const };
-
+  const status = resolveTraceStatus(trace.status);
   const events = await listBrowserTraceEvents(scope, trace.sessionId);
   const activityEnd = trace.completedAt ?? events.at(-1)?.at ?? trace.startedAt;
 
@@ -82,20 +156,13 @@ export default async function TraceDetailPage({
             <Badge variant={status.variant}>{status.label}</Badge>
           </div>
           <p className="type-supporting-body mt-2 truncate text-muted-foreground">
-            {trace.durationMs === null
-              ? "Duration unavailable"
-              : `${String(Math.round(trace.durationMs / 1000))}s`}
-            {` · Started ${trace.startedAt}`}
-            {trace.domains.length > 0 ? ` · ${trace.domains.join(", ")}` : ""}
+            {traceMetaLine({
+              durationMs: trace.durationMs,
+              startedAt: trace.startedAt,
+              domains: trace.domains,
+            })}
           </p>
-          {trace.resultMessage ? (
-            <p
-              className="type-supporting-body mt-1 truncate"
-              title={trace.resultMessage}
-            >
-              {trace.resultMessage}
-            </p>
-          ) : null}
+          <TraceResultMessage message={trace.resultMessage} />
           <div className="mt-4 max-w-4xl">
             <ActivityDurationBreakdown durations={activityDurations} />
           </div>
@@ -119,30 +186,7 @@ export default async function TraceDetailPage({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {events.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3} variant="empty">
-                  No events recorded for this trace.
-                </TableCell>
-              </TableRow>
-            ) : (
-              events.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell className="truncate text-muted-foreground">
-                    {new Date(event.at).toLocaleTimeString()}
-                  </TableCell>
-                  <TableCell className="truncate" title={event.label}>
-                    {event.label}
-                  </TableCell>
-                  <TableCell
-                    className="truncate text-muted-foreground"
-                    title={event.detail}
-                  >
-                    {event.detail || "—"}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+            <TraceEventsTable events={events} />
           </TableBody>
         </Table>
       </section>

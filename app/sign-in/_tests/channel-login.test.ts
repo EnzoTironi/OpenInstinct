@@ -3,7 +3,8 @@ import {
   channelHttpError,
   channelPollFailure,
   invalidChannelChallenge,
-  safeCallbackUrl } from "@web/auth/channel/client";
+  safeCallbackUrl,
+} from "@web/auth/channel/client";
 import { ChannelStatus } from "@web/auth/channel/status";
 import { Schema } from "effect";
 import { createElement } from "react";
@@ -18,7 +19,8 @@ const challenge = decodeChannelChallengeSchema({
   id: "5dd20c8c-9d99-49ea-8e04-936d238dac03",
   channel: "telegram",
   deepLink: "https://t.me/assistant_bot?start=example",
-  expiresAt: "2026-09-08T12:00:00.000Z" });
+  expiresAt: "2026-09-08T12:00:00.000Z",
+});
 
 function renderStatus(
   status: "pending" | "confirmed" | "expired" | "consumed" | "invalid",
@@ -32,7 +34,8 @@ function renderStatus(
       busy,
       error: undefined,
       onContinue: () => undefined,
-      onRestart: () => undefined })
+      onRestart: () => undefined,
+    })
   );
 }
 
@@ -123,7 +126,8 @@ it.each(["45", "Tue, 08 Sep 2026 11:00:45 GMT"])(
     expect(channelPollFailure(failure, 0, now, expiry)).toEqual({
       status: "pending",
       failures: 0,
-      delay: 45_000 });
+      delay: 45_000,
+    });
   }
 );
 
@@ -150,18 +154,18 @@ it("bounds exponential transient retries and then invalidates the request", () =
   expect(channelPollFailure(failure, failures, now, expiry)).toEqual({
     status: "invalid",
     failures: 5,
-    delay: 0 });
+    delay: 0,
+  });
 });
 
 it("never schedules another request beyond challenge expiry", () => {
   const failure = channelHttpError(429, "3600");
-  expect(channelPollFailure(failure, 0, now, expiry).delay).toBe(
-    expiry - now
-  );
+  expect(channelPollFailure(failure, 0, now, expiry).delay).toBe(expiry - now);
   expect(channelPollFailure(failure, 0, expiry, expiry)).toEqual({
     status: "expired",
     failures: 0,
-    delay: 0 });
+    delay: 0,
+  });
 });
 
 it("applies Retry-After to transient server failures too", () => {

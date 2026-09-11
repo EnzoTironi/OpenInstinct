@@ -17,6 +17,43 @@ const decodeOption_billingRedirectSchema = Schema.decodeUnknownOption(
   billingRedirectSchema
 );
 
+type BillingRedirect = Schema.Schema.Type<typeof billingRedirectSchema>;
+
+function billingErrorMessage(decoded: Option.Option<BillingRedirect>): string {
+  if (Option.isSome(decoded) && decoded.value.error) {
+    return decoded.value.error;
+  }
+
+  return "Billing request failed.";
+}
+
+async function throwBillingHttpError(response: Response): Promise<never> {
+  const raw: unknown = await response.json().catch(() => ({}));
+  const decoded = decodeOption_billingRedirectSchema(raw);
+
+  if (
+    Option.isSome(decoded) &&
+    decoded.value.reason === "stripe_not_configured"
+  ) {
+    throw new Error(
+      "Paid billing is disabled on this deployment (Stripe not configured)."
+    );
+  }
+
+  throw new Error(billingErrorMessage(decoded));
+}
+
+async function readBillingRedirectUrl(response: Response): Promise<string> {
+  const raw: unknown = await response.json();
+  const decoded = decodeOption_billingRedirectSchema(raw);
+
+  if (Option.isSome(decoded) && decoded.value.url) {
+    return decoded.value.url;
+  }
+
+  throw new Error(billingErrorMessage(decoded));
+}
+
 async function postBilling(
   path: string,
   body: {
@@ -32,38 +69,48 @@ async function postBilling(
   });
 
   if (!response.ok) {
-    const raw: unknown = await response.json().catch(() => ({}));
-    const decoded = decodeOption_billingRedirectSchema(raw);
-
-    if (
-      Option.isSome(decoded) &&
-      decoded.value.reason === "stripe_not_configured"
-    ) {
-      throw new Error(
-        "Paid billing is disabled on this deployment (Stripe not configured)."
-      );
-    }
-
-    const message =
-      Option.isSome(decoded) && decoded.value.error
-        ? decoded.value.error
-        : "Billing request failed.";
-
-    throw new Error(message);
+    await throwBillingHttpError(response);
   }
 
-  const raw: unknown = await response.json();
-  const decoded = decodeOption_billingRedirectSchema(raw);
+  return readBillingRedirectUrl(response);
+}
 
-  if (Option.isNone(decoded) || !decoded.value.url) {
-    throw new Error(
-      Option.isSome(decoded) && decoded.value.error
-        ? decoded.value.error
-        : "Billing request failed."
-    );
-  }
+function StripeNotConfiguredAlert({
+  stripeCheckoutConfigured,
+  stripePortalConfigured,
+}: {
+  readonly stripeCheckoutConfigured: boolean;
+  readonly stripePortalConfigured: boolean;
+}) {
+  if (stripeCheckoutConfigured && stripePortalConfigured) return null;
 
-  return decoded.value.url;
+  return (
+    <Alert variant="information">
+      <AlertTitle>Stripe not fully configured</AlertTitle>
+      <AlertDescription>
+        {stripeCheckoutConfigured
+          ? ""
+          : "Upgrade / Checkout CTAs are off on this deployment. "}
+        {stripePortalConfigured
+          ? ""
+          : "Customer Portal CTA is off until STRIPE_SECRET_KEY is set. "}
+        Free continues without a card. Operators set{" "}
+        <code className="type-caption">STRIPE_*</code> names only — never paste
+        secret values into chat or git.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function BillingErrorAlert({ error }: { readonly error: string | null }) {
+  if (!error) return null;
+
+  return (
+    <Alert variant="destructive">
+      <AlertTitle>Billing</AlertTitle>
+      <AlertDescription>{error}</AlertDescription>
+    </Alert>
+  );
 }
 
 function BillingConfigurationAlerts({
@@ -77,30 +124,40 @@ function BillingConfigurationAlerts({
 }) {
   return (
     <>
-      {!stripeCheckoutConfigured || !stripePortalConfigured ? (
-        <Alert variant="information">
-          <AlertTitle>Stripe not fully configured</AlertTitle>
-          <AlertDescription>
-            {!stripeCheckoutConfigured
-              ? "Upgrade / Checkout CTAs are off on this deployment. "
-              : ""}
-            {!stripePortalConfigured
-              ? "Customer Portal CTA is off until STRIPE_SECRET_KEY is set. "
-              : ""}
-            Free continues without a card. Operators set{" "}
-            <code className="type-caption">STRIPE_*</code> names only — never
-            paste secret values into chat or git.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Billing</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      <StripeNotConfiguredAlert
+        stripeCheckoutConfigured={stripeCheckoutConfigured}
+        stripePortalConfigured={stripePortalConfigured}
+      />
+      <BillingErrorAlert error={error} />
     </>
   );
+}
+
+function orgSeatSuffix(plan: BillingPlanId, seatCount: number): string {
+  if (plan !== "org") return "";
+
+  return ` · ${String(seatCount)} seat${seatCount === 1 ? "" : "s"}`;
+}
+
+function statusSuffix(status: string): string {
+  if (status === "active") return "";
+
+  return ` · status ${status}`;
+}
+
+function paidBillingBlurb(
+  stripeCheckoutConfigured: boolean,
+  stripePortalConfigured: boolean
+): string {
+  if (stripeCheckoutConfigured) {
+    return " Paid upgrades use Stripe Checkout; manage renewals in the Customer Portal.";
+  }
+
+  if (stripePortalConfigured) {
+    return " Paid Checkout stays disabled until Stripe Prices are configured; Customer Portal may still open for an existing customer.";
+  }
+
+  return " Paid Checkout and Customer Portal stay disabled until Stripe is configured.";
 }
 
 function BillingPlanSummary({
@@ -117,21 +174,13 @@ function BillingPlanSummary({
   readonly stripePortalConfigured: boolean;
 }) {
   const catalog = billingPlanCatalog[plan];
-  const seatLabel = String(seatCount);
 
   return (
     <p className="type-supporting-body text-muted-foreground">
       Current plan: <span className="text-foreground">{catalog.name}</span>
-      {plan === "org"
-        ? ` · ${seatLabel} seat${seatCount === 1 ? "" : "s"}`
-        : ""}
-      {status !== "active" ? ` · status ${status}` : ""}. Free never requires a
-      card.
-      {stripeCheckoutConfigured
-        ? " Paid upgrades use Stripe Checkout; manage renewals in the Customer Portal."
-        : stripePortalConfigured
-          ? " Paid Checkout stays disabled until Stripe Prices are configured; Customer Portal may still open for an existing customer."
-          : " Paid Checkout and Customer Portal stay disabled until Stripe is configured."}
+      {orgSeatSuffix(plan, seatCount)}
+      {statusSuffix(status)}. Free never requires a card.
+      {paidBillingBlurb(stripeCheckoutConfigured, stripePortalConfigured)}
     </p>
   );
 }

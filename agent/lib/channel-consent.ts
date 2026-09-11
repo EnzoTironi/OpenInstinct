@@ -308,6 +308,7 @@ function resolveConsentDelivery(
   const deliveries = receipts.filter((delivery) =>
     matchesConsentDelivery(delivery, source, target)
   );
+
   const [delivery] = deliveries;
 
   if (!delivery) {

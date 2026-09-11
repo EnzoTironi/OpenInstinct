@@ -12,7 +12,8 @@ const image = {
   id: artifactId,
   label: "Product",
   mediaType: "image/png" as const,
-  url: `/artifacts/${artifactId}` };
+  url: `/artifacts/${artifactId}`,
+};
 
 const mocks = vi.hoisted(() => ({
   captureScreenshot: vi.fn(),
@@ -27,24 +28,30 @@ const mocks = vi.hoisted(() => ({
   retrieve: vi.fn(),
   put: vi.fn(),
   requireOwnedBrowserSession: vi.fn(),
-  requireWorkerScope: vi.fn() }));
+  requireWorkerScope: vi.fn(),
+}));
 
 vi.mock("@agent/subagents/browser-agent/lib/access", () => ({
-  requireWorkerScope: mocks.requireWorkerScope }));
+  requireWorkerScope: mocks.requireWorkerScope,
+}));
 
 vi.mock("@agent/subagents/browser-agent/lib/owned-browser", () => ({
-  requireOwnedBrowserSession: mocks.requireOwnedBrowserSession }));
+  requireOwnedBrowserSession: mocks.requireOwnedBrowserSession,
+}));
 
 vi.mock("@agent/subagents/browser-agent/lib/vault-screenshot-mask", () => ({
-  withVaultScreenshotMask: mocks.mask }));
+  withVaultScreenshotMask: mocks.mask,
+}));
 
 vi.mock("@db/services/browser-images", () => ({
   finalizeBrowserImageArtifact: mocks.persist,
-  reserveBrowserImageArtifact: mocks.reserve }));
+  reserveBrowserImageArtifact: mocks.reserve,
+}));
 
 vi.mock("@vercel/blob", () => ({
   del: mocks.del,
-  put: mocks.put }));
+  put: mocks.put,
+}));
 
 vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
   getKernel: () => ({
@@ -53,7 +60,10 @@ vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
       fetch: mocks.fetch,
       fs: { deleteFile: mocks.deleteFile, readFile: mocks.readFile },
       playwright: { execute: mocks.playwrightExecute },
-      retrieve: mocks.retrieve } }) }));
+      retrieve: mocks.retrieve,
+    },
+  }),
+}));
 
 import captureBrowserImage from "@agent/subagents/browser-agent/tools/capture_browser_image";
 
@@ -61,7 +71,8 @@ const scope = { userId: "user-1", workspaceId: "workspace-1" };
 
 const reservation = {
   id: artifactId,
-  storagePathname: `browser-images/workspace/${artifactId}` };
+  storagePathname: `browser-images/workspace/${artifactId}`,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -69,7 +80,8 @@ beforeEach(() => {
   mocks.requireOwnedBrowserSession.mockResolvedValue({
     createdAt: "2026-08-31T00:00:00.000Z",
     sessionId: "browser-1",
-    workerSessionId: "worker-session-1" });
+    workerSessionId: "worker-session-1",
+  });
   mocks.reserve.mockResolvedValue({ reservation, status: "pending" });
   mocks.persist.mockResolvedValue({ image, storagePathname: "stored/image" });
   mocks.del.mockResolvedValue(undefined);
@@ -94,7 +106,8 @@ beforeEach(() => {
     session_id: "browser-1",
     stealth: true,
     timeout_seconds: 900,
-    webdriver_ws_url: "wss://kernel.test/webdriver" });
+    webdriver_ws_url: "wss://kernel.test/webdriver",
+  });
   mocks.fetch.mockResolvedValue(
     new Response(png, { headers: { "content-type": "image/png" } })
   );
@@ -108,7 +121,8 @@ it("captures a masked viewport and returns only the artifact descriptor", async 
       label: "Product",
       region: { height: 200, width: 300, x: 10, y: 20 },
       session_id: "browser-1",
-      source: "viewport" },
+      source: "viewport",
+    },
     toolContext
   );
 
@@ -144,14 +158,13 @@ it.each([
             label: "Product",
             selector,
             session_id: "browser-1",
-            source }
+            source,
+          }
         : { label: "Product", session_id: "browser-1", source };
 
     await captureBrowserImage.execute(input, context());
 
-    expect(JSON.stringify(mocks.playwrightExecute.mock.calls)).toContain(
-      code
-    );
+    expect(JSON.stringify(mocks.playwrightExecute.mock.calls)).toContain(code);
     expect(mocks.readFile).toHaveBeenCalledOnce();
     expect(mocks.deleteFile).toHaveBeenCalledOnce();
   }
@@ -161,14 +174,16 @@ it("fetches an image element's original resource through the browser", async () 
   const toolContext = context();
   mocks.playwrightExecute.mockResolvedValue({
     result: { url: "https://images.example/product.png?private=ignored" },
-    success: true });
+    success: true,
+  });
 
   await captureBrowserImage.execute(
     {
       label: "Product",
       selector: "#landingImage",
       session_id: "browser-1",
-      source: "image_resource" },
+      source: "image_resource",
+    },
     toolContext
   );
 
@@ -197,7 +212,8 @@ it("falls back to an element screenshot when the resource cannot be fetched", as
   mocks.playwrightExecute
     .mockResolvedValueOnce({
       result: { url: "https://images.example/product.avif" },
-      success: true })
+      success: true,
+    })
     .mockResolvedValueOnce({ result: true, success: true });
   mocks.fetch.mockResolvedValue(new Response("blocked", { status: 403 }));
 
@@ -206,7 +222,8 @@ it("falls back to an element screenshot when the resource cannot be fetched", as
       label: "Product",
       selector: "#landingImage",
       session_id: "browser-1",
-      source: "image_resource" },
+      source: "image_resource",
+    },
     toolContext
   );
 
@@ -225,7 +242,8 @@ it("reuses a ready idempotent artifact without another capture", async () => {
     {
       label: "Product",
       session_id: "browser-1",
-      source: "viewport" },
+      source: "viewport",
+    },
     context()
   );
 
@@ -242,7 +260,8 @@ it("leaves a shared pending reservation available when capture fails", async () 
       {
         label: "Product",
         session_id: "browser-1",
-        source: "viewport" },
+        source: "viewport",
+      },
       context()
     )
   ).rejects.toThrow("Kernel failed");
@@ -261,7 +280,8 @@ it("deletes a temporary screenshot without reusing an aborted signal", async () 
       {
         label: "Product",
         session_id: "browser-1",
-        source: "full_page" },
+        source: "full_page",
+      },
       context(controller.signal)
     )
   ).rejects.toThrow("Capture cancelled");
@@ -278,5 +298,6 @@ function context(abortSignal?: AbortSignal) {
     callId: "call-image",
     parentSessionId: "root-session",
     sessionId: "worker-session",
-    toolName: "capture_browser_image" });
+    toolName: "capture_browser_image",
+  });
 }

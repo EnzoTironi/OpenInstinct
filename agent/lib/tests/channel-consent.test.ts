@@ -7,7 +7,8 @@ import {
   type ChannelConsentDelivery,
   type ChannelConsentInterpretation,
   type ChannelConsentSnapshot,
-  type ChannelConsentSource } from "../channel-consent";
+  type ChannelConsentSource,
+} from "../channel-consent";
 
 const request: InputRequest = {
   requestId: "request-original",
@@ -20,18 +21,22 @@ const request: InputRequest = {
     toolName: "calendar-create-event",
     input: {
       start: "2026-09-10T10:00:00-03:00",
-      attendees: ["invitee@example.com"] } },
+      attendees: ["invitee@example.com"],
+    },
+  },
   options: [
     { id: "approve", label: "Aprovar" },
     { id: "cancel", label: "Cancelar" },
-  ] };
+  ],
+};
 
 const source: ChannelConsentSource = {
   sourceMessageId: "message-response",
   identityId: "native-identity",
   sessionId: "session-owner",
   text: "pode enviar",
-  sourceOccurredAtMs: 20_000 };
+  sourceOccurredAtMs: 20_000,
+};
 
 const delivered: ChannelConsentDelivery = {
   receiptId: "provider-receipt",
@@ -41,14 +46,16 @@ const delivered: ChannelConsentDelivery = {
   sessionId: source.sessionId,
   requestId: request.requestId,
   revision: channelConsentRevision(request),
-  deliveredAtMs: 10_000 };
+  deliveredAtMs: 10_000,
+};
 
 const snapshot: ChannelConsentSnapshot = {
   identityId: source.identityId,
   sessionId: source.sessionId,
   pending: [request],
   deliveries: [delivered],
-  consumedSourceMessageIds: [] };
+  consumedSourceMessageIds: [],
+};
 
 const interpretation: ChannelConsentInterpretation = {
   sourceMessageId: source.sourceMessageId,
@@ -57,7 +64,9 @@ const interpretation: ChannelConsentInterpretation = {
     intent: "approve",
     references: [
       { requestId: request.requestId, revision: delivered.revision },
-    ] } };
+    ],
+  },
+};
 
 const rejected = (reason: string) => ({ status: "rejected", reason });
 
@@ -71,16 +80,17 @@ test("returns an Eve response and caller-owned binding, without changing the sna
       requestId: request.requestId,
       revision: delivered.revision,
       deliveryReceiptId: delivered.receiptId,
-      deliveryProviderMessageIds: delivered.providerMessageIds },
-    response: { requestId: request.requestId, optionId: "approve" } });
+      deliveryProviderMessageIds: delivered.providerMessageIds,
+    },
+    response: { requestId: request.requestId, optionId: "approve" },
+  });
   expect(snapshot).toEqual(before);
 });
 
 test.each(["cancel", "correct"])(
   "%s only denies the original action",
   (intent) => {
-    const text =
-      intent === "correct" ? "sim, mas às onze" : "deixa, não envia";
+    const text = intent === "correct" ? "sim, mas às onze" : "deixa, não envia";
 
     expect(
       validateChannelConsent(
@@ -92,13 +102,16 @@ test.each(["cancel", "correct"])(
             intent,
             references: [
               { requestId: request.requestId, revision: delivered.revision },
-            ] } },
+            ],
+          },
+        },
         snapshot
       )
     ).toMatchObject({
       status: "validated",
       intent,
-      response: { requestId: request.requestId, optionId: "cancel" } });
+      response: { requestId: request.requestId, optionId: "cancel" },
+    });
   }
 );
 
@@ -112,7 +125,8 @@ test.each(["clarify", "conversation"])(
         {
           ...interpretation,
           sourceText: text,
-          candidate: { intent, references: [] } },
+          candidate: { intent, references: [] },
+        },
         snapshot
       )
     ).toEqual({ status: "non_action", intent });
@@ -127,11 +141,7 @@ test.each([
   "rejects an interpretation detached from its complete source: %j",
   (change) => {
     expect(
-      validateChannelConsent(
-        source,
-        { ...interpretation, ...change },
-        snapshot
-      )
+      validateChannelConsent(source, { ...interpretation, ...change }, snapshot)
     ).toEqual(rejected("source_mismatch"));
   }
 );
@@ -142,7 +152,8 @@ test.each([{ identityId: "other-owner" }, { sessionId: "other-session" }])(
     expect(
       validateChannelConsent(source, interpretation, {
         ...snapshot,
-        ...change })
+        ...change,
+      })
     ).toEqual(rejected("scope_mismatch"));
   }
 );
@@ -151,7 +162,8 @@ test("a still-visible request cannot reuse a source already consumed as a decisi
   expect(
     validateChannelConsent(source, interpretation, {
       ...snapshot,
-      consumedSourceMessageIds: [source.sourceMessageId] })
+      consumedSourceMessageIds: [source.sourceMessageId],
+    })
   ).toEqual(rejected("replayed_source"));
 });
 
@@ -165,23 +177,22 @@ test.each([
       {
         requestId: request.requestId,
         revision: delivered.revision,
-        actor: "native-identity" },
-    ] },
+        actor: "native-identity",
+      },
+    ],
+  },
   { intent: "allow", references: [] },
   {
     intent: "conversation",
     references: [
       { requestId: request.requestId, revision: delivered.revision },
-    ] },
+    ],
+  },
 ])(
   "rejects extra authority, replacement arguments and invalid candidates: %j",
   (candidate) => {
     expect(
-      validateChannelConsent(
-        source,
-        { ...interpretation, candidate },
-        snapshot
-      )
+      validateChannelConsent(source, { ...interpretation, candidate }, snapshot)
     ).toEqual(rejected("invalid_candidate"));
   }
 );
@@ -198,12 +209,15 @@ test("an explicit single target can resolve the older of two different pending p
           requestId: newer.requestId,
           revision: channelConsentRevision(newer),
           receiptId: "newer-receipt",
-          providerMessageIds: ["newer-receipt"] },
+          providerMessageIds: ["newer-receipt"],
+        },
         delivered,
-      ] })
+      ],
+    })
   ).toMatchObject({
     status: "validated",
-    response: { requestId: request.requestId } });
+    response: { requestId: request.requestId },
+  });
 });
 
 test.each([[], [request, request]].map((pending) => ({ pending })))(
@@ -217,35 +231,42 @@ test.each([[], [request, request]].map((pending) => ({ pending })))(
   }
 );
 
-test.each(
-  [[], [request.requestId, "another-request"]].map((ids) => ({ ids }))
-)("never selects a target from missing or multiple references", ({ ids }) => {
-  expect(
-    validateChannelConsent(
-      source,
-      {
-        ...interpretation,
-        candidate: {
-          intent: "approve",
-          references: ids.map((requestId) => ({
-            requestId,
-            revision: delivered.revision })) } },
-      snapshot
-    )
-  ).toEqual(rejected("ambiguous_reference"));
-});
+test.each([[], [request.requestId, "another-request"]].map((ids) => ({ ids })))(
+  "never selects a target from missing or multiple references",
+  ({ ids }) => {
+    expect(
+      validateChannelConsent(
+        source,
+        {
+          ...interpretation,
+          candidate: {
+            intent: "approve",
+            references: ids.map((requestId) => ({
+              requestId,
+              revision: delivered.revision,
+            })),
+          },
+        },
+        snapshot
+      )
+    ).toEqual(rejected("ambiguous_reference"));
+  }
+);
 
 test("changed arguments invalidate old consent even if the request ID is reused", () => {
   const corrected = {
     ...request,
     action: {
       ...request.action,
-      input: { ...request.action.input, start: "2026-09-10T11:00:00-03:00" } } };
+      input: { ...request.action.input, start: "2026-09-10T11:00:00-03:00" },
+    },
+  };
 
   expect(
     validateChannelConsent(source, interpretation, {
       ...snapshot,
-      pending: [corrected] })
+      pending: [corrected],
+    })
   ).toEqual(rejected("stale_revision"));
   expect(
     validateChannelConsent(
@@ -257,8 +278,11 @@ test("changed arguments invalidate old consent even if the request ID is reused"
           references: [
             {
               requestId: corrected.requestId,
-              revision: channelConsentRevision(corrected) },
-          ] } },
+              revision: channelConsentRevision(corrected),
+            },
+          ],
+        },
+      },
       { ...snapshot, pending: [corrected] }
     )
   ).toEqual(rejected("missing_delivery"));
@@ -273,16 +297,14 @@ test.each(
     [{ ...delivered, revision: "old-revision" }],
     [{ ...delivered, providerMessageIds: [] }],
   ].map((deliveries) => ({ deliveries }))
-)(
-  "rejects missing or mismatched confirmed delivery: %j",
-  ({ deliveries }) => {
-    expect(
-      validateChannelConsent(source, interpretation, {
-        ...snapshot,
-        deliveries })
-    ).toEqual(rejected("missing_delivery"));
-  }
-);
+)("rejects missing or mismatched confirmed delivery: %j", ({ deliveries }) => {
+  expect(
+    validateChannelConsent(source, interpretation, {
+      ...snapshot,
+      deliveries,
+    })
+  ).toEqual(rejected("missing_delivery"));
+});
 
 test("does not choose between duplicate delivery claims", () => {
   expect(
@@ -291,7 +313,8 @@ test("does not choose between duplicate delivery claims", () => {
       deliveries: [
         delivered,
         { ...delivered, providerMessageIds: ["another-receipt"] },
-      ] })
+      ],
+    })
   ).toEqual(rejected("ambiguous_delivery"));
 });
 
@@ -301,7 +324,8 @@ test.each([20_000, 20_001, Number.NaN, Number.POSITIVE_INFINITY])(
     expect(
       validateChannelConsent(source, interpretation, {
         ...snapshot,
-        deliveries: [{ ...delivered, deliveredAtMs }] })
+        deliveries: [{ ...delivered, deliveredAtMs }],
+      })
     ).toEqual(rejected("delivery_not_before_source"));
   }
 );
@@ -332,11 +356,14 @@ test.each([
             intent: "approve",
             references: [
               { requestId: pending.requestId, revision: currentRevision },
-            ] } },
+            ],
+          },
+        },
         {
           ...snapshot,
           pending: [pending],
-          deliveries: [{ ...delivered, revision: currentRevision }] }
+          deliveries: [{ ...delivered, revision: currentRevision }],
+        }
       )
     ).toEqual(rejected("unsupported_request"));
   }
@@ -349,7 +376,10 @@ test("object key reordering does not change the binding", () => {
       ...request.action,
       input: {
         attendees: ["invitee@example.com"],
-        start: "2026-09-10T10:00:00-03:00" } } };
+        start: "2026-09-10T10:00:00-03:00",
+      },
+    },
+  };
 
   expect(channelConsentRevision(reordered)).toBe(
     channelConsentRevision(request)
@@ -386,11 +416,13 @@ test.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
 test("array and numeric-key object are different proposal arguments", () => {
   const array = {
     ...request,
-    action: { ...request.action, input: { value: ["x"] } } };
+    action: { ...request.action, input: { value: ["x"] } },
+  };
 
   const object = {
     ...request,
-    action: { ...request.action, input: { value: { "0": "x" } } } };
+    action: { ...request.action, input: { value: { "0": "x" } } },
+  };
 
   expect(channelConsentRevision(array)).not.toBe(
     channelConsentRevision(object)
@@ -400,11 +432,13 @@ test("array and numeric-key object are different proposal arguments", () => {
 test("array order remains significant at nested argument positions", () => {
   const first = {
     ...request,
-    action: { ...request.action, input: { nested: { values: ["a", "b"] } } } };
+    action: { ...request.action, input: { nested: { values: ["a", "b"] } } },
+  };
 
   const second = {
     ...request,
-    action: { ...request.action, input: { nested: { values: ["b", "a"] } } } };
+    action: { ...request.action, input: { nested: { values: ["b", "a"] } } },
+  };
 
   expect(channelConsentRevision(first)).not.toBe(
     channelConsentRevision(second)
@@ -415,6 +449,7 @@ test("the receipt identity must belong to the fully delivered chunk set", () => 
   expect(
     validateChannelConsent(source, interpretation, {
       ...snapshot,
-      deliveries: [{ ...delivered, receiptId: "unrelated-receipt" }] })
+      deliveries: [{ ...delivered, receiptId: "unrelated-receipt" }],
+    })
   ).toEqual(rejected("missing_delivery"));
 });

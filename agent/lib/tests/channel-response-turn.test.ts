@@ -10,19 +10,22 @@ const meta = { id: "event", at: "2026-09-08T20:00:00.000Z" };
 const started: MessageStreamEvent = {
   type: "turn.started",
   data: { turnId: source.turnId, sequence: 1 },
-  meta };
+  meta,
+};
 
 const received: MessageStreamEvent = {
   type: "message.received",
   data: { turnId: source.turnId, sequence: 1, message: source.text },
-  meta };
+  meta,
+};
 
 function stream(events: readonly MessageStreamEvent[]) {
   return new ReadableStream<MessageStreamEvent>({
     start(controller) {
       for (const event of events) controller.enqueue(event);
       controller.close();
-    } });
+    },
+  });
 }
 
 async function matches(events: readonly MessageStreamEvent[]) {
@@ -45,7 +48,8 @@ test("rejects a task wake retaining the old source credentials", async () => {
       received,
       {
         ...started,
-        data: { turnId: "task-wake", sequence: 2 } },
+        data: { turnId: "task-wake", sequence: 2 },
+      },
     ])
   ).toBe(false);
 });
@@ -59,7 +63,8 @@ test("rejects source text received in another turn", async () => {
     await matches([
       {
         ...received,
-        data: { ...received.data, turnId: "old-turn" } },
+        data: { ...received.data, turnId: "old-turn" },
+      },
       started,
     ])
   ).toBe(false);
@@ -73,7 +78,8 @@ test.each(["não pode fazer", "ele escreveu: pode fazer", "pode fazer?"])(
         started,
         {
           ...received,
-          data: { ...received.data, message } },
+          data: { ...received.data, message },
+        },
       ])
     ).toBe(false);
   }
@@ -96,7 +102,8 @@ test("rejects a failed source turn", async () => {
       {
         type: "turn.failed",
         data: { ...started.data, code: "failure", message: "failed" },
-        meta },
+        meta,
+      },
     ])
   ).toBe(false);
 });
@@ -111,7 +118,8 @@ test("does not let unrelated earlier turn completion close the active turn", asy
       {
         type: "turn.completed",
         data: { turnId: "old-turn", sequence: 0 },
-        meta },
+        meta,
+      },
       started,
       received,
     ])

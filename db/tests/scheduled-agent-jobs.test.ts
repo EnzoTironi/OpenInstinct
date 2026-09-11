@@ -52,11 +52,13 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
 
   const aliceConversation = {
     conversationChannel: "linq" as const,
-    conversationId: "linq:chat-alice" };
+    conversationId: "linq:chat-alice",
+  };
 
   const bobConversation = {
     conversationChannel: "linq" as const,
-    conversationId: "linq:chat-bob" };
+    conversationId: "linq:chat-bob",
+  };
 
   await scope.ensureScope(alice);
   await scope.ensureScope(bob);
@@ -72,19 +74,17 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
       timing: {
         anchoredAt: "2026-09-01T13:00:00.000Z",
         everyMinutes: 60,
-        kind: "interval" } },
+        kind: "interval",
+      },
+    },
     now
   );
 
-  expect(await jobs.listScheduledAgentJobs(bob, aliceConversation)).toEqual(
-    []
-  );
-  expect(await jobs.listScheduledAgentJobs(alice, bobConversation)).toEqual(
-    []
-  );
-  expect(await jobs.listScheduledAgentJobs(alice, aliceConversation)).toEqual(
-    [{ ...created, latestRun: null }]
-  );
+  expect(await jobs.listScheduledAgentJobs(bob, aliceConversation)).toEqual([]);
+  expect(await jobs.listScheduledAgentJobs(alice, bobConversation)).toEqual([]);
+  expect(await jobs.listScheduledAgentJobs(alice, aliceConversation)).toEqual([
+    { ...created, latestRun: null },
+  ]);
   await jobs.updateScheduledAgentJob(
     alice,
     aliceConversation,
@@ -92,13 +92,12 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     { prompt: "Check for a meaningful price change." },
     new Date("2026-09-01T12:30:00.000Z")
   );
-  expect(await jobs.listScheduledAgentJobs(alice, aliceConversation)).toEqual(
-    [
-      expect.objectContaining({
-        nextRunAt: new Date("2026-09-01T13:00:00.000Z"),
-        prompt: "Check for a meaningful price change." }),
-    ]
-  );
+  expect(await jobs.listScheduledAgentJobs(alice, aliceConversation)).toEqual([
+    expect.objectContaining({
+      nextRunAt: new Date("2026-09-01T13:00:00.000Z"),
+      prompt: "Check for a meaningful price change.",
+    }),
+  ]);
 
   const dueAt = new Date("2026-09-01T13:00:00.000Z");
   await jobs.materializeDueScheduledAgentRuns({ limit: 25, now: dueAt });
@@ -109,17 +108,20 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
   let [claim] = await jobs.claimReadyScheduledAgentRuns({
     leaseForMs: 21_600_000,
     limit: 25,
-    now: dueAt });
+    now: dueAt,
+  });
 
   if (!claim?.run.leaseToken) throw new Error("Expected one leased run.");
   expect(claim).toMatchObject({
     job: { id: created.id, ...aliceConversation },
-    run: { attempts: 1, scheduledFor: dueAt, startedAt: null } });
+    run: { attempts: 1, scheduledFor: dueAt, startedAt: null },
+  });
   expect(
     await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 21_600_000,
       limit: 25,
-      now: dueAt })
+      now: dueAt,
+    })
   ).toEqual([]);
 
   expect(
@@ -174,18 +176,21 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     id: claim.run.id,
     startedAt: workerStartedAt,
     status: "running",
-    workerSessionId: "worker-session" });
+    workerSessionId: "worker-session",
+  });
 
   const question = {
     action: {
       callId: "call-question",
       input: { prompt: "Which airport should I use?" },
       kind: "tool-call" as const,
-      toolName: "ask_question" },
+      toolName: "ask_question",
+    },
     allowFreeform: true,
     kind: "question" as const,
     prompt: "Which airport should I use?",
-    requestId: "request-question" };
+    requestId: "request-question",
+  };
 
   const waiting = await jobs.waitForScheduledAgentRunInput(
     claim.run.id,
@@ -198,12 +203,14 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     pendingInputRequests: [question],
     reportSequence: 1,
     reportStatus: "pending",
-    status: "waiting_for_input" });
+    status: "waiting_for_input",
+  });
   expect(
     await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 21_600_000,
       limit: 25,
-      now: new Date("2026-09-02T13:00:00.000Z") })
+      now: new Date("2026-09-02T13:00:00.000Z"),
+    })
   ).toEqual([]);
 
   const questionReport = await jobs.claimScheduledReport(
@@ -249,9 +256,7 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
   );
 
   if (!retriedQuestionReport?.run.reportLeaseToken) {
-    throw new Error(
-      "Expected the unanswered question to be reportable again."
-    );
+    throw new Error("Expected the unanswered question to be reportable again.");
   }
 
   await jobs.finalizeScheduledReport(
@@ -266,13 +271,10 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     await jobs.getScheduledAgentRunInput(alice, bobConversation, claim.run.id)
   ).toBeUndefined();
   expect(
-    await jobs.getScheduledAgentRunInput(
-      alice,
-      aliceConversation,
-      claim.run.id
-    )
+    await jobs.getScheduledAgentRunInput(alice, aliceConversation, claim.run.id)
   ).toMatchObject({
-    leaseToken: claim.run.leaseToken });
+    leaseToken: claim.run.leaseToken,
+  });
 
   const resumed = await jobs.claimScheduledAgentRunInput(
     claim.run.id,
@@ -281,7 +283,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
   );
 
   expect(resumed).toMatchObject({
-    run: { pendingInputRequests: [question], status: "running" } });
+    run: { pendingInputRequests: [question], status: "running" },
+  });
   await jobs.finishScheduledAgentRunInput(
     claim.run.id,
     claim.run.leaseToken,
@@ -291,7 +294,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 21_600_000,
       limit: 25,
-      now: new Date("2026-09-01T19:03:00.000Z") })
+      now: new Date("2026-09-01T19:03:00.000Z"),
+    })
   ).toEqual([]);
   expect(
     await jobs.releaseScheduledAgentRun(
@@ -305,13 +309,15 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 21_600_000,
       limit: 25,
-      now: new Date("2026-09-01T19:07:00.000Z") })
+      now: new Date("2026-09-01T19:07:00.000Z"),
+    })
   ).toEqual([]);
 
   const [recoveredWorker] = await jobs.claimReadyScheduledAgentRuns({
     leaseForMs: 21_600_000,
     limit: 25,
-    now: new Date("2026-09-01T19:08:00.000Z") });
+    now: new Date("2026-09-01T19:08:00.000Z"),
+  });
 
   if (!recoveredWorker?.run.leaseToken) {
     throw new Error("Expected the interrupted worker to be reclaimed.");
@@ -320,7 +326,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
   expect(recoveredWorker.run).toMatchObject({
     attempts: 2,
     startedAt: null,
-    workerSessionId: "worker-session" });
+    workerSessionId: "worker-session",
+  });
   claim = recoveredWorker;
   await jobs.setScheduledRunSession(
     claim.run.id,
@@ -343,7 +350,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
       {
         kind: "result",
         summary: "Browser research is still running.",
-        urgency: "normal" },
+        urgency: "normal",
+      },
       new Date("2026-09-01T13:02:00.000Z")
     )
   ).toEqual({ status: "deferred" });
@@ -354,7 +362,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
       "turn-2",
       {
         kind: "nothing_to_report",
-        reason: "Another background task is still running." },
+        reason: "Another background task is still running.",
+      },
       new Date("2026-09-01T13:02:01.000Z")
     )
   ).toEqual({ status: "deferred" });
@@ -366,7 +375,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     {
       kind: "result",
       summary: "The price fell to $250.",
-      urgency: "normal" },
+      urgency: "normal",
+    },
     new Date("2026-09-01T13:02:02.000Z")
   );
 
@@ -377,19 +387,18 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
       reportSequence: 2,
       reportStatus: "pending",
       status: "completed",
-      workerSessionId: "replacement-worker-session" } });
+      workerSessionId: "replacement-worker-session",
+    },
+  });
   const report = await jobs.claimScheduledReport(claim.run.id, dueAt);
   expect(report).toMatchObject({
     job: { id: created.id },
-    run: { reportStatus: "queued" } });
+    run: { reportStatus: "queued" },
+  });
 
   const recovered = await Promise.all([
-    jobs.listRecoverableScheduledReports(
-      new Date("2026-09-01T13:10:00.000Z")
-    ),
-    jobs.listRecoverableScheduledReports(
-      new Date("2026-09-01T13:10:00.000Z")
-    ),
+    jobs.listRecoverableScheduledReports(new Date("2026-09-01T13:10:00.000Z")),
+    jobs.listRecoverableScheduledReports(new Date("2026-09-01T13:10:00.000Z")),
   ]);
 
   expect(recovered.flat().map(({ runId }) => runId)).toContain(claim.run.id);
@@ -425,21 +434,23 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
 
   expect(
     await jobs.updateScheduledAgentJob(bob, aliceConversation, created.id, {
-      status: "paused" })
+      status: "paused",
+    })
   ).toBeUndefined();
   expect(
     await jobs.updateScheduledAgentJob(alice, bobConversation, created.id, {
-      status: "paused" })
+      status: "paused",
+    })
   ).toBeUndefined();
-  expect(await jobs.listScheduledAgentJobs(alice, aliceConversation)).toEqual(
-    [
-      expect.objectContaining({
-        nextRunAt: new Date("2026-09-01T14:00:00.000Z"),
-        status: "active" }),
-    ]
-  );
+  expect(await jobs.listScheduledAgentJobs(alice, aliceConversation)).toEqual([
+    expect.objectContaining({
+      nextRunAt: new Date("2026-09-01T14:00:00.000Z"),
+      status: "active",
+    }),
+  ]);
   await jobs.updateScheduledAgentJob(alice, aliceConversation, created.id, {
-    status: "paused" });
+    status: "paused",
+  });
   await jobs.createScheduledAgentJob(
     bob,
     {
@@ -449,23 +460,28 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
       timing: {
         anchoredAt: "2026-09-01T13:00:00.000Z",
         everyMinutes: 60,
-        kind: "interval" } },
+        kind: "interval",
+      },
+    },
     now
   );
 
   const recoveredAt = new Date("2026-09-08T13:30:00.000Z");
   await jobs.materializeDueScheduledAgentRuns({
     limit: 25,
-    now: recoveredAt });
+    now: recoveredAt,
+  });
 
   let [latestClaim] = await jobs.claimReadyScheduledAgentRuns({
     leaseForMs: 21_600_000,
     limit: 25,
-    now: recoveredAt });
+    now: recoveredAt,
+  });
 
   expect(latestClaim).toMatchObject({
     job: { nextRunAt: new Date("2026-09-08T14:00:00.000Z") },
-    run: { scheduledFor: new Date("2026-09-08T13:00:00.000Z") } });
+    run: { scheduledFor: new Date("2026-09-08T13:00:00.000Z") },
+  });
   let retryAt = recoveredAt;
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -483,7 +499,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     [latestClaim] = await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 21_600_000,
       limit: 25,
-      now: retryAt });
+      now: retryAt,
+    });
   }
 
   expect(await jobs.listScheduledAgentJobs(bob, bobConversation)).toEqual([
@@ -492,7 +509,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
   expect(
     await jobs.listScheduledAgentJobs(bob, {
       conversationChannel: "linq",
-      conversationId: "linq:another-chat" })
+      conversationId: "linq:another-chat",
+    })
   ).toEqual([]);
 
   const [acceptedRun] = await pgliteDatabase
@@ -505,7 +523,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
       scheduledFor: new Date("2026-09-09T13:00:00.000Z"),
       startedAt: null,
       status: "running",
-      workerSessionId: "accepted-worker-session" })
+      workerSessionId: "accepted-worker-session",
+    })
     .returning();
 
   if (!acceptedRun) throw new Error("Expected an accepted worker run.");
@@ -513,7 +532,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 300_000,
       limit: 25,
-      now: new Date("2026-09-09T13:06:00.000Z") })
+      now: new Date("2026-09-09T13:06:00.000Z"),
+    })
   ).toEqual([]);
 
   const [exhaustedRun] = await pgliteDatabase
@@ -524,7 +544,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
       leaseExpiresAt: new Date("2026-09-09T14:05:00.000Z"),
       leaseToken: "00000000-0000-4000-8000-000000000011",
       scheduledFor: new Date("2026-09-09T14:00:00.000Z"),
-      status: "running" })
+      status: "running",
+    })
     .returning();
 
   if (!exhaustedRun) throw new Error("Expected an exhausted worker run.");
@@ -532,7 +553,8 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 300_000,
       limit: 25,
-      now: new Date("2026-09-09T14:06:00.000Z") })
+      now: new Date("2026-09-09T14:06:00.000Z"),
+    })
   ).toEqual([]);
   expect(
     await jobs.claimScheduledReport(
@@ -543,10 +565,12 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     run: {
       outcome: {
         kind: "blocked",
-        summary:
-          "The scheduled task could not complete after three attempts." },
+        summary: "The scheduled task could not complete after three attempts.",
+      },
       reportStatus: "queued",
-      status: "dead_letter" } });
+      status: "dead_letter",
+    },
+  });
 }, 20_000);
 
 async function applyMigration(database: PGlite, filename: string) {

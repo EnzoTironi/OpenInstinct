@@ -6,26 +6,23 @@ import {
   forgetWorkstream,
   readWorkstream,
   recallWorkstreams,
-  saveWorkstream } from "@db/services/workstreams";
+  saveWorkstream,
+} from "@db/services/workstreams";
 import { PGlite } from "@electric-sql/pglite";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import {
   saveWorkstreamSchema,
-  type WorkstreamContent } from "@shared/workstreams/schema";
+  type WorkstreamContent,
+} from "@shared/workstreams/schema";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import type {
   MemoryTurnStartedContext,
   MemoryToolsContext,
-  MemoryScopeContext } from "eve/memory";
+  MemoryScopeContext,
+} from "eve/memory";
 import type { ToolContext } from "eve/tools";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 
 const client = new PGlite();
 
@@ -46,8 +43,10 @@ const content = {
     {
       reference: "session:planning",
       observation: "User requested a window seat.",
-      observedAt: "2026-09-08T12:00:00Z" },
-  ] } satisfies WorkstreamContent;
+      observedAt: "2026-09-08T12:00:00Z",
+    },
+  ],
+} satisfies WorkstreamContent;
 
 beforeAll(async () => {
   await migrate(database, { migrationsFolder: "db/migrations" });
@@ -80,8 +79,7 @@ it("recalls an undertaking in a new session and preserves a corrected constraint
 
   const later = context("later");
 
-  const recall =
-    await workstreamMemory.provider.recall["turn.started"](later);
+  const recall = await workstreamMemory.provider.recall["turn.started"](later);
 
   expect(recall?.messages[0]?.content).toContain("Autumn trip");
   const laterTools = await workstreamMemory.provider.tools(later);
@@ -97,7 +95,8 @@ it("recalls an undertaking in a new session and preserves a corrected constraint
   const corrected = {
     ...content,
     notes:
-      "Aisle seat, replacing the window preference. First option departs at 09:00; second at 11:00. Nothing booked." };
+      "Aisle seat, replacing the window preference. First option departs at 09:00; second at 11:00. Nothing booked.",
+  };
 
   await laterTools.save.execute(
     { id: "autumn-trip", expectedRevision: 1, content: corrected },
@@ -106,7 +105,8 @@ it("recalls an undertaking in a new session and preserves a corrected constraint
   expect(await readWorkstream(alice, "key-a", "autumn-trip")).toMatchObject({
     revision: 2,
     content: corrected,
-    sessionId: "later" });
+    sessionId: "later",
+  });
   await expect(
     saveWorkstream(
       alice,
@@ -127,9 +127,7 @@ it("isolates records by both authenticated workspace and Eve memory scope", asyn
     "first"
   );
   expect(await readWorkstream(bob, "key-a", "autumn-trip")).toBeNull();
-  expect(
-    await readWorkstream(alice, "preview-key", "autumn-trip")
-  ).toBeNull();
+  expect(await readWorkstream(alice, "preview-key", "autumn-trip")).toBeNull();
   expect((await findWorkstreams(bob, "key-a", {})).items).toEqual([]);
   expect((await recallWorkstreams(alice, "preview-key")).items).toEqual([]);
   await expect(
@@ -172,7 +170,8 @@ it("deduplicates an interrupted save and rejects concurrent stale updates", asyn
       {
         ...input,
         expectedRevision: 1,
-        content: { ...content, nextStep: "Check morning fares." } },
+        content: { ...content, nextStep: "Check morning fares." },
+      },
       "update-a",
       "a"
     ),
@@ -182,7 +181,8 @@ it("deduplicates an interrupted save and rejects concurrent stale updates", asyn
       {
         ...input,
         expectedRevision: 1,
-        content: { ...content, nextStep: "Check afternoon fares." } },
+        content: { ...content, nextStep: "Check afternoon fares." },
+      },
       "update-b",
       "b"
     ),
@@ -191,11 +191,12 @@ it("deduplicates an interrupted save and rejects concurrent stale updates", asyn
   expect(
     results.filter((result) => result.status === "fulfilled")
   ).toHaveLength(1);
-  expect(
-    results.filter((result) => result.status === "rejected")
-  ).toHaveLength(1);
+  expect(results.filter((result) => result.status === "rejected")).toHaveLength(
+    1
+  );
   expect(await readWorkstream(alice, "key-a", input.id)).toMatchObject({
-    revision: 2 });
+    revision: 2,
+  });
   await expect(
     saveWorkstream(alice, "key-a", input, "same-call", "first")
   ).rejects.toThrow("changed");
@@ -220,14 +221,15 @@ it("replaces the recalled index after completion, and forgets content without re
     {
       id: "autumn-trip",
       expectedRevision: 1,
-      content: { ...content, status: "completed", nextStep: "" } },
+      content: { ...content, status: "completed", nextStep: "" },
+    },
     "complete",
     "later"
   );
 
-  const after = await workstreamMemory.provider.recall[
-    "compaction.completed"
-  ](context("later"));
+  const after = await workstreamMemory.provider.recall["compaction.completed"](
+    context("later")
+  );
 
   expect(after?.messages[0]?.id).toBe(before?.messages[0]?.id);
   expect(after?.messages[0]?.content).not.toContain("Autumn trip");
@@ -235,7 +237,8 @@ it("replaces the recalled index after completion, and forgets content without re
     (
       await findWorkstreams(alice, "key-a", {
         query: "autumn",
-        status: "completed" })
+        status: "completed",
+      })
     ).items
   ).toHaveLength(1);
   await expect(
@@ -300,7 +303,8 @@ it("fences a delayed initial save when forgetting an ID that is not yet persiste
     id: "autumn-trip",
     revision: 1,
     content: null,
-    sessionId: null });
+    sessionId: null,
+  });
 });
 
 it("bounds recall, supports pagination and literal search, and limits retained records", async () => {
@@ -315,19 +319,23 @@ it("bounds recall, supports pagination and literal search, and limits retained r
           content: {
             ...content,
             title: `Trip ${String(index)}`,
-            notes: index === 0 ? "Discount of 10%_available" : "Regular fare" } },
+            notes: index === 0 ? "Discount of 10%_available" : "Regular fare",
+          },
+        },
         `save-${String(index)}`,
         "first"
       );
     })
   );
   expect(await recallWorkstreams(alice, "key-a")).toMatchObject({
-    hasMore: true });
+    hasMore: true,
+  });
   expect((await recallWorkstreams(alice, "key-a")).items).toHaveLength(8);
   const first = await findWorkstreams(alice, "key-a", {});
 
   const second = await findWorkstreams(alice, "key-a", {
-    offset: first.nextOffset ?? 0 });
+    offset: first.nextOffset ?? 0,
+  });
 
   expect(first.items).toHaveLength(20);
   expect(second.items).toHaveLength(20);
@@ -380,7 +388,8 @@ it("disables the slot outside interactive authenticated user turns", async () =>
 
   const anonymous = {
     ...context("anonymous"),
-    session: { id: "anonymous", auth: { current: null, initiator: null } } };
+    session: { id: "anonymous", auth: { current: null, initiator: null } },
+  };
 
   expect(workstreamMemory.scope(anonymous)).toBeNull();
   expect(await workstreamMemory.provider.tools(anonymous)).toBeNull();
@@ -402,7 +411,8 @@ it("rejects oversized content and preserves cancellation", async () => {
     saveWorkstreamSchema.safeParse({
       id: "trip",
       expectedRevision: 0,
-      content: { ...content, notes: "x".repeat(3_001) } }).success
+      content: { ...content, notes: "x".repeat(3_001) },
+    }).success
   ).toBe(false);
   const aborted = context("cancelled");
   const controller = new AbortController();
@@ -411,7 +421,8 @@ it("rejects oversized content and preserves cancellation", async () => {
   await expect(
     workstreamMemory.provider.recall["turn.started"]({
       ...aborted,
-      abortSignal: controller.signal })
+      abortSignal: controller.signal,
+    })
   ).rejects.toBe(reason);
 });
 
@@ -435,8 +446,10 @@ function context(sessionId: string, authenticator = "authjs") {
       scope: {
         key: "key-a",
         namespace: "test-workstreams",
-        value: alice.workspaceId },
-      slot: "workstreams" },
+        value: alice.workspaceId,
+      },
+      slot: "workstreams",
+    },
     messages: [],
     operationId: `${sessionId}-recall`,
     session: {
@@ -447,9 +460,13 @@ function context(sessionId: string, authenticator = "authjs") {
           attributes: { workspaceId: alice.workspaceId },
           authenticator,
           principalId: alice.userId,
-          principalType: "user" },
-        initiator: null } },
-    turn: { id: "turn", input: [], sequence: 1 } } satisfies MemoryTurnStartedContext &
+          principalType: "user",
+        },
+        initiator: null,
+      },
+    },
+    turn: { id: "turn", input: [], sequence: 1 },
+  } satisfies MemoryTurnStartedContext &
     MemoryToolsContext &
     MemoryScopeContext &
     Pick<ToolContext, "getToken" | "requireAuth">;

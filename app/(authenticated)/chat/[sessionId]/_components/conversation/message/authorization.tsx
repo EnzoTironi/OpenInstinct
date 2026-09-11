@@ -8,6 +8,7 @@ import {
   KeyRoundIcon,
   XCircleIcon,
 } from "lucide-react";
+import { createElement } from "react";
 
 export function AuthorizationPrompt({
   part,
@@ -19,58 +20,116 @@ export function AuthorizationPrompt({
 
   const isCompleted = part.state === "completed";
 
-  const Icon = isAuthorized
-    ? CheckCircleIcon
-    : isCompleted
-      ? XCircleIcon
-      : KeyRoundIcon;
-
   const instructions = part.authorization?.instructions;
 
-  const shouldShowInstructions =
-    instructions !== undefined && instructions !== part.description;
-
-  const alertVariant = isAuthorized
-    ? "success"
-    : isCompleted
-      ? "destructive"
-      : "information";
+  const shouldShowInstructions = shouldShowAuthorizationInstructions(
+    instructions,
+    part.description
+  );
 
   return (
-    <Alert variant={alertVariant}>
-      <Icon />
+    <Alert variant={authorizationAlertVariant(isAuthorized, isCompleted)}>
+      {createElement(authorizationIcon(isAuthorized, isCompleted))}
       <AlertTitle>{authorizationTitle(part)}</AlertTitle>
       <AlertDescription>
         <p>{authorizationDescription(part)}</p>
         {shouldShowInstructions ? <p>{instructions}</p> : null}
-        {part.state === "required" && part.authorization?.userCode ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span>Code</span>
-            <Badge variant="outline">
-              <code className="type-compact-code">
-                {part.authorization.userCode}
-              </code>
-            </Badge>
-          </div>
-        ) : null}
-        {part.state === "required" && part.authorization?.url ? (
-          <Button
-            render={
-              <a
-                aria-label={`Sign in with ${part.displayName}`}
-                href={part.authorization.url}
-                rel="noreferrer"
-                target="_blank"
-              />
-            }
-            size="sm"
-          >
-            <ExternalLinkIcon />
-            Sign in with {part.displayName}
-          </Button>
-        ) : null}
+        <AuthorizationUserCode part={part} />
+        <AuthorizationSignInButton part={part} />
       </AlertDescription>
     </Alert>
+  );
+}
+
+function authorizationIcon(isAuthorized: boolean, isCompleted: boolean) {
+  if (isAuthorized) {
+    return CheckCircleIcon;
+  }
+
+  if (isCompleted) {
+    return XCircleIcon;
+  }
+
+  return KeyRoundIcon;
+}
+
+function authorizationAlertVariant(
+  isAuthorized: boolean,
+  isCompleted: boolean
+): "success" | "destructive" | "information" {
+  if (isAuthorized) {
+    return "success";
+  }
+
+  if (isCompleted) {
+    return "destructive";
+  }
+
+  return "information";
+}
+
+function shouldShowAuthorizationInstructions(
+  instructions: string | undefined,
+  description: string
+): boolean {
+  return instructions !== undefined && instructions !== description;
+}
+
+function AuthorizationUserCode({
+  part,
+}: {
+  readonly part: EveAuthorizationPart;
+}) {
+  if (part.state !== "required") {
+    return null;
+  }
+
+  const userCode = part.authorization?.userCode;
+
+  if (!userCode) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span>Code</span>
+      <Badge variant="outline">
+        <code className="type-compact-code">{userCode}</code>
+      </Badge>
+    </div>
+  );
+}
+
+function AuthorizationSignInButton({
+  part,
+}: {
+  readonly part: EveAuthorizationPart;
+}) {
+  if (part.state !== "required") {
+    return null;
+  }
+
+  const url = part.authorization?.url;
+
+  if (!url) {
+    return null;
+  }
+
+  return (
+    <Button
+      render={
+        <a
+          aria-label={`Sign in with ${part.displayName}`}
+          href={url}
+          rel="noreferrer"
+          target="_blank"
+        />
+      }
+      size="sm"
+    >
+      <ExternalLinkIcon />
+      Sign in with {part.displayName}
+    </Button>
   );
 }
 

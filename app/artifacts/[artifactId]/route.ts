@@ -49,29 +49,79 @@ async function openArtifact(
   options: { readonly ifNoneMatch?: string; readonly signal?: AbortSignal }
 ) {
   const artifact = await readReadyBrowserImageArtifact(scope, artifactId);
-  const byteSize = artifact?.byteSize;
-  const filename = artifact?.filename;
-  const mediaType = artifact?.mediaType;
+  const fields = readyArtifactFields(artifact);
 
-  if (!artifact || !byteSize || !filename || !mediaType) return undefined;
+  if (!fields) {
+    return undefined;
+  }
 
-  if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) return undefined;
+  if (!hasBlobCredentials()) {
+    return undefined;
+  }
 
-  const result = await get(artifact.storagePathname, {
+  const result = await get(fields.storagePathname, {
     access: "private",
     abortSignal: options.signal,
     ifNoneMatch: options.ifNoneMatch,
   });
 
-  if (!result) return undefined;
-
-  if (
-    result.statusCode === 200 &&
-    (result.blob.size !== byteSize || result.blob.contentType !== mediaType)
-  )
+  if (!result) {
     return undefined;
+  }
 
-  return { artifact: { ...artifact, byteSize, filename, mediaType }, result };
+  if (blobMismatchesArtifact(result, fields)) {
+    return undefined;
+  }
+
+  return {
+    artifact: {
+      ...artifact,
+      byteSize: fields.byteSize,
+      filename: fields.filename,
+      mediaType: fields.mediaType,
+    },
+    result,
+  };
+}
+
+function readyArtifactFields(
+  artifact: Awaited<ReturnType<typeof readReadyBrowserImageArtifact>>
+) {
+  const byteSize = artifact?.byteSize;
+  const filename = artifact?.filename;
+  const mediaType = artifact?.mediaType;
+
+  if (!artifact || !byteSize || !filename || !mediaType) {
+    return undefined;
+  }
+
+  return {
+    storagePathname: artifact.storagePathname,
+    byteSize,
+    filename,
+    mediaType,
+  };
+}
+
+function hasBlobCredentials(): boolean {
+  return Boolean(env.BLOB_STORE_ID) || Boolean(env.BLOB_READ_WRITE_TOKEN);
+}
+
+function blobMismatchesArtifact(
+  result: NonNullable<Awaited<ReturnType<typeof get>>>,
+  fields: {
+    readonly byteSize: number;
+    readonly mediaType: string;
+  }
+): boolean {
+  if (result.statusCode !== 200) {
+    return false;
+  }
+
+  return (
+    result.blob.size !== fields.byteSize ||
+    result.blob.contentType !== fields.mediaType
+  );
 }
 
 function notFound() {

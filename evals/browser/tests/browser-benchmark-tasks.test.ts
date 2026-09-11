@@ -1,6 +1,7 @@
 import {
   browserBenchmarkFixtureContext,
-  browserBenchmarkTasks } from "@evals/browser/tasks";
+  browserBenchmarkTasks,
+} from "@evals/browser/tasks";
 import { expect, it } from "vitest";
 
 it("includes the focused Peek next-month calendar regression", () => {
@@ -60,16 +61,10 @@ it("stops unauthenticated commerce tasks before login is required", () => {
     task.prompt.includes("Target's website")
   );
 
-  expect(yankeesTask?.prompt).toContain(
-    "before entering any required sign-in"
-  );
-  expect(yankeesTask?.successCriteria).not.toContain(
-    "final purchase boundary"
-  );
+  expect(yankeesTask?.prompt).toContain("before entering any required sign-in");
+  expect(yankeesTask?.successCriteria).not.toContain("final purchase boundary");
   expect(targetTask?.prompt).toContain("stop before activating checkout");
-  expect(targetTask?.successCriteria).not.toContain(
-    "final checkout boundary"
-  );
+  expect(targetTask?.successCriteria).not.toContain("final checkout boundary");
   expect(targetTask?.successCriteria).toContain(
     "Unrelated pre-existing cart items are outside the task"
   );
@@ -90,9 +85,7 @@ it("ends vertical-search tasks before unrelated checkout prerequisites", () => {
   expect(flightTask?.prompt).toContain(
     "Stop before entering traveler information"
   );
-  expect(flightTask?.successCriteria).not.toContain(
-    "final purchase boundary"
-  );
+  expect(flightTask?.successCriteria).not.toContain("final purchase boundary");
   expect(elsewhereTask?.prompt).toContain(
     "before continuing into any attendee-information"
   );

@@ -275,6 +275,7 @@ function sendInterruptSignal(
 ) {
   if (process.platform === "win32") {
     child.kill(signal);
+
     return;
   }
 

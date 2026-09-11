@@ -1,9 +1,11 @@
 import type {
   finalizeScheduledReport,
-  releaseScheduledReport } from "@db/services/scheduled-agent-jobs";
+  releaseScheduledReport,
+} from "@db/services/scheduled-agent-jobs";
 import {
   createLinqAdapter,
-  type LinqSendOptions } from "@linqapp/chat-sdk-adapter";
+  type LinqSendOptions,
+} from "@linqapp/chat-sdk-adapter";
 import type { LinqAPIV3 } from "@linqapp/sdk";
 import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
 import type * as EnvModule from "@shared/environment";
@@ -72,27 +74,33 @@ const linqChannelCapture = vi.hoisted(() => ({
         options?: NativeMessageOptions
       ) => Promise<{ message: { id: string } }>
     >()
-    .mockResolvedValue({ message: { id: "native-message-1" } }) }));
+    .mockResolvedValue({ message: { id: "native-message-1" } }),
+}));
 
 const scheduleDeliveryCapture = vi.hoisted(() => ({
   finalize: vi.fn<typeof finalizeScheduledReport>(),
-  release: vi.fn<typeof releaseScheduledReport>() }));
+  release: vi.fn<typeof releaseScheduledReport>(),
+}));
 
 vi.mock("@db/services/scheduled-agent-jobs", () => ({
   finalizeScheduledReport: scheduleDeliveryCapture.finalize,
-  releaseScheduledReport: scheduleDeliveryCapture.release }));
+  releaseScheduledReport: scheduleDeliveryCapture.release,
+}));
 
 vi.mock("@shared/environment", async (importOriginal) => {
   const original = await importOriginal<typeof EnvModule>();
 
   return {
     ...original,
-    env: { ...original.env, LINQ_CONNECTOR: "linq/test" } };
+    env: { ...original.env, LINQ_CONNECTOR: "linq/test" },
+  };
 });
 
 vi.mock("@vercel/connect/eve", () => ({
   connectLinqCredentials: () => ({
-    apiKey: linqChannelCapture.resolveApiKey }) }));
+    apiKey: linqChannelCapture.resolveApiKey,
+  }),
+}));
 
 vi.mock("@linqapp/sdk", () => ({
   LinqAPIV3: class {
@@ -101,8 +109,10 @@ vi.mock("@linqapp/sdk", () => ({
     }
 
     chats = {
-      messages: { send: linqChannelCapture.sendNativeMessage } };
-  } }));
+      messages: { send: linqChannelCapture.sendNativeMessage },
+    };
+  },
+}));
 
 vi.mock(import("eve/channels/linq"), async (importOriginal) => {
   const original = await importOriginal();
@@ -113,7 +123,8 @@ vi.mock(import("eve/channels/linq"), async (importOriginal) => {
       linqChannelCapture.config = config;
 
       return original.linqChannel(config);
-    } };
+    },
+  };
 });
 
 vi.mock("@db/services/browser-images", () => ({
@@ -136,8 +147,10 @@ vi.mock("@db/services/browser-images", () => ({
       filename: image.filename,
       id,
       mediaType: image.mediaType,
-      storagePathname: id };
-  } }));
+      storagePathname: id,
+    };
+  },
+}));
 
 vi.mock("@vercel/blob", async (importOriginal) => {
   const blob = await importOriginal<typeof Blob>();
@@ -152,8 +165,10 @@ vi.mock("@vercel/blob", async (importOriginal) => {
       return {
         blob: { contentType: image.mediaType, size: image.bytes.byteLength },
         statusCode: 200,
-        stream: new Response(Buffer.from(image.bytes)).body };
-    } };
+        stream: new Response(Buffer.from(image.bytes)).body,
+      };
+    },
+  };
 });
 
 const handleActionResult = linqChannelCapture.config?.events?.["action.result"];
@@ -217,7 +232,8 @@ it("sends a native reply to the current inbound message", async () => {
     sendMessageResult({
       kind: "message",
       replyTo: { kind: "current" },
-      text: "Yes, that one." }),
+      text: "Yes, that one.",
+    }),
     context,
     sessionContext("test", undefined, "message-to-reply-to")
   );
@@ -240,10 +256,12 @@ it("sends an attachment-only native reply", async () => {
           kind: "image",
           mimeType: "image/png",
           name: "result.png",
-          url: "https://media.example/result.png" },
+          url: "https://media.example/result.png",
+        },
       ],
       kind: "message",
-      replyTo: { kind: "current" } }),
+      replyTo: { kind: "current" },
+    }),
     context,
     sessionContext("test", undefined, "message-to-reply-to")
   );
@@ -256,9 +274,11 @@ it("sends an attachment-only native reply", async () => {
           mimeType: "image/png",
           name: "result.png",
           type: "image",
-          url: "https://media.example/result.png" },
+          url: "https://media.example/result.png",
+        },
       ],
-      raw: "" },
+      raw: "",
+    },
     { replyToMessageId: "message-to-reply-to" }
   );
   expect(post).not.toHaveBeenCalled();
@@ -269,7 +289,8 @@ it("passes media and a reply target through the Linq adapter", async () => {
     new Response(
       JSON.stringify({
         chat_id: "chat-1",
-        message: { id: "native-message-1" } }),
+        message: { id: "native-message-1" },
+      }),
       { headers: { "content-type": "application/json" }, status: 200 }
     )
   );
@@ -277,7 +298,8 @@ it("passes media and a reply target through the Linq adapter", async () => {
   const adapter = createLinqAdapter({
     apiKey: "linq-test-api-key",
     baseURL: "https://linq.test",
-    signingSecret: "linq-test-signing-secret" });
+    signingSecret: "linq-test-signing-secret",
+  });
 
   let body: unknown;
 
@@ -288,10 +310,12 @@ it("passes media and a reply target through the Linq adapter", async () => {
         attachments: [
           { type: "image", url: "https://media.example/result.png" },
         ],
-        raw: "Here it is." },
+        raw: "Here it is.",
+      },
       {
         idempotencyKey: "reply-with-media",
-        replyToMessageId: "message-to-reply-to" }
+        replyToMessageId: "message-to-reply-to",
+      }
     );
     expect(nativeFetch).toHaveBeenCalledOnce();
     const [input, init] = nativeFetch.mock.calls[0] ?? [];
@@ -309,7 +333,9 @@ it("passes media and a reply target through the Linq adapter", async () => {
         { type: "text", value: "Here it is." },
         { type: "media", url: "https://media.example/result.png" },
       ],
-      reply_to: { message_id: "message-to-reply-to" } } });
+      reply_to: { message_id: "message-to-reply-to" },
+    },
+  });
 });
 
 it("falls back to a normal message when a reply handle is unavailable", async () => {
@@ -319,7 +345,8 @@ it("falls back to a normal message when a reply handle is unavailable", async ()
     sendMessageResult({
       kind: "message",
       replyTo: { kind: "current" },
-      text: "Yes, that one." }),
+      text: "Yes, that one.",
+    }),
     context,
     sessionContext("test", undefined, null)
   );
@@ -345,8 +372,8 @@ it("finalizes a scheduled result after send_message posts it", async () => {
     "linq:dm:chat-1",
     { raw: "The price fell." },
     {
-      idempotencyKey:
-        "scheduled-report:00000000-0000-4000-8000-000000000002:1" }
+      idempotencyKey: "scheduled-report:00000000-0000-4000-8000-000000000002:1",
+    }
   );
 });
 
@@ -358,8 +385,10 @@ it("replies scheduled results to their initiating message", async () => {
       kind: "message",
       replyTo: {
         id: "00000000-0000-4000-8000-000000000003",
-        kind: "automation" },
-      text: "Time to renew it." }),
+        kind: "automation",
+      },
+      text: "Time to renew it.",
+    }),
     context,
     sessionContext("scheduled-result", "original-message")
   );
@@ -368,9 +397,9 @@ it("replies scheduled results to their initiating message", async () => {
     "linq:dm:chat-1",
     { raw: "Time to renew it." },
     {
-      idempotencyKey:
-        "scheduled-report:00000000-0000-4000-8000-000000000002:1",
-      replyToMessageId: "original-message" }
+      idempotencyKey: "scheduled-report:00000000-0000-4000-8000-000000000002:1",
+      replyToMessageId: "original-message",
+    }
   );
 });
 
@@ -382,8 +411,10 @@ it("keeps scheduled native link replies idempotent", async () => {
       kind: "link",
       replyTo: {
         id: "00000000-0000-4000-8000-000000000003",
-        kind: "automation" },
-      url: "https://example.com/renew" }),
+        kind: "automation",
+      },
+      url: "https://example.com/renew",
+    }),
     context,
     sessionContext("scheduled-result", "original-message")
   );
@@ -395,7 +426,9 @@ it("keeps scheduled native link replies idempotent", async () => {
         idempotency_key:
           "scheduled-report:00000000-0000-4000-8000-000000000002:1",
         parts: [{ type: "link", value: "https://example.com/renew" }],
-        reply_to: { message_id: "original-message" } } },
+        reply_to: { message_id: "original-message" },
+      },
+    },
     undefined
   );
 });
@@ -409,8 +442,10 @@ it("falls back without changing an automation anchor when the old target is unav
       kind: "message",
       replyTo: {
         id: "00000000-0000-4000-8000-000000000003",
-        kind: "automation" },
-      text: "Time to renew it." }),
+        kind: "automation",
+      },
+      text: "Time to renew it.",
+    }),
     context,
     sessionContext("scheduled-result", "expired-message")
   );
@@ -421,17 +456,17 @@ it("falls back without changing an automation anchor when the old target is unav
     "linq:dm:chat-1",
     { raw: "Time to renew it." },
     {
-      idempotencyKey:
-        "scheduled-report:00000000-0000-4000-8000-000000000002:1",
-      replyToMessageId: "expired-message" }
+      idempotencyKey: "scheduled-report:00000000-0000-4000-8000-000000000002:1",
+      replyToMessageId: "expired-message",
+    }
   );
   expect(linqChannelCapture.postMessage).toHaveBeenNthCalledWith(
     2,
     "linq:dm:chat-1",
     { raw: "Time to renew it." },
     {
-      idempotencyKey:
-        "scheduled-report:00000000-0000-4000-8000-000000000002:1" }
+      idempotencyKey: "scheduled-report:00000000-0000-4000-8000-000000000002:1",
+    }
   );
 });
 
@@ -440,18 +475,11 @@ it("uses the same Linq idempotency key when a report turn is retried", async () 
 
   const event = sendMessageResult({
     kind: "message",
-    text: "The price fell." });
+    text: "The price fell.",
+  });
 
-  await handleActionResult(
-    event,
-    context,
-    sessionContext("scheduled-result")
-  );
-  await handleActionResult(
-    event,
-    context,
-    sessionContext("scheduled-result")
-  );
+  await handleActionResult(event, context, sessionContext("scheduled-result"));
+  await handleActionResult(event, context, sessionContext("scheduled-result"));
 
   expect(linqChannelCapture.postMessage).toHaveBeenCalledTimes(2);
   expect(linqChannelCapture.postMessage.mock.calls[0]?.[2]).toEqual(
@@ -487,7 +515,9 @@ it("posts one native rich link preview per call with fresh credentials", async (
     "chat-1",
     {
       message: {
-        parts: [{ type: "link", value: "https://example.com/first" }] } },
+        parts: [{ type: "link", value: "https://example.com/first" }],
+      },
+    },
     undefined
   );
   expect(linqChannelCapture.sendNativeMessage).toHaveBeenNthCalledWith(
@@ -495,7 +525,9 @@ it("posts one native rich link preview per call with fresh credentials", async (
     "chat-1",
     {
       message: {
-        parts: [{ type: "link", value: "https://example.com/second" }] } },
+        parts: [{ type: "link", value: "https://example.com/second" }],
+      },
+    },
     undefined
   );
   expect(post).not.toHaveBeenCalled();
@@ -507,7 +539,8 @@ it("requires a native link preview to be its own send_message call", () => {
       decodeSendMessageOutputSchema({
         kind: "link",
         text: "Read this",
-        url: "https://example.com/article" })
+        url: "https://example.com/article",
+      })
     )
   ).toBe(false);
 });
@@ -518,7 +551,8 @@ it("accepts typed reply handles for text, attachments, and native links", () => 
       decodeSendMessageOutputSchema({
         kind: "message",
         replyTo: { kind: "current" },
-        text: "This one." })
+        text: "This one.",
+      })
     )
   ).toBe(true);
   expect(
@@ -526,7 +560,8 @@ it("accepts typed reply handles for text, attachments, and native links", () => 
       decodeSendMessageOutputSchema({
         kind: "message",
         replyTo: { id: "task-1", kind: "task" },
-        text: "This one." })
+        text: "This one.",
+      })
     )
   ).toBe(true);
   expect(
@@ -535,19 +570,20 @@ it("accepts typed reply handles for text, attachments, and native links", () => 
         kind: "link",
         replyTo: {
           id: "00000000-0000-4000-8000-000000000003",
-          kind: "automation" },
-        url: "https://example.com" })
+          kind: "automation",
+        },
+        url: "https://example.com",
+      })
     )
   ).toBe(true);
   expect(
     Result.isSuccess(
       decodeSendMessageOutputSchema({
-        attachments: [
-          { kind: "image", url: "https://example.com/image.png" },
-        ],
+        attachments: [{ kind: "image", url: "https://example.com/image.png" }],
         kind: "message",
         replyTo: { kind: "current" },
-        text: "This one." })
+        text: "This one.",
+      })
     )
   ).toBe(true);
 });
@@ -556,11 +592,10 @@ it("discriminates native links from message content", () => {
   expect(
     Result.isSuccess(
       decodeSendMessageOutputSchema({
-        attachments: [
-          { kind: "image", url: "https://example.com/image.png" },
-        ],
+        attachments: [{ kind: "image", url: "https://example.com/image.png" }],
         kind: "message",
-        text: "A caption" })
+        text: "A caption",
+      })
     )
   ).toBe(true);
   expect(
@@ -571,13 +606,15 @@ it("discriminates native links from message content", () => {
       decodeSendMessageOutputSchema({
         kind: "message",
         text: "Read this",
-        url: "https://example.com/article" })
+        url: "https://example.com/article",
+      })
     )
   ).toBe(false);
   expect(
     Result.isSuccess(
       decodeSendMessageOutputSchema({
-        link: "https://example.com/article" })
+        link: "https://example.com/article",
+      })
     )
   ).toBe(false);
 });
@@ -590,21 +627,24 @@ it("enforces Linq's native link URL constraints", () => {
     Result.isSuccess(
       decodeSendMessageOutputSchema({
         kind: "link",
-        url: maximumLengthLink })
+        url: maximumLengthLink,
+      })
     )
   ).toBe(true);
   expect(
     Result.isSuccess(
       decodeSendMessageOutputSchema({
         kind: "link",
-        url: `${maximumLengthLink}a` })
+        url: `${maximumLengthLink}a`,
+      })
     )
   ).toBe(false);
   expect(
     Result.isSuccess(
       decodeSendMessageOutputSchema({
         kind: "link",
-        url: "http://example.com/article" })
+        url: "http://example.com/article",
+      })
     )
   ).toBe(false);
 });
@@ -615,13 +655,15 @@ it("posts a proactive message without a current inbound message", async () => {
   await handleActionResult(
     sendMessageResult({
       kind: "message",
-      text: "Your weekly summary is ready." }),
+      text: "Your weekly summary is ready.",
+    }),
     context,
     sessionContext()
   );
 
   expect(post).toHaveBeenCalledExactlyOnceWith({
-    raw: "Your weekly summary is ready." });
+    raw: "Your weekly summary is ready.",
+  });
 });
 
 it.each([
@@ -636,14 +678,16 @@ it.each([
   await handleActionResult(
     sendMessageResult({
       attachments: [{ kind, mimeType, name, url }],
-      kind: "message" }),
+      kind: "message",
+    }),
     context,
     sessionContext()
   );
 
   expect(post).toHaveBeenCalledExactlyOnceWith({
     attachments: [{ mimeType, name, type: kind, url }],
-    raw: "" });
+    raw: "",
+  });
 });
 
 it("threads scoped artifact files as a native reply", async () => {
@@ -652,14 +696,16 @@ it("threads scoped artifact files as a native reply", async () => {
     bytes: new Uint8Array([1, 2, 3]),
     filename: "product.png",
     id: artifactId,
-    mediaType: "image/png" });
+    mediaType: "image/png",
+  });
   const { context, post } = handlerContext();
 
   await handleActionResult(
     sendMessageResult({
       kind: "message",
       replyTo: { kind: "current" },
-      text: `Here it is.\n\n![Product](/artifacts/${artifactId})` }),
+      text: `Here it is.\n\n![Product](/artifacts/${artifactId})`,
+    }),
     context,
     sessionContext()
   );
@@ -667,7 +713,8 @@ it("threads scoped artifact files as a native reply", async () => {
   expect(linqChannelCapture.readImage).toHaveBeenCalledWith(
     expect.objectContaining({
       userId: "user-1",
-      workspaceId: accessScopeForUser("user-1").workspaceId }),
+      workspaceId: accessScopeForUser("user-1").workspaceId,
+    }),
     artifactId,
     { rootSessionId: "session-1", signal: undefined }
   );
@@ -678,9 +725,11 @@ it("threads scoped artifact files as a native reply", async () => {
         {
           data: Buffer.from([1, 2, 3]),
           filename: "product.png",
-          mimeType: "image/png" },
+          mimeType: "image/png",
+        },
       ],
-      raw: "Here it is." },
+      raw: "Here it is.",
+    },
     { replyToMessageId: "message-1" }
   );
   expect(post).not.toHaveBeenCalled();
@@ -692,7 +741,8 @@ it("threads scheduled artifacts from the scheduled-run session", async () => {
     bytes: new Uint8Array([1, 2, 3]),
     filename: "scheduled-product.png",
     id: artifactId,
-    mediaType: "image/png" });
+    mediaType: "image/png",
+  });
   const { context } = handlerContext();
 
   await handleActionResult(
@@ -700,8 +750,10 @@ it("threads scheduled artifacts from the scheduled-run session", async () => {
       kind: "message",
       replyTo: {
         id: "00000000-0000-4000-8000-000000000003",
-        kind: "automation" },
-      text: `Price changed.\n\n![Product](/artifacts/${artifactId})` }),
+        kind: "automation",
+      },
+      text: `Price changed.\n\n![Product](/artifacts/${artifactId})`,
+    }),
     context,
     sessionContext("scheduled-result", "original-message")
   );
@@ -709,7 +761,8 @@ it("threads scheduled artifacts from the scheduled-run session", async () => {
   expect(linqChannelCapture.readImage).toHaveBeenCalledWith(
     expect.objectContaining({
       userId: "user-1",
-      workspaceId: accessScopeForUser("user-1").workspaceId }),
+      workspaceId: accessScopeForUser("user-1").workspaceId,
+    }),
     artifactId,
     { rootSessionId: "scheduled-run-session", signal: undefined }
   );
@@ -717,11 +770,12 @@ it("threads scheduled artifacts from the scheduled-run session", async () => {
     "linq:dm:chat-1",
     expect.objectContaining({
       files: [expect.objectContaining({ filename: "scheduled-product.png" })],
-      raw: "Price changed." }),
+      raw: "Price changed.",
+    }),
     expect.objectContaining({
-      idempotencyKey:
-        "scheduled-report:00000000-0000-4000-8000-000000000002:1",
-      replyToMessageId: "original-message" })
+      idempotencyKey: "scheduled-report:00000000-0000-4000-8000-000000000002:1",
+      replyToMessageId: "original-message",
+    })
   );
 });
 
@@ -735,7 +789,8 @@ it("sends multiple artifact images as one native attachment gallery", async () =
       ),
       filename: artifactId === firstArtifactId ? "first.png" : "second.png",
       id: artifactId,
-      mediaType: "image/png" })
+      mediaType: "image/png",
+    })
   );
   const { context, post } = handlerContext();
 
@@ -746,7 +801,8 @@ it("sends multiple artifact images as one native attachment gallery", async () =
         "Two good options.",
         `![First](/artifacts/${firstArtifactId})`,
         `![Second](/artifacts/${secondArtifactId})`,
-      ].join("\n") }),
+      ].join("\n"),
+    }),
     context,
     sessionContext()
   );
@@ -756,13 +812,16 @@ it("sends multiple artifact images as one native attachment gallery", async () =
       {
         data: Buffer.from([1, 2, 3]),
         filename: "first.png",
-        mimeType: "image/png" },
+        mimeType: "image/png",
+      },
       {
         data: Buffer.from([4, 5, 6]),
         filename: "second.png",
-        mimeType: "image/png" },
+        mimeType: "image/png",
+      },
     ],
-    raw: "Two good options." });
+    raw: "Two good options.",
+  });
 });
 
 it("keeps one send_message call in one bubble with its images", async () => {
@@ -771,13 +830,15 @@ it("keeps one send_message call in one bubble with its images", async () => {
     bytes: new Uint8Array([1, 2, 3]),
     filename: "product.png",
     id: artifactId,
-    mediaType: "image/png" });
+    mediaType: "image/png",
+  });
   const { context, post } = handlerContext();
 
   await handleActionResult(
     sendMessageResult({
       kind: "message",
-      text: `First thought.\n\nSecond thought.\n\n![Product](/artifacts/${artifactId})` }),
+      text: `First thought.\n\nSecond thought.\n\n![Product](/artifacts/${artifactId})`,
+    }),
     context,
     sessionContext()
   );
@@ -787,9 +848,11 @@ it("keeps one send_message call in one bubble with its images", async () => {
       {
         data: Buffer.from([1, 2, 3]),
         filename: "product.png",
-        mimeType: "image/png" },
+        mimeType: "image/png",
+      },
     ],
-    raw: "First thought.\n\nSecond thought." });
+    raw: "First thought.\n\nSecond thought.",
+  });
 });
 
 it.each([
@@ -843,11 +906,13 @@ function sendMessageResult(
       callId: "call-send-message",
       kind: "tool-result",
       output,
-      toolName: "send_message" },
+      toolName: "send_message",
+    },
     sequence: 0,
     status: "completed",
     stepIndex: 0,
-    turnId: "turn-1" };
+    turnId: "turn-1",
+  };
 }
 
 function reactToMessageResult(
@@ -860,11 +925,13 @@ function reactToMessageResult(
       callId: "call-react-to-message",
       kind: "tool-result",
       output,
-      toolName: "react_to_message" },
+      toolName: "react_to_message",
+    },
     sequence: 0,
     status: "completed",
     stepIndex: 0,
-    turnId: "turn-1" };
+    turnId: "turn-1",
+  };
 }
 
 function handlerContext(currentMessageId: string | null = "message-1") {
@@ -885,7 +952,9 @@ function handlerContext(currentMessageId: string | null = "message-1") {
         addReaction,
         decodeThreadId: () => ({ chatId: "chat-1", isGroup: false }),
         postMessage: linqChannelCapture.postMessage,
-        removeReaction }) },
+        removeReaction,
+      }),
+    },
     state: {},
     streaming: false,
     streamingEditIntervalMs: 1000,
@@ -898,13 +967,17 @@ function handlerContext(currentMessageId: string | null = "message-1") {
         channelId: "linq:dm:chat-1",
         currentMessage: currentMessageId ? { id: currentMessageId } : undefined,
         id: "linq:dm:chat-1",
-        isDM: true }) } });
+        isDM: true,
+      }),
+    },
+  });
 
   return {
     addReaction,
     context,
     post,
-    removeReaction };
+    removeReaction,
+  };
 }
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This test adapter deliberately accepts a focused structural fixture.
@@ -929,11 +1002,13 @@ function sessionContext(
           scheduledReportSequence: "1",
           scheduledRunId: "00000000-0000-4000-8000-000000000002",
           scheduledRunSessionId: "scheduled-run-session",
-          workspaceId: accessScopeForUser("user-1").workspaceId }
+          workspaceId: accessScopeForUser("user-1").workspaceId,
+        }
       : {
           conversationChannel: "linq",
           conversationId: "linq:dm:chat-1",
-          workspaceId: accessScopeForUser("user-1").workspaceId };
+          workspaceId: accessScopeForUser("user-1").workspaceId,
+        };
 
   if (authenticator !== "scheduled-result" && currentMessageId) {
     attributes.linqMessageId = currentMessageId;
@@ -956,8 +1031,12 @@ function sessionContext(
           attributes,
           authenticator,
           principalId: "user-1",
-          principalType: "user" },
-        initiator: null },
+          principalType: "user",
+        },
+        initiator: null,
+      },
       id: "session-1",
-      turn: { id: "turn-1", sequence: 0 } } } satisfies ActionHandlerParameters[2];
+      turn: { id: "turn-1", sequence: 0 },
+    },
+  } satisfies ActionHandlerParameters[2];
 }

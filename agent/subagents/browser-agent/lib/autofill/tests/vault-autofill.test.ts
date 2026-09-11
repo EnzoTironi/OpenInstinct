@@ -5,23 +5,27 @@ import {
   frameOriginExpression,
   nativeLoginFillFunctionDeclaration,
   selectNativeLoginFills,
-  type NativeLoginControlDescriptor } from "@agent/subagents/browser-agent/lib/autofill/login";
+  type NativeLoginControlDescriptor,
+} from "@agent/subagents/browser-agent/lib/autofill/login";
 import {
   buildNativeAutofillPayload,
   nativeAutofillSecretMarkingExpression,
-  nativeAutofillTokens } from "@agent/subagents/browser-agent/lib/autofill/native";
+  nativeAutofillTokens,
+} from "@agent/subagents/browser-agent/lib/autofill/native";
 import { vaultAutofillProvider } from "@agent/subagents/browser-agent/lib/autofill/provider";
 import {
   listAutofillSuggestions,
   materializeAutofillClaims,
-  type AutofillVaultAdapter } from "@agent/subagents/browser-agent/lib/autofill/service";
+  type AutofillVaultAdapter,
+} from "@agent/subagents/browser-agent/lib/autofill/service";
 import type { AccessScope } from "@shared/identity/access-scope";
 import {
   serializeAddressVaultPayload,
   serializeContactVaultPayload,
   serializeLoginVaultPayload,
   serializePaymentCard,
-  type VaultItemKind } from "@shared/vault/schema";
+  type VaultItemKind,
+} from "@shared/vault/schema";
 import { expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -33,7 +37,8 @@ interface VaultStore {
 function createVaultStore(): VaultStore {
   return {
     items: [],
-    secret: "" };
+    secret: "",
+  };
 }
 
 const vaultStore = vi.hoisted(createVaultStore);
@@ -43,11 +48,13 @@ vi.mock("@db/services/vault", () => ({
   listVaultItems: async () => vaultStore.items,
   readVaultItem: async (_scope: AccessScope, id: string) =>
     vaultStore.items.find((item) => item.id === id),
-  readVaultSecret: async () => vaultStore.secret }));
+  readVaultSecret: async () => vaultStore.secret,
+}));
 
 const scope: AccessScope = {
   userId: "user-1",
-  workspaceId: "workspace-1" };
+  workspaceId: "workspace-1",
+};
 
 const paymentSurface = {
   fields: [
@@ -55,7 +62,8 @@ const paymentSurface = {
     { score: 100, token: "cc-exp" },
   ],
   id: "payment-card",
-  kind: "payment-card" as const };
+  kind: "payment-card" as const,
+};
 
 const credentialsSurface = surface("credentials", [
   "username",
@@ -88,7 +96,8 @@ it("uses the encrypted local vault instead of a development card fixture", async
     id: "real-card-id",
     kind: "payment" as const,
     label: "Travel card",
-    updatedAt: "2026-08-27T00:00:00.000Z" };
+    updatedAt: "2026-08-27T00:00:00.000Z",
+  };
 
   const provider = providerFor(
     card,
@@ -100,21 +109,19 @@ it("uses the encrypted local vault instead of a development card fixture", async
       kind: "payment-card",
       number: "4111111111111111",
       securityCode: "321",
-      version: 1 })
+      version: 1,
+    })
   );
 
   await expect(
-    provider.listSuggestions(
-      scope,
-      "https://merchant.example",
-      paymentSurface
-    )
+    provider.listSuggestions(scope, "https://merchant.example", paymentSurface)
   ).resolves.toEqual([
     {
       candidateId: "real-card-id",
       label: "Travel card",
       matchReason: "Saved payment card",
-      summary: "Visa · •••• 1111" },
+      summary: "Visa · •••• 1111",
+    },
   ]);
 
   const claims = await provider.materializeClaims(scope, "real-card-id", {
@@ -126,7 +133,8 @@ it("uses the encrypted local vault instead of a development card fixture", async
       "postal-code",
     ]),
     origin: "https://merchant.example",
-    surface: paymentSurface });
+    surface: paymentSurface,
+  });
 
   expect(
     Object.fromEntries(claims.map(({ token, value }) => [token, value]))
@@ -135,7 +143,8 @@ it("uses the encrypted local vault instead of a development card fixture", async
     "cc-exp": "09/31",
     "cc-name": "Grace Hopper",
     "cc-number": "4111111111111111",
-    "postal-code": "10001" });
+    "postal-code": "10001",
+  });
 });
 
 it("keeps structured logins bound to their saved origin", async () => {
@@ -152,7 +161,8 @@ it("keeps structured logins bound to their saved origin", async () => {
       identifier: { type: "email", value: "ada@example.com" },
       kind: "login",
       origin: "https://checkout.example",
-      version: 2 })
+      version: 2,
+    })
   );
 
   await expect(
@@ -164,7 +174,8 @@ it("keeps structured logins bound to their saved origin", async () => {
   ).resolves.toEqual([
     expect.objectContaining({
       candidateId: login.id,
-      summary: "checkout.example · a•••@example.com" }),
+      summary: "checkout.example · a•••@example.com",
+    }),
   ]);
   await expect(
     provider.listSuggestions(
@@ -177,17 +188,20 @@ it("keeps structured logins bound to their saved origin", async () => {
   const claims = await provider.materializeClaims(scope, login.id, {
     availableTokens: new Set(["username", "current-password"]),
     origin: "https://checkout.example",
-    surface: credentialsSurface });
+    surface: credentialsSurface,
+  });
 
   expect(claimValues(claims)).toEqual({
     "current-password": "correct horse",
-    username: "ada@example.com" });
+    username: "ada@example.com",
+  });
 
   await expect(
     provider.materializeClaims(scope, login.id, {
       availableTokens: new Set(["username"]),
       origin: "https://attacker.example",
-      surface: credentialsSurface })
+      surface: credentialsSurface,
+    })
   ).rejects.toThrow("restricted to https://checkout.example");
 });
 
@@ -201,13 +215,15 @@ it("materializes passwordless identifiers without an OTP", async () => {
       identifier: { type: "email", value: "ada@example.com" },
       kind: "login",
       origin: "https://checkout.example",
-      version: 2 })
+      version: 2,
+    })
   );
 
   const claims = await provider.materializeClaims(scope, login.id, {
     availableTokens: new Set(["email", "one-time-code"]),
     origin: "https://checkout.example",
-    surface: contactSurface });
+    surface: contactSurface,
+  });
 
   expect(claimValues(claims)).toEqual({ email: "ada@example.com" });
 });
@@ -221,7 +237,8 @@ it("fails closed for legacy logins without an origin", async () => {
       authentication: { password: "correct horse", type: "password" },
       identifier: { type: "email", value: "ada@example.com" },
       kind: "login",
-      version: 1 })
+      version: 1,
+    })
   );
 
   await expect(
@@ -235,7 +252,8 @@ it("fails closed for legacy logins without an origin", async () => {
     provider.materializeClaims(scope, login.id, {
       availableTokens: new Set(["username"]),
       origin: "https://checkout.example",
-      surface: credentialsSurface })
+      surface: credentialsSurface,
+    })
   ).rejects.toThrow("not assigned to a website");
 });
 
@@ -253,18 +271,18 @@ it("maps structured addresses and contacts to standard tokens", async () => {
       postalCode: "SW1Y 4LB",
       recipientName: "Ada Lovelace",
       region: "London",
-      version: 1 })
+      version: 1,
+    })
   );
 
   const addressClaims = await addressProvider.materializeClaims(
     scope,
     address.id,
     {
-      availableTokens: new Set(
-        addressSurface.fields.map(({ token }) => token)
-      ),
+      availableTokens: new Set(addressSurface.fields.map(({ token }) => token)),
       origin: "https://merchant.example",
-      surface: addressSurface }
+      surface: addressSurface,
+    }
   );
 
   expect(claimValues(addressClaims)).toEqual({
@@ -275,7 +293,8 @@ it("maps structured addresses and contacts to standard tokens", async () => {
     country: "GB",
     "country-name": "United Kingdom",
     "postal-code": "SW1Y 4LB",
-    "street-address": "12 St James's Square\nFloor 2" });
+    "street-address": "12 St James's Square\nFloor 2",
+  });
 
   const contact = vaultItem("contact", "Checkout", "");
 
@@ -287,18 +306,18 @@ it("maps structured addresses and contacts to standard tokens", async () => {
       fullName: "Ada Lovelace",
       kind: "contact",
       phone: "+442079460000",
-      version: 1 })
+      version: 1,
+    })
   );
 
   const contactClaims = await contactProvider.materializeClaims(
     scope,
     contact.id,
     {
-      availableTokens: new Set(
-        contactSurface.fields.map(({ token }) => token)
-      ),
+      availableTokens: new Set(contactSurface.fields.map(({ token }) => token)),
       origin: "https://merchant.example",
-      surface: contactSurface }
+      surface: contactSurface,
+    }
   );
 
   expect(claimValues(contactClaims)).toEqual({
@@ -306,7 +325,8 @@ it("maps structured addresses and contacts to standard tokens", async () => {
     "bday-month": "12",
     "bday-year": "1815",
     email: "ada@example.com",
-    tel: "+442079460000" });
+    tel: "+442079460000",
+  });
 });
 
 it("lets a vault-owned adapter supply masked suggestions and claims", async () => {
@@ -320,7 +340,8 @@ it("lets a vault-owned adapter supply masked suggestions and claims", async () =
           candidateId: "opaque-card",
           label: "Personal Visa",
           matchReason: "Preferred payment method",
-          summary: "Visa •••• 4242" },
+          summary: "Visa •••• 4242",
+        },
       ];
     },
     async materializeClaims(_scope, candidateId, target) {
@@ -331,9 +352,11 @@ it("lets a vault-owned adapter supply masked suggestions and claims", async () =
         {
           id: "84e90f49-68d0-45ba-a183-3ca18ef087dc",
           token: "cc-number",
-          value: "4242424242424242" },
+          value: "4242424242424242",
+        },
       ];
-    } };
+    },
+  };
 
   await expect(
     listAutofillSuggestions(
@@ -347,7 +370,8 @@ it("lets a vault-owned adapter supply masked suggestions and claims", async () =
       candidateId: "opaque-card",
       label: "Personal Visa",
       matchReason: "Preferred payment method",
-      summary: "Visa •••• 4242" },
+      summary: "Visa •••• 4242",
+    },
   ]);
   await expect(
     materializeAutofillClaims(
@@ -356,14 +380,16 @@ it("lets a vault-owned adapter supply masked suggestions and claims", async () =
       {
         availableTokens: new Set(["cc-number", "cc-exp"]),
         origin: "https://merchant.example",
-        surface: paymentSurface },
+        surface: paymentSurface,
+      },
       adapter
     )
   ).resolves.toEqual([
     {
       id: "84e90f49-68d0-45ba-a183-3ca18ef087dc",
       token: "cc-number",
-      value: "4242424242424242" },
+      value: "4242424242424242",
+    },
   ]);
 });
 
@@ -382,7 +408,9 @@ it("builds Chromium card autofill parameters from vault claims", () => {
       expiryMonth: "09",
       expiryYear: "2031",
       name: "Grace Hopper",
-      number: "4111111111111111" } });
+      number: "4111111111111111",
+    },
+  });
   expect(nativeAutofillTokens.payment).toContain("cc-exp-month");
 });
 
@@ -403,13 +431,16 @@ it("builds Chromium address fields from structured vault claims", () => {
         { name: "NAME_FULL", value: "Ada Lovelace" },
         {
           name: "ADDRESS_HOME_LINE1",
-          value: "12 St James's Square" },
+          value: "12 St James's Square",
+        },
         { name: "ADDRESS_HOME_LINE2", value: "Floor 2" },
         { name: "ADDRESS_HOME_CITY", value: "London" },
         { name: "ADDRESS_HOME_STATE", value: "London" },
         { name: "ADDRESS_HOME_ZIP", value: "SW1Y 4LB" },
         { name: "ADDRESS_HOME_COUNTRY", value: "GB" },
-      ] } });
+      ],
+    },
+  });
 });
 
 it("builds Chromium contact and birthdate fields from vault claims", () => {
@@ -431,7 +462,9 @@ it("builds Chromium contact and birthdate fields from vault claims", () => {
         { name: "BIRTHDATE_DAY", value: "10" },
         { name: "BIRTHDATE_MONTH", value: "12" },
         { name: "BIRTHDATE_4_DIGIT_YEAR", value: "1815" },
-      ] } });
+      ],
+    },
+  });
   expect(nativeAutofillTokens.contact).toContain("bday-year");
 });
 
@@ -472,7 +505,8 @@ it.each(["address", "contact", "payment"])(
     const markedCount = z.number().parse(
       runInNewContext(nativeAutofillSecretMarkingExpression(0), {
         document,
-        HTMLInputElement: FakeInput })
+        HTMLInputElement: FakeInput,
+      })
     );
 
     expect(markedCount).toBe(3);
@@ -526,22 +560,25 @@ it("writes login values only into a document served from the saved origin", () =
           HTMLInputElement: FakeInput,
           InputEvent: FakeEvent,
           input,
-          self: { origin: documentOrigin } }
+          self: { origin: documentOrigin },
+        }
       )
     );
 
     return { accepted, value: input.value };
   };
 
-  expect(
-    fill("https://www.bank.example", "https://www.bank.example")
-  ).toEqual({ accepted: true, value: "hunter2" });
+  expect(fill("https://www.bank.example", "https://www.bank.example")).toEqual({
+    accepted: true,
+    value: "hunter2",
+  });
   expect(
     fill("https://widget.bank.example", "https://www.bank.example")
   ).toEqual({ accepted: false, value: "" });
   expect(fill("null", "https://www.bank.example")).toEqual({
     accepted: false,
-    value: "" });
+    value: "",
+  });
   expect(
     runInNewContext(frameOriginExpression, { self: { origin: "null" } })
   ).toBe("null");
@@ -557,8 +594,11 @@ it("builds a Chromium address from the current free-form vault value", () => {
       fields: [
         {
           name: "ADDRESS_HOME_STREET_ADDRESS",
-          value: "12 St James's Square\nLondon SW1Y 4LB" },
-      ] } });
+          value: "12 St James's Square\nLondon SW1Y 4LB",
+        },
+      ],
+    },
+  });
 });
 
 it("classifies current login controls without accepting OTP or new-password fields", () => {
@@ -588,16 +628,19 @@ it("selects one identifier and current password from the focused login form", ()
       focused: true,
       formIndex: 0,
       index: 0,
-      token: "email" }),
+      token: "email",
+    }),
     classifiedLoginControl({
       formIndex: 0,
       index: 1,
-      token: "current-password" }),
+      token: "current-password",
+    }),
     classifiedLoginControl({
       formIndex: 1,
       index: 2,
       score: 100,
-      token: "current-password" }),
+      token: "current-password",
+    }),
   ];
 
   expect(
@@ -633,7 +676,8 @@ it("fills a username into a combined email-or-membership field", () => {
   const combinedIdentifier = classifiedLoginControl({
     focused: true,
     label: "Email or MileagePlus number",
-    token: "email" });
+    token: "email",
+  });
 
   expect(
     selectNativeLoginFills(
@@ -658,7 +702,8 @@ function loginControl(
     label: "",
     name: "",
     type: "text",
-    ...overrides };
+    ...overrides,
+  };
 }
 
 function classifiedLoginControl(
@@ -670,14 +715,16 @@ function classifiedLoginControl(
     ...loginControl(),
     score: 70,
     token: "username" as const,
-    ...overrides };
+    ...overrides,
+  };
 }
 
 function surface(kind: string, tokens: readonly string[]) {
   return {
     fields: tokens.map((token) => ({ score: 100, token })),
     id: kind,
-    kind };
+    kind,
+  };
 }
 
 function vaultItem(kind: VaultItemKind, label: string, account: string) {
@@ -687,7 +734,8 @@ function vaultItem(kind: VaultItemKind, label: string, account: string) {
     id: `vault-${kind}`,
     kind,
     label,
-    updatedAt: "2026-08-27T00:00:00.000Z" };
+    updatedAt: "2026-08-27T00:00:00.000Z",
+  };
 }
 
 function providerFor(item: ReturnType<typeof vaultItem>, secret: string) {

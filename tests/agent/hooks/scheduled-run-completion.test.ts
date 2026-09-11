@@ -3,7 +3,8 @@ import type {
   deferScheduledAgentRunCompletion,
   markScheduledAgentRunStarted,
   releaseScheduledAgentRun,
-  waitForScheduledAgentRunInput } from "@db/services/scheduled-agent-jobs";
+  waitForScheduledAgentRunInput,
+} from "@db/services/scheduled-agent-jobs";
 import type { HookContext } from "eve/hooks";
 import { beforeEach, expect, it, vi } from "vitest";
 
@@ -12,14 +13,16 @@ const services = vi.hoisted(() => ({
   deferCompletion: vi.fn<typeof deferScheduledAgentRunCompletion>(),
   markStarted: vi.fn<typeof markScheduledAgentRunStarted>(),
   release: vi.fn<typeof releaseScheduledAgentRun>(),
-  waitForInput: vi.fn<typeof waitForScheduledAgentRunInput>() }));
+  waitForInput: vi.fn<typeof waitForScheduledAgentRunInput>(),
+}));
 
 vi.mock("@db/services/scheduled-agent-jobs", () => ({
   completeScheduledAgentRun: services.complete,
   deferScheduledAgentRunCompletion: services.deferCompletion,
   markScheduledAgentRunStarted: services.markStarted,
   releaseScheduledAgentRun: services.release,
-  waitForScheduledAgentRunInput: services.waitForInput }));
+  waitForScheduledAgentRunInput: services.waitForInput,
+}));
 
 import completionHook from "@agent/hooks/scheduled-run-completion";
 
@@ -44,12 +47,17 @@ const context = {
       initiator: {
         attributes: {
           scheduledRunId: runId,
-          scheduledRunLeaseToken: leaseToken },
+          scheduledRunLeaseToken: leaseToken,
+        },
         authenticator: "scheduled-worker",
         principalId: "user-1",
-        principalType: "user" } },
+        principalType: "user",
+      },
+    },
     id: "worker-session",
-    turn: { id: "turn-1", sequence: 0 } } } satisfies HookContext;
+    turn: { id: "turn-1", sequence: 0 },
+  },
+} satisfies HookContext;
 
 const resumedContext = {
   ...context,
@@ -61,7 +69,11 @@ const resumedContext = {
         attributes: {},
         authenticator: "linq",
         principalId: "user-1",
-        principalType: "user" as const } } } } satisfies HookContext;
+        principalType: "user" as const,
+      },
+    },
+  },
+} satisfies HookContext;
 
 const retriedContext = {
   ...context,
@@ -72,10 +84,15 @@ const retriedContext = {
       current: {
         attributes: {
           scheduledRunId: runId,
-          scheduledRunLeaseToken: retryLeaseToken },
+          scheduledRunLeaseToken: retryLeaseToken,
+        },
         authenticator: "scheduled-worker",
         principalId: "user-1",
-        principalType: "user" as const } } } } satisfies HookContext;
+        principalType: "user" as const,
+      },
+    },
+  },
+} satisfies HookContext;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -90,9 +107,11 @@ it("starts the runtime lease only when the worker turn begins", async () => {
     {
       data: {
         sequence: 0,
-        turnId: "turn-1" },
+        turnId: "turn-1",
+      },
       meta: { at: "2026-09-01T13:00:05.000Z", id: "event-start" },
-      type: "turn.started" },
+      type: "turn.started",
+    },
     context
   );
 
@@ -111,7 +130,8 @@ it("uses a retry turn's current lease over the original session lease", async ()
     {
       data: { sequence: 1, turnId: "turn-2" },
       meta: { at: "2026-09-01T13:05:05.000Z", id: "event-retry" },
-      type: "turn.started" },
+      type: "turn.started",
+    },
     retriedContext
   );
 
@@ -141,7 +161,8 @@ it("persists the outcome for durable report delivery", async () => {
       outcome: {
         kind: "result",
         summary: "The price fell to $250.",
-        urgency: "normal" },
+        urgency: "normal",
+      },
       reportStatus: "pending",
       reportSequence: 1,
       reportLeaseExpiresAt: null,
@@ -151,7 +172,9 @@ it("persists the outcome for durable report delivery", async () => {
       startedAt: new Date("2026-09-01T13:00:00.000Z"),
       status: "completed",
       updatedAt: new Date("2026-09-01T13:02:00.000Z"),
-      workerSessionId: "worker-session" } });
+      workerSessionId: "worker-session",
+    },
+  });
   const handler = completionHook.events?.["message.completed"];
   await handler?.(
     {
@@ -160,9 +183,11 @@ it("persists the outcome for durable report delivery", async () => {
         message: "The price fell to $250.",
         sequence: 0,
         stepIndex: 0,
-        turnId: "turn-1" },
+        turnId: "turn-1",
+      },
       meta: { at: "2026-09-01T13:02:00.000Z", id: "event-1" },
-      type: "message.completed" },
+      type: "message.completed",
+    },
     context
   );
 
@@ -173,7 +198,8 @@ it("persists the outcome for durable report delivery", async () => {
     {
       kind: "result",
       summary: "The price fell to $250.",
-      urgency: "normal" },
+      urgency: "normal",
+    },
     new Date("2026-09-01T13:02:00.000Z")
   );
 });
@@ -186,9 +212,11 @@ it("defers an interim outcome until background work wakes a later turn", async (
         backgroundTask: { status: "working", taskId: "task-1" },
         callId: "call-1",
         output: '{"status":"working"}',
-        subagentName: "browser-agent" },
+        subagentName: "browser-agent",
+      },
       meta: { at: "2026-09-01T13:01:00.000Z", id: "event-task" },
-      type: "subagent.completed" },
+      type: "subagent.completed",
+    },
     context
   );
   services.complete.mockResolvedValue({ status: "deferred" });
@@ -201,9 +229,11 @@ it("defers an interim outcome until background work wakes a later turn", async (
         message: null,
         sequence: 0,
         stepIndex: 1,
-        turnId: "turn-1" },
+        turnId: "turn-1",
+      },
       meta: { at: "2026-09-01T13:01:01.000Z", id: "event-interim" },
-      type: "message.completed" },
+      type: "message.completed",
+    },
     context
   );
 
@@ -231,9 +261,11 @@ it("ignores messages emitted before a tool call completes", async () => {
         message: "I will check that now.",
         sequence: 0,
         stepIndex: 0,
-        turnId: "turn-1" },
+        turnId: "turn-1",
+      },
       meta: { at: "2026-09-01T13:01:00.000Z", id: "event-tool-text" },
-      type: "message.completed" },
+      type: "message.completed",
+    },
     context
   );
 
@@ -249,9 +281,11 @@ it("retries a non-success model boundary instead of completing it", async () => 
         message: "This response was truncated",
         sequence: 0,
         stepIndex: 0,
-        turnId: "turn-1" },
+        turnId: "turn-1",
+      },
       meta: { at: "2026-09-01T13:01:00.000Z", id: "event-truncated" },
-      type: "message.completed" },
+      type: "message.completed",
+    },
     context
   );
 
@@ -273,9 +307,11 @@ it("bounds a long final handoff before persisting it", async () => {
         message: "a".repeat(4_001),
         sequence: 0,
         stepIndex: 0,
-        turnId: "turn-1" },
+        turnId: "turn-1",
+      },
       meta: { at: "2026-09-01T13:01:00.000Z", id: "event-long" },
-      type: "message.completed" },
+      type: "message.completed",
+    },
     context
   );
 
@@ -286,7 +322,8 @@ it("bounds a long final handoff before persisting it", async () => {
     {
       kind: "result",
       summary: "a".repeat(4_000),
-      urgency: "normal" },
+      urgency: "normal",
+    },
     new Date("2026-09-01T13:01:00.000Z")
   );
 });
@@ -297,11 +334,13 @@ it("parks the worker and queues its question for delivery", async () => {
       callId: "call-1",
       input: { prompt: "Which airport?" },
       kind: "tool-call" as const,
-      toolName: "ask_question" },
+      toolName: "ask_question",
+    },
     allowFreeform: true,
     kind: "question" as const,
     prompt: "Which airport?",
-    requestId: "request-1" };
+    requestId: "request-1",
+  };
 
   services.waitForInput.mockResolvedValue({
     attempts: 1,
@@ -324,7 +363,8 @@ it("parks the worker and queues its question for delivery", async () => {
     startedAt: new Date("2026-09-01T13:00:00.000Z"),
     status: "waiting_for_input",
     updatedAt: new Date("2026-09-01T13:01:00.000Z"),
-    workerSessionId: "worker-session" });
+    workerSessionId: "worker-session",
+  });
   const handler = completionHook.events?.["input.requested"];
   await handler?.(
     {
@@ -332,9 +372,11 @@ it("parks the worker and queues its question for delivery", async () => {
         requests: [request],
         sequence: 0,
         stepIndex: 0,
-        turnId: "turn-1" },
+        turnId: "turn-1",
+      },
       meta: { at: "2026-09-01T13:01:00.000Z", id: "event-input" },
-      type: "input.requested" },
+      type: "input.requested",
+    },
     context
   );
 
@@ -354,9 +396,11 @@ it("releases a failed worker for retry", async () => {
         code: "model_error",
         message: "Model unavailable.",
         sequence: 0,
-        turnId: "turn-1" },
+        turnId: "turn-1",
+      },
       meta: { at: "2026-09-01T13:02:00.000Z", id: "event-2" },
-      type: "turn.failed" },
+      type: "turn.failed",
+    },
     context
   );
 
@@ -376,9 +420,11 @@ it("retains the scheduled identity after the user resumes the turn", async () =>
         code: "model_error",
         message: "Model unavailable after resumption.",
         sequence: 1,
-        turnId: "turn-2" },
+        turnId: "turn-2",
+      },
       meta: { at: "2026-09-01T13:03:00.000Z", id: "event-3" },
-      type: "turn.failed" },
+      type: "turn.failed",
+    },
     resumedContext
   );
 

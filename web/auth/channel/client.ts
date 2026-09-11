@@ -109,28 +109,48 @@ export class ChannelAuthorizationError extends Schema.TaggedError<ChannelAuthori
   }
 ) {}
 
+const TERMINAL_CHANNEL_STATUSES = new Set([400, 401, 403, 404, 409, 410]);
+
 export function channelHttpError(
   status: number,
   retryAfter: string | null = null
 ) {
-  const terminal = [400, 401, 403, 404, 409, 410].includes(status);
-
   return new ChannelAuthorizationError({
     status,
     retryAfter,
-    category: terminal
-      ? "terminal"
-      : status === 429
-        ? "rate-limit"
-        : "transient",
-    message: terminal
-      ? "This sign-in could not be verified in this browser. Start again and confirm the new request in chat."
-      : status === 429
-        ? "Too many attempts. Wait before trying again."
-        : status === 503
-          ? "Sign-in through this messenger is unavailable. Try the other messenger, or try again later."
-          : "Unable to check sign-in. Check your connection and try again.",
+    category: channelErrorCategory(status),
+    message: channelErrorMessage(status),
   });
+}
+
+function channelErrorCategory(
+  status: number
+): ChannelAuthorizationError["category"] {
+  if (TERMINAL_CHANNEL_STATUSES.has(status)) {
+    return "terminal";
+  }
+
+  if (status === 429) {
+    return "rate-limit";
+  }
+
+  return "transient";
+}
+
+function channelErrorMessage(status: number): string {
+  if (TERMINAL_CHANNEL_STATUSES.has(status)) {
+    return "This sign-in could not be verified in this browser. Start again and confirm the new request in chat.";
+  }
+
+  if (status === 429) {
+    return "Too many attempts. Wait before trying again.";
+  }
+
+  if (status === 503) {
+    return "Sign-in through this messenger is unavailable. Try the other messenger, or try again later.";
+  }
+
+  return "Unable to check sign-in. Check your connection and try again.";
 }
 
 export function invalidChannelChallenge(status: number) {
@@ -160,43 +180,84 @@ export function channelPollFailure(
   now: number,
   expiresAt: number
 ) {
-  if (now >= expiresAt)
+  if (now >= expiresAt) {
     return { status: "expired" as const, failures, delay: 0 };
+  }
 
-  if (failure.category === "terminal")
+  if (failure.category === "terminal") {
     return { status: "invalid" as const, failures, delay: 0 };
+  }
 
-  const nextFailures =
-    failure.category === "transient" ? failures + 1 : failures;
+  const nextFailures = nextPollFailures(failure.category, failures);
 
-  if (nextFailures >= 5)
+  if (nextFailures >= 5) {
     return { status: "invalid" as const, failures: nextFailures, delay: 0 };
-  const header = failure.retryAfter;
+  }
 
-  const retryAfter =
-    header === null
-      ? Number.NaN
-      : Schema.is(retrySecondsSchema)(header)
-        ? Math.min(Number(header) * 1000, expiresAt - now)
-        : Schema.is(retryDateSchema)(header)
-          ? Date.parse(header) - now
-          : Number.NaN;
+  return {
+    status: "pending" as const,
+    failures: nextFailures,
+    delay: pollRetryDelay(failure, nextFailures, now, expiresAt),
+  };
+}
 
-  const fallback =
-    failure.category === "rate-limit"
-      ? 30_000
-      : Math.min(2000 * 2 ** nextFailures, 30_000);
+function nextPollFailures(
+  category: ChannelAuthorizationError["category"],
+  failures: number
+): number {
+  if (category === "transient") {
+    return failures + 1;
+  }
+
+  return failures;
+}
+
+function pollRetryDelay(
+  failure: ChannelAuthorizationError,
+  nextFailures: number,
+  now: number,
+  expiresAt: number
+): number {
+  const retryAfter = parseRetryAfter(failure.retryAfter, now, expiresAt);
+  const fallback = pollFallbackDelay(failure.category, nextFailures);
 
   const delay = Math.max(
     2000,
     Number.isFinite(retryAfter) ? retryAfter : fallback
   );
 
-  return {
-    status: "pending" as const,
-    failures: nextFailures,
-    delay: Math.min(delay, expiresAt - now),
-  };
+  return Math.min(delay, expiresAt - now);
+}
+
+function parseRetryAfter(
+  header: string | null,
+  now: number,
+  expiresAt: number
+): number {
+  if (header === null) {
+    return Number.NaN;
+  }
+
+  if (Schema.is(retrySecondsSchema)(header)) {
+    return Math.min(Number(header) * 1000, expiresAt - now);
+  }
+
+  if (Schema.is(retryDateSchema)(header)) {
+    return Date.parse(header) - now;
+  }
+
+  return Number.NaN;
+}
+
+function pollFallbackDelay(
+  category: ChannelAuthorizationError["category"],
+  nextFailures: number
+): number {
+  if (category === "rate-limit") {
+    return 30_000;
+  }
+
+  return Math.min(2000 * 2 ** nextFailures, 30_000);
 }
 
 interface ChannelHttpInit {
@@ -205,68 +266,91 @@ interface ChannelHttpInit {
   readonly body?: string;
 }
 
-const requestJson = Effect.fn("channelAuthorization.request")(
-  function* <A>(
-    path: string,
-    init: ChannelHttpInit,
-    decodeResponse: (body: string) => Effect.Effect<A, Schema.SchemaError>
-  ) {
-    const http = yield* HttpClient.HttpClient;
-    const method = (init.method ?? "GET").toUpperCase();
-    const url = `/api/auth/channel-auth/${path}`;
+function channelHttpMethod(init: ChannelHttpInit): string {
+  return (init.method ?? "GET").toUpperCase();
+}
 
-    let request =
-      method === "POST"
-        ? HttpClientRequest.post(url)
-        : HttpClientRequest.get(url);
+function buildChannelRequest(path: string, init: ChannelHttpInit) {
+  const url = `/api/auth/channel-auth/${path}`;
+  const method = channelHttpMethod(init);
 
-    const headers = new Headers(init.headers);
+  let request =
+    method === "POST"
+      ? HttpClientRequest.post(url)
+      : HttpClientRequest.get(url);
 
-    if ([...headers.keys()].length > 0) {
-      request = request.pipe(
-        HttpClientRequest.setHeaders(Object.fromEntries(headers.entries()))
-      );
-    }
+  const headers = new Headers(init.headers);
 
-    if (init.body !== undefined) {
-      request = request.pipe(
-        HttpClientRequest.bodyText(
-          init.body,
-          headers.get("content-type") ?? "application/json"
-        )
-      );
-    }
-
-    const response = yield* http.execute(request).pipe(
-      Effect.mapError(() => channelHttpError(0)),
-      Effect.provideService(FetchHttpClient.RequestInit, {
-        cache: "no-store",
-        credentials: "same-origin",
-        redirect: "error",
-      })
+  if ([...headers.keys()].length > 0) {
+    request = request.pipe(
+      HttpClientRequest.setHeaders(Object.fromEntries(headers.entries()))
     );
+  }
 
-    if (response.status < 200 || response.status >= 300)
-      return yield* channelHttpError(
-        response.status,
-        Option.getOrNull(HttpHeaders.get(response.headers, "retry-after"))
-      );
-
-    const body = yield* response.text.pipe(
-      Effect.mapError(() => channelHttpError(0))
+  if (init.body !== undefined) {
+    request = request.pipe(
+      HttpClientRequest.bodyText(
+        init.body,
+        headers.get("content-type") ?? "application/json"
+      )
     );
+  }
 
-    return yield* decodeResponse(body).pipe(
-      Effect.mapError(() => invalidChannelChallenge(response.status))
+  return request;
+}
+
+function mapChannelTransportError() {
+  return channelHttpError(0);
+}
+
+function mapChannelDecodeError(status: number) {
+  return () => invalidChannelChallenge(status);
+}
+
+function failOnTimeout() {
+  return Effect.fail(channelHttpError(0));
+}
+
+function withChannelRequestDefaults<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  return effect.pipe(
+    Effect.timeout("10 seconds"),
+    Effect.catchTag("TimeoutError", failOnTimeout),
+    Effect.provide(FetchHttpClient.layer)
+  );
+}
+
+const requestJson = Effect.fn("channelAuthorization.request")(function* <A>(
+  path: string,
+  init: ChannelHttpInit,
+  decodeResponse: (body: string) => Effect.Effect<A, Schema.SchemaError>
+) {
+  const http = yield* HttpClient.HttpClient;
+  const request = buildChannelRequest(path, init);
+
+  const response = yield* http.execute(request).pipe(
+    Effect.mapError(mapChannelTransportError),
+    Effect.provideService(FetchHttpClient.RequestInit, {
+      cache: "no-store",
+      credentials: "same-origin",
+      redirect: "error",
+    })
+  );
+
+  if (response.status < 200 || response.status >= 300) {
+    return yield* channelHttpError(
+      response.status,
+      Option.getOrNull(HttpHeaders.get(response.headers, "retry-after"))
     );
-  },
-  (effect) =>
-    effect.pipe(
-      Effect.timeout("10 seconds"),
-      Effect.catchTag("TimeoutError", () => Effect.fail(channelHttpError(0))),
-      Effect.provide(FetchHttpClient.layer)
-    )
-);
+  }
+
+  const body = yield* response.text.pipe(
+    Effect.mapError(mapChannelTransportError)
+  );
+
+  return yield* decodeResponse(body).pipe(
+    Effect.mapError(mapChannelDecodeError(response.status))
+  );
+}, withChannelRequestDefaults);
 
 export const startChannelAuthorization = Effect.fn(
   "channelAuthorization.start"
