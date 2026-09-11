@@ -64,4 +64,106 @@ describe("schedule timing", () => {
       }).success
     ).toBe(false);
   });
+
+  it("does return a one-shot run only when it is still in the future", () => {
+    const timing = {
+      at: "2026-09-15T12:00:00.000Z",
+      kind: "once" as const,
+    };
+
+    expect(
+      computeNextRun(
+        timing,
+        new Date("2026-09-15T11:00:00.000Z")
+      )?.toISOString()
+    ).toBe("2026-09-15T12:00:00.000Z");
+    expect(
+      computeNextRun(timing, new Date("2026-09-15T12:00:00.000Z"))
+    ).toBeNull();
+  });
+
+  it("does return the one-shot as latest only after it has elapsed", () => {
+    const timing = {
+      at: "2026-09-15T12:00:00.000Z",
+      kind: "once" as const,
+    };
+
+    expect(
+      computeLatestRun(timing, new Date("2026-09-15T11:59:59.000Z"))
+    ).toBeNull();
+    expect(
+      computeLatestRun(
+        timing,
+        new Date("2026-09-15T12:00:00.000Z")
+      )?.toISOString()
+    ).toBe("2026-09-15T12:00:00.000Z");
+  });
+
+  it("does skip weekend days for weekday calendar recurrence", () => {
+    const timing = {
+      frequency: "weekdays" as const,
+      kind: "calendar" as const,
+      localTime: "09:00",
+      timezone: "America/Sao_Paulo",
+    };
+
+    expect(
+      computeNextRun(
+        timing,
+        new Date("2026-09-11T12:00:00.000Z")
+      )?.toISOString()
+    ).toBe("2026-09-14T12:00:00.000Z");
+  });
+
+  it("does find the latest matching calendar occurrence before now", () => {
+    const timing = {
+      frequency: "weekly" as const,
+      kind: "calendar" as const,
+      localTime: "09:00",
+      timezone: "America/Sao_Paulo",
+      weekday: 1,
+    };
+
+    expect(
+      computeLatestRun(
+        timing,
+        new Date("2026-09-11T15:00:00.000Z")
+      )?.toISOString()
+    ).toBe("2026-09-07T12:00:00.000Z");
+  });
+
+  it("does reject an invalid IANA timezone in the timing schema", () => {
+    expect(
+      scheduleTimingSchema.safeParse({
+        frequency: "daily",
+        kind: "calendar",
+        localTime: "09:00",
+        timezone: "Not/AZone",
+      }).success
+    ).toBe(false);
+  });
+
+  it("does reject an invalid local time string", () => {
+    expect(
+      scheduleTimingSchema.safeParse({
+        frequency: "daily",
+        kind: "calendar",
+        localTime: "25:00",
+        timezone: "UTC",
+      }).success
+    ).toBe(false);
+  });
+
+  it("does return null for an interval that has not started yet", () => {
+    expect(
+      computeLatestRun(
+        {
+          anchoredAt: "2026-09-20T12:00:00.000Z",
+          everyMinutes: 30,
+          kind: "interval",
+        },
+        new Date("2026-09-15T12:00:00.000Z")
+      )
+    ).toBeNull();
+  });
 });

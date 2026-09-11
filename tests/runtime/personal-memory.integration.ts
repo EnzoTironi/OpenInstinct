@@ -283,13 +283,14 @@ const cleanupPersonalMemoryFixture = Effect.fn("personalMemory.cleanupFixture")(
   }
 );
 
-const makePersonalMemoryLogin = (
-  auth: AuthApi,
-  accounts: AccountsService,
-  installationId: string,
-  origin: string,
-  users: Identity[]
-) => {
+const makePersonalMemoryLogin = (input: {
+  readonly auth: AuthApi;
+  readonly accounts: AccountsService;
+  readonly installationId: string;
+  readonly origin: string;
+  readonly users: Identity[];
+}) => {
+  const { auth, accounts, installationId, origin, users } = input;
   return async (senderId: string = randomUUID()) => {
     const request = (
       path: string,
@@ -357,13 +358,13 @@ test("actual account auth, profile store, Eve provider, private tool and export 
   const users: Identity[] = [];
   const keys: string[] = [];
 
-  const login = makePersonalMemoryLogin(
+  const login = makePersonalMemoryLogin({
     auth,
     accounts,
     installationId,
     origin,
-    users
-  );
+    users,
+  });
 
   try {
     const owner = await login();

@@ -30,11 +30,8 @@ const appendDownloadChunk = (
   return Effect.succeed(state);
 };
 
-const enforceDeclaredContentLength = (
-  declared: string | undefined,
-  maxBytes: number
-) =>
-  Effect.gen(function* () {
+const enforceDeclaredContentLength = Effect.fn("enforceDeclaredContentLength")(
+  function* (declared: string | undefined, maxBytes: number) {
     if (declared === undefined) return;
 
     const length = yield* decodeEffect_contentLength(declared).pipe(
@@ -44,7 +41,8 @@ const enforceDeclaredContentLength = (
     if (Number(length) > maxBytes) {
       yield* tooLarge();
     }
-  });
+  }
+);
 
 export const downloadMediaBytes = Effect.fn("downloadMediaBytes")(
   function* (

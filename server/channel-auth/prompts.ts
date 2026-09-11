@@ -173,17 +173,16 @@ const withPromptTransaction =
       })
     );
 
-const makeRetire = (sql: Sql) =>
-  Effect.gen(function* () {
-    yield* sql`UPDATE public.channel_auth_prompt SET status = 'uncertain', token_ciphertext = NULL,
+const makeRetire = Effect.fn("makeRetire")(function* (sql: Sql) {
+  yield* sql`UPDATE public.channel_auth_prompt SET status = 'uncertain', token_ciphertext = NULL,
         lease_token = NULL, lease_expires_at = NULL, last_error = 'lease_expired'
         WHERE status = 'dispatching' AND lease_expires_at <= clock_timestamp()`;
-    yield* sql`UPDATE public.channel_auth_prompt p SET status = 'cancelled', token_ciphertext = NULL,
+  yield* sql`UPDATE public.channel_auth_prompt p SET status = 'cancelled', token_ciphertext = NULL,
         lease_token = NULL, lease_expires_at = NULL, last_error = 'challenge_inactive'
         FROM public.channel_auth_challenge c WHERE c.id = p.challenge_id
         AND p.status = 'queued'
         AND (c.expires_at <= clock_timestamp() OR c.cancelled_at IS NOT NULL OR c.confirmed_at IS NOT NULL OR c.consumed_at IS NOT NULL)`;
-  });
+});
 
 const makeSelect = (sql: Sql): SelectPrompt =>
   Effect.fn("ChannelAuthPrompts.select")(function* (challengeId: string) {
@@ -271,57 +270,54 @@ const senderConflicts = (
   existing.channel !== request.sender.channel ||
   existing.installationId !== request.sender.installationId;
 
-const resolveQueuedExisting = (
+const resolveQueuedExisting = Effect.fn("resolveQueuedExisting")(function* (
   challengeId: string,
   request: typeof PreparePrompt.Type,
   preview: PreviewPrompt,
   cancel: CancelPrompt
-) =>
-  Effect.gen(function* () {
-    const valid = yield* preview(request);
+) {
+  const valid = yield* preview(request);
 
-    if (!valid) {
-      yield* cancel(challengeId, "cancelled");
+  if (!valid) {
+    yield* cancel(challengeId, "cancelled");
 
-      return {
-        challengeId,
-        status: "cancelled" as const,
-      };
-    }
+    return {
+      challengeId,
+      status: "cancelled" as const,
+    };
+  }
 
-    return { challengeId, status: "queued" as const };
-  });
+  return { challengeId, status: "queued" as const };
+});
 
-const prepareExisting = (
-  existing: typeof PromptRow.Type,
-  challengeId: string,
-  request: typeof PreparePrompt.Type,
-  preview: PreviewPrompt,
-  cancel: CancelPrompt
-) =>
-  Effect.gen(function* () {
-    if (senderConflicts(existing, request)) return yield* error("conflict");
+const prepareExisting = Effect.fn("prepareExisting")(function* (input: {
+  readonly existing: typeof PromptRow.Type;
+  readonly challengeId: string;
+  readonly request: typeof PreparePrompt.Type;
+  readonly preview: PreviewPrompt;
+  readonly cancel: CancelPrompt;
+}) {
+  const { existing, challengeId, request, preview, cancel } = input;
 
-    if (existing.status === "queued") {
-      return yield* resolveQueuedExisting(
-        challengeId,
-        request,
-        preview,
-        cancel
-      );
-    }
+  if (senderConflicts(existing, request)) return yield* error("conflict");
 
-    return { challengeId, status: existing.status };
-  });
+  if (existing.status === "queued") {
+    return yield* resolveQueuedExisting(challengeId, request, preview, cancel);
+  }
 
-const insertPreparedPrompt = (
-  sql: Sql,
-  challengeId: string,
-  request: typeof PreparePrompt.Type,
-  accounts: AccountsService,
-  encryptionKey: EncryptionKey
-) =>
-  Effect.gen(function* () {
+  return { challengeId, status: existing.status };
+});
+
+const insertPreparedPrompt = Effect.fn("insertPreparedPrompt")(
+  function* (input: {
+    readonly sql: Sql;
+    readonly challengeId: string;
+    readonly request: typeof PreparePrompt.Type;
+    readonly accounts: AccountsService;
+    readonly encryptionKey: EncryptionKey;
+  }) {
+    const { sql, challengeId, request, accounts, encryptionKey } = input;
+
     yield* accounts.previewChallenge(request);
     const key = yield* encryptionKey;
 
@@ -336,13 +332,14 @@ const insertPreparedPrompt = (
     });
 
     yield* sql`INSERT INTO public.channel_auth_prompt
-          (challenge_id, channel, installation_id, sender_id, event_id, token_ciphertext)
-          VALUES (${challengeId}, ${request.sender.channel}, ${request.sender.installationId}, ${request.sender.senderId}, ${request.eventId}, ${ciphertext})`;
+        (challenge_id, channel, installation_id, sender_id, event_id, token_ciphertext)
+        VALUES (${challengeId}, ${request.sender.channel}, ${request.sender.installationId}, ${request.sender.senderId}, ${request.eventId}, ${ciphertext})`;
 
     return { challengeId, status: "queued" as const };
-  });
+  }
+);
 
-const prepareTransactionBody = (
+const prepareTransactionBody = Effect.fn("prepareTransactionBody")(function* (
   sql: Sql,
   request: typeof PreparePrompt.Type,
   deps: {
@@ -353,50 +350,49 @@ const prepareTransactionBody = (
     readonly accounts: AccountsService;
     readonly encryptionKey: EncryptionKey;
   }
-) =>
-  Effect.gen(function* () {
-    yield* deps.retire;
+) {
+  yield* deps.retire;
 
-    const challenges = yield* sql<{
-      id: string;
-    }>`SELECT id FROM public.channel_auth_challenge
+  const challenges = yield* sql<{
+    id: string;
+  }>`SELECT id FROM public.channel_auth_challenge
           WHERE token_hash = ${createHash("sha256").update(request.token).digest("hex")}
           AND channel = ${request.sender.channel} AND installation_id = ${request.sender.installationId}`;
 
-    const challenge = challenges[0];
+  const challenge = challenges[0];
 
-    if (!challenge)
-      return yield* new ChannelAccountError({
-        reason: "invalid_challenge",
-      });
+  if (!challenge)
+    return yield* new ChannelAccountError({
+      reason: "invalid_challenge",
+    });
 
-    const events = yield* sql<{
-      challengeId: string;
-    }>`SELECT challenge_id AS "challengeId" FROM public.channel_auth_prompt
+  const events = yield* sql<{
+    challengeId: string;
+  }>`SELECT challenge_id AS "challengeId" FROM public.channel_auth_prompt
           WHERE channel = ${request.sender.channel} AND installation_id = ${request.sender.installationId} AND event_id = ${request.eventId}`;
 
-    if (events.some((event) => event.challengeId !== challenge.id))
-      return yield* error("conflict");
-    const existing = yield* deps.select(challenge.id);
+  if (events.some((event) => event.challengeId !== challenge.id))
+    return yield* error("conflict");
+  const existing = yield* deps.select(challenge.id);
 
-    if (existing) {
-      return yield* prepareExisting(
-        existing,
-        challenge.id,
-        request,
-        deps.preview,
-        deps.cancel
-      );
-    }
-
-    return yield* insertPreparedPrompt(
-      sql,
-      challenge.id,
+  if (existing) {
+    return yield* prepareExisting({
+      existing,
+      challengeId: challenge.id,
       request,
-      deps.accounts,
-      deps.encryptionKey
-    );
+      preview: deps.preview,
+      cancel: deps.cancel,
+    });
+  }
+
+  return yield* insertPreparedPrompt({
+    sql,
+    challengeId: challenge.id,
+    request,
+    accounts: deps.accounts,
+    encryptionKey: deps.encryptionKey,
   });
+});
 
 const makePrepare = (
   sql: Sql,
@@ -443,40 +439,41 @@ const makePending = (
     );
   });
 
-const claimQueuedPrompt = (
-  sql: Sql,
-  id: string,
-  row: typeof PromptRow.Type,
-  decrypt: DecryptPrompt,
-  preview: PreviewPrompt,
-  cancel: CancelPrompt
-) =>
-  Effect.gen(function* () {
-    const envelope = yield* decrypt(row);
+const claimQueuedPrompt = Effect.fn("claimQueuedPrompt")(function* (input: {
+  readonly sql: Sql;
+  readonly id: string;
+  readonly row: typeof PromptRow.Type;
+  readonly decrypt: DecryptPrompt;
+  readonly preview: PreviewPrompt;
+  readonly cancel: CancelPrompt;
+}) {
+  const { sql, id, row, decrypt, preview, cancel } = input;
 
-    if (!envelope) {
-      yield* cancel(id, "failed");
+  const envelope = yield* decrypt(row);
 
-      return null;
-    }
+  if (!envelope) {
+    yield* cancel(id, "failed");
 
-    if (!(yield* preview(envelope))) {
-      yield* cancel(id, "cancelled");
+    return null;
+  }
 
-      return null;
-    }
+  if (!(yield* preview(envelope))) {
+    yield* cancel(id, "cancelled");
 
-    const leaseToken = randomUUID();
-    yield* sql`UPDATE public.channel_auth_prompt SET status = 'dispatching', attempts = attempts + 1,
-          lease_token = ${leaseToken}, lease_expires_at = clock_timestamp() + interval '30 seconds'
-          WHERE challenge_id = ${id} AND status = 'queued'`;
+    return null;
+  }
 
-    return {
-      lease: { challengeId: id, leaseToken },
-      ...envelope.sender,
-      token: envelope.token,
-    };
-  });
+  const leaseToken = randomUUID();
+  yield* sql`UPDATE public.channel_auth_prompt SET status = 'dispatching', attempts = attempts + 1,
+        lease_token = ${leaseToken}, lease_expires_at = clock_timestamp() + interval '30 seconds'
+        WHERE challenge_id = ${id} AND status = 'queued'`;
+
+  return {
+    lease: { challengeId: id, leaseToken },
+    ...envelope.sender,
+    token: envelope.token,
+  };
+});
 
 const makeClaim = (
   transaction: ReturnType<typeof withPromptTransaction>,
@@ -499,33 +496,35 @@ const makeClaim = (
 
         if (row?.status !== "queued") return null;
 
-        return yield* claimQueuedPrompt(
+        return yield* claimQueuedPrompt({
           sql,
           id,
           row,
-          deps.decrypt,
-          deps.preview,
-          deps.cancel
-        );
+          decrypt: deps.decrypt,
+          preview: deps.preview,
+          cancel: deps.cancel,
+        });
       })
     );
   });
 
-const validateLeaseStillActive = (
-  sql: Sql,
-  lease: typeof PromptLease.Type,
-  select: SelectPrompt,
-  decrypt: DecryptPrompt,
-  preview: PreviewPrompt,
-  retire: Effect.Effect<void, SqlError>
-) =>
-  Effect.gen(function* () {
+const validateLeaseStillActive = Effect.fn("validateLeaseStillActive")(
+  function* (input: {
+    readonly sql: Sql;
+    readonly lease: typeof PromptLease.Type;
+    readonly select: SelectPrompt;
+    readonly decrypt: DecryptPrompt;
+    readonly preview: PreviewPrompt;
+    readonly retire: Effect.Effect<void, SqlError>;
+  }) {
+    const { sql, lease, select, decrypt, preview, retire } = input;
+
     yield* retire;
 
     const matches =
       yield* sql`SELECT challenge_id FROM public.channel_auth_prompt
-          WHERE challenge_id = ${lease.challengeId} AND lease_token = ${lease.leaseToken}
-          AND status = 'dispatching' AND lease_expires_at > clock_timestamp()`;
+        WHERE challenge_id = ${lease.challengeId} AND lease_token = ${lease.leaseToken}
+        AND status = 'dispatching' AND lease_expires_at > clock_timestamp()`;
 
     if (!matches.length) return false;
     const row = yield* select(lease.challengeId);
@@ -541,14 +540,15 @@ const validateLeaseStillActive = (
     yield* retire;
 
     const active = yield* sql<{ valid: boolean }>`SELECT EXISTS (
-              SELECT 1 FROM public.channel_auth_prompt p JOIN public.channel_auth_challenge c ON c.id = p.challenge_id
-              WHERE p.challenge_id = ${lease.challengeId} AND p.lease_token = ${lease.leaseToken}
-              AND p.status = 'dispatching' AND p.lease_expires_at > clock_timestamp()
-              AND c.expires_at > clock_timestamp() AND c.confirmed_at IS NULL
-              AND c.cancelled_at IS NULL AND c.consumed_at IS NULL) AS valid`;
+            SELECT 1 FROM public.channel_auth_prompt p JOIN public.channel_auth_challenge c ON c.id = p.challenge_id
+            WHERE p.challenge_id = ${lease.challengeId} AND p.lease_token = ${lease.leaseToken}
+            AND p.status = 'dispatching' AND p.lease_expires_at > clock_timestamp()
+            AND c.expires_at > clock_timestamp() AND c.confirmed_at IS NULL
+            AND c.cancelled_at IS NULL AND c.consumed_at IS NULL) AS valid`;
 
     return active[0]?.valid === true;
-  });
+  }
+);
 
 const makeCheckLease = (
   transaction: ReturnType<typeof withPromptTransaction>,
@@ -566,14 +566,14 @@ const makeCheckLease = (
     const lease = yield* decode(PromptLease, input);
 
     const valid = yield* transaction(
-      validateLeaseStillActive(
+      validateLeaseStillActive({
         sql,
         lease,
-        deps.select,
-        deps.decrypt,
-        deps.preview,
-        deps.retire
-      )
+        select: deps.select,
+        decrypt: deps.decrypt,
+        preview: deps.preview,
+        retire: deps.retire,
+      })
     );
 
     if (!valid) return yield* error("lease_lost");

@@ -122,22 +122,22 @@ const pendingDeviceChallenges = (run: DeviceRun, source: DeviceSource) =>
     })
   );
 
-const confirmDeviceChallenge = (
-  run: DeviceRun,
-  id: string,
-  boundAt: string,
-  purpose: "login" | "link",
-  source: DeviceSource
-) =>
-  run(
+const confirmDeviceChallenge = (input: {
+  readonly run: DeviceRun;
+  readonly id: string;
+  readonly boundAt: string;
+  readonly purpose: "login" | "link";
+  readonly source: DeviceSource;
+}) =>
+  input.run(
     Effect.gen(function* () {
       const devices = yield* NativeDeviceAuth;
 
       return yield* devices.confirm({
-        ...source,
-        challengeId: id,
-        browserBoundAt: boundAt,
-        purpose,
+        ...input.source,
+        challengeId: input.id,
+        browserBoundAt: input.boundAt,
+        purpose: input.purpose,
       });
     })
   );
@@ -226,7 +226,7 @@ test("native account linking pins purpose, both proofs and one browser session w
     boundAt: string,
     purpose: "login" | "link" = "link",
     source = owner.source
-  ) => confirmDeviceChallenge(run, id, boundAt, purpose, source);
+  ) => confirmDeviceChallenge({ run, id, boundAt, purpose, source });
 
   const signIn = async (source = owner.source) => {
     const issued = await issue("login", randomUUID(), source);

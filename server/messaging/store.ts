@@ -544,13 +544,25 @@ const lockIdentityForCancel = (
   });
 };
 
-const makeResolveUncertain = (
-  parts: QueueParts,
-  lockActive: ReturnType<typeof makeLockActive>,
-  loadUncertainRow: ReturnType<typeof makeLoadUncertainRow>,
-  resolveIdempotentSettled: ReturnType<typeof makeResolveIdempotentSettled>,
-  applyUncertainDecision: ReturnType<typeof makeApplyUncertainDecision>
-) => {
+const makeResolveUncertain = (deps: {
+  readonly parts: QueueParts;
+  readonly lockActive: ReturnType<typeof makeLockActive>;
+  readonly loadUncertainRow: ReturnType<typeof makeLoadUncertainRow>;
+  readonly resolveIdempotentSettled: ReturnType<
+    typeof makeResolveIdempotentSettled
+  >;
+  readonly applyUncertainDecision: ReturnType<
+    typeof makeApplyUncertainDecision
+  >;
+}) => {
+  const {
+    parts,
+    lockActive,
+    loadUncertainRow,
+    resolveIdempotentSettled,
+    applyUncertainDecision,
+  } = deps;
+
   const { sql, lane } = parts;
 
   return Effect.fn("Messaging.resolveUncertain")(function* (
@@ -659,13 +671,13 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
     claim: makeClaim(parts),
     complete: makeComplete(parts, requireLease),
     stop: makeStop(parts, requireLease),
-    resolveUncertain: makeResolveUncertain(
+    resolveUncertain: makeResolveUncertain({
       parts,
       lockActive,
       loadUncertainRow,
       resolveIdempotentSettled,
-      applyUncertainDecision
-    ),
+      applyUncertainDecision,
+    }),
     scheduleRetry: makeScheduleRetry(parts, requireLease),
     inspect: makeInspect(parts),
     checkLease: (lease: Lease) => sql.withTransaction(requireLease(lease)),

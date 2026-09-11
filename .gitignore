@@ -12,3 +12,7 @@ next-env.d.ts
 dist
 .DS_Store
 *.tsbuildinfo
+
+# Vitest / Istanbul coverage artifacts (baseline summary lives under docs/ops/)
+coverage
+

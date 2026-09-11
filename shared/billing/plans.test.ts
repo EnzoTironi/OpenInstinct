@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   billingPlanCatalog,
+  isPaidPlan,
   planQuotaLimits,
   quotaLimitsForPlan,
 } from "./plans";
@@ -26,4 +27,15 @@ describe("consumer billing plans", () => {
     );
     expect(three.user.dailyModelTokens).toBe(one.user.dailyModelTokens);
   });
+});
+
+it("does treat only Pro and Org as paid plans", () => {
+  expect(isPaidPlan("free")).toBe(false);
+  expect(isPaidPlan("pro")).toBe(true);
+  expect(isPaidPlan("org")).toBe(true);
+});
+
+it("does leave Free and Pro installation limits unscaled by seats", () => {
+  expect(quotaLimitsForPlan("free", 9)).toEqual(planQuotaLimits.free);
+  expect(quotaLimitsForPlan("pro", 4)).toEqual(planQuotaLimits.pro);
 });

@@ -205,86 +205,82 @@ const putLaneMessage = (
   });
 };
 
-const seedFairnessMessages = (
+const seedFairnessMessages = Effect.fn("seedFairnessMessages")(function* (
   lane: FairnessLane,
   messaging: MessagingService,
   identities: readonly string[],
   selected: SevenIdentities
-) =>
-  Effect.gen(function* () {
-    yield* Effect.forEach(
-      identities,
-      (id) => putLaneMessage(lane, messaging, id, "first"),
-      { concurrency: 1 }
-    );
-    yield* Effect.forEach(
-      Array.from({ length: 30 }, (_, index) => String(index)),
-      (key) => putLaneMessage(lane, messaging, selected.noisy, key),
-      { concurrency: 1 }
-    );
-    yield* Effect.forEach(
-      [selected.uncertain, selected.expired, selected.busy],
-      (id) => putLaneMessage(lane, messaging, id, "second"),
-      { concurrency: 1 }
-    );
-  });
+) {
+  yield* Effect.forEach(
+    identities,
+    (id) => putLaneMessage(lane, messaging, id, "first"),
+    { concurrency: 1 }
+  );
+  yield* Effect.forEach(
+    Array.from({ length: 30 }, (_, index) => String(index)),
+    (key) => putLaneMessage(lane, messaging, selected.noisy, key),
+    { concurrency: 1 }
+  );
+  yield* Effect.forEach(
+    [selected.uncertain, selected.expired, selected.busy],
+    (id) => putLaneMessage(lane, messaging, id, "second"),
+    { concurrency: 1 }
+  );
+});
 
-const blockFairnessLeases = (
+const blockFairnessLeases = Effect.fn("blockFairnessLeases")(function* (
   lane: FairnessLane,
   messaging: MessagingService,
   sql: PgClient.PgClient,
   selected: SevenIdentities
-) =>
-  Effect.gen(function* () {
-    const claim =
-      lane === "inbox" ? messaging.claimInbox : messaging.claimOutbox;
+) {
+  const claim = lane === "inbox" ? messaging.claimInbox : messaging.claimOutbox;
 
-    const stop =
-      lane === "inbox"
-        ? messaging.markInboxUncertain
-        : messaging.markOutboxUncertain;
+  const stop =
+    lane === "inbox"
+      ? messaging.markInboxUncertain
+      : messaging.markOutboxUncertain;
 
-    const lease = yield* claim({
-      identityId: selected.uncertain,
-      leaseSeconds: 30,
-    });
-
-    if (!lease) return yield* Effect.fail(new Error("Missing lease"));
-    yield* stop({
-      lease: {
-        id: lease.id,
-        identityId: lease.identityId,
-        leaseToken: lease.leaseToken,
-      },
-      reason: "handoff_unknown",
-    });
-
-    if (lane === "inbox") {
-      yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${lease.id}`;
-    }
-
-    yield* claim({ identityId: selected.expired, leaseSeconds: 30 });
-    yield* claim({ identityId: selected.busy, leaseSeconds: 30 });
+  const lease = yield* claim({
+    identityId: selected.uncertain,
+    leaseSeconds: 30,
   });
 
-const ageFairnessRows = (
+  if (!lease) return yield* Effect.fail(new Error("Missing lease"));
+  yield* stop({
+    lease: {
+      id: lease.id,
+      identityId: lease.identityId,
+      leaseToken: lease.leaseToken,
+    },
+    reason: "handoff_unknown",
+  });
+
+  if (lane === "inbox") {
+    yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${lease.id}`;
+  }
+
+  yield* claim({ identityId: selected.expired, leaseSeconds: 30 });
+  yield* claim({ identityId: selected.busy, leaseSeconds: 30 });
+});
+
+const ageFairnessRows = Effect.fn("ageFairnessRows")(function* (
   lane: FairnessLane,
   sql: PgClient.PgClient,
   identities: readonly string[],
   selected: SevenIdentities
-) =>
-  Effect.gen(function* () {
-    const table = sql(lane === "inbox" ? "channel_inbox" : "channel_outbox");
-    const received = sql(lane === "inbox" ? "received_at" : "created_at");
-    yield* sql`UPDATE ${table} SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE identity_id = ${selected.expired} AND status = 'dispatching'`;
-    yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${selected.revoked}`;
-    yield* Effect.forEach(
-      identities,
-      (id, index) =>
-        sql`UPDATE ${table} SET ${received} = clock_timestamp() - ${100 - index} * interval '1 minute' WHERE identity_id = ${id}`,
-      { concurrency: 1 }
-    );
-  });
+) {
+  const table = sql(lane === "inbox" ? "channel_inbox" : "channel_outbox");
+  const received = sql(lane === "inbox" ? "received_at" : "created_at");
+  yield* sql`UPDATE ${table} SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE identity_id = ${selected.expired} AND status = 'dispatching'`;
+  yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${selected.revoked}`;
+  yield* Effect.forEach(
+    identities,
+    (id, index) =>
+      sql`UPDATE ${table} SET ${received} = clock_timestamp() - ${100 - index} * interval '1 minute' WHERE identity_id = ${id}`,
+    { concurrency: 1 }
+  );
+});
 
 const fairnessCandidatesFor = (
   lane: FairnessLane,
@@ -303,54 +299,51 @@ const expectedTelegramFairness = (
   return [selected.noisy, selected.other, selected.expired, selected.revoked];
 };
 
-const loadFairnessSnapshot = (
+const loadFairnessSnapshot = Effect.fn("loadFairnessSnapshot")(function* (
   lane: FairnessLane,
   transport: TransportService,
   sql: PgClient.PgClient,
   selected: SevenIdentities
-) =>
-  Effect.gen(function* () {
-    const candidates = fairnessCandidatesFor(lane, transport);
-    const telegram25 = identityIds(yield* candidates("telegram", 25));
-    const telegram2 = identityIds(yield* candidates("telegram", 2));
-    const kapso25 = identityIds(yield* candidates("kapso", 25));
+) {
+  const candidates = fairnessCandidatesFor(lane, transport);
+  const telegram25 = identityIds(yield* candidates("telegram", 25));
+  const telegram2 = identityIds(yield* candidates("telegram", 2));
+  const kapso25 = identityIds(yield* candidates("kapso", 25));
 
-    const telegramOverflow = yield* candidates("telegram", 26).pipe(
-      Effect.flip
-    );
+  const telegramOverflow = yield* candidates("telegram", 26).pipe(Effect.flip);
 
-    if (lane !== "outbox") {
-      return {
-        telegram25,
-        telegram2,
-        kapso25,
-        telegramOverflow,
-        drain: null,
-      } as const;
-    }
-
-    const revokedDrain = yield* transport.drainOutbox(selected.revoked);
-
-    const rows = yield* sql<{
-      status: string;
-    }>`SELECT status FROM channel_outbox WHERE identity_id = ${selected.revoked}`;
-
-    const expiredDrain = yield* transport.drainOutbox(selected.expired);
-    const afterDrain = identityIds(yield* candidates("telegram", 25));
-
+  if (lane !== "outbox") {
     return {
       telegram25,
       telegram2,
       kapso25,
       telegramOverflow,
-      drain: {
-        revokedDrain,
-        allCancelled: rows.every((row) => row.status === "cancelled"),
-        expiredDrain,
-        afterDrain,
-      },
+      drain: null,
     } as const;
-  });
+  }
+
+  const revokedDrain = yield* transport.drainOutbox(selected.revoked);
+
+  const rows = yield* sql<{
+    status: string;
+  }>`SELECT status FROM channel_outbox WHERE identity_id = ${selected.revoked}`;
+
+  const expiredDrain = yield* transport.drainOutbox(selected.expired);
+  const afterDrain = identityIds(yield* candidates("telegram", 25));
+
+  return {
+    telegram25,
+    telegram2,
+    kapso25,
+    telegramOverflow,
+    drain: {
+      revokedDrain,
+      allCancelled: rows.every((row) => row.status === "cancelled"),
+      expiredDrain,
+      afterDrain,
+    },
+  } as const;
+});
 
 const enqueueConcurrentTaskReports = (
   transport: TransportService,
@@ -365,50 +358,53 @@ const enqueueConcurrentTaskReports = (
     { concurrency: 8 }
   );
 
-const seedRecoveryIdentity = Effect.fn("transport.recoveryIdentity")(function* (
-  messaging: MessagingService,
-  sql: PgClient.PgClient,
-  preparedId: string,
-  unmarkedId: string,
-  identityId: string
-) {
-  yield* messaging.accept({
-    identityId,
-    eventId: "recovery-candidate",
-    sourceMessageId: "source",
-    payload: { text: "one" },
-  });
+const seedRecoveryIdentity = Effect.fn("transport.recoveryIdentity")(
+  function* (input: {
+    readonly messaging: MessagingService;
+    readonly sql: PgClient.PgClient;
+    readonly preparedId: string;
+    readonly unmarkedId: string;
+    readonly identityId: string;
+  }) {
+    const { messaging, sql, preparedId, unmarkedId, identityId } = input;
+    yield* messaging.accept({
+      identityId,
+      eventId: "recovery-candidate",
+      sourceMessageId: "source",
+      payload: { text: "one" },
+    });
 
-  const claim = yield* messaging.claimInbox({
-    identityId,
-    leaseSeconds: 30,
-  });
+    const claim = yield* messaging.claimInbox({
+      identityId,
+      leaseSeconds: 30,
+    });
 
-  if (!claim) return yield* Effect.fail(new Error("Expected initial claim"));
+    if (!claim) return yield* Effect.fail(new Error("Expected initial claim"));
 
-  if (identityId === unmarkedId) {
-    yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${claim.id}`;
-  }
+    if (identityId === unmarkedId) {
+      yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${claim.id}`;
+    }
 
-  const lease = {
-    identityId,
-    id: claim.id,
-    leaseToken: claim.leaseToken,
-  };
+    const lease = {
+      identityId,
+      id: claim.id,
+      leaseToken: claim.leaseToken,
+    };
 
-  if (identityId === preparedId) {
-    yield* messaging.prepareInboxHandoff({
-      transcripts: [],
+    if (identityId === preparedId) {
+      yield* messaging.prepareInboxHandoff({
+        transcripts: [],
+        lease,
+        content: "one",
+      });
+    }
+
+    yield* messaging.markInboxUncertain({
       lease,
-      content: "one",
+      reason: "handoff_unknown",
     });
   }
-
-  yield* messaging.markInboxUncertain({
-    lease,
-    reason: "handoff_unknown",
-  });
-});
+);
 
 function requireSevenIdentities(identities: readonly string[]) {
   const [noisy, other, uncertain, expired, busy, revoked, anotherChannel] =
@@ -899,13 +895,13 @@ test("the dispatcher recovers native inputs before and after preparation while b
       yield* Effect.forEach(
         [preparedId, unpreparedId, unmarkedId],
         (identityId) =>
-          seedRecoveryIdentity(
+          seedRecoveryIdentity({
             messaging,
             sql,
             preparedId,
             unmarkedId,
-            identityId
-          ),
+            identityId,
+          }),
         { concurrency: 1 }
       );
       yield* messaging.enqueue({

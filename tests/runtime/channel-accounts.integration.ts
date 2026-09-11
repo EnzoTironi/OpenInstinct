@@ -37,14 +37,16 @@ const rejected = <A>(
     })
   );
 
-const insertLoginSession = (sessionId: string, userId: string) =>
-  Effect.gen(function* () {
-    const separateConnection = yield* PgClient.PgClient;
-    yield* separateConnection`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
+const insertLoginSession = Effect.fn("insertLoginSession")(function* (
+  sessionId: string,
+  userId: string
+) {
+  const separateConnection = yield* PgClient.PgClient;
+  yield* separateConnection`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
             VALUES (${sessionId}, ${secret()}, ${userId}, clock_timestamp() + interval '1 hour', clock_timestamp(), clock_timestamp())`;
 
-    return sessionId;
-  });
+  return sessionId;
+});
 
 const holdLoginSessionUntilReleased = <A, E, R>(
   entered: Deferred.Deferred<undefined>,
