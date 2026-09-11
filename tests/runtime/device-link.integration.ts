@@ -44,6 +44,119 @@ const BrowserSession = Schema.Struct({
 
 const decodeSync_BrowserSession = Schema.decodeUnknownSync(BrowserSession);
 
+interface DeviceSource {
+  readonly identityId: string;
+  readonly sessionId: string;
+}
+
+type DeviceRun = <A, E>(
+  operation: Effect.Effect<
+    A,
+    E,
+    NativeDeviceAuth | ChannelAccounts | PgClient.PgClient
+  >
+) => Promise<A>;
+
+const makeDeviceLinkRequest = (
+  auth: { readonly handler: (request: Request) => Promise<Response> },
+  baseURL: string
+) => {
+  return (path: string, cookie: string, body?: Schema.Json) => {
+    const init: RequestInit = {
+      method: body === undefined ? "GET" : "POST",
+      headers: { cookie, origin: baseURL, "content-type": "application/json" },
+    };
+
+    if (body !== undefined) init.body = JSON.stringify(body);
+
+    return auth.handler(
+      new Request(`${baseURL}/api/auth/channel-auth/${path}`, init)
+    );
+  };
+};
+
+const createKapsoDeviceIdentity = (run: DeviceRun, installationId: string) =>
+  run(
+    Effect.gen(function* () {
+      const accounts = yield* ChannelAccounts;
+      const sql = yield* PgClient.PgClient;
+
+      const identity = yield* accounts.resolveVerifiedSender({
+        channel: "kapso",
+        installationId,
+        senderId: randomUUID(),
+      });
+
+      const scope = accessScopeForUser(`better-auth:${identity.userId}`);
+      const sessionId = randomUUID();
+      yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${scope.workspaceId}, ${scope.userId})`;
+
+      return {
+        identity,
+        scope,
+        source: { identityId: identity.id, sessionId },
+      };
+    })
+  );
+
+const issueDeviceChallenge = (
+  run: DeviceRun,
+  purpose: "login" | "link",
+  source: DeviceSource,
+  callId = randomUUID()
+) =>
+  run(
+    Effect.gen(function* () {
+      const devices = yield* NativeDeviceAuth;
+
+      return yield* devices.issue({ ...source, callId, purpose });
+    })
+  );
+
+const pendingDeviceChallenges = (run: DeviceRun, source: DeviceSource) =>
+  run(
+    Effect.gen(function* () {
+      const devices = yield* NativeDeviceAuth;
+
+      return yield* devices.pending(source);
+    })
+  );
+
+const confirmDeviceChallenge = (
+  run: DeviceRun,
+  id: string,
+  boundAt: string,
+  purpose: "login" | "link",
+  source: DeviceSource
+) =>
+  run(
+    Effect.gen(function* () {
+      const devices = yield* NativeDeviceAuth;
+
+      return yield* devices.confirm({
+        ...source,
+        challengeId: id,
+        browserBoundAt: boundAt,
+        purpose,
+      });
+    })
+  );
+
+const findChallengeById = <T extends { readonly id: string }>(
+  items: readonly T[],
+  id: string
+) => items.find((item) => item.id === id);
+
+const sortedHttpStatuses = (results: readonly { readonly status: number }[]) =>
+  results.map((result) => result.status).toSorted((a, b) => a - b);
+
+const sortedIdentityPairs = (
+  rows: readonly { readonly id: string; readonly userId: string }[]
+) =>
+  rows
+    .map(({ id, userId }) => ({ id, userId }))
+    .toSorted((a, b) => a.id.localeCompare(b.id));
+
 test("native account linking pins purpose, both proofs and one browser session without merging accounts", async () => {
   const databaseUrl = await Effect.runPromise(
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
@@ -95,86 +208,25 @@ test("native account linking pins purpose, both proofs and one browser session w
     plugins: [channelAuthPlugin(run)],
   });
 
-  const request = (path: string, cookie: string, body?: Schema.Json) => {
-    const init: RequestInit = {
-      method: body === undefined ? "GET" : "POST",
-      headers: { cookie, origin: baseURL, "content-type": "application/json" },
-    };
+  const request = makeDeviceLinkRequest(auth, baseURL);
 
-    if (body !== undefined) init.body = JSON.stringify(body);
-
-    return auth.handler(
-      new Request(`${baseURL}/api/auth/channel-auth/${path}`, init)
-    );
-  };
-
-  const createIdentity = () =>
-    run(
-      Effect.gen(function* () {
-        const accounts = yield* ChannelAccounts;
-        const sql = yield* PgClient.PgClient;
-
-        const identity = yield* accounts.resolveVerifiedSender({
-          channel: "kapso",
-          installationId,
-          senderId: randomUUID(),
-        });
-
-        const scope = accessScopeForUser(`better-auth:${identity.userId}`);
-        const sessionId = randomUUID();
-        yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${scope.workspaceId}, ${scope.userId})`;
-
-        return {
-          identity,
-          scope,
-          source: { identityId: identity.id, sessionId },
-        };
-      })
-    );
-
-  const owner = await createIdentity();
-  const other = await createIdentity();
+  const owner = await createKapsoDeviceIdentity(run, installationId);
+  const other = await createKapsoDeviceIdentity(run, installationId);
 
   const issue = (
     purpose: "login" | "link",
     callId = randomUUID(),
     source = owner.source
-  ) =>
-    run(
-      Effect.gen(function* () {
-        const devices = yield* NativeDeviceAuth;
+  ) => issueDeviceChallenge(run, purpose, source, callId);
 
-        return yield* devices.issue({ ...source, callId, purpose });
-      })
-    );
-
-  const pending = () =>
-    run(
-      Effect.gen(function* () {
-        const devices = yield* NativeDeviceAuth;
-
-        return yield* devices.pending(owner.source);
-      })
-    );
+  const pending = () => pendingDeviceChallenges(run, owner.source);
 
   const confirm = (
     id: string,
     boundAt: string,
     purpose: "login" | "link" = "link",
     source = owner.source
-  ) =>
-    run(
-      Effect.gen(function* () {
-        const devices = yield* NativeDeviceAuth;
-
-        return yield* devices.confirm({
-          ...source,
-          challengeId: id,
-          browserBoundAt: boundAt,
-          purpose,
-        });
-      })
-    );
+  ) => confirmDeviceChallenge(run, id, boundAt, purpose, source);
 
   const signIn = async (source = owner.source) => {
     const issued = await issue("login", randomUUID(), source);
@@ -192,8 +244,9 @@ test("native account linking pins purpose, both proofs and one browser session w
       Effect.gen(function* () {
         const devices = yield* NativeDeviceAuth;
 
-        return (yield* devices.pending(source)).find(
-          (item) => item.id === issued.challenge.id
+        return findChallengeById(
+          yield* devices.pending(source),
+          issued.challenge.id
         );
       })
     );
@@ -310,7 +363,7 @@ test("native account linking pins purpose, both proofs and one browser session w
       (await request(`device?id=${input.id}&purpose=link`, boundCookie)).status,
       200
     );
-    const bound = (await pending()).find((item) => item.id === input.id);
+    const bound = findChallengeById(await pending(), input.id);
     assert.ok(bound?.browserBoundAt);
     assert.equal(bound.purpose, "link");
     await assert.rejects(confirm(bound.id, bound.browserBoundAt, "login"));
@@ -338,10 +391,7 @@ test("native account linking pins purpose, both proofs and one browser session w
       request("complete", boundCookie, { id: bound.id }),
     ]);
 
-    assert.deepEqual(
-      results.map((result) => result.status).toSorted((a, b) => a - b),
-      [200, 400]
-    );
+    assert.deepEqual(sortedHttpStatuses(results), [200, 400]);
     assert.ok(
       results.every(
         (response) =>
@@ -364,10 +414,8 @@ test("native account linking pins purpose, both proofs and one browser session w
     );
 
     assert.deepEqual(
-      owners.rows,
-      [owner.identity, other.identity]
-        .map(({ id, userId }) => ({ id, userId }))
-        .toSorted((a, b) => a.id.localeCompare(b.id))
+      sortedIdentityPairs(owners.rows),
+      sortedIdentityPairs([owner.identity, other.identity])
     );
 
     const stale = await issue("link");
@@ -395,9 +443,7 @@ test("native account linking pins purpose, both proofs and one browser session w
 
     assert.equal(expiring.status, 200);
 
-    const staleBound = (await pending()).find(
-      (item) => item.id === stale.challenge.id
-    );
+    const staleBound = findChallengeById(await pending(), stale.challenge.id);
 
     assert.ok(staleBound?.browserBoundAt);
     await pool.query(
@@ -428,8 +474,9 @@ test("native account linking pins purpose, both proofs and one browser session w
 
     assert.equal(revokedBinding.status, 200);
 
-    const revokedBound = (await pending()).find(
-      (item) => item.id === revoked.challenge.id
+    const revokedBound = findChallengeById(
+      await pending(),
+      revoked.challenge.id
     );
 
     assert.ok(revokedBound?.browserBoundAt);
