@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import { PgClient } from "@effect/sql-pg";
-import { ConfigProvider, Effect, Layer, Predicate, Result } from "effect";
+import {
+  Clock,
+  ConfigProvider,
+  Effect,
+  Layer,
+  Predicate,
+  Result,
+} from "effect";
 import type { HookContext } from "eve/hooks";
 import { expect, test } from "vitest";
 
@@ -136,7 +143,7 @@ test("outer PostgreSQL rollback removes both output chunks and their bindings", 
           Effect.gen(function* () {
             yield* dispatchNativeScheduledReport(runId);
 
-            return yield* Effect.fail("interrupt before commit");
+            return yield* Effect.fail(new Error("interrupt before commit"));
           })
         )
         .pipe(Effect.flip);
@@ -373,10 +380,16 @@ test.each(["telegram", "kapso"] as const)(
         Effect.gen(function* () {
           const sql = yield* PgClient.PgClient;
           expect(
-            yield* Effect.tryPromise(() => getScheduledReportChannel(runId))
+            yield* Effect.tryPromise({
+              try: () => getScheduledReportChannel(runId),
+              catch: (c) => (c instanceof Error ? c : new Error(String(c))),
+            })
           ).toBe(channel);
           expect(
-            yield* Effect.tryPromise(() => claimScheduledReport(runId))
+            yield* Effect.tryPromise({
+              try: () => claimScheduledReport(runId),
+              catch: (c) => (c instanceof Error ? c : new Error(String(c))),
+            })
           ).toBeUndefined();
           expect(
             (yield* sql<{
@@ -479,33 +492,38 @@ test("native completion hook persists and attempts the report before returning",
         return yield* Effect.fail(
           new Error("The completion hook is required.")
         );
-      yield* Effect.tryPromise(async () => {
-        await handler(
-          {
-            type: "message.completed",
-            data: {
-              turnId: "turn-0",
-              stepIndex: 0,
-              sequence: 1,
-              finishReason: "stop",
-              message: "Lembrete: revisar a demonstração do Companion.",
+      const at = new Date(yield* Clock.currentTimeMillis).toISOString();
+      yield* Effect.tryPromise({
+        try: async () => {
+          await handler(
+            {
+              type: "message.completed",
+              data: {
+                turnId: "turn-0",
+                stepIndex: 0,
+                sequence: 1,
+                finishReason: "stop",
+                message: "Lembrete: revisar a demonstração do Companion.",
+              },
+              meta: { id: randomUUID(), at },
             },
-            meta: { id: randomUUID(), at: new Date().toISOString() },
-          },
-          context({
-            authenticator: "scheduled-worker",
-            principalId: userId,
-            principalType: "user",
-            attributes: {
-              scheduledRunId: runId,
-              scheduledRunLeaseToken: leaseToken,
-              conversationChannel: "telegram",
-              conversationId: identityId,
-              channelIdentityId: identityId,
-              workspaceId,
-            },
-          })
-        );
+            context({
+              authenticator: "scheduled-worker",
+              principalId: userId,
+              principalType: "user",
+              attributes: {
+                scheduledRunId: runId,
+                scheduledRunLeaseToken: leaseToken,
+                conversationChannel: "telegram",
+                conversationId: identityId,
+                channelIdentityId: identityId,
+                workspaceId,
+              },
+            })
+          );
+        },
+        catch: (cause) =>
+          cause instanceof Error ? cause : new Error(String(cause)),
       });
       // The synthetic installation cannot match the configured real bot. The real
       // transport rejects before HTTP, proving this hook attempted the queued item.

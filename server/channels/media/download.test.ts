@@ -22,13 +22,12 @@ function fixtureUrl(server: Server) {
 }
 
 const download = (url: string, limit: number) =>
-  Effect.gen(function* () {
-    return yield* downloadMediaBytes(
-      yield* HttpClient.HttpClient,
-      HttpClientRequest.get(url),
-      limit
-    );
-  }).pipe(Effect.provide(FetchHttpClient.layer));
+  HttpClient.HttpClient.pipe(
+    Effect.flatMap((client) =>
+      downloadMediaBytes(client, HttpClientRequest.get(url), limit)
+    ),
+    Effect.provide(FetchHttpClient.layer)
+  );
 
 describe("bounded download over real loopback HTTP (no provider emulation)", () => {
   it("downloads a synthetic text file and decodes its actual bytes", async () => {

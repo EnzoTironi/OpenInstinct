@@ -66,7 +66,7 @@ test("channel identities, browser binding, races and revocation against migrated
           Array.from({ length: 12 }, () =>
             accounts.resolveVerifiedSender(sender)
           ),
-          { concurrency: "unbounded" }
+          { concurrency: 8 }
         );
 
         const first = results[0];
@@ -229,7 +229,7 @@ test("channel identities, browser binding, races and revocation against migrated
                 })
               )
           ),
-          { concurrency: "unbounded" }
+          { concurrency: 8 }
         );
 
         assert.equal(consumes.filter(Boolean).length, 1);

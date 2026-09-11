@@ -36,14 +36,18 @@ const fixture = Effect.fn("artifacts.fixture")(function* (
   const accounts = yield* ChannelAccounts;
   const identities: Identity[] = [];
   yield* Effect.addFinalizer(() =>
-    Effect.forEach(identities, (identity) => {
-      const scope = accessScopeForUser(`better-auth:${identity.userId}`);
+    Effect.forEach(
+      identities,
+      (identity) => {
+        const scope = accessScopeForUser(`better-auth:${identity.userId}`);
 
-      return sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`.pipe(
-        Effect.andThen(sql`DELETE FROM "user" WHERE id = ${identity.userId}`),
-        Effect.orDie
-      );
-    })
+        return sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`.pipe(
+          Effect.andThen(sql`DELETE FROM "user" WHERE id = ${identity.userId}`),
+          Effect.orDie
+        );
+      },
+      { concurrency: 1 }
+    )
   );
 
   for (let index = 0; index < 2; index++) {

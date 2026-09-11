@@ -58,7 +58,8 @@ const fixture = Effect.fn("transport.fixture")(function* (
       id,
       index
     ) => sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
-    VALUES (${id}, ${index === 6 ? "kapso" : "telegram"}, 'transport-proof', ${id}, ${userId})`
+    VALUES (${id}, ${index === 6 ? "kapso" : "telegram"}, 'transport-proof', ${id}, ${userId})`,
+    { concurrency: 1 }
   );
   yield* body(
     yield* ChannelTransport,
@@ -202,13 +203,18 @@ test.each(["inbox", "outbox"] as const)(
                 payload: { text: "fixture" },
               });
 
-        yield* Effect.forEach(identities, (id) => put(id, "first"));
+        yield* Effect.forEach(identities, (id) => put(id, "first"), {
+          concurrency: 1,
+        });
         yield* Effect.forEach(
           Array.from({ length: 30 }, (_, index) => String(index)),
-          (key) => put(noisy, key)
+          (key) => put(noisy, key),
+          { concurrency: 1 }
         );
-        yield* Effect.forEach([uncertain, expired, busy], (id) =>
-          put(id, "second")
+        yield* Effect.forEach(
+          [uncertain, expired, busy],
+          (id) => put(id, "second"),
+          { concurrency: 1 }
         );
 
         const claim =
@@ -240,7 +246,8 @@ test.each(["inbox", "outbox"] as const)(
         yield* Effect.forEach(
           identities,
           (id, index) =>
-            sql`UPDATE ${table} SET ${received} = clock_timestamp() - ${100 - index} * interval '1 minute' WHERE identity_id = ${id}`
+            sql`UPDATE ${table} SET ${received} = clock_timestamp() - ${100 - index} * interval '1 minute' WHERE identity_id = ${id}`,
+          { concurrency: 1 }
         );
 
         const candidates =
@@ -503,33 +510,37 @@ test("claims atomic text chunks in enqueue order despite tied timestamps and rev
         receipts,
         (receipt, index) =>
           sql`UPDATE channel_outbox SET id = ${`${prefix}${String(4 - index).padStart(12, "0")}`}
-          WHERE id = ${receipt.id}`
+          WHERE id = ${receipt.id}`,
+        { concurrency: 1 }
       );
       const delivered: string[] = [];
-      yield* Effect.forEach(chunks, (text, index) =>
-        Effect.gen(function* () {
-          const claim = yield* messaging.claimOutbox({
-            identityId,
-            leaseSeconds: 30,
-          });
+      yield* Effect.forEach(
+        chunks,
+        (text, index) =>
+          Effect.gen(function* () {
+            const claim = yield* messaging.claimOutbox({
+              identityId,
+              leaseSeconds: 30,
+            });
 
-          if (!claim)
-            return yield* Effect.fail(new Error("Missing ordered claim"));
-          expect(claim.key).toBe(`ordered:${String(index)}`);
-          expect(claim.payload.text).toBe(text);
-          delivered.push(text);
+            if (!claim)
+              return yield* Effect.fail(new Error("Missing ordered claim"));
+            expect(claim.key).toBe(`ordered:${String(index)}`);
+            expect(claim.payload.text).toBe(text);
+            delivered.push(text);
 
-          // This receipt exercises queue settlement only; it is not provider evidence.
-          const settled = yield* messaging.markSent({
-            lease: { identityId, id: claim.id, leaseToken: claim.leaseToken },
-            receipt: {
-              status: "sent",
-              providerMessageId: `storage-order-fixture-${String(index)}`,
-            },
-          });
+            // This receipt exercises queue settlement only; it is not provider evidence.
+            const settled = yield* messaging.markSent({
+              lease: { identityId, id: claim.id, leaseToken: claim.leaseToken },
+              receipt: {
+                status: "sent",
+                providerMessageId: `storage-order-fixture-${String(index)}`,
+              },
+            });
 
-          expect(settled.status).toBe("sent");
-        })
+            expect(settled.status).toBe("sent");
+          }),
+        { concurrency: 1 }
       );
       expect(delivered.join("")).toBe(chunks.join(""));
       expect(
@@ -590,7 +601,7 @@ test("settled task reports retain the first atomic delivery across concurrent re
         wording.map((text) =>
           transport.enqueueTaskReport({ identityId, deliveryKey, text })
         ),
-        { concurrency: "unbounded" }
+        { concurrency: 8 }
       );
 
       expect(first?.map((receipt) => receipt.id)).toEqual(
@@ -692,7 +703,8 @@ test("the dispatcher recovers native inputs before and after preparation while b
               lease,
               reason: "handoff_unknown",
             });
-          })
+          }),
+        { concurrency: 1 }
       );
       yield* messaging.enqueue({
         identityId: outboundId,

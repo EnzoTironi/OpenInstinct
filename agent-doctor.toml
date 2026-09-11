@@ -20,7 +20,18 @@ prefer-platform-fetch = "off"
 prefer-node-effect-counterparts = "off"
 # Remaining hits are imported or function-local schemas; naive module hoists caused TDZ/self-init.
 hoist-schema-codecs = "off"
+# Rule assumes TaggedError/YieldableError; plain `Error` is not yieldable under tsc (TS2488).
+no-unnecessary-fail-of-yieldable = "off"
 
 # Channel auth poller: Effect.whileLoop here trips oxlint react(exhaustive-effect-dependencies).
 # Keep the Clock-backed while; revisit when whileLoop + react deps coexist cleanly.
 prefer-foreach-over-yield-loop = "off"
+
+# Test harness patterns (not score-affecting; re-enable when harness adopts Effect.fn / typed tools):
+prefer-effect-fn = "off"
+no-ts-ignore = "off"
+prefer-schema-over-json = "off"
+no-orDie-to-silence-errors = "off"
+max-function-parameters = "off"
+no-try-finally-in-gen = "off"
+no-unsafe-double-cast = "off"

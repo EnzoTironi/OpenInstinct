@@ -29,15 +29,18 @@ function fixtureUrl(server: Server, path = "/send") {
 }
 
 const call = (url: string) =>
-  Effect.gen(function* () {
-    return yield* requestProviderJson(
-      yield* HttpClient.HttpClient,
-      "telegram",
-      HttpClientRequest.post(url).pipe(
-        HttpClientRequest.bodyJsonUnsafe({ text: "hello" })
+  HttpClient.HttpClient.pipe(
+    Effect.flatMap((client) =>
+      requestProviderJson(
+        client,
+        "telegram",
+        HttpClientRequest.post(url).pipe(
+          HttpClientRequest.bodyJsonUnsafe({ text: "hello" })
+        )
       )
-    );
-  }).pipe(Effect.provide(FetchHttpClient.layer));
+    ),
+    Effect.provide(FetchHttpClient.layer)
+  );
 
 describe("retry_after parsing", () => {
   it("bounds missing and malformed delays to the default", () => {

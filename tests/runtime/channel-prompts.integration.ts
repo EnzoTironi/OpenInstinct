@@ -123,7 +123,7 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
 
         const receipts = yield* Effect.all(
           Array.from({ length: 8 }, () => prompts.prepare(request)),
-          { concurrency: "unbounded" }
+          { concurrency: 8 }
         );
 
         for (const receipt of receipts)
@@ -178,7 +178,7 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
 
         const claims = yield* Effect.all(
           Array.from({ length: 8 }, () => prompts.claim(challenge.challengeId)),
-          { concurrency: "unbounded" }
+          { concurrency: 8 }
         );
 
         assert.equal(claims.filter(Boolean).length, 1);
