@@ -3,39 +3,57 @@ export function isSameOrigin(request: Request) {
 
   if (!origin) return true;
 
-  let parsedOrigin: URL;
+  const parsedOrigin = parseOriginHeader(origin);
 
-  try {
-    parsedOrigin = new URL(origin);
-  } catch {
-    return false;
-  }
+  if (!parsedOrigin) return false;
 
   const requestUrl = new URL(request.url);
+  const allowedOrigins = collectAllowedOrigins(request, requestUrl);
+
+  return allowedOrigins.has(parsedOrigin.origin);
+}
+
+function parseOriginHeader(origin: string) {
+  try {
+    return new URL(origin);
+  } catch {
+    return null;
+  }
+}
+
+function collectAllowedOrigins(request: Request, requestUrl: URL) {
   const allowedOrigins = new Set([requestUrl.origin]);
 
   const protocol =
     firstForwardedValue(request.headers.get("x-forwarded-proto")) ??
     requestUrl.protocol;
 
-  for (const value of [
-    request.headers.get("x-forwarded-host"),
-    request.headers.get("host"),
-  ]) {
-    const host = firstForwardedValue(value);
+  addForwardedHostOrigin(
+    allowedOrigins,
+    protocol,
+    request.headers.get("x-forwarded-host")
+  );
+  addForwardedHostOrigin(allowedOrigins, protocol, request.headers.get("host"));
 
-    if (!host) continue;
+  return allowedOrigins;
+}
 
-    try {
-      allowedOrigins.add(
-        new URL(`${normalizeProtocol(protocol)}//${host}`).origin
-      );
-    } catch {
-      continue;
-    }
+function addForwardedHostOrigin(
+  allowedOrigins: Set<string>,
+  protocol: string,
+  value: string | null
+) {
+  const host = firstForwardedValue(value);
+
+  if (!host) return;
+
+  try {
+    allowedOrigins.add(
+      new URL(`${normalizeProtocol(protocol)}//${host}`).origin
+    );
+  } catch {
+    return;
   }
-
-  return allowedOrigins.has(parsedOrigin.origin);
 }
 
 function firstForwardedValue(value: string | null) {

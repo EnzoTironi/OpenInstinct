@@ -1,7 +1,7 @@
 import type { InstallationSecrets } from "@db/services/installation-secrets";
 import type { get, put } from "@vercel/blob";
 import { Effect, Redacted } from "effect";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 const mocks = vi.hoisted(() => ({
@@ -30,7 +30,6 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("installation secrets", () => {
   it("atomically creates and caches independent secrets in private Blob", async () => {
     mocks.get.mockResolvedValue(null);
     mocks.put.mockResolvedValue({
