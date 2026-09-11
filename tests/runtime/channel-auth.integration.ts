@@ -46,6 +46,50 @@ const cookieHeader = (response: Response) =>
     .map((cookie) => cookie.split(";")[0])
     .join("; ");
 
+interface ChallengeSender {
+  readonly channel: "telegram";
+  readonly installationId: string;
+  readonly senderId: string;
+}
+
+const confirmChannelChallenge = (token: string, sender: ChallengeSender) =>
+  Effect.gen(function* () {
+    const accounts = yield* ChannelAccounts;
+    yield* accounts.confirmChallenge({ token, sender });
+  });
+
+const readActiveChannelIdentity = (sender: ChallengeSender) =>
+  Effect.gen(function* () {
+    const accounts = yield* ChannelAccounts;
+
+    return yield* accounts.getActiveIdentity(sender);
+  });
+
+const hasSessionTokenCookie = (cookies: readonly string[]) =>
+  cookies.some((cookie) => cookie.includes("session_token="));
+
+const deleteChannelAuthUser = (sql: PgClient.PgClient, id: string) =>
+  Effect.gen(function* () {
+    yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
+    yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
+  });
+
+const cleanupChannelAuthInstallation = (
+  installationId: string,
+  userIds: ReadonlySet<string>
+) =>
+  Effect.gen(function* () {
+    const sql = yield* PgClient.PgClient;
+    yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
+    yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
+
+    yield* Effect.forEach(
+      [...userIds],
+      (id) => deleteChannelAuthUser(sql, id),
+      { concurrency: 1 }
+    );
+  });
+
 test("real BetterAuth router, signed browser challenge and database session", async () => {
   const url = await Effect.runPromise(
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
@@ -221,12 +265,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
       senderId: randomUUID(),
     };
 
-    await runtime.runPromise(
-      Effect.gen(function* () {
-        const accounts = yield* ChannelAccounts;
-        yield* accounts.confirmChallenge({ token, sender });
-      })
-    );
+    await runtime.runPromise(confirmChannelChallenge(token, sender));
 
     const confirmed = await request({
       path: `/channel-auth/status?id=${challenge.id}`,
@@ -259,11 +298,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
     assert.deepEqual(await completed.json(), { ok: true });
 
     const identity = await runtime.runPromise(
-      Effect.gen(function* () {
-        const accounts = yield* ChannelAccounts;
-
-        return yield* accounts.getActiveIdentity(sender);
-      })
+      readActiveChannelIdentity(sender)
     );
 
     userIds.add(identity.userId);
@@ -309,12 +344,9 @@ test("real BetterAuth router, signed browser challenge and database session", as
     const linkToken = new URL(linkChallenge.deepLink).searchParams.get("start");
     assert.ok(linkToken);
     await runtime.runPromise(
-      Effect.gen(function* () {
-        const accounts = yield* ChannelAccounts;
-        yield* accounts.confirmChallenge({
-          token: linkToken,
-          sender: { ...sender, senderId: randomUUID() },
-        });
+      confirmChannelChallenge(linkToken, {
+        ...sender,
+        senderId: randomUUID(),
       })
     );
     const linkBrowser = cookieHeader(linking);
@@ -336,12 +368,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
     });
 
     assert.equal(linked.status, 200);
-    assert.equal(
-      linked.headers
-        .getSetCookie()
-        .some((cookie) => cookie.includes("session_token=")),
-      false
-    );
+    assert.equal(hasSessionTokenCookie(linked.headers.getSetCookie()), false);
 
     const sessionCount = await pool.query<{ count: number }>(
       'SELECT count(*)::int AS count FROM public.session WHERE "userId" = $1',
@@ -380,20 +407,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
     assert.equal(kapsoStarted.headers.getSetCookie().length, 0);
   } finally {
     await runtime.runPromise(
-      Effect.gen(function* () {
-        const sql = yield* PgClient.PgClient;
-        yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
-        yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
-
-        yield* Effect.forEach(
-          [...userIds],
-          Effect.fn("auth.deleteUser")(function* (id) {
-            yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
-            yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
-          }),
-          { concurrency: 1 }
-        );
-      })
+      cleanupChannelAuthInstallation(installationId, userIds)
     );
     await runtime.dispose();
     await pool.end();
