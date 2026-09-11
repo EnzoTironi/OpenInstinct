@@ -73,9 +73,12 @@ function insertOwnerSessions(
   return Effect.gen(function* () {
     const sql = yield* PgClient.PgClient;
 
-    for (const id of sessionIds) {
-      yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${id}, ${workspaceId}, ${userId})`;
-    }
+    yield* Effect.forEach(
+      sessionIds,
+      (id) =>
+        sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${id}, ${workspaceId}, ${userId})`,
+      { concurrency: 1 }
+    );
   });
 }
 
