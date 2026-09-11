@@ -1,6 +1,6 @@
-import type { WorkstreamContent } from "@shared/workstreams/schema";
 import { db, workspaces, workstreams } from "@db";
 import type { AccessScope } from "@shared/identity/access-scope";
+import type { WorkstreamContent } from "@shared/workstreams/schema";
 import {
   findWorkstreamsSchema,
   forgetWorkstreamSchema,
