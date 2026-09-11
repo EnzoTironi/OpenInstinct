@@ -138,16 +138,17 @@ export default defineConfig({
     "prefer-template": "off",
     "prefer-object-spread": "off",
     "require-unicode-regexp": "off",
-    // Built-in cyclomatic complexity (keep on as a coarse gate).
-    complexity: ["error", 20],
+    // Built-in cyclomatic `complexity` stays off — oxlint-plugin-complexity
+    // owns both cyclomatic (20) and cognitive (6) below.
+    complexity: "off",
     // Cognitive complexity — user-facing limit is 6 (agent-doctor stays at default 15).
     "complexity/complexity": [
       "error",
       {
         cyclomatic: 20,
         cognitive: 6,
-        // Analyze short helpers too — default minLines:10 would skip many Effect.fn bodies.
-        minLines: 0,
+        // Default minLines (10): skip tiny getters/one-liners; still enforce ≤6 on
+        // substantial functions (≥10 lines). Matches Ultracite plugin docs pattern.
       },
     ],
     "max-classes-per-file": "off",
