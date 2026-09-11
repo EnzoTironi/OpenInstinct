@@ -18,6 +18,7 @@ const composeArguments = (...args: string[]) => [
   ...args,
 ];
 
+// oxlint-disable-next-line eslint/no-restricted-properties -- the eval supervisor must forward model credentials and provider configuration to its child processes
 const inheritedEnvironment = { ...process.env };
 
 let activeChild: ChildProcess | undefined;

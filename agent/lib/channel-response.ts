@@ -135,6 +135,7 @@ export async function readChannelResponseTurnStream(
   try {
     for (let index = 0; index <= tail; index++) {
       signal.throwIfAborted();
+      // oxlint-disable-next-line eslint/no-await-in-loop
       const item = await reader.read();
 
       if (item.done)
