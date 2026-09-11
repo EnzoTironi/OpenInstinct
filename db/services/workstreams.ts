@@ -1,3 +1,4 @@
+import type { WorkstreamContent } from "@shared/workstreams/schema";
 import { db, workspaces, workstreams } from "@db";
 import type { AccessScope } from "@shared/identity/access-scope";
 import {
@@ -86,6 +87,150 @@ export async function readWorkstream(
   return row ? workstreamResult(row) : null;
 }
 
+function revisionMismatch(
+  current: typeof workstreams.$inferSelect | undefined,
+  expectedRevision: number
+) {
+  const revision = current?.revision ?? 0;
+
+  if (revision !== expectedRevision) return true;
+
+  return current?.content === null;
+}
+
+async function assertWorkstreamCapacity(
+  transaction: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  scope: AccessScope,
+  scopeKey: string
+) {
+  const [total] = await transaction
+    .select({ value: count() })
+    .from(workstreams)
+    .where(
+      and(
+        eq(workstreams.workspaceId, scope.workspaceId),
+        eq(workstreams.scopeKey, scopeKey),
+        isNotNull(workstreams.content)
+      )
+    );
+
+  if ((total?.value ?? 0) < 100) return;
+
+  throw new Error(
+    "Workstream memory is full (100 records). Ask which obsolete workstream to forget before adding another."
+  );
+}
+
+async function writeWorkstreamRow(
+  transaction: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  input: {
+    current: typeof workstreams.$inferSelect | undefined;
+    identity: ReturnType<typeof and>;
+    values: {
+      content: WorkstreamContent;
+      lastOperationId: string;
+      revision: number;
+      sessionId: string;
+      updatedAt: Date;
+    };
+    id: string;
+    scopeKey: string;
+    workspaceId: string;
+    expectedRevision: number;
+  }
+) {
+  if (input.current) {
+    const [saved] = await transaction
+      .update(workstreams)
+      .set(input.values)
+      .where(
+        and(
+          input.identity,
+          eq(workstreams.revision, input.expectedRevision),
+          isNotNull(workstreams.content)
+        )
+      )
+      .returning();
+
+    return saved;
+  }
+
+  const [saved] = await transaction
+    .insert(workstreams)
+    .values({
+      ...input.values,
+      id: input.id,
+      scopeKey: input.scopeKey,
+      workspaceId: input.workspaceId,
+    })
+    .returning();
+
+  return saved;
+}
+
+async function saveWorkstreamInTransaction(
+  transaction: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  scope: AccessScope,
+  scopeKey: string,
+  parsed: z.infer<typeof saveWorkstreamSchema>,
+  operationId: string,
+  sessionId: string
+) {
+  await transaction
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(eq(workspaces.id, scope.workspaceId))
+    .for("update");
+
+  const identity = and(
+    eq(workstreams.workspaceId, scope.workspaceId),
+    eq(workstreams.scopeKey, scopeKey),
+    eq(workstreams.id, parsed.id)
+  );
+
+  const [current] = await transaction
+    .select()
+    .from(workstreams)
+    .where(identity)
+    .limit(1);
+
+  if (current?.lastOperationId === operationId) {
+    return workstreamResult(current);
+  }
+
+  if (revisionMismatch(current, parsed.expectedRevision)) {
+    throw new Error(
+      "Workstream changed or was forgotten. Read it again and reconcile your update; use a new ID for a forgotten workstream."
+    );
+  }
+
+  if (!current) {
+    await assertWorkstreamCapacity(transaction, scope, scopeKey);
+  }
+
+  const values = {
+    content: parsed.content,
+    lastOperationId: operationId,
+    revision: parsed.expectedRevision + 1,
+    sessionId,
+    updatedAt: new Date(),
+  };
+
+  const saved = await writeWorkstreamRow(transaction, {
+    current,
+    identity,
+    values,
+    id: parsed.id,
+    scopeKey,
+    workspaceId: scope.workspaceId,
+    expectedRevision: parsed.expectedRevision,
+  });
+
+  if (!saved) throw new Error("The workstream could not be saved.");
+
+  return workstreamResult(saved);
+}
+
 export async function saveWorkstream(
   scope: AccessScope,
   scopeKey: string,
@@ -93,88 +238,19 @@ export async function saveWorkstream(
   operationId: string,
   sessionId: string
 ) {
-  const { id, expectedRevision, content } = saveWorkstreamSchema.parse(input);
+  const parsed = saveWorkstreamSchema.parse(input);
   await ensureScope(scope);
 
-  return db.transaction(async (transaction) => {
-    // Serialize capacity checks and writes for this workspace, including new IDs.
-    await transaction
-      .select({ id: workspaces.id })
-      .from(workspaces)
-      .where(eq(workspaces.id, scope.workspaceId))
-      .for("update");
-
-    const identity = and(
-      eq(workstreams.workspaceId, scope.workspaceId),
-      eq(workstreams.scopeKey, scopeKey),
-      eq(workstreams.id, id)
-    );
-
-    const [current] = await transaction
-      .select()
-      .from(workstreams)
-      .where(identity)
-      .limit(1);
-
-    if (current?.lastOperationId === operationId)
-      return workstreamResult(current);
-
-    if (
-      (current?.revision ?? 0) !== expectedRevision ||
-      current?.content === null
-    ) {
-      throw new Error(
-        "Workstream changed or was forgotten. Read it again and reconcile your update; use a new ID for a forgotten workstream."
-      );
-    }
-
-    if (!current) {
-      const [total] = await transaction
-        .select({ value: count() })
-        .from(workstreams)
-        .where(
-          and(
-            eq(workstreams.workspaceId, scope.workspaceId),
-            eq(workstreams.scopeKey, scopeKey),
-            isNotNull(workstreams.content)
-          )
-        );
-
-      if ((total?.value ?? 0) >= 100)
-        throw new Error(
-          "Workstream memory is full (100 records). Ask which obsolete workstream to forget before adding another."
-        );
-    }
-
-    const values = {
-      content,
-      lastOperationId: operationId,
-      revision: expectedRevision + 1,
-      sessionId,
-      updatedAt: new Date(),
-    };
-
-    const [saved] = current
-      ? await transaction
-          .update(workstreams)
-          .set(values)
-          .where(
-            and(
-              identity,
-              eq(workstreams.revision, expectedRevision),
-              isNotNull(workstreams.content)
-            )
-          )
-          .returning()
-      : await transaction
-          .insert(workstreams)
-          .values({ ...values, id, scopeKey, workspaceId: scope.workspaceId })
-          .returning();
-
-    if (!saved) throw new Error("The workstream could not be saved.");
-
-    return workstreamResult(saved);
-  });
+  return db.transaction((transaction) =>
+    saveWorkstreamInTransaction(
+      transaction,
+      scope,
+      scopeKey,
+      parsed,
+      operationId,
+      sessionId
+    )
+  );
 }
 
 export async function forgetWorkstream(
