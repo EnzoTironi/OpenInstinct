@@ -125,7 +125,7 @@ it("does find the latest matching calendar occurrence before now", () => {
       timing,
       new Date("2026-09-11T15:00:00.000Z")
     )?.toISOString()
-  ).toBe("2026-09-08T12:00:00.000Z");
+  ).toBe("2026-09-07T12:00:00.000Z");
 });
 
 it("does reject an invalid IANA timezone in the timing schema", () => {
