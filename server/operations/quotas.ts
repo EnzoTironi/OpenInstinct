@@ -1,5 +1,5 @@
 import { type BillingPlanId, quotaLimitsForPlan } from "@shared/billing/plans";
-import { Effect, Schema, Match } from "effect";
+import { Effect, Schema } from "effect";
 
 /**
  * Release-1 self-host minimum quotas (P11 admission).
