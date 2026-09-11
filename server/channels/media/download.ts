@@ -11,6 +11,41 @@ const contentLength = Schema.String.check(Schema.isPattern(/^[0-9]+$/u));
 
 const decodeEffect_contentLength = Schema.decodeUnknownEffect(contentLength);
 
+const downloadFailed = () =>
+  new ChannelMediaError({ reason: "download_failed" });
+
+const tooLarge = () => new ChannelMediaError({ reason: "too_large" });
+
+const emptyFoldState = () => ({ size: 0, chunks: new Array<Uint8Array>() });
+
+const appendDownloadChunk = (
+  state: { size: number; chunks: Uint8Array[] },
+  chunk: Uint8Array,
+  maxBytes: number
+) => {
+  if (state.size + chunk.length > maxBytes) return Effect.fail(tooLarge());
+  state.size += chunk.length;
+  state.chunks.push(chunk);
+
+  return Effect.succeed(state);
+};
+
+const enforceDeclaredContentLength = (
+  declared: string | undefined,
+  maxBytes: number
+) =>
+  Effect.gen(function* () {
+    if (declared === undefined) return;
+
+    const length = yield* decodeEffect_contentLength(declared).pipe(
+      Effect.mapError(downloadFailed)
+    );
+
+    if (Number(length) > maxBytes) {
+      yield* tooLarge();
+    }
+  });
+
 export const downloadMediaBytes = Effect.fn("downloadMediaBytes")(
   function* (
     client: HttpClient.HttpClient,
@@ -19,41 +54,18 @@ export const downloadMediaBytes = Effect.fn("downloadMediaBytes")(
   ) {
     const response = yield* HttpClient.withScope(client)
       .execute(request)
-      .pipe(
-        Effect.mapError(
-          () => new ChannelMediaError({ reason: "download_failed" })
-        )
-      );
+      .pipe(Effect.mapError(downloadFailed));
 
-    if (response.status !== 200)
-      return yield* new ChannelMediaError({ reason: "download_failed" });
-    const declared = response.headers["content-length"];
-
-    if (declared !== undefined) {
-      const length = yield* decodeEffect_contentLength(declared).pipe(
-        Effect.mapError(
-          () => new ChannelMediaError({ reason: "download_failed" })
-        )
-      );
-
-      if (Number(length) > maxBytes)
-        return yield* new ChannelMediaError({ reason: "too_large" });
-    }
+    if (response.status !== 200) return yield* downloadFailed();
+    yield* enforceDeclaredContentLength(
+      response.headers["content-length"],
+      maxBytes
+    );
 
     const body = yield* response.stream.pipe(
-      Stream.mapError(
-        () => new ChannelMediaError({ reason: "download_failed" })
-      ),
-      Stream.runFoldEffect(
-        () => ({ size: 0, chunks: new Array<Uint8Array>() }),
-        (state, chunk) => {
-          if (state.size + chunk.length > maxBytes)
-            return Effect.fail(new ChannelMediaError({ reason: "too_large" }));
-          state.size += chunk.length;
-          state.chunks.push(chunk);
-
-          return Effect.succeed(state);
-        }
+      Stream.mapError(downloadFailed),
+      Stream.runFoldEffect(emptyFoldState, (state, chunk) =>
+        appendDownloadChunk(state, chunk, maxBytes)
       )
     );
 
@@ -61,10 +73,7 @@ export const downloadMediaBytes = Effect.fn("downloadMediaBytes")(
   },
   Effect.scoped,
   Effect.timeout("15 seconds"),
-  Effect.catchTag(
-    "TimeoutError",
-    () => new ChannelMediaError({ reason: "download_failed" })
-  ),
+  Effect.catchTag("TimeoutError", downloadFailed),
   Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
   Effect.provideService(HttpClient.TracerDisabledWhen, () => true),
   Effect.provideService(HttpClient.TracerPropagationEnabled, false)

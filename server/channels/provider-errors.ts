@@ -195,6 +195,33 @@ const resolveRetryAfterSeconds = Effect.fn("resolveRetryAfterSeconds")(
 // effect: even a transport failure may follow a successful external action.
 // HTTP 429 is a definite rejection with a provider delay; the outbox schedules
 // the next attempt instead of retrying inside this call.
+const providerTransportUncertain = (channel: "telegram" | "kapso") =>
+  new ProviderUncertain({ provider: channel, reason: "transport" });
+
+const providerMalformedReceipt = (channel: "telegram" | "kapso") =>
+  new ProviderUncertain({
+    provider: channel,
+    reason: "malformed_receipt",
+  });
+
+const isClientRejectStatus = (status: number) => {
+  if (status < 400 || status >= 500) return false;
+
+  return status !== 408;
+};
+
+const isUnexpectedHttpStatus = (status: number) => {
+  if (status < 200) return true;
+
+  return status >= 300;
+};
+
+const unexpectedStatusReason = (status: number) => {
+  if (status >= 500) return "server_error" as const;
+
+  return "unexpected_status" as const;
+};
+
 export const requestProviderJson = Effect.fn("requestProviderJson")(
   function* (
     client: HttpClient.HttpClient,
@@ -203,12 +230,7 @@ export const requestProviderJson = Effect.fn("requestProviderJson")(
   ) {
     const response = yield* client
       .execute(request)
-      .pipe(
-        Effect.mapError(
-          () =>
-            new ProviderUncertain({ provider: channel, reason: "transport" })
-        )
-      );
+      .pipe(Effect.mapError(() => providerTransportUncertain(channel)));
 
     if (response.status === 429) {
       const retryAfterSeconds = yield* resolveRetryAfterSeconds(
@@ -223,21 +245,17 @@ export const requestProviderJson = Effect.fn("requestProviderJson")(
       });
     }
 
-    if (
-      response.status >= 400 &&
-      response.status < 500 &&
-      response.status !== 408
-    ) {
+    if (isClientRejectStatus(response.status)) {
       return yield* new ProviderRejected({
         provider: channel,
         status: response.status,
       });
     }
 
-    if (response.status < 200 || response.status >= 300) {
+    if (isUnexpectedHttpStatus(response.status)) {
       return yield* new ProviderUncertain({
         provider: channel,
-        reason: response.status >= 500 ? "server_error" : "unexpected_status",
+        reason: unexpectedStatusReason(response.status),
       });
     }
 
@@ -245,15 +263,7 @@ export const requestProviderJson = Effect.fn("requestProviderJson")(
 
     return yield* decodeSchema_fromJsonString_Schema_Json(
       Buffer.concat(body.chunks, body.size).toString("utf8")
-    ).pipe(
-      Effect.mapError(
-        () =>
-          new ProviderUncertain({
-            provider: channel,
-            reason: "malformed_receipt",
-          })
-      )
-    );
+    ).pipe(Effect.mapError(() => providerMalformedReceipt(channel)));
   },
   (operation, _client, channel) =>
     operation.pipe(
