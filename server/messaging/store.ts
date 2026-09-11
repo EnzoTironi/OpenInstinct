@@ -51,23 +51,33 @@ const queues = {
 
 export type Lane = keyof typeof queues;
 
-export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
-  const queue = queues[lane];
-  const table = sql(queue.table);
+interface QueueParts {
+  readonly sql: PgClient.PgClient;
+  readonly lane: Lane;
+  readonly queue: (typeof queues)[Lane];
+}
 
-  const sourceMessageId =
-    lane === "inbox" ? sql`source_message_id` : sql`NULL::text`;
+const queueTable = (parts: QueueParts) => parts.sql(parts.queue.table);
 
-  const nativeInput = lane === "inbox" ? sql`native_input` : sql`NULL::jsonb`;
+const queueSourceMessageId = (parts: QueueParts) =>
+  parts.lane === "inbox" ? parts.sql`source_message_id` : parts.sql`NULL::text`;
 
-  const columns = sql`id, identity_id AS "identityId", ${sql(queue.key)} AS key,
-    ${sourceMessageId} AS "sourceMessageId", payload, ${nativeInput} AS "nativeInput", status, attempts, lease_token AS "leaseToken",
+const queueNativeInput = (parts: QueueParts) =>
+  parts.lane === "inbox" ? parts.sql`native_input` : parts.sql`NULL::jsonb`;
+
+const queueColumns = (parts: QueueParts) => {
+  const { sql, queue } = parts;
+
+  return sql`id, identity_id AS "identityId", ${sql(queue.key)} AS key,
+    ${queueSourceMessageId(parts)} AS "sourceMessageId", payload, ${queueNativeInput(parts)} AS "nativeInput", status, attempts, lease_token AS "leaseToken",
     lease_expires_at::text AS "leaseExpiresAt", ${sql(queue.result)} AS "resultId",
     last_error AS "lastError"`;
+};
 
-  const lockActive = Effect.fn("Messaging.lockActive")(function* (
-    identityId: string
-  ) {
+const makeLockActive = (parts: QueueParts) =>
+  Effect.fn("Messaging.lockActive")(function* (identityId: string) {
+    const { sql } = parts;
+
     const rows = yield* sql<{
       active: boolean;
     }>`SELECT revoked_at IS NULL AS active
@@ -78,7 +88,27 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
     return undefined;
   });
 
-  const insert = Effect.fn("Messaging.insert")(function* (input: {
+const intentHashForInsert = (
+  lane: Lane,
+  sourceMessageId: string | null,
+  canonicalHash: string
+) => {
+  if (lane !== "inbox") return canonicalHash;
+
+  return createHash("sha256")
+    .update(encodeJson([sourceMessageId, canonicalHash]))
+    .digest("hex");
+};
+
+const makeInsert = (
+  parts: QueueParts,
+  lockActive: ReturnType<typeof makeLockActive>
+) => {
+  const { sql, lane, queue } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.fn("Messaging.insert")(function* (input: {
     identityId: string;
     key: string;
     sourceMessageId: string | null;
@@ -87,12 +117,11 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
     yield* lockActive(input.identityId);
     const canonical = canonicalPayload(input.payload);
 
-    const hash =
-      lane === "inbox"
-        ? createHash("sha256")
-            .update(encodeJson([input.sourceMessageId, canonical.hash]))
-            .digest("hex")
-        : canonical.hash;
+    const hash = intentHashForInsert(
+      lane,
+      input.sourceMessageId,
+      canonical.hash
+    );
 
     const existing = yield* sql<{ id: string; hash: string }>`
       SELECT id, ${sql(queue.hash)} AS hash FROM ${table}
@@ -123,8 +152,40 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
+};
 
-  const claim = Effect.fn("Messaging.claim")(function* (
+const cancelQueuedOutbox = (parts: QueueParts, identityId: string) => {
+  const { sql, lane } = parts;
+
+  if (lane !== "outbox") return Effect.void;
+
+  const table = queueTable(parts);
+
+  return sql`UPDATE ${table} SET status = 'cancelled', last_error = 'identity_revoked'
+          WHERE identity_id = ${identityId} AND status = 'queued'`;
+};
+
+const claimSnapshotFragment = (
+  parts: QueueParts,
+  channel: string,
+  principalId: string
+) => {
+  const { sql, lane } = parts;
+
+  if (lane !== "inbox") return sql``;
+
+  return sql`, native_input = COALESCE(native_input, jsonb_build_object(
+          'protocol', 'eve-keyed-input-v1', 'inputId', id::text,
+          'channel', ${channel}::text, 'address', identity_id::text,
+          'principalId', ${principalId}::text, 'content', NULL))`;
+};
+
+const makeClaim = (parts: QueueParts) => {
+  const { sql, lane, queue } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.fn("Messaging.claim")(function* (
     identityId: string,
     leaseSeconds: number
   ) {
@@ -142,10 +203,7 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
         AND lease_expires_at <= clock_timestamp()`;
 
     if (!identities[0].active) {
-      if (lane === "outbox") {
-        yield* sql`UPDATE ${table} SET status = 'cancelled', last_error = 'identity_revoked'
-          WHERE identity_id = ${identityId} AND status = 'queued'`;
-      }
+      yield* cancelQueuedOutbox(parts, identityId);
 
       return null;
     }
@@ -159,13 +217,11 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     if (blocked.length > 0) return null;
 
-    const snapshot =
-      lane === "inbox"
-        ? sql`, native_input = COALESCE(native_input, jsonb_build_object(
-          'protocol', 'eve-keyed-input-v1', 'inputId', id::text,
-          'channel', ${identities[0].channel}::text, 'address', identity_id::text,
-          'principalId', ${identities[0].principalId}::text, 'content', NULL))`
-        : sql``;
+    const snapshot = claimSnapshotFragment(
+      parts,
+      identities[0].channel,
+      identities[0].principalId
+    );
 
     // lease_expires_at on queued rows is a not-before time for rate-limit deferral.
     const rows =
@@ -179,12 +235,21 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
         AND (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp())
       RETURNING ${columns}`;
 
-    return rows[0] ? yield* decodeMessageClaimSchema(rows[0]) : null;
-  }, sql.withTransaction);
+    if (!rows[0]) return null;
 
-  const requireLease = Effect.fn("Messaging.requireLease")(function* (
-    lease: Lease
-  ) {
+    return yield* decodeMessageClaimSchema(rows[0]);
+  }, sql.withTransaction);
+};
+
+const makeRequireLease = (
+  parts: QueueParts,
+  lockActive: ReturnType<typeof makeLockActive>
+) => {
+  const { sql } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.fn("Messaging.requireLease")(function* (lease: Lease) {
     yield* lockActive(lease.identityId);
 
     const rows = yield* sql`SELECT ${columns} FROM ${table}
@@ -196,8 +261,17 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     return yield* decodeReceipt(rows[0]);
   });
+};
 
-  const complete = Effect.fn("Messaging.complete")(function* (
+const makeComplete = (
+  parts: QueueParts,
+  requireLease: ReturnType<typeof makeRequireLease>
+) => {
+  const { sql, queue } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.fn("Messaging.complete")(function* (
     lease: Lease,
     resultId: string
   ) {
@@ -213,8 +287,17 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
+};
 
-  const stop = Effect.fn("Messaging.stop")(function* (
+const makeStop = (
+  parts: QueueParts,
+  requireLease: ReturnType<typeof makeRequireLease>
+) => {
+  const { sql } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.fn("Messaging.stop")(function* (
     lease: Lease,
     status: "uncertain" | "failed",
     reason: DeliveryFailure
@@ -231,8 +314,13 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
+};
 
-  const loadUncertainRow = Effect.fn("Messaging.loadUncertainRow")(function* (
+const makeLoadUncertainRow = (parts: QueueParts) => {
+  const { sql } = parts;
+  const table = queueTable(parts);
+
+  return Effect.fn("Messaging.loadUncertainRow")(function* (
     input: ResolveOutboxUncertainInput
   ) {
     const current = yield* sql<{
@@ -248,45 +336,63 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     return current[0];
   });
+};
 
-  const resolveIdempotentSettled = Effect.fn(
-    "Messaging.resolveIdempotentSettled"
-  )(function* (
+interface UncertainRow {
+  readonly status: string;
+  readonly lastError: string | null;
+  readonly resultId: string | null;
+}
+
+const isIdempotentDelivered = (
+  decision: OutboxResolutionDecision,
+  row: UncertainRow
+) =>
+  decision.kind === "mark_delivered" &&
+  row.status === "sent" &&
+  row.resultId === decision.providerMessageId;
+
+const isIdempotentCancel = (
+  decision: OutboxResolutionDecision,
+  row: UncertainRow
+) =>
+  decision.kind === "cancel" &&
+  row.status === "cancelled" &&
+  row.lastError === decision.reason;
+
+const isIdempotentRetry = (
+  decision: OutboxResolutionDecision,
+  row: UncertainRow
+) =>
+  decision.kind === "authorize_retry" &&
+  row.status === "queued" &&
+  row.lastError === "duplicate_retry_authorized";
+
+const makeResolveIdempotentSettled = (parts: QueueParts) => {
+  const { sql } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.fn("Messaging.resolveIdempotentSettled")(function* (
     input: ResolveOutboxUncertainInput,
-    row: {
-      readonly status: string;
-      readonly lastError: string | null;
-      readonly resultId: string | null;
-    },
+    row: UncertainRow,
     decision: OutboxResolutionDecision
   ) {
-    if (
-      decision.kind === "mark_delivered" &&
-      row.status === "sent" &&
-      row.resultId === decision.providerMessageId
-    ) {
+    if (isIdempotentDelivered(decision, row)) {
       const existing =
         yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
 
       return yield* decodeReceipt(existing[0]);
     }
 
-    if (
-      decision.kind === "cancel" &&
-      row.status === "cancelled" &&
-      row.lastError === decision.reason
-    ) {
+    if (isIdempotentCancel(decision, row)) {
       const existing =
         yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
 
       return yield* decodeReceipt(existing[0]);
     }
 
-    if (
-      decision.kind === "authorize_retry" &&
-      row.status === "queued" &&
-      row.lastError === "duplicate_retry_authorized"
-    ) {
+    if (isIdempotentRetry(decision, row)) {
       const existing =
         yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
 
@@ -298,15 +404,90 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
       reason: "not_uncertain",
     });
   });
+};
 
-  const applyUncertainDecision = Effect.fn("Messaging.applyUncertainDecision")(
-    function* (
-      input: ResolveOutboxUncertainInput,
-      row: { readonly lastError: string | null },
-      decision: OutboxResolutionDecision,
-      detail: string
-    ) {
-      yield* sql`INSERT INTO channel_outbox_resolution
+const rejectConflict = (id: string) =>
+  new OutboxResolutionRejected({
+    id,
+    reason: "conflict",
+  });
+
+const applyMarkDelivered = (
+  parts: QueueParts,
+  input: ResolveOutboxUncertainInput,
+  decision: Extract<OutboxResolutionDecision, { kind: "mark_delivered" }>
+) => {
+  const { sql } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.gen(function* () {
+    const rows = yield* sql`UPDATE ${table} SET status = 'sent',
+        provider_message_id = ${decision.providerMessageId},
+        sent_at = clock_timestamp(),
+        lease_token = NULL, lease_expires_at = NULL, last_error = NULL
+        WHERE id = ${input.id} AND status = 'uncertain'
+        RETURNING ${columns}`;
+
+    if (!rows[0]) return yield* rejectConflict(input.id);
+
+    return yield* decodeReceipt(rows[0]);
+  });
+};
+
+const applyCancelDecision = (
+  parts: QueueParts,
+  input: ResolveOutboxUncertainInput,
+  decision: Extract<OutboxResolutionDecision, { kind: "cancel" }>
+) => {
+  const { sql } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.gen(function* () {
+    const rows = yield* sql`UPDATE ${table} SET status = 'cancelled',
+        last_error = ${decision.reason},
+        lease_token = NULL, lease_expires_at = NULL
+        WHERE id = ${input.id} AND status = 'uncertain'
+        RETURNING ${columns}`;
+
+    if (!rows[0]) return yield* rejectConflict(input.id);
+
+    return yield* decodeReceipt(rows[0]);
+  });
+};
+
+const applyAuthorizeRetry = (
+  parts: QueueParts,
+  input: ResolveOutboxUncertainInput
+) => {
+  const { sql } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.gen(function* () {
+    const rows = yield* sql`UPDATE ${table} SET status = 'queued',
+      last_error = 'duplicate_retry_authorized',
+      lease_token = NULL, lease_expires_at = NULL
+      WHERE id = ${input.id} AND status = 'uncertain'
+      RETURNING ${columns}`;
+
+    if (!rows[0]) return yield* rejectConflict(input.id);
+
+    return yield* decodeReceipt(rows[0]);
+  });
+};
+
+const makeApplyUncertainDecision = (parts: QueueParts) => {
+  const { sql } = parts;
+
+  return Effect.fn("Messaging.applyUncertainDecision")(function* (
+    input: ResolveOutboxUncertainInput,
+    row: { readonly lastError: string | null },
+    decision: OutboxResolutionDecision,
+    detail: string
+  ) {
+    yield* sql`INSERT INTO channel_outbox_resolution
       (id, outbox_id, identity_id, decision, detail, prior_status, prior_error,
        actor_principal_id, note)
       VALUES (
@@ -321,59 +502,58 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
         ${input.note ?? null}
       )`;
 
-      if (decision.kind === "mark_delivered") {
-        const rows = yield* sql`UPDATE ${table} SET status = 'sent',
-        provider_message_id = ${decision.providerMessageId},
-        sent_at = clock_timestamp(),
-        lease_token = NULL, lease_expires_at = NULL, last_error = NULL
-        WHERE id = ${input.id} AND status = 'uncertain'
-        RETURNING ${columns}`;
-
-        if (!rows[0]) {
-          return yield* new OutboxResolutionRejected({
-            id: input.id,
-            reason: "conflict",
-          });
-        }
-
-        return yield* decodeReceipt(rows[0]);
-      }
-
-      if (decision.kind === "cancel") {
-        const rows = yield* sql`UPDATE ${table} SET status = 'cancelled',
-        last_error = ${decision.reason},
-        lease_token = NULL, lease_expires_at = NULL
-        WHERE id = ${input.id} AND status = 'uncertain'
-        RETURNING ${columns}`;
-
-        if (!rows[0]) {
-          return yield* new OutboxResolutionRejected({
-            id: input.id,
-            reason: "conflict",
-          });
-        }
-
-        return yield* decodeReceipt(rows[0]);
-      }
-
-      const rows = yield* sql`UPDATE ${table} SET status = 'queued',
-      last_error = 'duplicate_retry_authorized',
-      lease_token = NULL, lease_expires_at = NULL
-      WHERE id = ${input.id} AND status = 'uncertain'
-      RETURNING ${columns}`;
-
-      if (!rows[0]) {
-        return yield* new OutboxResolutionRejected({
-          id: input.id,
-          reason: "conflict",
-        });
-      }
-
-      return yield* decodeReceipt(rows[0]);
+    if (decision.kind === "mark_delivered") {
+      return yield* applyMarkDelivered(parts, input, decision);
     }
+
+    if (decision.kind === "cancel") {
+      return yield* applyCancelDecision(parts, input, decision);
+    }
+
+    return yield* applyAuthorizeRetry(parts, input);
+  });
+};
+
+const decisionDetail = (decision: OutboxResolutionDecision) =>
+  Match.value(decision).pipe(
+    Match.when({ kind: "mark_delivered" }, (d) => d.providerMessageId),
+    Match.when({ kind: "cancel" }, (d) => d.reason),
+    Match.orElse((d) => d.acknowledgment)
   );
 
-  const resolveUncertain = Effect.fn("Messaging.resolveUncertain")(function* (
+const lockIdentityForCancel = (
+  parts: QueueParts,
+  input: ResolveOutboxUncertainInput
+) => {
+  const { sql } = parts;
+
+  return Effect.gen(function* () {
+    const rows = yield* sql<{
+      active: boolean;
+    }>`SELECT revoked_at IS NULL AS active
+        FROM channel_identity WHERE id = ${input.identityId} FOR UPDATE`;
+
+    if (!rows[0]) {
+      return yield* new OutboxResolutionRejected({
+        id: input.id,
+        reason: "identity_inactive",
+      });
+    }
+
+    return undefined;
+  });
+};
+
+const makeResolveUncertain = (
+  parts: QueueParts,
+  lockActive: ReturnType<typeof makeLockActive>,
+  loadUncertainRow: ReturnType<typeof makeLoadUncertainRow>,
+  resolveIdempotentSettled: ReturnType<typeof makeResolveIdempotentSettled>,
+  applyUncertainDecision: ReturnType<typeof makeApplyUncertainDecision>
+) => {
+  const { sql, lane } = parts;
+
+  return Effect.fn("Messaging.resolveUncertain")(function* (
     input: ResolveOutboxUncertainInput
   ) {
     if (lane !== "outbox") {
@@ -390,17 +570,7 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
     if (decision.kind !== "cancel") {
       yield* lockActive(input.identityId);
     } else {
-      const rows = yield* sql<{
-        active: boolean;
-      }>`SELECT revoked_at IS NULL AS active
-        FROM channel_identity WHERE id = ${input.identityId} FOR UPDATE`;
-
-      if (!rows[0]) {
-        return yield* new OutboxResolutionRejected({
-          id: input.id,
-          reason: "identity_inactive",
-        });
-      }
+      yield* lockIdentityForCancel(parts, input);
     }
 
     const row = yield* loadUncertainRow(input);
@@ -412,11 +582,7 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
       });
     }
 
-    const detail = Match.value(decision).pipe(
-      Match.when({ kind: "mark_delivered" }, (d) => d.providerMessageId),
-      Match.when({ kind: "cancel" }, (d) => d.reason),
-      Match.orElse((d) => d.acknowledgment)
-    );
+    const detail = decisionDetail(decision);
 
     if (row.status !== "uncertain") {
       return yield* resolveIdempotentSettled(input, row, decision);
@@ -424,8 +590,17 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     return yield* applyUncertainDecision(input, row, decision, detail);
   }, sql.withTransaction);
+};
 
-  const scheduleRetry = Effect.fn("Messaging.scheduleRetry")(function* (
+const makeScheduleRetry = (
+  parts: QueueParts,
+  requireLease: ReturnType<typeof makeRequireLease>
+) => {
+  const { sql } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.fn("Messaging.scheduleRetry")(function* (
     lease: Lease,
     retryAfterSeconds: number
   ) {
@@ -443,10 +618,14 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
+};
 
-  const inspect = Effect.fn("Messaging.inspect")(function* (
-    identityId: string
-  ) {
+const makeInspect = (parts: QueueParts) => {
+  const { sql, queue } = parts;
+  const table = queueTable(parts);
+  const columns = queueColumns(parts);
+
+  return Effect.fn("Messaging.inspect")(function* (identityId: string) {
     const counts =
       yield* sql`SELECT status, count(*)::int AS count FROM ${table}
       WHERE identity_id = ${identityId} GROUP BY status ORDER BY status`;
@@ -465,15 +644,30 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
       }),
     };
   });
+};
+
+export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
+  const parts: QueueParts = { sql, lane, queue: queues[lane] };
+  const lockActive = makeLockActive(parts);
+  const requireLease = makeRequireLease(parts, lockActive);
+  const loadUncertainRow = makeLoadUncertainRow(parts);
+  const resolveIdempotentSettled = makeResolveIdempotentSettled(parts);
+  const applyUncertainDecision = makeApplyUncertainDecision(parts);
 
   return {
-    insert,
-    claim,
-    complete,
-    stop,
-    resolveUncertain,
-    scheduleRetry,
-    inspect,
+    insert: makeInsert(parts, lockActive),
+    claim: makeClaim(parts),
+    complete: makeComplete(parts, requireLease),
+    stop: makeStop(parts, requireLease),
+    resolveUncertain: makeResolveUncertain(
+      parts,
+      lockActive,
+      loadUncertainRow,
+      resolveIdempotentSettled,
+      applyUncertainDecision
+    ),
+    scheduleRetry: makeScheduleRetry(parts, requireLease),
+    inspect: makeInspect(parts),
     checkLease: (lease: Lease) => sql.withTransaction(requireLease(lease)),
   };
 };
