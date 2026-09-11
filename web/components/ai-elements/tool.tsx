@@ -77,6 +77,45 @@ interface ToolHeaderProps extends Omit<
   title: ReactNode;
 }
 
+function ToolHeaderMeta({ meta }: { readonly meta: ReactNode }) {
+  return (
+    <span
+      className="flex shrink-0 items-center gap-1"
+      data-slot="chat-tool-meta"
+    >
+      {meta}
+    </span>
+  );
+}
+
+function ToolHeaderStatus({
+  presentation,
+  status,
+  statusIcon,
+  statusLabel,
+}: {
+  readonly presentation: (typeof statusPresentation)[ToolStatus];
+  readonly status: ToolStatus;
+  readonly statusIcon: ReactNode;
+  readonly statusLabel: ReactNode;
+}) {
+  const icon = statusIcon === undefined ? presentation.icon : statusIcon;
+  const label = statusLabel === undefined ? presentation.label : statusLabel;
+
+  return (
+    <span
+      className={cn(
+        "flex shrink-0 items-center gap-1 type-caption",
+        status === "output-error" && "text-destructive"
+      )}
+      data-status={status}
+    >
+      {icon}
+      {label}
+    </span>
+  );
+}
+
 function ToolHeader({
   className,
   icon,
@@ -100,25 +139,14 @@ function ToolHeader({
     >
       {icon ?? <WrenchIcon className="size-4 shrink-0" />}
       <span className="min-w-0 flex-1 truncate type-label">{title}</span>
-      {meta ? (
-        <span
-          className="flex shrink-0 items-center gap-1"
-          data-slot="chat-tool-meta"
-        >
-          {meta}
-        </span>
-      ) : null}
-      {presentation ? (
-        <span
-          className={cn(
-            "flex shrink-0 items-center gap-1 type-caption",
-            status === "output-error" && "text-destructive"
-          )}
-          data-status={status}
-        >
-          {statusIcon === undefined ? presentation.icon : statusIcon}
-          {statusLabel === undefined ? presentation.label : statusLabel}
-        </span>
+      {meta ? <ToolHeaderMeta meta={meta} /> : null}
+      {presentation && status ? (
+        <ToolHeaderStatus
+          presentation={presentation}
+          status={status}
+          statusIcon={statusIcon}
+          statusLabel={statusLabel}
+        />
       ) : null}
       <ChevronRightIcon className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
     </CollapsibleTrigger>
@@ -160,26 +188,25 @@ interface ToolOutputProps extends ComponentProps<"div"> {
   output?: unknown;
 }
 
-function ToolOutput({
-  className,
+function toolOutputTitle(errorText: string | undefined) {
+  if (errorText) {
+    return "Error";
+  }
+
+  return "Result";
+}
+
+function ToolOutputBody({
+  content,
   errorText,
-  output,
-  ...props
-}: ToolOutputProps) {
-  if (output === undefined && !errorText) return null;
-
-  const text = z.string().safeParse(output);
-
-  const content = isValidElement(output)
-    ? output
-    : text.success
-      ? text.data
-      : JSON.stringify(output, null, 2);
-
+}: {
+  readonly content: ReactNode;
+  readonly errorText?: string;
+}) {
   return (
-    <div className={cn("space-y-2", className)} {...props}>
+    <>
       <p className="type-label text-muted-foreground">
-        {errorText ? "Error" : "Result"}
+        {toolOutputTitle(errorText)}
       </p>
       <div
         className={cn(
@@ -189,6 +216,34 @@ function ToolOutput({
       >
         {errorText ?? content}
       </div>
+    </>
+  );
+}
+
+function ToolOutput({
+  className,
+  errorText,
+  output,
+  ...props
+}: ToolOutputProps) {
+  if (output === undefined && !errorText) {
+    return null;
+  }
+
+  if (isValidElement(output)) {
+    return (
+      <div className={cn("space-y-2", className)} {...props}>
+        <ToolOutputBody content={output} errorText={errorText} />
+      </div>
+    );
+  }
+
+  const text = z.string().safeParse(output);
+  const content = text.success ? text.data : JSON.stringify(output, null, 2);
+
+  return (
+    <div className={cn("space-y-2", className)} {...props}>
+      <ToolOutputBody content={content} errorText={errorText} />
     </div>
   );
 }
