@@ -445,15 +445,24 @@ const requireClaimText = (claim: MessageClaim) => {
   return Effect.succeed(claim.payload.text);
 };
 
-const makeDispatch = (
-  messaging: MessagingService,
-  telegram: TelegramService,
-  kapso: KapsoService,
-  findIdentity: ReturnType<typeof makeFindIdentity>,
-  activeIdentity: ReturnType<typeof makeActiveIdentity>,
-  installationMatches: ReturnType<typeof makeInstallationMatches>
-) =>
+const makeDispatch = (deps: {
+  readonly messaging: MessagingService;
+  readonly telegram: TelegramService;
+  readonly kapso: KapsoService;
+  readonly findIdentity: ReturnType<typeof makeFindIdentity>;
+  readonly activeIdentity: ReturnType<typeof makeActiveIdentity>;
+  readonly installationMatches: ReturnType<typeof makeInstallationMatches>;
+}) =>
   Effect.fn("ChannelTransport.dispatch")(function* (claim: MessageClaim) {
+    const {
+      messaging,
+      telegram,
+      kapso,
+      findIdentity,
+      activeIdentity,
+      installationMatches,
+    } = deps;
+
     const lease = {
       id: claim.id,
       identityId: claim.identityId,
@@ -596,16 +605,19 @@ const enqueueExistingDelivery = Effect.fn(
   });
 });
 
-const makeEnqueueTaskReport = (
-  sql: PgClient.PgClient,
-  messaging: MessagingService,
-  findIdentity: ReturnType<typeof makeFindIdentity>,
-  activeIdentity: ReturnType<typeof makeActiveIdentity>,
-  enqueueText: ReturnType<typeof makeEnqueueText>
-) =>
+const makeEnqueueTaskReport = (deps: {
+  readonly sql: PgClient.PgClient;
+  readonly messaging: MessagingService;
+  readonly findIdentity: ReturnType<typeof makeFindIdentity>;
+  readonly activeIdentity: ReturnType<typeof makeActiveIdentity>;
+  readonly enqueueText: ReturnType<typeof makeEnqueueText>;
+}) =>
   Effect.fn("ChannelTransport.enqueueTaskReport")(function* (
     input: typeof enqueueInput.Type
   ) {
+    const { sql, messaging, findIdentity, activeIdentity, enqueueText } =
+      deps;
+
     const value = yield* decodeEnqueueInput2(input).pipe(
       Effect.mapError(invalidInput)
     );
@@ -639,7 +651,7 @@ const makeEnqueueTaskReport = (
       (row) => enqueueExistingDelivery(messaging, value.identityId, row),
       { concurrency: 1 }
     );
-  }, sql.withTransaction);
+  }, deps.sql.withTransaction);
 
 const deliveredChunkMatches = (
   chunk: {
@@ -883,14 +895,14 @@ const makeTransport = Effect.gen(function* () {
   const candidates = makeCandidates(sql, identityColumns);
   const installationMatches = makeInstallationMatches();
 
-  const dispatch = makeDispatch(
+  const dispatch = makeDispatch({
     messaging,
     telegram,
     kapso,
     findIdentity,
     activeIdentity,
-    installationMatches
-  );
+    installationMatches,
+  });
 
   const enqueueText = makeEnqueueText(
     sql,
@@ -899,13 +911,13 @@ const makeTransport = Effect.gen(function* () {
     activeIdentity
   );
 
-  const enqueueTaskReport = makeEnqueueTaskReport(
+  const enqueueTaskReport = makeEnqueueTaskReport({
     sql,
     messaging,
     findIdentity,
     activeIdentity,
-    enqueueText
-  );
+    enqueueText,
+  });
 
   return {
     activeIdentity,
