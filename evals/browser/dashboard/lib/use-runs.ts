@@ -7,6 +7,51 @@ import {
   type BrowserBenchmarkLiveStatus,
 } from "../../live-status-schema";
 
+function isActiveRunStatus(status: BrowserBenchmarkLiveStatus["status"]) {
+  return status === "preparing" || status === "running";
+}
+
+function hasActiveRun(runs: readonly BrowserBenchmarkLiveStatus[]) {
+  return runs.some((run) => isActiveRunStatus(run.status));
+}
+
+function delayForRuns(runs: readonly BrowserBenchmarkLiveStatus[]) {
+  return hasActiveRun(runs) ? 1_000 : 5_000;
+}
+
+async function readRunsResponse(response: Response) {
+  if (!response.ok) {
+    return {
+      delay: 5_000,
+      error: "Unable to read benchmark runs." as const,
+      runs: null,
+    };
+  }
+
+  const next = browserBenchmarkRunListSchema.parse(await response.json());
+
+  return { delay: delayForRuns(next.runs), error: null, runs: next.runs };
+}
+
+function applyRunsResult(
+  result: Awaited<ReturnType<typeof readRunsResponse>>,
+  setRuns: (runs: BrowserBenchmarkLiveStatus[]) => void,
+  setError: (error: string | null) => void
+) {
+  if (result.runs) {
+    setRuns(result.runs);
+    setError(null);
+  } else {
+    setError(result.error);
+  }
+
+  return result.delay;
+}
+
+function markUnreachable(setError: (error: string | null) => void) {
+  setError("Dashboard server is unreachable.");
+}
+
 export function useRuns() {
   const [runs, setRuns] = useState<BrowserBenchmarkLiveStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +60,14 @@ export function useRuns() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
+    const queuePoll = () => {
+      void poll();
+    };
+
+    const storeTimer = (next: ReturnType<typeof setTimeout>) => {
+      timer = next;
+    };
+
     async function poll() {
       let nextDelay = 5_000;
 
@@ -22,34 +75,18 @@ export function useRuns() {
         const response = await fetch("/api/runs", { cache: "no-store" });
 
         if (cancelled) return;
-
-        if (response.ok) {
-          const next = browserBenchmarkRunListSchema.parse(
-            await response.json()
-          );
-
-          setRuns(next.runs);
-          setError(null);
-
-          if (
-            next.runs.some(
-              (run) => run.status === "preparing" || run.status === "running"
-            )
-          ) {
-            nextDelay = 1_000;
-          }
-        } else {
-          setError("Unable to read benchmark runs.");
-        }
+        nextDelay = applyRunsResult(
+          await readRunsResponse(response),
+          setRuns,
+          setError
+        );
       } catch {
-        if (!cancelled) setError("Dashboard server is unreachable.");
+        if (!cancelled) markUnreachable(setError);
       }
 
-      if (!cancelled) {
-        timer = setTimeout(() => {
-          void poll();
-        }, nextDelay);
-      }
+      if (cancelled) return;
+      timer = setTimeout(queuePoll, nextDelay);
+      storeTimer(timer);
     }
 
     void poll();

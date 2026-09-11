@@ -162,6 +162,53 @@ export const browserBenchmarkReporter: EvalReporter = {
   },
 };
 
+function activityChangedFor(taskName: string, activity: string | null) {
+  return activity !== null && liveActivities.get(taskName) !== activity;
+}
+
+function liveViewChangedFor(
+  taskName: string,
+  browserLiveViewUrl: string | null
+) {
+  return (
+    browserLiveViewUrl !== null &&
+    liveViewUrls.get(taskName) !== browserLiveViewUrl
+  );
+}
+
+function rememberLiveActivity(
+  taskName: string,
+  activity: string | null,
+  durationSignature: string,
+  browserLiveViewUrl: string | null
+) {
+  if (activity !== null) liveActivities.set(taskName, activity);
+  liveActivityDurations.set(taskName, durationSignature);
+
+  if (browserLiveViewUrl !== null) {
+    liveViewUrls.set(taskName, browserLiveViewUrl);
+  }
+}
+
+function patchLiveTaskActivity(
+  task: LiveTask,
+  taskName: string,
+  activity: string | null,
+  activityDurationsMs: ReturnType<typeof browserBenchmarkActivityDurations>,
+  browserLiveViewUrl: string | null
+) {
+  if (task.name !== taskName) return task;
+  const updated = { ...task, activityDurationsMs };
+
+  if (activity !== null) updated.activity = activity;
+
+  if (browserLiveViewUrl !== null) {
+    updated.browserLiveViewUrl = browserLiveViewUrl;
+  }
+
+  return updated;
+}
+
 export async function reportBrowserBenchmarkActivity(
   taskName: string,
   sessionId: string,
@@ -171,42 +218,35 @@ export async function reportBrowserBenchmarkActivity(
   const activityDurationsMs = browserBenchmarkActivityDurations(events);
   const browserLiveViewUrl = browserBenchmarkLiveViewUrl(events);
   const durationSignature = JSON.stringify(activityDurationsMs);
-
-  const activityChanged =
-    activity !== null && liveActivities.get(taskName) !== activity;
+  const activityChanged = activityChangedFor(taskName, activity);
 
   const durationsChanged =
     liveActivityDurations.get(taskName) !== durationSignature;
 
-  const liveViewChanged =
-    browserLiveViewUrl !== null &&
-    liveViewUrls.get(taskName) !== browserLiveViewUrl;
+  const liveViewChanged = liveViewChangedFor(taskName, browserLiveViewUrl);
 
   await writeLiveTrace(taskName, sessionId, events);
 
   if (!activityChanged && !durationsChanged && !liveViewChanged) return;
 
-  if (activity !== null) liveActivities.set(taskName, activity);
-  liveActivityDurations.set(taskName, durationSignature);
-
-  if (browserLiveViewUrl !== null) {
-    liveViewUrls.set(taskName, browserLiveViewUrl);
-  }
+  rememberLiveActivity(
+    taskName,
+    activity,
+    durationSignature,
+    browserLiveViewUrl
+  );
 
   await updateLiveVariant((variant) => ({
     ...variant,
-    tasks: variant.tasks.map((task) => {
-      if (task.name !== taskName) return task;
-      const updated = { ...task, activityDurationsMs };
-
-      if (activity !== null) updated.activity = activity;
-
-      if (browserLiveViewUrl !== null) {
-        updated.browserLiveViewUrl = browserLiveViewUrl;
-      }
-
-      return updated;
-    }),
+    tasks: variant.tasks.map((task) =>
+      patchLiveTaskActivity(
+        task,
+        taskName,
+        activity,
+        activityDurationsMs,
+        browserLiveViewUrl
+      )
+    ),
   }));
 }
 
@@ -240,45 +280,88 @@ async function writeLiveTrace(
   await rename(temporaryPath, tracePath);
 }
 
+function isSecondarySession(session: {
+  primary: boolean;
+  events: readonly unknown[];
+}) {
+  return !session.primary;
+}
+
+function byEventCountDesc(
+  left: { events: readonly unknown[] },
+  right: { events: readonly unknown[] }
+) {
+  return right.events.length - left.events.length;
+}
+
+function countToolCall(counts: Record<string, number>, call: { name: string }) {
+  counts[call.name] = (counts[call.name] ?? 0) + 1;
+
+  return counts;
+}
+
+function isFailedToolCall(call: { status: string }) {
+  return call.status === "failed";
+}
+
+function isTaskCompletedJudge(assertion: { name: string }) {
+  return assertion.name === "judge.autoevals.closedQA [task completed]";
+}
+
+function sumMessageCount(count: number, derived: { messageCount: number }) {
+  return count + derived.messageCount;
+}
+
+function sumReasoningBlockCount(
+  count: number,
+  derived: { reasoningBlockCount: number }
+) {
+  return count + derived.reasoningBlockCount;
+}
+
+function fallbackTerminalMessage(result: EveEvalResult) {
+  return (
+    result.result.finalMessage ??
+    result.error ??
+    result.skipReason ??
+    "No reply"
+  );
+}
+
+function workerSessionFor(result: EveEvalResult) {
+  return result.result.sessions
+    ?.filter(isSecondarySession)
+    .toSorted(byEventCountDesc)
+    .at(0);
+}
+
+function derivedFacts(
+  result: EveEvalResult,
+  workerSession: NonNullable<ReturnType<typeof workerSessionFor>> | undefined
+) {
+  if (workerSession) return [workerSession.derived];
+
+  return [result.result.derived];
+}
+
 function summarizeTaskResult(result: EveEvalResult, name: string) {
   const metrics = measureWorkerTask(
     result.result.events,
     elapsedMs(result.startedAt, result.completedAt)
   );
 
-  const fallbackMessage =
-    result.result.finalMessage ??
-    result.error ??
-    result.skipReason ??
-    "No reply";
-
-  const workerSession = result.result.sessions
-    ?.filter((session) => !session.primary)
-    .toSorted((left, right) => right.events.length - left.events.length)
-    .at(0);
-
+  const workerSession = workerSessionFor(result);
   const workerEvents = workerSession?.events;
 
   const terminalMessage = terminalWorkerMessage(
-    fallbackMessage,
+    fallbackTerminalMessage(result),
     workerEvents ?? result.result.events
   );
 
-  const workerFacts = workerSession ? [workerSession.derived] : [];
-  const facts = workerFacts.length > 0 ? workerFacts : [result.result.derived];
+  const facts = derivedFacts(result, workerSession);
   const calls = facts.flatMap((derived) => derived.toolCalls);
-
-  const toolCalls = calls.reduce<Record<string, number>>((counts, call) => {
-    counts[call.name] = (counts[call.name] ?? 0) + 1;
-
-    return counts;
-  }, {});
-
-  const judge = result.assertions.find(
-    (assertion) =>
-      assertion.name === "judge.autoevals.closedQA [task completed]"
-  );
-
+  const toolCalls = calls.reduce<Record<string, number>>(countToolCall, {});
+  const judge = result.assertions.find(isTaskCompletedJudge);
   const rationale = z.string().safeParse(judge?.metadata?.rationale);
 
   return {
@@ -287,22 +370,16 @@ function summarizeTaskResult(result: EveEvalResult, name: string) {
     durationMs: metrics.durationMs,
     error: result.error ?? null,
     evalDurationMs: elapsedMs(result.startedAt, result.completedAt),
-    failedToolCalls: calls.filter((call) => call.status === "failed").length,
+    failedToolCalls: calls.filter(isFailedToolCall).length,
     id: result.id,
     inputTokens: metrics.inputTokens,
     judgeRationale: rationale.success ? rationale.data : null,
     judgeScore: judge?.score ?? null,
-    messageCount: facts.reduce(
-      (count, derived) => count + derived.messageCount,
-      0
-    ),
+    messageCount: facts.reduce(sumMessageCount, 0),
     modelSteps: metrics.modelSteps,
     name,
     outputTokens: metrics.outputTokens,
-    reasoningBlockCount: facts.reduce(
-      (count, derived) => count + derived.reasoningBlockCount,
-      0
-    ),
+    reasoningBlockCount: facts.reduce(sumReasoningBlockCount, 0),
     sessionId: result.result.sessionId ?? null,
     status: result.result.status,
     success: result.verdict === "passed",
@@ -312,98 +389,157 @@ function summarizeTaskResult(result: EveEvalResult, name: string) {
   };
 }
 
+type SummarizedTask = ReturnType<typeof summarizeTaskResult>;
+
+function taskFromResult(result: EveEvalResult) {
+  return (
+    completedTasks.get(result.id) ??
+    summarizeTaskResult(result, taskNames.get(result.id) ?? result.id)
+  );
+}
+
+function isSuccessfulTask(task: SummarizedTask) {
+  return task.success;
+}
+
+function isFailedTask(task: SummarizedTask) {
+  return !task.success;
+}
+
+function byNumberAsc(left: number, right: number) {
+  return left - right;
+}
+
+function nonNullCost(task: SummarizedTask) {
+  return task.costUsd === null ? [] : [task.costUsd];
+}
+
+function nonNullJudgeScore(task: SummarizedTask) {
+  return task.judgeScore === null ? [] : [task.judgeScore];
+}
+
+function nonNullInputTokens(task: SummarizedTask) {
+  return task.inputTokens === null ? [] : [task.inputTokens];
+}
+
+function nonNullOutputTokens(task: SummarizedTask) {
+  return task.outputTokens === null ? [] : [task.outputTokens];
+}
+
+function hasRuntimeIdentity(result: EveEvalResult) {
+  return result.result.runtimeIdentity !== undefined;
+}
+
+function sumFailedToolCalls(count: number, task: SummarizedTask) {
+  return count + task.failedToolCalls;
+}
+
+function sumNumbers(total: number, value: number) {
+  return total + value;
+}
+
+function meanOrNull(values: readonly number[]) {
+  if (values.length === 0) return null;
+
+  return values.reduce(sumNumbers, 0) / values.length;
+}
+
+function sumOrNull(values: readonly number[]) {
+  if (values.length === 0) return null;
+
+  return values.reduce(sumNumbers, 0);
+}
+
+function sumModelSteps(count: number, task: SummarizedTask) {
+  return count + task.modelSteps;
+}
+
+function sumToolCallValues(taskCount: number, calls: number) {
+  return taskCount + calls;
+}
+
+function totalToolCallsForTask(task: SummarizedTask) {
+  return Object.values(task.toolCalls).reduce(sumToolCallValues, 0);
+}
+
+function sumTotalToolCalls(count: number, task: SummarizedTask) {
+  return count + totalToolCallsForTask(task);
+}
+
+function allCostComplete(task: SummarizedTask) {
+  return task.costComplete;
+}
+
+function benchmarkLabel(
+  environmentLabel: string | undefined,
+  gitSha: string | null,
+  startedAt: string
+) {
+  if (environmentLabel && environmentLabel.length > 0) return environmentLabel;
+
+  return gitSha?.slice(0, 12) ?? startedAt;
+}
+
+function successRate(passed: number, total: number) {
+  if (total === 0) return 0;
+
+  return passed / total;
+}
+
+async function resolveGitSha(summary: EveEvalRunSummary) {
+  const runtimeIdentity =
+    summary.results.find(hasRuntimeIdentity)?.result.runtimeIdentity;
+
+  return runtimeIdentity?.build?.gitSha ?? (await readCurrentGitSha()) ?? null;
+}
+
+function successfulDuration(task: SummarizedTask) {
+  if (!task.success) return [];
+
+  return [task.durationMs];
+}
+
+function buildBenchmarkSummary(tasks: readonly SummarizedTask[]) {
+  const successfulDurations = tasks
+    .flatMap(successfulDuration)
+    .toSorted(byNumberAsc);
+
+  const measuredCosts = tasks.flatMap(nonNullCost);
+  const judgeScores = tasks.flatMap(nonNullJudgeScore);
+  const inputTokens = tasks.flatMap(nonNullInputTokens);
+  const outputTokens = tasks.flatMap(nonNullOutputTokens);
+  const passed = tasks.filter(isSuccessfulTask).length;
+
+  return {
+    costComplete: tasks.length > 0 && tasks.every(allCostComplete),
+    failed: tasks.filter(isFailedTask).length,
+    failedToolCalls: tasks.reduce(sumFailedToolCalls, 0),
+    meanJudgeScore: meanOrNull(judgeScores),
+    medianDurationMs: percentile(successfulDurations, 0.5),
+    passed,
+    p95DurationMs: percentile(successfulDurations, 0.95),
+    successRate: successRate(passed, tasks.length),
+    totalInputTokens: sumOrNull(inputTokens),
+    totalModelSteps: tasks.reduce(sumModelSteps, 0),
+    totalOutputTokens: sumOrNull(outputTokens),
+    totalToolCalls: tasks.reduce(sumTotalToolCalls, 0),
+    totalCostUsd: sumOrNull(measuredCosts),
+  };
+}
+
 async function buildBenchmark(
   summary: EveEvalRunSummary
 ): Promise<BrowserBenchmark> {
-  const tasks = summary.results.map(
-    (result) =>
-      completedTasks.get(result.id) ??
-      summarizeTaskResult(result, taskNames.get(result.id) ?? result.id)
-  );
-
-  const successfulDurations = tasks
-    .filter((task) => task.success)
-    .map((task) => task.durationMs)
-    .toSorted((left, right) => left - right);
-
-  const measuredCosts = tasks.flatMap((task) =>
-    task.costUsd === null ? [] : [task.costUsd]
-  );
-
-  const judgeScores = tasks.flatMap((task) =>
-    task.judgeScore === null ? [] : [task.judgeScore]
-  );
-
-  const inputTokens = tasks.flatMap((task) =>
-    task.inputTokens === null ? [] : [task.inputTokens]
-  );
-
-  const outputTokens = tasks.flatMap((task) =>
-    task.outputTokens === null ? [] : [task.outputTokens]
-  );
-
-  const passed = tasks.filter((task) => task.success).length;
-
-  const runtimeIdentity = summary.results.find(
-    (result) => result.result.runtimeIdentity !== undefined
-  )?.result.runtimeIdentity;
-
-  const gitSha =
-    runtimeIdentity?.build?.gitSha ?? (await readCurrentGitSha()) ?? null;
-
+  const tasks = summary.results.map(taskFromResult);
+  const gitSha = await resolveGitSha(summary);
   const environmentLabel = browserBenchmarkEnv.BROWSER_BENCH_LABEL?.trim();
 
   return {
     completedAt: summary.completedAt,
     gitSha,
-    label:
-      environmentLabel && environmentLabel.length > 0
-        ? environmentLabel
-        : (gitSha?.slice(0, 12) ?? summary.startedAt),
+    label: benchmarkLabel(environmentLabel, gitSha, summary.startedAt),
     startedAt: summary.startedAt,
-    summary: {
-      costComplete:
-        tasks.length > 0 && tasks.every((task) => task.costComplete),
-      failed: tasks.filter((task) => !task.success).length,
-      failedToolCalls: tasks.reduce(
-        (count, task) => count + task.failedToolCalls,
-        0
-      ),
-      meanJudgeScore:
-        judgeScores.length === 0
-          ? null
-          : judgeScores.reduce((total, score) => total + score, 0) /
-            judgeScores.length,
-      medianDurationMs: percentile(successfulDurations, 0.5),
-      passed,
-      p95DurationMs: percentile(successfulDurations, 0.95),
-      successRate: tasks.length === 0 ? 0 : passed / tasks.length,
-      totalInputTokens:
-        inputTokens.length === 0
-          ? null
-          : inputTokens.reduce((total, tokens) => total + tokens, 0),
-      totalModelSteps: tasks.reduce(
-        (count, task) => count + task.modelSteps,
-        0
-      ),
-      totalOutputTokens:
-        outputTokens.length === 0
-          ? null
-          : outputTokens.reduce((total, tokens) => total + tokens, 0),
-      totalToolCalls: tasks.reduce(
-        (count, task) =>
-          count +
-          Object.values(task.toolCalls).reduce(
-            (taskCount, calls) => taskCount + calls,
-            0
-          ),
-        0
-      ),
-      totalCostUsd:
-        measuredCosts.length === 0
-          ? null
-          : measuredCosts.reduce((total, cost) => total + cost, 0),
-    },
+    summary: buildBenchmarkSummary(tasks),
     target: {
       kind: summary.target.kind,
       url: summary.target.url,

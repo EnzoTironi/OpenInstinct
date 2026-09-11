@@ -7,7 +7,7 @@ import {
   requireDeliveredText,
 } from "@evals/agent/shared";
 import { accessScopeForUser } from "@shared/identity/access-scope";
-import { defineEval } from "eve/evals";
+import { defineEval, type EveEvalContext } from "eve/evals";
 import { includes, satisfies } from "eve/evals/expect";
 
 import { requirePersonalMemoryMembership } from "../../server/personal-memory/access";
@@ -19,6 +19,70 @@ const lastNameCanary = "Canary";
 
 const isolatedFirstNameCanary = "OtherTenantEvalina";
 
+function throwCombinedErrors(
+  evaluationError: Error | undefined,
+  cleanupError: Error | undefined,
+  bothMessage: string
+) {
+  if (evaluationError && cleanupError) {
+    throw new AggregateError([evaluationError, cleanupError], bothMessage);
+  }
+
+  if (evaluationError) throw evaluationError;
+
+  if (cleanupError) throw cleanupError;
+}
+
+async function runPersonalInfoRecallCase(t: EveEvalContext) {
+  const save = await t.send(
+    `My first name is ${firstNameCanary} and my last name is ${lastNameCanary}. Remember those as reusable personal information.`
+  );
+
+  save.expectOk();
+  save.succeeded();
+  save.calledTool("personal_info__update", {
+    input: (input) =>
+      isDeepStrictEqual(input, {
+        firstName: firstNameCanary,
+        lastName: lastNameCanary,
+      }),
+    status: "completed",
+    count: 1,
+  });
+  await requireDeliveredText(t, save);
+
+  const laterSession = t.newSession();
+
+  const recall = await laterSession.send(
+    "What first and last name do you have in my personal information?"
+  );
+
+  recall.expectOk();
+  recall.succeeded();
+  const text = await requireDeliveredText(t, recall);
+  t.check(text, includes(firstNameCanary));
+  t.check(text, includes(lastNameCanary));
+  assertPlainTextDelivery(t, text);
+}
+
+async function cleanupPersonalInfo(t: EveEvalContext) {
+  const cleanupSession = t.newSession();
+
+  const cleanup = await cleanupSession.send(
+    "Use personal_info__update to forget my first and last name from personal information."
+  );
+
+  cleanup.expectOk();
+  cleanup.succeeded();
+  cleanup.calledTool("personal_info__update", {
+    input: (input) =>
+      isDeepStrictEqual(input, { firstName: null, lastName: null }),
+    status: "completed",
+    count: 1,
+  });
+  await requireDeliveredText(t, cleanup);
+}
+
 export default [
   defineEval({
     description: "Recalls structured personal information in a new session",
@@ -27,35 +91,7 @@ export default [
       let evaluationError: Error | undefined;
 
       try {
-        const save = await t.send(
-          `My first name is ${firstNameCanary} and my last name is ${lastNameCanary}. Remember those as reusable personal information.`
-        );
-
-        save.expectOk();
-        save.succeeded();
-        save.calledTool("personal_info__update", {
-          input: (input) =>
-            isDeepStrictEqual(input, {
-              firstName: firstNameCanary,
-              lastName: lastNameCanary,
-            }),
-          status: "completed",
-          count: 1,
-        });
-        await requireDeliveredText(t, save);
-
-        const laterSession = t.newSession();
-
-        const recall = await laterSession.send(
-          "What first and last name do you have in my personal information?"
-        );
-
-        recall.expectOk();
-        recall.succeeded();
-        const text = await requireDeliveredText(t, recall);
-        t.check(text, includes(firstNameCanary));
-        t.check(text, includes(lastNameCanary));
-        assertPlainTextDelivery(t, text);
+        await runPersonalInfoRecallCase(t);
       } catch (error) {
         evaluationError =
           error instanceof Error
@@ -69,21 +105,7 @@ export default [
       let cleanupError: Error | undefined;
 
       try {
-        const cleanupSession = t.newSession();
-
-        const cleanup = await cleanupSession.send(
-          "Use personal_info__update to forget my first and last name from personal information."
-        );
-
-        cleanup.expectOk();
-        cleanup.succeeded();
-        cleanup.calledTool("personal_info__update", {
-          input: (input) =>
-            isDeepStrictEqual(input, { firstName: null, lastName: null }),
-          status: "completed",
-          count: 1,
-        });
-        await requireDeliveredText(t, cleanup);
+        await cleanupPersonalInfo(t);
       } catch (error) {
         cleanupError =
           error instanceof Error
@@ -94,16 +116,11 @@ export default [
               );
       }
 
-      if (evaluationError && cleanupError) {
-        throw new AggregateError(
-          [evaluationError, cleanupError],
-          "Personal information evaluation and cleanup both failed."
-        );
-      }
-
-      if (evaluationError) throw evaluationError;
-
-      if (cleanupError) throw cleanupError;
+      throwCombinedErrors(
+        evaluationError,
+        cleanupError,
+        "Personal information evaluation and cleanup both failed."
+      );
     },
   }),
   defineEval({

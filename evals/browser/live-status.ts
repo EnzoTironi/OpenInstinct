@@ -73,32 +73,49 @@ export async function updateBrowserBenchmarkLiveStatus(
   }
 }
 
-async function withFileLock(path: string, action: () => Promise<void>) {
-  const lockPath = `${path}.lock`;
-  await mkdir(dirname(path), { recursive: true });
+function shouldRetryBusyLock(
+  parsed: ReturnType<typeof nodeErrorSchema.safeParse>,
+  attempt: number
+) {
+  if (!parsed.success) return false;
 
+  if (parsed.data.code !== "EEXIST") return false;
+
+  return attempt < 600;
+}
+
+async function waitForLockRetry(lockPath: string, attempt: number) {
+  if (attempt % 100 === 99 && (await lockIsStale(lockPath))) {
+    await rm(lockPath, { force: true, recursive: true });
+
+    return;
+  }
+
+  await delay(50);
+}
+
+async function acquireFileLock(lockPath: string) {
   for (let attempt = 0; ; attempt += 1) {
     try {
       // oxlint-disable-next-line eslint/no-await-in-loop -- lock creation is the sequential acquisition attempt itself
       await mkdir(lockPath);
-      break;
-    } catch (error) {
-      const parsed = nodeErrorSchema.safeParse(error);
 
-      if (!parsed.success || parsed.data.code !== "EEXIST" || attempt >= 600) {
+      return;
+    } catch (error) {
+      if (!shouldRetryBusyLock(nodeErrorSchema.safeParse(error), attempt)) {
         throw error;
       }
 
-      // oxlint-disable-next-line eslint/no-await-in-loop -- lock acquisition retries must inspect the current lock before the next sequential attempt
-      if (attempt % 100 === 99 && (await lockIsStale(lockPath))) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- stale lock cleanup must finish before retrying acquisition
-        await rm(lockPath, { force: true, recursive: true });
-      } else {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- bounded backoff intentionally serializes lock acquisition attempts
-        await delay(50);
-      }
+      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential lock acquisition retries
+      await waitForLockRetry(lockPath, attempt);
     }
   }
+}
+
+async function withFileLock(path: string, action: () => Promise<void>) {
+  const lockPath = `${path}.lock`;
+  await mkdir(dirname(path), { recursive: true });
+  await acquireFileLock(lockPath);
 
   try {
     await action();

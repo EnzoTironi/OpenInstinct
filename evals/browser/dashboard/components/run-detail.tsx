@@ -23,47 +23,98 @@ type Variant = BrowserBenchmarkLiveStatus["variants"]["baseline"];
 
 type Task = Variant["tasks"][number];
 
-export function RunDetail({ runId }: { runId: string }) {
-  const { error, runs } = useRuns();
-  const [now, setNow] = useState(() => Date.now());
-  const run = runs.find((candidate) => candidate.runId === runId) ?? null;
-  const active = run?.status === "preparing" || run?.status === "running";
+function initialNow() {
+  return Date.now();
+}
+
+function findRun(
+  runs: BrowserBenchmarkLiveStatus[],
+  runId: string
+): BrowserBenchmarkLiveStatus | null {
+  return runs.find((candidate) => candidate.runId === runId) ?? null;
+}
+
+function isActiveRun(run: BrowserBenchmarkLiveStatus | null) {
+  if (!run) return false;
+
+  return run.status === "preparing" || run.status === "running";
+}
+
+function tickNow(setNow: (value: number) => void) {
+  return () => {
+    setNow(Date.now());
+  };
+}
+
+function useTickingNow(active: boolean) {
+  const [now, setNow] = useState(initialNow);
 
   useEffect(() => {
     if (!active) return undefined;
 
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1_000);
+    const timer = setInterval(tickNow(setNow), 1_000);
 
     return () => {
       clearInterval(timer);
     };
   }, [active]);
 
+  return now;
+}
+
+export function RunDetail({ runId }: { runId: string }) {
+  const { error, runs } = useRuns();
+  const run = findRun(runs, runId);
+  const now = useTickingNow(isActiveRun(run));
+
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <Link
-            className="type-caption text-muted-foreground hover:text-foreground"
-            href="/"
-          >
-            ← All runs
-          </Link>
-          <h1 className="type-page-title mt-3">
-            {run?.label ?? "Browser A/B"}
-          </h1>
-          {run ? (
-            <p className="type-supporting-body mt-1 text-muted-foreground">
-              {run.suite} · {run.variants.baseline.sha.slice(0, 7)} →{" "}
-              {run.variants.candidate.sha.slice(0, 7)}
-            </p>
-          ) : null}
-        </div>
-        {run ? <StatusText status={run.status} /> : null}
-      </header>
+      <RunDetailHeader run={run} />
+      <RunDetailBody error={error} now={now} run={run} />
+    </main>
+  );
+}
 
+function RunDetailHeader({ run }: { run: BrowserBenchmarkLiveStatus | null }) {
+  return (
+    <header className="flex items-end justify-between gap-4">
+      <div>
+        <Link
+          className="type-caption text-muted-foreground hover:text-foreground"
+          href="/"
+        >
+          ← All runs
+        </Link>
+        <h1 className="type-page-title mt-3">{run?.label ?? "Browser A/B"}</h1>
+        <RunSubtitle run={run} />
+      </div>
+      {run ? <StatusText status={run.status} /> : null}
+    </header>
+  );
+}
+
+function RunSubtitle({ run }: { run: BrowserBenchmarkLiveStatus | null }) {
+  if (!run) return null;
+
+  return (
+    <p className="type-supporting-body mt-1 text-muted-foreground">
+      {run.suite} · {run.variants.baseline.sha.slice(0, 7)} →{" "}
+      {run.variants.candidate.sha.slice(0, 7)}
+    </p>
+  );
+}
+
+function RunDetailBody({
+  error,
+  now,
+  run,
+}: {
+  error: string | null;
+  now: number;
+  run: BrowserBenchmarkLiveStatus | null;
+}) {
+  return (
+    <>
       {error ? (
         <p className="type-supporting-body text-destructive">{error}</p>
       ) : null}
@@ -77,7 +128,7 @@ export function RunDetail({ runId }: { runId: string }) {
           Loading run…
         </p>
       )}
-    </main>
+    </>
   );
 }
 
@@ -355,65 +406,70 @@ function traceHref(runId: string, task: Task | undefined) {
     : null;
 }
 
-function StatusDot({ status }: { status: Task["status"] }) {
-  const className =
-    status === "passed"
-      ? "bg-success"
-      : status === "failed"
-        ? "bg-destructive"
-        : status === "scored" || status === "skipped"
-          ? "bg-warning"
-          : status === "running"
-            ? "bg-information"
-            : "bg-muted-foreground";
+const statusDotClass: Record<Task["status"], string> = {
+  failed: "bg-destructive",
+  passed: "bg-success",
+  pending: "bg-muted-foreground",
+  running: "bg-information",
+  scored: "bg-warning",
+  skipped: "bg-warning",
+};
 
+function StatusDot({ status }: { status: Task["status"] }) {
   return (
     <span
       aria-label={status}
-      className={`size-2 shrink-0 rounded-full ${className}`}
+      className={`size-2 shrink-0 rounded-full ${statusDotClass[status]}`}
       title={status}
     />
   );
 }
 
+const statusTextClass = new Map([
+  ["completed", "text-success"],
+  ["failed", "text-destructive"],
+  ["passed", "text-success"],
+  ["preparing", "text-information"],
+  ["running", "text-information"],
+  ["scored", "text-warning"],
+  ["skipped", "text-warning"],
+]);
+
 function StatusText({ status }: { status: string }) {
-  let className = "text-muted-foreground";
+  return (
+    <span className={statusTextClass.get(status) ?? "text-muted-foreground"}>
+      {status}
+    </span>
+  );
+}
 
-  if (status === "passed" || status === "completed") className = "text-success";
+function countTask(
+  totals: { passed: number; running: number; failed: number; cost: number },
+  task: Task
+) {
+  if (task.success === true) totals.passed += 1;
 
-  if (status === "failed") className = "text-destructive";
+  if (task.status === "running") totals.running += 1;
 
-  if (status === "scored" || status === "skipped") className = "text-warning";
+  if (task.success === false) totals.failed += 1;
+  totals.cost += task.costUsd ?? 0;
+}
 
-  if (status === "running" || status === "preparing")
-    className = "text-information";
-
-  return <span className={className}>{status}</span>;
+function isCostComplete(task: Task) {
+  return task.costComplete;
 }
 
 function summarize(variant: Variant) {
-  let passed = 0;
-  let running = 0;
-  let failed = 0;
-  let cost = 0;
+  const totals = { cost: 0, failed: 0, passed: 0, running: 0 };
 
   for (const task of variant.tasks) {
-    if (task.success === true) passed += 1;
-
-    if (task.status === "running") running += 1;
-
-    if (task.success === false) failed += 1;
-    cost += task.costUsd ?? 0;
+    countTask(totals, task);
   }
 
   return {
-    cost,
+    ...totals,
     costComplete:
-      variant.tasks.length > 0 &&
-      variant.tasks.every((task) => task.costComplete),
-    failed,
-    passed,
-    running,
+      variant.tasks.length > 0 && variant.tasks.every(isCostComplete),
   };
 }
 
