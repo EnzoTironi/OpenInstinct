@@ -40,15 +40,19 @@ const nativeAuthUnavailable = () => {
   );
 };
 
-const hasSaveAndRemove = (
+type ErasedTool = Parameters<typeof executeErasedTool>[0];
+
+function hasSaveAndRemove(
   tools:
     | {
-        save_memory?: unknown;
-        remove_memory?: unknown;
+        save_memory?: ErasedTool;
+        remove_memory?: ErasedTool;
       }
     | null
     | undefined
-) => Boolean(tools?.save_memory && tools.remove_memory);
+): tools is { save_memory: ErasedTool; remove_memory: ErasedTool } {
+  return Boolean(tools?.save_memory && tools.remove_memory);
+}
 
 const recallLineIndex = (content: string | undefined) =>
   /(?:^|\n)(\d+):.*orange/mu.exec(content ?? "")?.[1];

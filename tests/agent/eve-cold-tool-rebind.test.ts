@@ -82,7 +82,7 @@ interface ColdCalls {
   execute: number;
 }
 
-const approvalRequestCallback = () => "user-approval";
+const approvalRequestCallback = () => "user-approval" as const;
 
 const makeExecuteCallback = (calls: ColdCalls) => () => {
   calls.execute += 1;

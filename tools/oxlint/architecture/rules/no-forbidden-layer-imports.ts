@@ -67,7 +67,9 @@ const isMockRunnerIdentifier = (name: string) => {
   return name === "jest";
 };
 
-const isModuleMockCallee = (callee: ESTree.CallExpression["callee"]) => {
+function isModuleMockCallee(
+  callee: ESTree.CallExpression["callee"]
+): callee is ESTree.MemberExpression {
   if (!("object" in callee)) return false;
 
   if (!("property" in callee)) return false;
@@ -77,7 +79,7 @@ const isModuleMockCallee = (callee: ESTree.CallExpression["callee"]) => {
   if (callee.object.type !== "Identifier") return false;
 
   return isMockRunnerIdentifier(callee.object.name);
-};
+}
 
 const moduleMockMethodName = (callee: ESTree.MemberExpression) => {
   if (callee.computed) {

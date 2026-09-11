@@ -28,8 +28,12 @@ const scrollPositionSchema = z.object({
   scrollTop: z.number(),
 });
 
-const isConversationRenderChild = (value: ConversationProps["children"]) =>
-  z.function().safeParse(value).success;
+const isConversationRenderChild = (
+  value: unknown
+): value is ConversationRenderChild => z.function().safeParse(value).success;
+
+const isConversationLeafChild = (value: unknown): value is React.ReactNode =>
+  !isConversationRenderChild(value);
 
 const parseConversationRenderChild = (
   children: ConversationProps["children"]
@@ -41,6 +45,18 @@ const parseConversationRenderChild = (
   if (!parsedRenderer.success) return undefined;
 
   return parsedRenderer.data;
+};
+
+const parseConversationLeafChild = (
+  children: ConversationProps["children"]
+) => {
+  const parsedLeaf = z
+    .custom<React.ReactNode>(isConversationLeafChild)
+    .safeParse(children);
+
+  if (!parsedLeaf.success) return null;
+
+  return parsedLeaf.data;
 };
 
 const conversationInitialScroll = (
@@ -111,6 +127,8 @@ export const Conversation = ({
     );
   }
 
+  const leafChildren = parseConversationLeafChild(children);
+
   return (
     <StickToBottom
       className={cn("relative flex-1 overflow-y-hidden", className)}
@@ -119,7 +137,7 @@ export const Conversation = ({
       role="log"
       {...props}
     >
-      {children}
+      {leafChildren}
       <ConversationScrollRestorationSlot storageKey={scrollRestorationKey} />
     </StickToBottom>
   );

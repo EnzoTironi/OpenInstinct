@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
+import type { Context } from "effect";
 import { Config, Effect, Schema } from "effect";
 import type { MemoryTurnStartedContext } from "eve/memory";
 import type { ToolContext } from "eve/tools";
@@ -26,6 +27,174 @@ const cookieHeader = (response: Response) =>
     .getSetCookie()
     .map((cookie) => cookie.split(";")[0])
     .join("; ");
+
+type ServiceOf<S> =
+  S extends Context.Service<infer _I, infer Api> ? Api : never;
+
+type AccountsService = ServiceOf<typeof ChannelAccounts>;
+
+type AuthApi = Awaited<ReturnType<typeof getAuth>>;
+
+type ErasedTool = Parameters<typeof executeErasedTool>[0];
+
+interface WriterPidSlot {
+  pid?: number;
+}
+
+const raceSandboxUnavailable = () => {
+  throw new Error("No sandbox belongs in this memory proof");
+};
+
+const raceSkillUnavailable = () => {
+  throw new Error("No skill belongs in this memory proof");
+};
+
+const raceTokenUnavailable = () => {
+  throw new Error("No connection belongs in this memory proof");
+};
+
+const raceAuthUnavailable = () => {
+  throw new Error("No external authorization belongs in this memory proof");
+};
+
+const channelOrWebPrincipal = (
+  authority: "channel" | "web",
+  identity: Parameters<typeof channelPrincipal>[0],
+  scope: ReturnType<typeof accessScopeForUser>,
+  workspaceId: string,
+  authSessionId: string
+) => {
+  if (authority === "channel") {
+    return channelPrincipal(identity);
+  }
+
+  return {
+    principalId: scope.userId,
+    principalType: "user" as const,
+    authenticator: "authjs",
+    attributes: {
+      conversationChannel: "eve",
+      workspaceId,
+      authSessionId,
+    },
+  };
+};
+
+const makeMemorySaveInvoker = (save: ErasedTool, execution: ToolContext) => {
+  return async (text: string) => {
+    await executeErasedTool(save, { text }, execution);
+  };
+};
+
+const asWriteOutcome = (promise: Promise<void>) =>
+  promise.then(
+    () => ({ ok: true as const }),
+    () => ({ ok: false as const })
+  );
+
+const makeWriterBlockedPoll = (
+  database: Client,
+  blockerPid: number,
+  slot: WriterPidSlot
+) => {
+  return async () => {
+    const rows = await database.query<{ pid: number }>(
+      "SELECT pid FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)) AND query ILIKE '%UPDATE%memory_document%'",
+      [blockerPid]
+    );
+
+    slot.pid = rows.rows[0]?.pid;
+
+    return slot.pid !== undefined;
+  };
+};
+
+const makeRevocationBlockedPoll = (
+  database: Client,
+  writerPid: number | undefined,
+  revocation: { completed: boolean }
+) => {
+  return async () => {
+    if (revocation.completed) return true;
+
+    const rows = await database.query<{ pid: number }>(
+      "SELECT pid FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))",
+      [writerPid]
+    );
+
+    return rows.rowCount !== 0;
+  };
+};
+
+const runAuthorityRevocation = async (
+  authority: "channel" | "web",
+  accounts: AccountsService,
+  identity: { id: string; userId: string },
+  auth: AuthApi,
+  origin: string,
+  cookie: string,
+  revocation: { completed: boolean }
+) => {
+  if (authority === "channel") {
+    await serverRuntime.runPromise(
+      accounts.revokeIdentity({
+        identityId: identity.id,
+        userId: identity.userId,
+      })
+    );
+  } else {
+    const response = await auth.handler(
+      new Request(`${origin}/api/auth/sign-out`, {
+        method: "POST",
+        headers: { origin, cookie, "content-type": "application/json" },
+        body: "{}",
+      })
+    );
+
+    assert.equal(response.status, 200);
+  }
+
+  revocation.completed = true;
+};
+
+const assertRaceOutcome = (
+  revocationWon: boolean,
+  after: { content: string; version: string },
+  before: { content: string; version: string },
+  outcome: { ok: boolean }
+) => {
+  if (revocationWon) {
+    assert.deepEqual(
+      after,
+      before,
+      "Revocation completed before releasing the document lock, but the native tool still committed a write"
+    );
+    assert.equal(outcome.ok, false);
+
+    return;
+  }
+
+  // The writer held an authority lock: revocation could finish only after its transaction ended.
+  assert.match(after.content, /Racing write/);
+};
+
+const deleteRaceUserRows = async (
+  database: Client,
+  userId: string | undefined,
+  workspaceId: string | undefined
+) => {
+  if (!userId) return;
+
+  await database.query(
+    "DELETE FROM channel_auth_challenge WHERE identity_id IN (SELECT id FROM channel_identity WHERE user_id=$1)",
+    [userId]
+  );
+  await database.query("DELETE FROM channel_identity WHERE user_id=$1", [
+    userId,
+  ]);
+  await database.query("DELETE FROM workspaces WHERE id=$1", [workspaceId]);
+  await database.query('DELETE FROM "user" WHERE id=$1', [userId]);
+};
 
 for (const authority of ["channel", "web"] as const) {
   test(`${authority} revocation linearizes with native memory writes waiting on a real row lock`, async () => {
@@ -117,19 +286,13 @@ for (const authority of ["channel", "web"] as const) {
 
       assert.ok(session);
 
-      const principal =
-        authority === "channel"
-          ? channelPrincipal(identity)
-          : {
-              principalId: scope.userId,
-              principalType: "user" as const,
-              authenticator: "authjs",
-              attributes: {
-                conversationChannel: "eve",
-                workspaceId,
-                authSessionId: session.session.id,
-              },
-            };
+      const principal = channelOrWebPrincipal(
+        authority,
+        identity,
+        scope,
+        workspaceId,
+        session.session.id
+      );
 
       const turnId = randomUUID();
 
@@ -151,26 +314,16 @@ for (const authority of ["channel", "web"] as const) {
           turn: { id: turnId, sequence: 1 },
         },
         turn: { id: turnId, input: [], sequence: 1 },
-        getSandbox() {
-          throw new Error("No sandbox belongs in this memory proof");
-        },
-        getSkill() {
-          throw new Error("No skill belongs in this memory proof");
-        },
+        getSandbox: raceSandboxUnavailable,
+        getSkill: raceSkillUnavailable,
       };
 
       const execution: ToolContext = {
         ...context,
         callId: randomUUID(),
         toolName: "profile__save_memory",
-        getToken() {
-          throw new Error("No connection belongs in this memory proof");
-        },
-        requireAuth() {
-          throw new Error(
-            "No external authorization belongs in this memory proof"
-          );
-        },
+        getToken: raceTokenUnavailable,
+        requireAuth: raceAuthUnavailable,
       };
 
       const tools = await personalMemoryProvider.tools?.({
@@ -181,9 +334,7 @@ for (const authority of ["channel", "web"] as const) {
       const save = tools?.save_memory;
       assert.ok(save);
 
-      const invoke = async (text: string) => {
-        await executeErasedTool(save, { text }, execution);
-      };
+      const invoke = makeMemorySaveInvoker(save, execution);
 
       await invoke("Before revocation");
 
@@ -206,64 +357,31 @@ for (const authority of ["channel", "web"] as const) {
       ).rows[0]?.pid;
 
       assert.ok(blockerPid);
-      write = invoke("Racing write").then(
-        () => ({ ok: true }),
-        () => ({ ok: false })
-      );
-      let writerPid: number | undefined;
+      write = asWriteOutcome(invoke("Racing write"));
+      const writerSlot: WriterPidSlot = {};
       await expect
-        .poll(
-          async () => {
-            const rows = await database.query<{ pid: number }>(
-              "SELECT pid FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)) AND query ILIKE '%UPDATE%memory_document%'",
-              [blockerPid]
-            );
-
-            writerPid = rows.rows[0]?.pid;
-
-            return writerPid !== undefined;
-          },
-          { timeout: 5000, interval: 20 }
-        )
+        .poll(makeWriterBlockedPoll(database, blockerPid, writerSlot), {
+          timeout: 5000,
+          interval: 20,
+        })
         .toBe(true);
+      const writerPid = writerSlot.pid;
       const revocation = { completed: false };
-      revoke = (async () => {
-        if (authority === "channel") {
-          await serverRuntime.runPromise(
-            accounts.revokeIdentity({
-              identityId: identity.id,
-              userId: identity.userId,
-            })
-          );
-        } else {
-          const response = await auth.handler(
-            new Request(`${origin}/api/auth/sign-out`, {
-              method: "POST",
-              headers: { origin, cookie, "content-type": "application/json" },
-              body: "{}",
-            })
-          );
-
-          assert.equal(response.status, 200);
-        }
-
-        revocation.completed = true;
-      })();
+      revoke = runAuthorityRevocation(
+        authority,
+        accounts,
+        identity,
+        auth,
+        origin,
+        cookie,
+        revocation
+      );
       // Establish order from database locks, not an assumed sleep duration.
       await expect
-        .poll(
-          async () => {
-            if (revocation.completed) return true;
-
-            const rows = await database.query<{ pid: number }>(
-              "SELECT pid FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))",
-              [writerPid]
-            );
-
-            return rows.rowCount !== 0;
-          },
-          { timeout: 5000, interval: 20 }
-        )
+        .poll(makeRevocationBlockedPoll(database, writerPid, revocation), {
+          timeout: 5000,
+          interval: 20,
+        })
         .toBe(true);
       const revocationWon = revocation.completed;
       await blocker.query("COMMIT");
@@ -279,17 +397,7 @@ for (const authority of ["channel", "web"] as const) {
 
       assert.ok(after);
 
-      if (revocationWon) {
-        assert.deepEqual(
-          after,
-          before,
-          "Revocation completed before releasing the document lock, but the native tool still committed a write"
-        );
-        assert.equal(outcome.ok, false);
-      } else {
-        // The writer held an authority lock: revocation could finish only after its transaction ended.
-        assert.match(after.content, /Racing write/);
-      }
+      assertRaceOutcome(revocationWon, after, before, outcome);
 
       const frozen = after;
       await assert.rejects(invoke("Must not persist after revocation"));
@@ -316,19 +424,7 @@ for (const authority of ["channel", "web"] as const) {
       await Promise.allSettled([write, revoke]);
       await database.query("DELETE FROM memory_document WHERE key=$1", [key]);
 
-      if (userId) {
-        await database.query(
-          "DELETE FROM channel_auth_challenge WHERE identity_id IN (SELECT id FROM channel_identity WHERE user_id=$1)",
-          [userId]
-        );
-        await database.query("DELETE FROM channel_identity WHERE user_id=$1", [
-          userId,
-        ]);
-        await database.query("DELETE FROM workspaces WHERE id=$1", [
-          workspaceId,
-        ]);
-        await database.query('DELETE FROM "user" WHERE id=$1', [userId]);
-      }
+      await deleteRaceUserRows(database, userId, workspaceId);
 
       await blocker.end();
       await database.end();
