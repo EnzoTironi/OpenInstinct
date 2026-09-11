@@ -119,72 +119,65 @@ const malformed = () =>
   new ProviderInputError({ provider: "telegram", reason: "malformed" });
 
 /** Expects verified JSON. Pure normalization; no credentials or network access. */
-export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
-  value: Schema.Json,
-  configuration: TelegramInstallation,
-  nowMs: number
-): Effect.fn.Return<readonly InboundEvent[], ProviderInputError> {
-  const installation = yield* decodeEffect_TelegramInstallationSchema(
-    configuration
-  ).pipe(Effect.mapError(malformed));
 
-  const incoming = yield* decodeUpdate(value).pipe(
-    Effect.mapError(malformed)
-  );
-
-  if (incoming.message && incoming.callback_query) return yield* malformed();
-  const source = incoming.callback_query?.message ?? incoming.message;
-  const sender = incoming.callback_query?.from ?? incoming.message?.from;
-
-  if (!source || !sender || sender.is_bot) return [];
-
-  if (String(sender.id) === installation.botId) return [];
-  const chatKind = detectTelegramChatKind(source.chat.type);
-
-  if (chatKind === "unsupported") return [];
-
-  // Callbacks / login confirmations remain private-only.
-  if (incoming.callback_query && chatKind !== "private") return [];
-
+const resolveTelegramGroupAccess = (
+  source: {
+    readonly chat: { readonly id: number; readonly type: string };
+    readonly text?: string;
+    readonly caption?: string;
+    readonly entities?: readonly {
+      readonly type: string;
+      readonly offset: number;
+      readonly length: number;
+      readonly user?: { readonly id: number };
+    }[];
+    readonly caption_entities?: readonly {
+      readonly type: string;
+      readonly offset: number;
+      readonly length: number;
+      readonly user?: { readonly id: number };
+    }[];
+    readonly reply_to_message?: {
+      readonly from?: { readonly is_bot?: boolean; readonly id?: number };
+    };
+  },
+  sender: { readonly id: number },
+  installation: { readonly botId: string; readonly botUsername: string },
+  chatKind: "private" | "group"
+) => {
   if (chatKind === "private") {
-    if (source.chat.id !== sender.id) return [];
-  } else {
-    const botUsername = installation.botUsername.replace(/^@/, "");
-    const bodyText = source.text ?? source.caption;
-    const entities = source.entities ?? source.caption_entities;
-
-    const mentionedBot = telegramTextMentionsBot(
-      bodyText,
-      botUsername,
-      entities,
-      installation.botId
-    );
-
-    const replyFrom = source.reply_to_message?.from;
-
-    const replyToBot = Boolean(
-      replyFrom?.is_bot && String(replyFrom.id) === installation.botId
-    );
-
-    if (!evaluateGroupMentionPolicy({ mentionedBot, replyToBot })) return [];
+    return source.chat.id === sender.id;
   }
 
-  const occurredAt = yield* validateEventAge("telegram", source.date, nowMs);
+  const botUsername = installation.botUsername.replace(/^@/, "");
+  const bodyText = source.text ?? source.caption;
+  const entities = source.entities ?? source.caption_entities;
 
-  const coordinates: InboundCoordinates = {
-    channel: "telegram",
-    installationId: installation.botId,
-    eventId: String(incoming.update_id),
-    senderId: String(sender.id),
-    messageId: String(source.message_id),
-    occurredAt,
-    chatKind,
-    chatId: String(source.chat.id),
-  };
+  const mentionedBot = telegramTextMentionsBot(
+    bodyText,
+    botUsername,
+    entities,
+    installation.botId
+  );
 
-  const query = incoming.callback_query;
+  const replyFrom = source.reply_to_message?.from;
 
-  if (query) {
+  const replyToBot = Boolean(
+    replyFrom?.is_bot && String(replyFrom.id) === installation.botId
+  );
+
+  return evaluateGroupMentionPolicy({ mentionedBot, replyToBot });
+};
+
+const parseTelegramCallbackCommand = Effect.fn("parseTelegramCallbackCommand")(
+  function* (
+    query: typeof callback.Type,
+    coordinates: InboundCoordinates,
+    installation: TelegramInstallation,
+    source: {
+      readonly from?: { readonly is_bot?: boolean; readonly id?: number };
+    }
+  ): Effect.fn.Return<readonly InboundEvent[], ProviderInputError> {
     if (!source.from?.is_bot || String(source.from.id) !== installation.botId)
       return [];
 
@@ -192,9 +185,7 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
 
     if (Buffer.byteLength(query.data, "utf8") > 64) return yield* malformed();
 
-    const token = yield* decodeLoginTokenSchema(
-      query.data.slice(8)
-    ).pipe(
+    const token = yield* decodeLoginTokenSchema(query.data.slice(8)).pipe(
       Effect.mapError(
         () =>
           new ProviderInputError({
@@ -214,7 +205,9 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
       },
     ];
   }
+);
 
+const telegramMessagePayload = (source: typeof message.Type) => {
   const media =
     source.document ??
     source.audio ??
@@ -223,7 +216,7 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
     source.sticker ??
     source.photo?.at(-1);
 
-  const payload = {
+  return {
     text: source.text ?? source.caption,
     attachments: media
       ? [
@@ -238,10 +231,63 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
       ? String(source.reply_to_message.message_id)
       : undefined,
   };
+};
+
+export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
+  value: Schema.Json,
+  configuration: TelegramInstallation,
+  nowMs: number
+): Effect.fn.Return<readonly InboundEvent[], ProviderInputError> {
+  const installation = yield* decodeEffect_TelegramInstallationSchema(
+    configuration
+  ).pipe(Effect.mapError(malformed));
+
+  const incoming = yield* decodeUpdate(value).pipe(Effect.mapError(malformed));
+
+  if (incoming.message && incoming.callback_query) return yield* malformed();
+  const source = incoming.callback_query?.message ?? incoming.message;
+  const sender = incoming.callback_query?.from ?? incoming.message?.from;
+
+  if (!source || !sender || sender.is_bot) return [];
+
+  if (String(sender.id) === installation.botId) return [];
+  const chatKind = detectTelegramChatKind(source.chat.type);
+
+  if (chatKind === "unsupported") return [];
+
+  // Callbacks / login confirmations remain private-only.
+  if (incoming.callback_query && chatKind !== "private") return [];
+
+  if (!resolveTelegramGroupAccess(source, sender, installation, chatKind))
+    return [];
+
+  const occurredAt = yield* validateEventAge("telegram", source.date, nowMs);
+
+  const coordinates: InboundCoordinates = {
+    channel: "telegram",
+    installationId: installation.botId,
+    eventId: String(incoming.update_id),
+    senderId: String(sender.id),
+    messageId: String(source.message_id),
+    occurredAt,
+    chatKind,
+    chatId: String(source.chat.id),
+  };
+
+  const query = incoming.callback_query;
+
+  if (query) {
+    return yield* parseTelegramCallbackCommand(
+      query,
+      coordinates,
+      installation,
+      source
+    );
+  }
 
   const event = yield* normalizeInbound(
     coordinates,
-    payload,
+    telegramMessagePayload(source),
     installation.botUsername.replace(/^@/, "")
   );
 
@@ -269,15 +315,29 @@ const sendInput = Schema.Struct({
   text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
   reply: Schema.optional(stringId),
 });
+
 const decodeUpdate = Schema.decodeUnknownEffect(update);
+
 const decodeLoginTokenSchema = Schema.decodeUnknownEffect(LoginTokenSchema);
-const decodeSchema_String_check_Schema_isPattern_1_9_0_9_A_Za_ = Schema.decodeUnknownEffect(Schema.String.check(Schema.isPattern(/^[1-9][0-9]*:[A-Za-z0-9_-]+$/)));
+
+const decodeSchema_String_check_Schema_isPattern_1_9_0_9_A_Za_ =
+  Schema.decodeUnknownEffect(
+    Schema.String.check(Schema.isPattern(/^[1-9][0-9]*:[A-Za-z0-9_-]+$/))
+  );
+
 const decodeSendInput = Schema.decodeUnknownEffect(sendInput);
-const decodeProviderReferenceSchema = Schema.decodeUnknownEffect(ProviderReferenceSchema);
-const decodeSchema_Struct_ok_Schema_Literal_true_result_Schema = Schema.decodeUnknownEffect(Schema.Struct({
-          ok: Schema.Literal(true),
-          result: Schema.Literal(true),
-        }));
+
+const decodeProviderReferenceSchema = Schema.decodeUnknownEffect(
+  ProviderReferenceSchema
+);
+
+const decodeSchema_Struct_ok_Schema_Literal_true_result_Schema =
+  Schema.decodeUnknownEffect(
+    Schema.Struct({
+      ok: Schema.Literal(true),
+      result: Schema.Literal(true),
+    })
+  );
 
 const response = Schema.Union([
   Schema.Struct({
@@ -474,9 +534,7 @@ const makeTelegram = Effect.gen(function* () {
       if (installation.botId !== installationId)
         return yield* new ChannelMediaError({ reason: "wrong_installation" });
 
-      const id = yield* decodeProviderReferenceSchema(
-        fileId
-      ).pipe(
+      const id = yield* decodeProviderReferenceSchema(fileId).pipe(
         Effect.mapError(
           () => new ChannelMediaError({ reason: "invalid_media" })
         )
@@ -536,9 +594,9 @@ const makeTelegram = Effect.gen(function* () {
     }),
     sendLoginConfirmation: Effect.fn("Telegram.sendLoginConfirmation")(
       function* (targetId: string, token: string) {
-        const valid = yield* decodeLoginTokenSchema(
-          token
-        ).pipe(Effect.mapError(malformed));
+        const valid = yield* decodeLoginTokenSchema(token).pipe(
+          Effect.mapError(malformed)
+        );
 
         const data = `confirm:${valid}`;
 
@@ -555,15 +613,17 @@ const makeTelegram = Effect.gen(function* () {
     answerCallbackQuery: Effect.fn("Telegram.answerCallbackQuery")(function* (
       callbackQueryId: string
     ) {
-      const id = yield* decodeProviderReferenceSchema(
-        callbackQueryId
-      ).pipe(Effect.mapError(malformed));
+      const id = yield* decodeProviderReferenceSchema(callbackQueryId).pipe(
+        Effect.mapError(malformed)
+      );
 
       const body = yield* request("answerCallbackQuery", {
         callback_query_id: id,
       });
 
-      yield* decodeSchema_Struct_ok_Schema_Literal_true_result_Schema(body).pipe(
+      yield* decodeSchema_Struct_ok_Schema_Literal_true_result_Schema(
+        body
+      ).pipe(
         Effect.mapError(
           () =>
             new ProviderUncertain({

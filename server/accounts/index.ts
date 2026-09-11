@@ -168,26 +168,26 @@ const hash = (secret: string) =>
 const fail = (reason: ChannelAccountError["reason"]) =>
   new ChannelAccountError({ reason });
 
+/* oxlint-disable anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion -- WeakMap-cached generic Schema.decodeUnknownEffect; required by agent-doctor hoist-schema-codecs. */
 const decodeUnknownEffectCache = new WeakMap<
   object,
   (input: unknown) => Effect.Effect<unknown, unknown>
 >();
 
 const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) => {
-  let decoder = decodeUnknownEffectCache.get(schema as object) as
+  let decoder = decodeUnknownEffectCache.get(schema) as
     | ((input: S["Type"]) => Effect.Effect<S["Type"], unknown>)
     | undefined;
 
   if (!decoder) {
     const built = Schema.decodeUnknownEffect(schema);
-    decodeUnknownEffectCache.set(schema as object, built as never);
+    decodeUnknownEffectCache.set(schema, built as never);
     decoder = built as (input: S["Type"]) => Effect.Effect<S["Type"], unknown>;
   }
 
-  return decoder(input).pipe(
-    Effect.mapError(() => fail("invalid_input"))
-  );
+  return decoder(input).pipe(Effect.mapError(() => fail("invalid_input")));
 };
+/* oxlint-enable anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion */
 
 const publicIdentity = ({
   id,

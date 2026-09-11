@@ -23,8 +23,14 @@ const probeResult = Schema.Struct({
     ),
   }),
 });
-const decodeSchema_fromJsonString_probeResult = Schema.decodeUnknownEffect(Schema.fromJsonString(probeResult));
-const decodeChannelTranscriptSchema = Schema.decodeUnknownEffect(ChannelTranscriptSchema);
+
+const decodeSchema_fromJsonString_probeResult = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(probeResult)
+);
+
+const decodeChannelTranscriptSchema = Schema.decodeUnknownEffect(
+  ChannelTranscriptSchema
+);
 
 export const validateAudioDuration = Effect.fn("validateAudioDuration")(
   function* (bytes: Uint8Array, mediaType: typeof audioType.Type) {
@@ -85,7 +91,9 @@ export const validateAudioDuration = Effect.fn("validateAudioDuration")(
     if ((yield* handle.exitCode) !== 0)
       return yield* new ChannelMediaError({ reason: "invalid_media" });
 
-    const probe = yield* decodeSchema_fromJsonString_probeResult(output.toString("utf8")).pipe(
+    const probe = yield* decodeSchema_fromJsonString_probeResult(
+      output.toString("utf8")
+    ).pipe(
       Effect.mapError(() => new ChannelMediaError({ reason: "invalid_media" }))
     );
 
@@ -133,9 +141,7 @@ export const transcribeChannelAudio = Effect.fn("transcribeChannelAudio")(
       catch: () => new ChannelMediaError({ reason: "transcription_failed" }),
     });
 
-    return yield* decodeChannelTranscriptSchema(
-      result.text.trim()
-    ).pipe(
+    return yield* decodeChannelTranscriptSchema(result.text.trim()).pipe(
       Effect.mapError(
         () => new ChannelMediaError({ reason: "transcription_failed" })
       )

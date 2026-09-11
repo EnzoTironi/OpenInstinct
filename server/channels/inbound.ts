@@ -2,8 +2,11 @@ import { DateTime, Effect, Schema } from "effect";
 
 import { MessagePayloadSchema, type MessagePayload } from "../messaging/model";
 import { ProviderInputError } from "./provider-errors";
+
 const decodeFinite = Schema.decodeUnknownEffect(Schema.Finite);
-const decodeMessagePayloadSchema = Schema.decodeUnknownEffect(MessagePayloadSchema);
+
+const decodeMessagePayloadSchema =
+  Schema.decodeUnknownEffect(MessagePayloadSchema);
 
 export const ProviderReferenceSchema = Schema.String.check(
   Schema.isMinLength(1),
@@ -80,55 +83,9 @@ export const validateEventAge = Effect.fn("validateEventAge")(function* (
   return DateTime.formatIso(DateTime.makeUnsafe(milliseconds));
 });
 
-export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
-  coordinates: InboundCoordinates,
-  payload: MessagePayload,
-  botUsername?: string
-): Effect.fn.Return<InboundEvent | null, ProviderInputError> {
-  const text = payload.text?.trim() ?? "";
-
-  if (coordinates.chatKind === "group") {
-    // Auth challenges stay private-only; groups never mint login/link commands.
-    if (/^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) return null;
-  }
-
-  const command =
-    coordinates.channel === "telegram" && coordinates.chatKind !== "group"
-      ? /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text)
-      : null;
-
-  if (command?.[2] && command[2].toLowerCase() !== botUsername?.toLowerCase())
-    return null;
-  const greeting = command?.[1]?.toLowerCase() === "start" && !command[3];
-
-  if (command && !greeting) {
-    const token = yield* decodeEffect_LoginTokenSchema(command[3]).pipe(
-      Effect.mapError(
-        () =>
-          new ProviderInputError({
-            provider: coordinates.channel,
-            reason: "invalid_command",
-          })
-      )
-    );
-
-    const action = command[1]?.toLowerCase() === "start" ? "start" : "confirm";
-
-    return { ...coordinates, kind: "command", command: action, token };
-  }
-
-  if (
-    coordinates.channel === "telegram" &&
-    !greeting &&
-    /^\/(?:start|confirm)(?:@|\s|$)/i.test(text)
-  ) {
-    return yield* new ProviderInputError({
-      provider: coordinates.channel,
-      reason: "invalid_command",
-    });
-  }
-
-  if (!text && !payload.attachments?.length) return null;
+const buildMessagePayloadCandidate = (
+  payload: MessagePayload
+): Schema.MutableJsonObject => {
   const candidate: Schema.MutableJsonObject = {};
 
   if (payload.text !== undefined) candidate.text = payload.text;
@@ -148,8 +105,92 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
       return reference;
     });
 
+  return candidate;
+};
+
+const parseTelegramAuthCommand = Effect.fn("parseTelegramAuthCommand")(
+  function* (
+    coordinates: InboundCoordinates,
+    text: string,
+    botUsername?: string
+  ): Effect.fn.Return<
+    | { readonly kind: "command"; readonly event: InboundEvent }
+    | { readonly kind: "greeting" }
+    | { readonly kind: "none" }
+    | null,
+    ProviderInputError
+  > {
+    if (coordinates.chatKind === "group") {
+      // Auth challenges stay private-only; groups never mint login/link commands.
+      if (/^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) return null;
+
+      return { kind: "none" };
+    }
+
+    if (coordinates.channel !== "telegram") return { kind: "none" };
+
+    const command =
+      /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text);
+
+    if (!command) {
+      if (/^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) {
+        return yield* new ProviderInputError({
+          provider: coordinates.channel,
+          reason: "invalid_command",
+        });
+      }
+
+      return { kind: "none" };
+    }
+
+    if (command[2] && command[2].toLowerCase() !== botUsername?.toLowerCase())
+      return null;
+
+    const greeting = command[1]?.toLowerCase() === "start" && !command[3];
+
+    if (greeting) return { kind: "greeting" };
+
+    const token = yield* decodeEffect_LoginTokenSchema(command[3]).pipe(
+      Effect.mapError(
+        () =>
+          new ProviderInputError({
+            provider: coordinates.channel,
+            reason: "invalid_command",
+          })
+      )
+    );
+
+    const action = command[1]?.toLowerCase() === "start" ? "start" : "confirm";
+
+    return {
+      kind: "command",
+      event: { ...coordinates, kind: "command", command: action, token },
+    };
+  }
+);
+
+export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
+  coordinates: InboundCoordinates,
+  payload: MessagePayload,
+  botUsername?: string
+): Effect.fn.Return<InboundEvent | null, ProviderInputError> {
+  const text = payload.text?.trim() ?? "";
+
+  const auth = yield* parseTelegramAuthCommand(coordinates, text, botUsername);
+
+  if (auth === null) return null;
+
+  if (auth.kind === "command") return auth.event;
+
+  if (!text && !payload.attachments?.length) return null;
+
+  if (auth.kind === "greeting") {
+    // Bare /start is not a login token command; fall through as a message when
+    // there is payload content, otherwise drop.
+  }
+
   const normalized = yield* decodeMessagePayloadSchema(
-    candidate
+    buildMessagePayloadCandidate(payload)
   ).pipe(
     Effect.mapError(
       () =>

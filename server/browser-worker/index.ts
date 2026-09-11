@@ -15,8 +15,12 @@ import {
 } from "./access";
 
 const identifier = Schema.NonEmptyString.check(Schema.isTrimmed());
+
 const decodeIdentifier = Schema.decodeUnknownEffect(identifier);
-const decodeSchema_String_check_Schema_isUUID = Schema.decodeUnknownEffect(Schema.String.check(Schema.isUUID()));
+
+const decodeSchema_String_check_Schema_isUUID = Schema.decodeUnknownEffect(
+  Schema.String.check(Schema.isUUID())
+);
 
 const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
   function* (principal: SessionAuthContext) {
@@ -58,9 +62,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       const scheduleId = principal.attributes.scheduleId;
 
       if (scheduleId !== undefined) {
-        const id = yield* decodeIdentifier(
-          scheduleId
-        ).pipe(
+        const id = yield* decodeIdentifier(scheduleId).pipe(
           Effect.mapError(
             () => new BrowserWorkerAccessError({ reason: "paused" })
           )
@@ -74,7 +76,9 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       principal.authenticator === "verified-channel" ||
       Schema.is(channelProviderSchema)(principal.attributes.conversationChannel)
     ) {
-      const identityId = yield* decodeSchema_String_check_Schema_isUUID(principal.attributes.channelIdentityId).pipe(
+      const identityId = yield* decodeSchema_String_check_Schema_isUUID(
+        principal.attributes.channelIdentityId
+      ).pipe(
         Effect.mapError(
           () => new BrowserWorkerAccessError({ reason: "revoked" })
         )

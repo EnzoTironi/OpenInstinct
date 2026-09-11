@@ -26,9 +26,19 @@ import {
   type channelChallengeRequestSchema,
 } from "../../shared/identity/channel-auth.ts";
 import { runtimeDatabase } from "./database";
-const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
-const decodeSchema_Struct_user_Schema_Struct_id_Schema_String = Schema.decodeUnknownSync(Schema.Struct({ user: Schema.Struct({ id: Schema.String }) }));
-const decodeChannelConversationEntrySchema = Schema.decodeUnknownSync(channelConversationEntrySchema);
+
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(
+  channelChallengeSchema
+);
+
+const decodeSchema_Struct_user_Schema_Struct_id_Schema_String =
+  Schema.decodeUnknownSync(
+    Schema.Struct({ user: Schema.Struct({ id: Schema.String }) })
+  );
+
+const decodeChannelConversationEntrySchema = Schema.decodeUnknownSync(
+  channelConversationEntrySchema
+);
 
 const cookieHeader = (response: Response) =>
   response.headers
@@ -91,13 +101,8 @@ test("real BetterAuth router, signed browser challenge and database session", as
       | typeof channelChallengeRequestSchema.Type;
     origin?: string;
   }) => {
-    const {
-      path,
-      method,
-      cookie = "",
-      body,
-      origin = baseURL,
-    } = options;
+    const { path, method, cookie = "", body, origin = baseURL } = options;
+
     const headers = new Headers({ origin });
 
     if (cookie) headers.set("cookie", cookie);
@@ -119,9 +124,9 @@ test("real BetterAuth router, signed browser challenge and database session", as
       method: "POST",
       cookie: "",
       body: {
-      channel: "kapso",
-      purpose: "login",
-    },
+        channel: "kapso",
+        purpose: "login",
+      },
     });
 
     assert.equal(unavailable.status, 503);
@@ -141,9 +146,9 @@ test("real BetterAuth router, signed browser challenge and database session", as
       method: "POST",
       cookie: "",
       body: {
-      channel: "telegram",
-      purpose: "link",
-    },
+        channel: "telegram",
+        purpose: "link",
+      },
     });
 
     assert.equal(noSession.status, 401);
@@ -153,16 +158,14 @@ test("real BetterAuth router, signed browser challenge and database session", as
       method: "POST",
       cookie: "",
       body: {
-      channel: "telegram",
-      purpose: "login",
-    },
+        channel: "telegram",
+        purpose: "login",
+      },
     });
 
     assert.equal(started.status, 200);
 
-    const challenge = decodeChannelChallengeSchema(
-      await started.json()
-    );
+    const challenge = decodeChannelChallengeSchema(await started.json());
 
     assert.equal(challenge.channel, "telegram");
     assert.equal(Object.hasOwn(challenge, "token"), false);
@@ -206,8 +209,8 @@ test("real BetterAuth router, signed browser challenge and database session", as
       method: "POST",
       cookie: browser,
       body: {
-      id: challenge.id,
-    },
+        id: challenge.id,
+      },
     });
 
     assert.equal(premature.status, 400);
@@ -248,8 +251,8 @@ test("real BetterAuth router, signed browser challenge and database session", as
       method: "POST",
       cookie: browser,
       body: {
-      id: challenge.id,
-    },
+        id: challenge.id,
+      },
     });
 
     assert.equal(completed.status, 200);
@@ -265,14 +268,19 @@ test("real BetterAuth router, signed browser challenge and database session", as
 
     userIds.add(identity.userId);
     const sessionCookie = cookieHeader(completed);
+
     const sessionResponse = await request({
       path: "/get-session",
       method: "GET",
       cookie: sessionCookie,
     });
+
     assert.equal(sessionResponse.status, 200);
 
-    const authenticated = decodeSchema_Struct_user_Schema_Struct_id_Schema_String(await sessionResponse.json());
+    const authenticated =
+      decodeSchema_Struct_user_Schema_Struct_id_Schema_String(
+        await sessionResponse.json()
+      );
 
     assert.equal(authenticated.user.id, identity.userId);
 
@@ -281,8 +289,8 @@ test("real BetterAuth router, signed browser challenge and database session", as
       method: "POST",
       cookie: browser,
       body: {
-      id: challenge.id,
-    },
+        id: challenge.id,
+      },
     });
 
     assert.equal(replay.status, 400);
@@ -296,9 +304,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
 
     assert.equal(linking.status, 200);
 
-    const linkChallenge = decodeChannelChallengeSchema(
-      await linking.json()
-    );
+    const linkChallenge = decodeChannelChallengeSchema(await linking.json());
 
     const linkToken = new URL(linkChallenge.deepLink).searchParams.get("start");
     assert.ok(linkToken);
@@ -353,9 +359,9 @@ test("real BetterAuth router, signed browser challenge and database session", as
       method: "POST",
       cookie: "",
       body: {
-      channel: "kapso",
-      purpose: "login",
-    },
+        channel: "kapso",
+        purpose: "login",
+      },
     });
 
     assert.equal(kapsoStarted.status, 200);
@@ -379,10 +385,14 @@ test("real BetterAuth router, signed browser challenge and database session", as
         yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
         yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
 
-        for (const id of userIds) {
-          yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
-          yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
-        }
+        yield* Effect.forEach(
+          [...userIds],
+          Effect.fn("auth.deleteUser")(function* (id) {
+            yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
+            yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
+          }),
+          { concurrency: 1 }
+        );
       })
     );
     await runtime.dispose();

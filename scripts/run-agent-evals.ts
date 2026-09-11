@@ -113,6 +113,35 @@ async function runAgentEvals() {
   }
 }
 
+function appendValueOption(
+  args: string[],
+  index: number,
+  argument: string,
+  validated: string[]
+) {
+  const equalsIndex = argument.indexOf("=");
+
+  if (equalsIndex !== -1) {
+    if (argument.slice(equalsIndex + 1).length === 0) {
+      throw unsupportedEvalArgument(argument);
+    }
+
+    validated.push(argument);
+
+    return index;
+  }
+
+  const value = args[index + 1];
+
+  if (!value || value.startsWith("-")) {
+    throw unsupportedEvalArgument(argument);
+  }
+
+  validated.push(argument, value);
+
+  return index + 1;
+}
+
 function validateEvalArguments(args: string[]) {
   const booleanOptions = new Set([
     "--json",
@@ -140,32 +169,15 @@ function validateEvalArguments(args: string[]) {
       continue;
     }
 
-    const equalsIndex = argument.indexOf("=");
-
-    const option =
-      equalsIndex === -1 ? argument : argument.slice(0, equalsIndex);
+    const option = !argument.includes("=")
+      ? argument
+      : argument.slice(0, argument.indexOf("="));
 
     if (!valueOptions.has(option)) {
       throw unsupportedEvalArgument(argument);
     }
 
-    if (equalsIndex !== -1) {
-      if (argument.slice(equalsIndex + 1).length === 0) {
-        throw unsupportedEvalArgument(argument);
-      }
-
-      validated.push(argument);
-      continue;
-    }
-
-    const value = args[index + 1];
-
-    if (!value || value.startsWith("-")) {
-      throw unsupportedEvalArgument(argument);
-    }
-
-    validated.push(argument, value);
-    index += 1;
+    index = appendValueOption(args, index, argument, validated);
   }
 
   return validated;

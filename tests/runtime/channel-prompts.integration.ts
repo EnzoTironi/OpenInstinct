@@ -72,7 +72,7 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         browserSecret: randomBytes(32).toString("base64url"),
       });
 
-      try {
+      yield* Effect.gen(function* () {
         const unavailableKey = yield* issue;
 
         const unavailableLive = ChannelAuthPrompts.layer.pipe(
@@ -287,71 +287,85 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           null
         );
 
-        for (const invalidation of ["confirm", "expire"] as const) {
-          const inFlight = yield* issue;
+        yield* Effect.forEach(
+          ["confirm", "expire"] as const,
+          Effect.fn("prompts.invalidation")(function* (invalidation) {
+            const inFlight = yield* issue;
 
-          const inFlightRequest = {
-            token: inFlight.token,
-            sender,
-            eventId: randomUUID(),
-          };
+            const inFlightRequest = {
+              token: inFlight.token,
+              sender,
+              eventId: randomUUID(),
+            };
 
-          yield* prompts.prepare(inFlightRequest);
-          const dispatch = yield* prompts.claim(inFlight.challengeId);
-          assert.ok(dispatch);
-          yield* prompts.checkLease(dispatch.lease);
+            yield* prompts.prepare(inFlightRequest);
+            const dispatch = yield* prompts.claim(inFlight.challengeId);
+            assert.ok(dispatch);
+            yield* prompts.checkLease(dispatch.lease);
 
-          // Provider I/O may already be running when the challenge becomes inactive.
-          if (invalidation === "confirm")
-            yield* accounts.confirmChallenge({ token: inFlight.token, sender });
-          else
-            yield* sql`UPDATE public.channel_auth_challenge SET created_at = clock_timestamp() - interval '6 minutes', expires_at = clock_timestamp() - interval '1 second' WHERE id = ${inFlight.challengeId}`;
-          yield* prompts.pending(100);
-          assert.deepEqual(yield* prompts.prepare(inFlightRequest), {
-            challengeId: inFlight.challengeId,
-            status: "dispatching",
-          });
-          yield* rejected(prompts.checkLease(dispatch.lease), "lease_lost");
-          yield* prompts.markSent(dispatch.lease, "synthetic-inflight-receipt");
+            // Provider I/O may already be running when the challenge becomes inactive.
+            if (invalidation === "confirm")
+              yield* accounts.confirmChallenge({
+                token: inFlight.token,
+                sender,
+              });
+            else
+              yield* sql`UPDATE public.channel_auth_challenge SET created_at = clock_timestamp() - interval '6 minutes', expires_at = clock_timestamp() - interval '1 second' WHERE id = ${inFlight.challengeId}`;
+            yield* prompts.pending(100);
+            assert.deepEqual(yield* prompts.prepare(inFlightRequest), {
+              challengeId: inFlight.challengeId,
+              status: "dispatching",
+            });
+            yield* rejected(prompts.checkLease(dispatch.lease), "lease_lost");
+            yield* prompts.markSent(
+              dispatch.lease,
+              "synthetic-inflight-receipt"
+            );
 
-          const settled = yield* sql<{
-            status: string;
-            providerMessageId: string | null;
-            tokenCiphertext: string | null;
-          }>`SELECT status,
+            const settled = yield* sql<{
+              status: string;
+              providerMessageId: string | null;
+              tokenCiphertext: string | null;
+            }>`SELECT status,
             provider_message_id AS "providerMessageId", token_ciphertext AS "tokenCiphertext" FROM public.channel_auth_prompt WHERE challenge_id = ${inFlight.challengeId}`;
 
-          assert.equal(settled[0]?.status, "sent");
-          assert.equal(
-            settled[0].providerMessageId,
-            "synthetic-inflight-receipt"
-          );
-          assert.equal(settled[0].tokenCiphertext, null);
-          assert.equal(yield* prompts.claim(inFlight.challengeId), null);
-        }
+            assert.equal(settled[0]?.status, "sent");
+            assert.equal(
+              settled[0].providerMessageId,
+              "synthetic-inflight-receipt"
+            );
+            assert.equal(settled[0].tokenCiphertext, null);
+            assert.equal(yield* prompts.claim(inFlight.challengeId), null);
+          }),
+          { concurrency: 1 }
+        );
 
-        for (const terminal of ["uncertain", "failed"] as const) {
-          const item = yield* issue;
+        yield* Effect.forEach(
+          ["uncertain", "failed"] as const,
+          Effect.fn("prompts.terminal")(function* (terminal) {
+            const item = yield* issue;
 
-          const itemRequest = {
-            token: item.token,
-            sender,
-            eventId: randomUUID(),
-          };
+            const itemRequest = {
+              token: item.token,
+              sender,
+              eventId: randomUUID(),
+            };
 
-          yield* prompts.prepare(itemRequest);
-          const lease = yield* prompts.claim(item.challengeId);
-          assert.ok(lease);
+            yield* prompts.prepare(itemRequest);
+            const lease = yield* prompts.claim(item.challengeId);
+            assert.ok(lease);
 
-          if (terminal === "uncertain")
-            yield* prompts.markUncertain(lease.lease);
-          else yield* prompts.markRejected(lease.lease);
-          assert.deepEqual(yield* prompts.prepare(itemRequest), {
-            challengeId: item.challengeId,
-            status: terminal,
-          });
-          assert.equal(yield* prompts.claim(item.challengeId), null);
-        }
+            if (terminal === "uncertain")
+              yield* prompts.markUncertain(lease.lease);
+            else yield* prompts.markRejected(lease.lease);
+            assert.deepEqual(yield* prompts.prepare(itemRequest), {
+              challengeId: item.challengeId,
+              status: terminal,
+            });
+            assert.equal(yield* prompts.claim(item.challengeId), null);
+          }),
+          { concurrency: 1 }
+        );
 
         const swapped = yield* issue;
         yield* prompts.prepare({
@@ -375,10 +389,14 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         AND status IN ('sent', 'uncertain', 'failed', 'cancelled') AND token_ciphertext IS NOT NULL`;
 
         assert.equal(retained.length, 0);
-      } finally {
-        yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;
-        yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
-      }
+      }).pipe(
+        Effect.ensuring(
+          Effect.gen(function* () {
+            yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;
+            yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
+          }).pipe(Effect.catch((error) => Effect.die(error)))
+        )
+      );
     }).pipe(Effect.provide(live))
   );
 });
@@ -411,7 +429,7 @@ test("prompt preparation delegates revoked link rejection to account preview", a
 
       const owner = yield* accounts.resolveVerifiedSender(sender);
 
-      try {
+      yield* Effect.gen(function* () {
         yield* sql`INSERT INTO public.channel_identity (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)
         VALUES (${randomUUID()}, 'telegram', ${installationId}, 'backup', ${owner.userId}, clock_timestamp(), clock_timestamp(), clock_timestamp())`;
         yield* accounts.revokeIdentity({
@@ -448,13 +466,17 @@ test("prompt preparation delegates revoked link rejection to account preview", a
           yield* sql`SELECT challenge_id FROM public.channel_auth_prompt WHERE challenge_id = ${challenge.challengeId}`;
 
         assert.equal(rows.length, 0);
-      } finally {
-        yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;
-        yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
-        yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
-        yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
-        yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
-      }
+      }).pipe(
+        Effect.ensuring(
+          Effect.gen(function* () {
+            yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;
+            yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
+            yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
+            yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
+            yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
+          }).pipe(Effect.catch((error) => Effect.die(error)))
+        )
+      );
     }).pipe(Effect.provide(live))
   );
 });

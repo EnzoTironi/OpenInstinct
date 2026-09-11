@@ -12,8 +12,13 @@ import { channelProviderSchema } from "../../shared/identity/channel-auth";
 import { approvalMessageSchema } from "../lib/approval-message";
 import { authorizeApprovalResponse } from "../lib/approval-response";
 import { resolveModeValue } from "../lib/mode";
-const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
+
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(
+  channelProviderSchema
+);
+
 const decodeArtifactId = Schema.decodeUnknownEffect(ArtifactId);
+
 const decodeLimit = Schema.decodeUnknownEffect(ArtifactListSchema.fields.limit);
 
 const toolArtifactId = z.fromJSONSchema(
@@ -39,9 +44,7 @@ export const artifactRead = defineTool({
       Effect.gen(function* () {
         const identity = yield* requireActor(context.session.auth.current);
 
-        const artifactId = yield* decodeArtifactId(
-          input.artifactId
-        );
+        const artifactId = yield* decodeArtifactId(input.artifactId);
 
         return yield* readArtifactText(identity.id, artifactId);
       }),
@@ -88,9 +91,7 @@ export const artifactDelete = defineTool({
       Effect.gen(function* () {
         const identity = yield* requireActor(context.session.auth.current);
 
-        const artifactId = yield* decodeArtifactId(
-          input.artifactId
-        );
+        const artifactId = yield* decodeArtifactId(input.artifactId);
 
         return yield* (yield* Artifacts).delete({
           identityId: identity.id,

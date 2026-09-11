@@ -25,11 +25,17 @@ import {
   type ResolveOutboxUncertainInput,
 } from "./model";
 import { createQueue, storageFailure } from "./store";
-const encodeSchema_fromJsonString_NativeInboxContentSchema = Schema.encodeEffect(Schema.fromJsonString(NativeInboxContentSchema));
-const decodeSchema_Struct_NativeInboxHandoffSchema_fields_cont = Schema.decodeUnknownEffect(Schema.Struct({
-            ...NativeInboxHandoffSchema.fields,
-            content: NativeInboxContentSchema,
-          }));
+
+const encodeSchema_fromJsonString_NativeInboxContentSchema =
+  Schema.encodeEffect(Schema.fromJsonString(NativeInboxContentSchema));
+
+const decodeSchema_Struct_NativeInboxHandoffSchema_fields_cont =
+  Schema.decodeUnknownEffect(
+    Schema.Struct({
+      ...NativeInboxHandoffSchema.fields,
+      content: NativeInboxContentSchema,
+    })
+  );
 
 export * from "./model";
 
@@ -122,7 +128,10 @@ const makeMessaging = Effect.gen(function* () {
         const value = yield* decodeInput(PrepareInboxHandoffSchema)(input);
         const current = yield* inbox.checkLease(value.lease);
 
-        const content = yield* encodeSchema_fromJsonString_NativeInboxContentSchema(value.content);
+        const content =
+          yield* encodeSchema_fromJsonString_NativeInboxContentSchema(
+            value.content
+          );
 
         const rows =
           yield* sql`UPDATE channel_inbox SET native_input = jsonb_set(native_input, '{content}', ${content}::jsonb)
@@ -156,7 +165,9 @@ const makeMessaging = Effect.gen(function* () {
           );
         }
 
-        return yield* decodeSchema_Struct_NativeInboxHandoffSchema_fields_cont(rows[0].input);
+        return yield* decodeSchema_Struct_NativeInboxHandoffSchema_fields_cont(
+          rows[0].input
+        );
       },
       sql.withTransaction,
       protect

@@ -28,9 +28,13 @@ import { applicationOrigin } from "../../shared/environment/origin";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { channelChallengeSchema } from "../../shared/identity/channel-auth";
 import { emptyUserProfile } from "../../shared/user-profile/schema";
+import { executeErasedTool } from "./_lib/execute-erased-tool";
 import { runtimeDatabase } from "./database";
 import { waitForBlocked } from "./pg-locks";
-const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
+
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(
+  channelChallengeSchema
+);
 
 async function fixture() {
   await Effect.runPromise(Effect.void.pipe(Effect.provide(runtimeDatabase)));
@@ -151,8 +155,16 @@ test("real structured tools correct, forget the last field, supersede recall and
   const other = await fixture();
 
   try {
-    await owner.update.execute({ city: "Old city" }, owner.execution);
-    await owner.update.execute({ city: "New city" }, owner.execution);
+    await executeErasedTool(
+      owner.update,
+      { city: "Old city" },
+      owner.execution
+    );
+    await executeErasedTool(
+      owner.update,
+      { city: "New city" },
+      owner.execution
+    );
 
     const corrected = await personalInfo.provider.recall["turn.started"](
       owner.context
@@ -161,9 +173,13 @@ test("real structured tools correct, forget the last field, supersede recall and
     assert.match(corrected?.messages[0]?.content ?? "", /New city/);
     assert.doesNotMatch(corrected?.messages[0]?.content ?? "", /Old city/);
     await assert.rejects(
-      owner.update.execute({ city: "Foreign write" }, other.execution)
+      executeErasedTool(
+        owner.update,
+        { city: "Foreign write" },
+        other.execution
+      )
     );
-    await owner.update.execute({ city: null }, owner.execution);
+    await executeErasedTool(owner.update, { city: null }, owner.execution);
 
     const forgotten = await personalInfo.provider.recall["turn.started"](
       owner.context
@@ -180,7 +196,11 @@ test("real structured tools correct, forget the last field, supersede recall and
     assert.equal(compacted?.messages[0]?.id, "user-profile");
     await owner.revoke();
     await assert.rejects(
-      owner.update.execute({ city: "Revoked write" }, owner.execution)
+      executeErasedTool(
+        owner.update,
+        { city: "Revoked write" },
+        owner.execution
+      )
     );
     await assert.rejects(
       personalInfo.provider.recall["turn.started"](owner.context)
@@ -206,7 +226,11 @@ test("profile write retains identity authority while blocked on storage; revocat
   let revoked: Promise<unknown> | undefined;
 
   try {
-    await owner.update.execute({ city: "Old city" }, owner.execution);
+    await executeErasedTool(
+      owner.update,
+      { city: "Old city" },
+      owner.execution
+    );
     await blocker.query("BEGIN");
     await blocker.query(
       "SELECT workspace_id FROM user_profiles WHERE workspace_id = $1 FOR UPDATE",
@@ -218,7 +242,7 @@ test("profile write retains identity authority while blocked on storage; revocat
     ).rows[0]?.pid;
 
     assert.ok(pid);
-    pending = owner.update.execute({ city: null }, owner.execution);
+    pending = executeErasedTool(owner.update, { city: null }, owner.execution);
 
     const writerPid = await waitForBlocked(
       owner.sql,
@@ -243,7 +267,7 @@ test("profile write retains identity authority while blocked on storage; revocat
 
     assert.equal(result.rows[0]?.city, null);
     await assert.rejects(
-      owner.update.execute({ city: "Restored" }, owner.execution)
+      executeErasedTool(owner.update, { city: "Restored" }, owner.execution)
     );
   } finally {
     await blocker.query("ROLLBACK");
@@ -257,13 +281,18 @@ test("concurrent unrelated patch cannot restore a forgotten field", async () => 
   const owner = await fixture();
 
   try {
-    await owner.update.execute(
+    await executeErasedTool(
+      owner.update,
       { city: "Forget me", firstName: "Old name" },
       owner.execution
     );
     await Promise.all([
-      owner.update.execute({ city: null }, owner.execution),
-      owner.update.execute({ firstName: "New name" }, owner.execution),
+      executeErasedTool(owner.update, { city: null }, owner.execution),
+      executeErasedTool(
+        owner.update,
+        { firstName: "New name" },
+        owner.execution
+      ),
     ]);
 
     const rows = await owner.sql.query<{
@@ -296,8 +325,8 @@ test("native note correction and last-note removal replace recalled content acro
     assert.ok(tools?.save_memory && tools.remove_memory);
     const save = tools.save_memory;
     const remove = tools.remove_memory;
-    await save.execute(
-      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
+    await executeErasedTool(
+      save,
       { text: "My favorite color is orange." },
       owner.execution
     );
@@ -307,13 +336,16 @@ test("native note correction and last-note removal replace recalled content acro
     assert.ok(recallId, "Native recall must identify the content it replaces.");
     const oldIndex = /(?:^|\n)(\d+):.*orange/mu.exec(firstMessage.content)?.[1];
     assert.ok(oldIndex, firstMessage.content);
-    await save.execute(
-      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
+    await executeErasedTool(
+      save,
       { text: "My favorite color is green." },
       owner.execution
     );
-    // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
-    await remove.execute({ index: Number(oldIndex) }, owner.execution);
+    await executeErasedTool(
+      remove,
+      { index: Number(oldIndex) },
+      owner.execution
+    );
 
     const corrected =
       await personalMemoryProvider.recall["turn.started"](context);
@@ -323,8 +355,11 @@ test("native note correction and last-note removal replace recalled content acro
     assert.doesNotMatch(content, /orange/);
     const newIndex = /(?:^|\n)(\d+):.*green/mu.exec(content)?.[1];
     assert.ok(newIndex, content);
-    // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
-    await remove.execute({ index: Number(newIndex) }, owner.execution);
+    await executeErasedTool(
+      remove,
+      { index: Number(newIndex) },
+      owner.execution
+    );
 
     // Exercise both native lifecycle callbacks in their actual sequence.
     /* oxlint-disable eslint/no-await-in-loop */
@@ -342,8 +377,11 @@ test("native note correction and last-note removal replace recalled content acro
     /* oxlint-enable eslint/no-await-in-loop */
     await owner.revoke();
     await assert.rejects(async () =>
-      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
-      save.execute({ text: "My favorite color is orange." }, owner.execution)
+      executeErasedTool(
+        save,
+        { text: "My favorite color is orange." },
+        owner.execution
+      )
     );
   } finally {
     await owner.sql.query("DELETE FROM memory_document WHERE key = $1", [
@@ -383,9 +421,7 @@ async function login(owner: Awaited<ReturnType<typeof fixture>>) {
 
   assert.equal(started.status, 200);
 
-  const challenge = decodeChannelChallengeSchema(
-    await started.json()
-  );
+  const challenge = decodeChannelChallengeSchema(await started.json());
 
   const token = new URL(challenge.deepLink).searchParams.get("start");
   assert.ok(token);
@@ -545,7 +581,11 @@ test("profile read retains authorization in its own transaction while blocked on
   let revoked: Promise<unknown> | undefined;
 
   try {
-    await owner.update.execute({ city: "Authorized city" }, owner.execution);
+    await executeErasedTool(
+      owner.update,
+      { city: "Authorized city" },
+      owner.execution
+    );
     await blocker.query("BEGIN");
     await blocker.query("LOCK TABLE user_profiles IN ACCESS EXCLUSIVE MODE");
 

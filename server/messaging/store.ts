@@ -18,8 +18,13 @@ import {
   type OutboxResolutionDecision,
   type ResolveOutboxUncertainInput,
 } from "./model";
+
 const decodeMessageClaimSchema = Schema.decodeUnknownEffect(MessageClaimSchema);
-const decodeSchema_Array_Schema_Struct_status_Schema_String_co = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ status: Schema.String, count: Schema.Int })));
+
+const decodeSchema_Array_Schema_Struct_status_Schema_String_co =
+  Schema.decodeUnknownEffect(
+    Schema.Array(Schema.Struct({ status: Schema.String, count: Schema.Int }))
+  );
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
@@ -174,9 +179,7 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
         AND (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp())
       RETURNING ${columns}`;
 
-    return rows[0]
-      ? yield* decodeMessageClaimSchema(rows[0])
-      : null;
+    return rows[0] ? yield* decodeMessageClaimSchema(rows[0]) : null;
   }, sql.withTransaction);
 
   const requireLease = Effect.fn("Messaging.requireLease")(function* (
@@ -229,6 +232,147 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
 
+  const loadUncertainRow = Effect.fn("Messaging.loadUncertainRow")(function* (
+    input: ResolveOutboxUncertainInput
+  ) {
+    const current = yield* sql<{
+      id: string;
+      status: string;
+      lastError: string | null;
+      resultId: string | null;
+    }>`SELECT id, status, last_error AS "lastError",
+        provider_message_id AS "resultId"
+      FROM ${table}
+      WHERE id = ${input.id} AND identity_id = ${input.identityId}
+      FOR UPDATE`;
+
+    return current[0];
+  });
+
+  const resolveIdempotentSettled = Effect.fn(
+    "Messaging.resolveIdempotentSettled"
+  )(function* (
+    input: ResolveOutboxUncertainInput,
+    row: {
+      readonly status: string;
+      readonly lastError: string | null;
+      readonly resultId: string | null;
+    },
+    decision: OutboxResolutionDecision
+  ) {
+    if (
+      decision.kind === "mark_delivered" &&
+      row.status === "sent" &&
+      row.resultId === decision.providerMessageId
+    ) {
+      const existing =
+        yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
+
+      return yield* decodeReceipt(existing[0]);
+    }
+
+    if (
+      decision.kind === "cancel" &&
+      row.status === "cancelled" &&
+      row.lastError === decision.reason
+    ) {
+      const existing =
+        yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
+
+      return yield* decodeReceipt(existing[0]);
+    }
+
+    if (
+      decision.kind === "authorize_retry" &&
+      row.status === "queued" &&
+      row.lastError === "duplicate_retry_authorized"
+    ) {
+      const existing =
+        yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
+
+      return yield* decodeReceipt(existing[0]);
+    }
+
+    return yield* new OutboxResolutionRejected({
+      id: input.id,
+      reason: "not_uncertain",
+    });
+  });
+
+  const applyUncertainDecision = Effect.fn("Messaging.applyUncertainDecision")(
+    function* (
+      input: ResolveOutboxUncertainInput,
+      row: { readonly lastError: string | null },
+      decision: OutboxResolutionDecision,
+      detail: string
+    ) {
+      yield* sql`INSERT INTO channel_outbox_resolution
+      (id, outbox_id, identity_id, decision, detail, prior_status, prior_error,
+       actor_principal_id, note)
+      VALUES (
+        ${randomUUID()},
+        ${input.id},
+        ${input.identityId},
+        ${decision.kind},
+        ${detail},
+        'uncertain',
+        ${row.lastError},
+        ${input.actorPrincipalId},
+        ${input.note ?? null}
+      )`;
+
+      if (decision.kind === "mark_delivered") {
+        const rows = yield* sql`UPDATE ${table} SET status = 'sent',
+        provider_message_id = ${decision.providerMessageId},
+        sent_at = clock_timestamp(),
+        lease_token = NULL, lease_expires_at = NULL, last_error = NULL
+        WHERE id = ${input.id} AND status = 'uncertain'
+        RETURNING ${columns}`;
+
+        if (!rows[0]) {
+          return yield* new OutboxResolutionRejected({
+            id: input.id,
+            reason: "conflict",
+          });
+        }
+
+        return yield* decodeReceipt(rows[0]);
+      }
+
+      if (decision.kind === "cancel") {
+        const rows = yield* sql`UPDATE ${table} SET status = 'cancelled',
+        last_error = ${decision.reason},
+        lease_token = NULL, lease_expires_at = NULL
+        WHERE id = ${input.id} AND status = 'uncertain'
+        RETURNING ${columns}`;
+
+        if (!rows[0]) {
+          return yield* new OutboxResolutionRejected({
+            id: input.id,
+            reason: "conflict",
+          });
+        }
+
+        return yield* decodeReceipt(rows[0]);
+      }
+
+      const rows = yield* sql`UPDATE ${table} SET status = 'queued',
+      last_error = 'duplicate_retry_authorized',
+      lease_token = NULL, lease_expires_at = NULL
+      WHERE id = ${input.id} AND status = 'uncertain'
+      RETURNING ${columns}`;
+
+      if (!rows[0]) {
+        return yield* new OutboxResolutionRejected({
+          id: input.id,
+          reason: "conflict",
+        });
+      }
+
+      return yield* decodeReceipt(rows[0]);
+    }
+  );
+
   const resolveUncertain = Effect.fn("Messaging.resolveUncertain")(function* (
     input: ResolveOutboxUncertainInput
   ) {
@@ -259,18 +403,7 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
       }
     }
 
-    const current = yield* sql<{
-      id: string;
-      status: string;
-      lastError: string | null;
-      resultId: string | null;
-    }>`SELECT id, status, last_error AS "lastError",
-        provider_message_id AS "resultId"
-      FROM ${table}
-      WHERE id = ${input.id} AND identity_id = ${input.identityId}
-      FOR UPDATE`;
-
-    const row = current[0];
+    const row = yield* loadUncertainRow(input);
 
     if (!row) {
       return yield* new OutboxResolutionRejected({
@@ -286,109 +419,10 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
     );
 
     if (row.status !== "uncertain") {
-      if (
-        decision.kind === "mark_delivered" &&
-        row.status === "sent" &&
-        row.resultId === decision.providerMessageId
-      ) {
-        const existing =
-          yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
-
-        return yield* decodeReceipt(existing[0]);
-      }
-
-      if (
-        decision.kind === "cancel" &&
-        row.status === "cancelled" &&
-        row.lastError === decision.reason
-      ) {
-        const existing =
-          yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
-
-        return yield* decodeReceipt(existing[0]);
-      }
-
-      if (
-        decision.kind === "authorize_retry" &&
-        row.status === "queued" &&
-        row.lastError === "duplicate_retry_authorized"
-      ) {
-        const existing =
-          yield* sql`SELECT ${columns} FROM ${table} WHERE id = ${input.id}`;
-
-        return yield* decodeReceipt(existing[0]);
-      }
-
-      return yield* new OutboxResolutionRejected({
-        id: input.id,
-        reason: "not_uncertain",
-      });
+      return yield* resolveIdempotentSettled(input, row, decision);
     }
 
-    yield* sql`INSERT INTO channel_outbox_resolution
-      (id, outbox_id, identity_id, decision, detail, prior_status, prior_error,
-       actor_principal_id, note)
-      VALUES (
-        ${randomUUID()},
-        ${input.id},
-        ${input.identityId},
-        ${decision.kind},
-        ${detail},
-        'uncertain',
-        ${row.lastError},
-        ${input.actorPrincipalId},
-        ${input.note ?? null}
-      )`;
-
-    if (decision.kind === "mark_delivered") {
-      const rows = yield* sql`UPDATE ${table} SET status = 'sent',
-        provider_message_id = ${decision.providerMessageId},
-        sent_at = clock_timestamp(),
-        lease_token = NULL, lease_expires_at = NULL, last_error = NULL
-        WHERE id = ${input.id} AND status = 'uncertain'
-        RETURNING ${columns}`;
-
-      if (!rows[0]) {
-        return yield* new OutboxResolutionRejected({
-          id: input.id,
-          reason: "conflict",
-        });
-      }
-
-      return yield* decodeReceipt(rows[0]);
-    }
-
-    if (decision.kind === "cancel") {
-      const rows = yield* sql`UPDATE ${table} SET status = 'cancelled',
-        last_error = ${decision.reason},
-        lease_token = NULL, lease_expires_at = NULL
-        WHERE id = ${input.id} AND status = 'uncertain'
-        RETURNING ${columns}`;
-
-      if (!rows[0]) {
-        return yield* new OutboxResolutionRejected({
-          id: input.id,
-          reason: "conflict",
-        });
-      }
-
-      return yield* decodeReceipt(rows[0]);
-    }
-
-    const rows = yield* sql`UPDATE ${table} SET status = 'queued',
-      last_error = 'duplicate_retry_authorized',
-      lease_token = NULL, lease_expires_at = NULL
-      WHERE id = ${input.id} AND status = 'uncertain'
-      RETURNING ${columns}`;
-
-    if (!rows[0]) {
-      return yield* new OutboxResolutionRejected({
-        id: input.id,
-        reason: "conflict",
-      });
-    }
-
-    return yield* decodeReceipt(rows[0]);
+    return yield* applyUncertainDecision(input, row, decision, detail);
   }, sql.withTransaction);
 
   const scheduleRetry = Effect.fn("Messaging.scheduleRetry")(function* (
@@ -421,7 +455,8 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
       WHERE identity_id = ${identityId} AND status = 'uncertain'
       ORDER BY ${sql(queue.order)}, id LIMIT 100`;
 
-    const decodedCounts = yield* decodeSchema_Array_Schema_Struct_status_Schema_String_co(counts);
+    const decodedCounts =
+      yield* decodeSchema_Array_Schema_Struct_status_Schema_String_co(counts);
 
     return {
       counts: decodedCounts,

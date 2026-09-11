@@ -5,6 +5,7 @@ import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { ChannelAccounts, IdentitySchema } from "../accounts";
 import { MessagePayloadSchema } from "../messaging/model";
 import { ArtifactError, type ArtifactSourceSchema } from "./model";
+
 const decodeIdentitySchema = Schema.decodeUnknownEffect(IdentitySchema);
 
 const sourceRow = Schema.Struct({
@@ -28,9 +29,7 @@ export const artifactAccess = Effect.gen(function* () {
 
     if (!rows[0]) return yield* new ArtifactError({ reason: "not_found" });
 
-    const candidate = yield* decodeIdentitySchema(
-      rows[0]
-    );
+    const candidate = yield* decodeIdentitySchema(rows[0]);
 
     const identity = yield* accounts
       .getActiveIdentity(candidate)

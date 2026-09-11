@@ -97,28 +97,51 @@ const enqueueInput = Schema.Struct({
   inputRequest: Schema.optionalKey(InputDeliveryReferenceSchema),
   replyToMessageId: Schema.optionalKey(ProviderReferenceSchema),
 });
+
 const decodeIdentityId = Schema.decodeUnknownEffect(IdentityId);
+
 const decodeIdentitySchema = Schema.decodeUnknownEffect(IdentitySchema);
-const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
-const decodeSchema_Array_IdentitySchema = Schema.decodeUnknownEffect(Schema.Array(IdentitySchema));
+
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(
+  channelProviderSchema
+);
+
+const decodeSchema_Array_IdentitySchema = Schema.decodeUnknownEffect(
+  Schema.Array(IdentitySchema)
+);
+
 const decodeEnqueueInput = Schema.decodeUnknownEffect(enqueueInput, {
-      onExcessProperty: "error",
-    });
-const decodeMessagePayloadSchema = Schema.decodeUnknownEffect(MessagePayloadSchema);
+  onExcessProperty: "error",
+});
+
+const decodeMessagePayloadSchema =
+  Schema.decodeUnknownEffect(MessagePayloadSchema);
+
 const decodeEnqueueInput2 = Schema.decodeUnknownEffect(enqueueInput, {
-        onExcessProperty: "error",
-      });
-const decodeSchema_String_check_Schema_isPattern_task_report_0 = Schema.decodeUnknownEffect(Schema.String.check(Schema.isPattern(/^task-report:[0-9a-f]{64}$/u)));
-const decodeInputDeliveryReferenceSchema = Schema.decodeUnknownEffect(InputDeliveryReferenceSchema);
-const decodeSchema_Array_Schema_Struct_key_Schema_String_paylo = Schema.decodeUnknownEffect(Schema.Array(
-          Schema.Struct({
-            key: Schema.String,
-            payload: MessagePayloadSchema,
-            status: Schema.String,
-            sentAtMs: Schema.NullOr(Schema.Finite),
-            providerMessageId: Schema.NullOr(Schema.String),
-          })
-        ));
+  onExcessProperty: "error",
+});
+
+const decodeSchema_String_check_Schema_isPattern_task_report_0 =
+  Schema.decodeUnknownEffect(
+    Schema.String.check(Schema.isPattern(/^task-report:[0-9a-f]{64}$/u))
+  );
+
+const decodeInputDeliveryReferenceSchema = Schema.decodeUnknownEffect(
+  InputDeliveryReferenceSchema
+);
+
+const decodeSchema_Array_Schema_Struct_key_Schema_String_paylo =
+  Schema.decodeUnknownEffect(
+    Schema.Array(
+      Schema.Struct({
+        key: Schema.String,
+        payload: MessagePayloadSchema,
+        status: Schema.String,
+        sentAtMs: Schema.NullOr(Schema.Finite),
+        providerMessageId: Schema.NullOr(Schema.String),
+      })
+    )
+  );
 
 const candidateInput = Schema.Struct({
   channel: channelProviderSchema,
@@ -177,9 +200,9 @@ const makeTransport = Effect.gen(function* () {
 
   const activeIdentity = Effect.fn("ChannelTransport.activeIdentity")(
     function* (identityId: string, expectedChannel: Identity["channel"]) {
-      const channel = yield* decodeChannelProviderSchema(
-        expectedChannel
-      ).pipe(Effect.mapError(invalidInput));
+      const channel = yield* decodeChannelProviderSchema(expectedChannel).pipe(
+        Effect.mapError(invalidInput)
+      );
 
       const identity = yield* findIdentity(identityId);
 
@@ -262,9 +285,7 @@ const makeTransport = Effect.gen(function* () {
       WHERE i.channel = ${input.channel} AND ${visibility}
       ORDER BY eligible.oldest, i.id LIMIT ${input.limit}`;
 
-    return yield* decodeSchema_Array_IdentitySchema(
-      rows
-    );
+    return yield* decodeSchema_Array_IdentitySchema(rows);
   });
 
   const installationMatches = Effect.fn("ChannelTransport.installationMatches")(
@@ -382,7 +403,9 @@ const makeTransport = Effect.gen(function* () {
   const enqueueText = Effect.fn("ChannelTransport.enqueueText")(function* (
     input: typeof enqueueInput.Type
   ) {
-    const value = yield* decodeEnqueueInput(input).pipe(Effect.mapError(invalidInput));
+    const value = yield* decodeEnqueueInput(input).pipe(
+      Effect.mapError(invalidInput)
+    );
 
     const identity = yield* findIdentity(value.identityId);
     yield* activeIdentity(identity.id, identity.channel);
@@ -446,9 +469,13 @@ const makeTransport = Effect.gen(function* () {
 
   const enqueueTaskReport = Effect.fn("ChannelTransport.enqueueTaskReport")(
     function* (input: typeof enqueueInput.Type) {
-      const value = yield* decodeEnqueueInput2(input).pipe(Effect.mapError(invalidInput));
+      const value = yield* decodeEnqueueInput2(input).pipe(
+        Effect.mapError(invalidInput)
+      );
 
-      yield* decodeSchema_String_check_Schema_isPattern_task_report_0(value.deliveryKey).pipe(Effect.mapError(invalidInput));
+      yield* decodeSchema_String_check_Schema_isPattern_task_report_0(
+        value.deliveryKey
+      ).pipe(Effect.mapError(invalidInput));
       yield* sql`SELECT id FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
       const identity = yield* findIdentity(value.identityId);
       yield* activeIdentity(identity.id, identity.channel);
@@ -473,7 +500,9 @@ const makeTransport = Effect.gen(function* () {
       return yield* Effect.forEach(
         existing,
         Effect.fn("ChannelTransport.enqueueExistingDelivery")(function* (row) {
-          const payload = yield* decodeMessagePayloadSchema(row.payload).pipe(Effect.mapError(invalidInput));
+          const payload = yield* decodeMessagePayloadSchema(row.payload).pipe(
+            Effect.mapError(invalidInput)
+          );
 
           return yield* messaging.enqueue({
             identityId: value.identityId,
@@ -497,7 +526,9 @@ const makeTransport = Effect.gen(function* () {
         Effect.mapError(invalidInput)
       );
 
-      const value = yield* decodeInputDeliveryReferenceSchema(reference).pipe(Effect.mapError(invalidInput));
+      const value = yield* decodeInputDeliveryReferenceSchema(reference).pipe(
+        Effect.mapError(invalidInput)
+      );
 
       const prefix = `input:${value.sessionId}:${value.requestId}:`;
 
@@ -509,7 +540,10 @@ const makeTransport = Effect.gen(function* () {
           AND substring(delivery_key FROM char_length(${prefix}) + 1) ~ '^[0-9]+$'
         ORDER BY sequence LIMIT 6`;
 
-      const chunks = yield* decodeSchema_Array_Schema_Struct_key_Schema_String_paylo(rows).pipe(Effect.mapError(invalidInput));
+      const chunks =
+        yield* decodeSchema_Array_Schema_Struct_key_Schema_String_paylo(
+          rows
+        ).pipe(Effect.mapError(invalidInput));
 
       if (chunks.length === 0 || chunks.length > 5) return null;
       let deliveredAtMs = 0;

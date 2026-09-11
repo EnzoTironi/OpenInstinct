@@ -6,6 +6,7 @@ import { ConfigProvider, Effect, Layer, Result, Schema } from "effect";
 const encodeJsonUnknown = Schema.encodeSync(
   Schema.fromJsonString(Schema.Unknown)
 );
+
 import { expect, test } from "vitest";
 
 import { ChannelAccounts } from "../../server/accounts";

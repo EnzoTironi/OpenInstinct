@@ -58,7 +58,8 @@ const insertJob = Effect.fn("reminders.insertFixtureJob")(function* (
 });
 
 test("lists across conversations, isolates both owner dimensions and keeps run/report state separate", () =>
-  run(Effect.fn("run.1")(function* ({ owner, neighbor, elsewhere }) {
+  run(
+    Effect.fn("run.1")(function* ({ owner, neighbor, elsewhere }) {
       const sql = yield* PgClient.PgClient;
       expect(yield* listReminders(owner)).toEqual({
         reminders: [],
@@ -97,7 +98,8 @@ test("lists across conversations, isolates both owner dimensions and keeps run/r
   ));
 
 test("links only a currently owned original Eve session and drops the link after revocation", () =>
-  run(Effect.fn("run.2")(function* ({ owner, neighbor }) {
+  run(
+    Effect.fn("run.2")(function* ({ owner, neighbor }) {
       const sql = yield* PgClient.PgClient;
       const original = randomUUID();
       const foreign = randomUUID();
@@ -141,7 +143,8 @@ test("links only a currently owned original Eve session and drops the link after
   ));
 
 test("caps at 50 with stable ordering and an honest more-results flag", () =>
-  run(Effect.fn("run.3")(function* ({ owner }) {
+  run(
+    Effect.fn("run.3")(function* ({ owner }) {
       const sql = yield* PgClient.PgClient;
       yield* sql`INSERT INTO scheduled_agent_jobs
     (workspace_id, created_by_user_id, conversation_id, conversation_channel, prompt, timing, status, next_run_at, updated_at)

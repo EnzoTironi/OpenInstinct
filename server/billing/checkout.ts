@@ -41,6 +41,35 @@ async function assertOrgAdmin(organizationId: string, userId: string) {
   return rows[0]?.role === "admin";
 }
 
+const requireOrgCheckoutAdmin = Effect.fn("Billing.requireOrgCheckoutAdmin")(
+  function* (organizationId: string | undefined, userId: string) {
+    if (!organizationId) {
+      return yield* new BillingCheckoutError({
+        reason: "org_required",
+        message: "Org Checkout requires an organizationId.",
+      });
+    }
+
+    const allowed = yield* Effect.tryPromise({
+      try: () => assertOrgAdmin(organizationId, userId),
+      catch: () =>
+        new BillingCheckoutError({
+          reason: "org_forbidden",
+          message: "Unable to verify organization admin.",
+        }),
+    });
+
+    if (!allowed) {
+      return yield* new BillingCheckoutError({
+        reason: "org_forbidden",
+        message: "Only organization admins can purchase Org seats.",
+      });
+    }
+
+    return yield* Effect.void;
+  }
+);
+
 export const createCheckoutSession = Effect.fn("createCheckoutSession")(
   function* (input: {
     userId: string;
@@ -82,28 +111,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
     const organizationId = input.organizationId;
 
     if (input.plan === "org") {
-      if (!organizationId) {
-        return yield* new BillingCheckoutError({
-          reason: "org_required",
-          message: "Org Checkout requires an organizationId.",
-        });
-      }
-
-      const allowed = yield* Effect.tryPromise({
-        try: () => assertOrgAdmin(organizationId, input.userId),
-        catch: () =>
-          new BillingCheckoutError({
-            reason: "org_forbidden",
-            message: "Unable to verify organization admin.",
-          }),
-      });
-
-      if (!allowed) {
-        return yield* new BillingCheckoutError({
-          reason: "org_forbidden",
-          message: "Only organization admins can purchase Org seats.",
-        });
-      }
+      yield* requireOrgCheckoutAdmin(organizationId, input.userId);
     }
 
     const subjectType = input.plan === "org" ? "organization" : "user";

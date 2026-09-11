@@ -24,7 +24,11 @@ import {
   deviceBoundSchema,
 } from "../../shared/identity/channel-auth";
 import { runtimeDatabase } from "./database";
-const decodeChannelConversationEntrySchema = Schema.decodeUnknownSync(channelConversationEntrySchema);
+
+const decodeChannelConversationEntrySchema = Schema.decodeUnknownSync(
+  channelConversationEntrySchema
+);
+
 const decodeDeviceBoundSchema = Schema.decodeUnknownSync(deviceBoundSchema);
 
 const cookieHeader = (response: Response) =>
@@ -226,9 +230,7 @@ test("native account linking pins purpose, both proofs and one browser session w
 
     assert.equal(start.status, 200);
 
-    const entry = decodeChannelConversationEntrySchema(
-      await start.json()
-    );
+    const entry = decodeChannelConversationEntrySchema(await start.json());
 
     assert.equal(
       new URL(entry.conversationUrl).searchParams.get("text"),
@@ -264,9 +266,7 @@ test("native account linking pins purpose, both proofs and one browser session w
     const bind = await request("device-bind", browser.cookie, input);
     assert.equal(bind.status, 200);
 
-    const metadata = decodeDeviceBoundSchema(
-      await bind.json()
-    );
+    const metadata = decodeDeviceBoundSchema(await bind.json());
 
     assert.equal(metadata.purpose, "link");
     assert.deepEqual(Object.keys(metadata).toSorted(), [

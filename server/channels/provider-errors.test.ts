@@ -19,7 +19,10 @@ import {
   ProviderUncertain,
   requestProviderJson,
 } from "./provider-errors";
-const decodeSchema_Struct_port_Schema_Number = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }));
+
+const decodeSchema_Struct_port_Schema_Number = Schema.decodeUnknownSync(
+  Schema.Struct({ port: Schema.Number })
+);
 
 function fixtureUrl(server: Server, path = "/send") {
   const address = decodeSchema_Struct_port_Schema_Number(server.address());

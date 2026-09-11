@@ -18,7 +18,10 @@ import {
   requireChannelModelInput,
 } from "./policy";
 import { transcribeChannelAudio } from "./transcription";
-const decodeSchema_Array_ArtifactReferenceSchema = Schema.decodeUnknownEffect(Schema.Array(ArtifactReferenceSchema));
+
+const decodeSchema_Array_ArtifactReferenceSchema = Schema.decodeUnknownEffect(
+  Schema.Array(ArtifactReferenceSchema)
+);
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 

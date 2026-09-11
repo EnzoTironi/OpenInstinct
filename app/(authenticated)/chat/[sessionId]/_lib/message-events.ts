@@ -6,8 +6,14 @@ import {
 import { Result, Schema } from "effect";
 import type { MessageStreamEvent } from "eve/client";
 import type { EveMessagePart } from "eve/react";
-const decodeReactToMessageToolResultSchema = Schema.decodeUnknownResult(reactToMessageToolResultSchema);
-const decodeSendMessageToolResultSchema = Schema.decodeUnknownResult(sendMessageToolResultSchema);
+
+const decodeReactToMessageToolResultSchema = Schema.decodeUnknownResult(
+  reactToMessageToolResultSchema
+);
+
+const decodeSendMessageToolResultSchema = Schema.decodeUnknownResult(
+  sendMessageToolResultSchema
+);
 
 export function messageTimestamps(events: readonly MessageStreamEvent[]) {
   const timestamps = new Map<string, string>();
@@ -50,70 +56,81 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
 
   for (const event of events) {
     if (event.type !== "action.result") continue;
-    const delivery = completedSendMessageOutput(event);
-    const reaction = completedReactionOutput(event);
-    const completed = delivery ?? reaction;
-
-    if (!completed) continue;
-    const deliveryId = delivery?.output.deliveryId ?? completed.callId;
-
-    if (delivery?.output.deliveryId) {
-      if (delivered.has(delivery.output.deliveryId)) continue;
-      delivered.add(delivery.output.deliveryId);
-    }
-
-    const turnMessageId = `${event.data.turnId}:assistant`;
-    const parts: EveMessagePart[] = [];
-
-    if (reaction) {
-      parts.push({
-        state: "done",
-        stepIndex: event.data.stepIndex,
-        text: reactionTextFor(reaction.output.type),
-        type: "text",
-      });
-    } else if (delivery) {
-      const { output } = delivery;
-
-      // Delivered text is plain and reaches the user verbatim. The chat view
-      // renders text parts as Markdown, so keep every line break as a hard break.
-      const text =
-        output.kind === "link"
-          ? output.url
-          : output.text?.replaceAll("\n", "  \n");
-
-      if (text) {
-        parts.push({
-          state: "done",
-          stepIndex: event.data.stepIndex,
-          text,
-          type: "text",
-        });
-      }
-
-      const attachments = output.kind === "message" ? output.attachments : [];
-
-      for (const attachment of attachments ?? []) {
-        parts.push({
-          filename: attachment.name,
-          mediaType: attachment.mimeType ?? defaultMediaType[attachment.kind],
-          stepIndex: event.data.stepIndex,
-          type: "file",
-          url: attachment.url,
-        });
-      }
-    }
-
-    const messages = messagesByTurn.get(turnMessageId) ?? [];
-    messages.push({
-      id: `${turnMessageId}:${deliveryId}`,
-      parts,
-      timestamp: event.meta.at,
-    });
-    messagesByTurn.set(turnMessageId, messages);
+    recordSentMessage(event, delivered, messagesByTurn);
   }
 
   return messagesByTurn;
+}
+
+function recordSentMessage(
+  event: Extract<MessageStreamEvent, { type: "action.result" }>,
+  delivered: Set<string>,
+  messagesByTurn: Map<
+    string,
+    { id: string; parts: EveMessagePart[]; timestamp: string }[]
+  >
+) {
+  const delivery = completedSendMessageOutput(event);
+  const reaction = completedReactionOutput(event);
+  const completed = delivery ?? reaction;
+
+  if (!completed) return;
+  const deliveryId = delivery?.output.deliveryId ?? completed.callId;
+
+  if (delivery?.output.deliveryId) {
+    if (delivered.has(delivery.output.deliveryId)) return;
+    delivered.add(delivery.output.deliveryId);
+  }
+
+  const turnMessageId = `${event.data.turnId}:assistant`;
+  const parts: EveMessagePart[] = [];
+
+  if (reaction) {
+    parts.push({
+      state: "done",
+      stepIndex: event.data.stepIndex,
+      text: reactionTextFor(reaction.output.type),
+      type: "text",
+    });
+  } else if (delivery) {
+    const { output } = delivery;
+
+    // Delivered text is plain and reaches the user verbatim. The chat view
+    // renders text parts as Markdown, so keep every line break as a hard break.
+    const text =
+      output.kind === "link"
+        ? output.url
+        : output.text?.replaceAll("\n", "  \n");
+
+    if (text) {
+      parts.push({
+        state: "done",
+        stepIndex: event.data.stepIndex,
+        text,
+        type: "text",
+      });
+    }
+
+    const attachments = output.kind === "message" ? output.attachments : [];
+
+    for (const attachment of attachments ?? []) {
+      parts.push({
+        filename: attachment.name,
+        mediaType: attachment.mimeType ?? defaultMediaType[attachment.kind],
+        stepIndex: event.data.stepIndex,
+        type: "file",
+        url: attachment.url,
+      });
+    }
+  }
+
+  const messages = messagesByTurn.get(turnMessageId) ?? [];
+  messages.push({
+    id: `${turnMessageId}:${deliveryId}`,
+    parts,
+    timestamp: event.meta.at,
+  });
+  messagesByTurn.set(turnMessageId, messages);
 }
 
 function completedReactionOutput(event: MessageStreamEvent) {
@@ -121,9 +138,7 @@ function completedReactionOutput(event: MessageStreamEvent) {
     return undefined;
   }
 
-  const result = decodeReactToMessageToolResultSchema(
-    event.data.result
-  );
+  const result = decodeReactToMessageToolResultSchema(event.data.result);
 
   return Result.isSuccess(result) && result.success.output.operation === "add"
     ? { callId: event.data.result.callId, output: result.success.output }
@@ -135,9 +150,7 @@ function completedSendMessageOutput(event: MessageStreamEvent) {
     return undefined;
   }
 
-  const result = decodeSendMessageToolResultSchema(
-    event.data.result
-  );
+  const result = decodeSendMessageToolResultSchema(event.data.result);
 
   return Result.isSuccess(result)
     ? { callId: event.data.result.callId, output: result.success.output }

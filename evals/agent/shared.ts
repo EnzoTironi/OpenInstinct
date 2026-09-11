@@ -2,8 +2,14 @@ import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
 import { Result, Schema } from "effect";
 import type { EveEvalContext, EveEvalTurn } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
-const decodeSendMessageOutputSchema = Schema.decodeUnknownResult(sendMessageOutputSchema);
-const decodeSchema_Trim_check_Schema_isMinLength_1 = Schema.decodeUnknownResult(Schema.Trim.check(Schema.isMinLength(1)));
+
+const decodeSendMessageOutputSchema = Schema.decodeUnknownResult(
+  sendMessageOutputSchema
+);
+
+const decodeSchema_Trim_check_Schema_isMinLength_1 = Schema.decodeUnknownResult(
+  Schema.Trim.check(Schema.isMinLength(1))
+);
 
 export const agentEvalTags = ["agent", "behavior"] as const;
 
@@ -15,9 +21,7 @@ export async function requireDeliveredText(
     status: "completed",
   });
 
-  const parsed = decodeSendMessageOutputSchema(
-    delivery.input
-  );
+  const parsed = decodeSendMessageOutputSchema(delivery.input);
 
   const text =
     Result.isSuccess(parsed) && parsed.success.kind === "message"

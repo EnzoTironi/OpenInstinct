@@ -9,27 +9,38 @@ import {
   channelChallengeIdSchema,
   channelChallengeRequestSchema,
 } from "@shared/identity/channel-auth";
-import { Effect, Layer, Option, Result, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import {
   FetchHttpClient,
   Headers as HttpHeaders,
   HttpClient,
   HttpClientRequest,
 } from "effect/unstable/http";
-const decodeChannelChallengeRequestSchema = Schema.decodeEffect(channelChallengeRequestSchema);
-const decodeChannelChallengeIdSchema = Schema.decodeEffect(channelChallengeIdSchema);
+
+const decodeChannelChallengeRequestSchema = Schema.decodeEffect(
+  channelChallengeRequestSchema
+);
+
+const decodeChannelChallengeIdSchema = Schema.decodeEffect(
+  channelChallengeIdSchema
+);
+
 const decodeDeviceBindingSchema = Schema.decodeEffect(deviceBindingSchema);
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+
 const decodeChannelStartResultJson = Schema.decodeEffect(
   Schema.fromJsonString(channelStartResultSchema)
 );
+
 const decodeChannelChallengeStatusJson = Schema.decodeEffect(
   Schema.fromJsonString(channelChallengeStatusSchema)
 );
+
 const decodeChannelChallengeCompletionJson = Schema.decodeEffect(
   Schema.fromJsonString(channelChallengeCompletionSchema)
 );
+
 const decodeDeviceBoundJson = Schema.decodeEffect(
   Schema.fromJsonString(deviceBoundSchema)
 );
@@ -188,30 +199,36 @@ export function channelPollFailure(
   };
 }
 
+interface ChannelHttpInit {
+  readonly method?: string;
+  readonly headers?: HeadersInit;
+  readonly body?: string;
+}
+
 const requestJson = Effect.fn("channelAuthorization.request")(
   function* <A>(
     path: string,
-    init: RequestInit,
-    decodeResponse: (
-      body: string
-    ) => Effect.Effect<A, Schema.SchemaError>
+    init: ChannelHttpInit,
+    decodeResponse: (body: string) => Effect.Effect<A, Schema.SchemaError>
   ) {
     const http = yield* HttpClient.HttpClient;
     const method = (init.method ?? "GET").toUpperCase();
     const url = `/api/auth/channel-auth/${path}`;
+
     let request =
       method === "POST"
         ? HttpClientRequest.post(url)
         : HttpClientRequest.get(url);
 
     const headers = new Headers(init.headers);
+
     if ([...headers.keys()].length > 0) {
       request = request.pipe(
         HttpClientRequest.setHeaders(Object.fromEntries(headers.entries()))
       );
     }
 
-    if (typeof init.body === "string") {
+    if (init.body !== undefined) {
       request = request.pipe(
         HttpClientRequest.bodyText(
           init.body,

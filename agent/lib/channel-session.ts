@@ -16,7 +16,10 @@ import {
   NativeInboxContentSchema,
   type Lease,
 } from "../../server/messaging";
-const decodeNativeInboxContentSchema = Schema.decodeUnknownEffect(NativeInboxContentSchema);
+
+const decodeNativeInboxContentSchema = Schema.decodeUnknownEffect(
+  NativeInboxContentSchema
+);
 
 export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
   function* (
@@ -125,9 +128,7 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
         const prepared = yield* messaging.prepareInboxHandoff({
           lease,
           transcripts: loaded.transcripts,
-          content: yield* decodeNativeInboxContentSchema(
-            loaded.content
-          ),
+          content: yield* decodeNativeInboxContentSchema(loaded.content),
         });
 
         content = prepared.content;

@@ -9,7 +9,10 @@ import {
 } from "../../../node_modules/eve/dist/src/tools/schema.js";
 import { sendMessageOutputSchema } from "../../../shared/chat/message-delivery";
 import messaging from "../../tools/messaging";
-const decodeSendMessageOutputSchema = Schema.decodeUnknownSync(sendMessageOutputSchema);
+
+const decodeSendMessageOutputSchema = Schema.decodeUnknownSync(
+  sendMessageOutputSchema
+);
 
 // Exercise the installed codec and the real dynamic definition without provider I/O.
 const onTurnStarted = messaging.events["turn.started"];
@@ -106,9 +109,7 @@ describe("message delivery native Eve codec", () => {
     expect(validation.issues).toBeUndefined();
 
     if (validation.issues) throw new Error("Attachment metadata was rejected.");
-    expect(
-      decodeSendMessageOutputSchema(validation.value)
-    ).toEqual({
+    expect(decodeSendMessageOutputSchema(validation.value)).toEqual({
       kind: "message",
       attachments: [{ kind: "file", url: "https://example.com" }],
     });

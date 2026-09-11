@@ -7,12 +7,30 @@ import {
   reactToMessageOutputSchema,
   reactToMessageToolResultSchema,
 } from "./reaction";
-const decodeReactToMessageToolResultSchema = Schema.decodeUnknownSync(reactToMessageToolResultSchema);
-const decodeReactToMessageToolResultSchema2 = Schema.decodeUnknownResult(reactToMessageToolResultSchema);
-const decodeReactToMessageOutputSchema = Schema.decodeUnknownSync(reactToMessageOutputSchema);
-const decodeAddReactionToMessageOutputSchema = Schema.decodeUnknownSync(addReactionToMessageOutputSchema);
-const decodeReactToMessageOutputSchema2 = Schema.decodeUnknownResult(reactToMessageOutputSchema);
-const decodeAddReactionToMessageOutputSchema2 = Schema.decodeUnknownResult(addReactionToMessageOutputSchema);
+
+const decodeReactToMessageToolResultSchema = Schema.decodeUnknownSync(
+  reactToMessageToolResultSchema
+);
+
+const decodeReactToMessageToolResultSchema2 = Schema.decodeUnknownResult(
+  reactToMessageToolResultSchema
+);
+
+const decodeReactToMessageOutputSchema = Schema.decodeUnknownSync(
+  reactToMessageOutputSchema
+);
+
+const decodeAddReactionToMessageOutputSchema = Schema.decodeUnknownSync(
+  addReactionToMessageOutputSchema
+);
+
+const decodeReactToMessageOutputSchema2 = Schema.decodeUnknownResult(
+  reactToMessageOutputSchema
+);
+
+const decodeAddReactionToMessageOutputSchema2 = Schema.decodeUnknownResult(
+  addReactionToMessageOutputSchema
+);
 
 const reactions = [
   ["thumbs_up", "👍"],
@@ -27,7 +45,10 @@ describe("reaction contract", () => {
   it("defaults only omitted operation and rejects explicit undefined or null", () => {
     for (const [decodeSync, decodeResult] of [
       [decodeReactToMessageOutputSchema, decodeReactToMessageOutputSchema2],
-      [decodeAddReactionToMessageOutputSchema, decodeAddReactionToMessageOutputSchema2],
+      [
+        decodeAddReactionToMessageOutputSchema,
+        decodeAddReactionToMessageOutputSchema2,
+      ],
     ] as const) {
       expect(decodeSync({ type: "heart" })).toEqual({
         type: "heart",
@@ -67,12 +88,14 @@ describe("reaction contract", () => {
   });
   it.each(reactions)("preserves %s and its display text", (type, text) => {
     expect(reactionTextFor(type)).toBe(text);
-    expect(
-      decodeReactToMessageOutputSchema({ type })
-    ).toEqual({ operation: "add", type });
-    expect(
-      decodeAddReactionToMessageOutputSchema({ type })
-    ).toEqual({ operation: "add", type });
+    expect(decodeReactToMessageOutputSchema({ type })).toEqual({
+      operation: "add",
+      type,
+    });
+    expect(decodeAddReactionToMessageOutputSchema({ type })).toEqual({
+      operation: "add",
+      type,
+    });
 
     for (const operation of ["add", "remove"]) {
       expect(
@@ -97,15 +120,11 @@ describe("reaction contract", () => {
     { type: 1 },
     [],
   ])("rejects invalid input %j", (input) => {
+    expect(Result.isSuccess(decodeReactToMessageOutputSchema2(input))).toBe(
+      false
+    );
     expect(
-      Result.isSuccess(
-        decodeReactToMessageOutputSchema2(input)
-      )
-    ).toBe(false);
-    expect(
-      Result.isSuccess(
-        decodeAddReactionToMessageOutputSchema2(input)
-      )
+      Result.isSuccess(decodeAddReactionToMessageOutputSchema2(input))
     ).toBe(false);
   });
 
@@ -151,9 +170,7 @@ describe("reaction contract", () => {
       { kind: "tool-result", toolName: "react_to_message", output: null },
     ]) {
       expect(
-        Result.isSuccess(
-          decodeReactToMessageToolResultSchema2(input)
-        )
+        Result.isSuccess(decodeReactToMessageToolResultSchema2(input))
       ).toBe(false);
     }
   });

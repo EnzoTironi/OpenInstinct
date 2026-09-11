@@ -17,7 +17,10 @@ import {
   decodeArtifactInput,
   type ArtifactRow,
 } from "./model";
-const decodeSchema_Array_ArtifactMetadataSchema = Schema.decodeUnknownEffect(Schema.Array(ArtifactMetadataSchema));
+
+const decodeSchema_Array_ArtifactMetadataSchema = Schema.decodeUnknownEffect(
+  Schema.Array(ArtifactMetadataSchema)
+);
 
 const unavailable = () => new ArtifactError({ reason: "unavailable" });
 

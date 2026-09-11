@@ -7,7 +7,10 @@ import {
   ArtifactMetadataSchema,
   type ArtifactRow,
 } from "./model";
-const decodeArtifactMetadataSchema = Schema.decodeUnknownEffect(ArtifactMetadataSchema);
+
+const decodeArtifactMetadataSchema = Schema.decodeUnknownEffect(
+  ArtifactMetadataSchema
+);
 
 export const artifactDigest = (bytes: Uint8Array) =>
   createHash("sha256").update(bytes).digest("hex");
@@ -27,9 +30,7 @@ export const verifiedArtifact = Effect.fn("verifiedArtifact")(function* (
   if ((row.derivedText === null) !== (row.derivedKind === null))
     return yield* new ArtifactError({ reason: "corrupt" });
 
-  const metadata = yield* decodeArtifactMetadataSchema(
-    row
-  );
+  const metadata = yield* decodeArtifactMetadataSchema(row);
 
   return {
     metadata,

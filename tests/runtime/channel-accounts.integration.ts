@@ -641,10 +641,14 @@ test("channel identities, browser binding, races and revocation against migrated
             yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
             yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
 
-            for (const id of userIds) {
-              yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
-              yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
-            }
+            yield* Effect.forEach(
+              [...userIds],
+              Effect.fn("accounts.deleteUser")(function* (id) {
+                yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
+                yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
+              }),
+              { concurrency: 1 }
+            );
           }).pipe(Effect.catch((error) => Effect.die(error)))
         )
       );
@@ -664,109 +668,117 @@ test("session issuance serializes with revocation across real PostgreSQL connect
       const accounts = yield* ChannelAccounts;
       const sql = yield* PgClient.PgClient;
 
-      for (const order of ["before", "during", "after"] as const) {
-        const installationId = `issuance-${randomUUID()}`;
-        const browserSecret = secret();
+      yield* Effect.forEach(
+        ["before", "during", "after"] as const,
+        Effect.fn("accounts.issuanceOrder")(function* (order) {
+          const installationId = `issuance-${randomUUID()}`;
+          const browserSecret = secret();
 
-        const challenge = yield* accounts.issueChallenge({
-          purpose: "login" as const,
-          channel: "telegram",
-          installationId,
-          browserSecret,
-        });
+          const challenge = yield* accounts.issueChallenge({
+            purpose: "login" as const,
+            channel: "telegram",
+            installationId,
+            browserSecret,
+          });
 
-        const sender = {
-          channel: "telegram" as const,
-          installationId,
-          senderId: "first-contact",
-        };
+          const sender = {
+            channel: "telegram" as const,
+            installationId,
+            senderId: "first-contact",
+          };
 
-        yield* accounts.confirmChallenge({ token: challenge.token, sender });
+          yield* accounts.confirmChallenge({ token: challenge.token, sender });
 
-        const owner = yield* accounts.consumeChallenge({
-          challengeId: challenge.challengeId,
-          browserSecret,
-        });
+          const owner = yield* accounts.consumeChallenge({
+            challengeId: challenge.challengeId,
+            browserSecret,
+          });
 
-        try {
-          // A second synthetic access path makes revocation legal; all storage is real.
-          yield* sql`INSERT INTO public.channel_identity (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)
+          yield* Effect.gen(function* () {
+            // A second synthetic access path makes revocation legal; all storage is real.
+            yield* sql`INSERT INTO public.channel_identity (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)
           VALUES (${randomUUID()}, 'telegram', ${installationId}, 'backup', ${owner.userId}, clock_timestamp(), clock_timestamp(), clock_timestamp())`;
-          const sessionId = randomUUID();
+            const sessionId = randomUUID();
 
-          const createSession = Effect.gen(function* () {
-            const separateConnection = yield* PgClient.PgClient;
-            yield* separateConnection`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
+            const createSession = Effect.gen(function* () {
+              const separateConnection = yield* PgClient.PgClient;
+              yield* separateConnection`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
             VALUES (${sessionId}, ${secret()}, ${owner.userId}, clock_timestamp() + interval '1 hour', clock_timestamp(), clock_timestamp())`;
 
-            return sessionId;
-          }).pipe(Effect.provide(storage));
+              return sessionId;
+            }).pipe(Effect.provide(storage));
 
-          if (order === "before") {
-            yield* accounts.revokeIdentity(owner);
-            yield* rejected(
-              accounts.withLoginSession(owner, createSession),
-              "identity_inactive"
-            );
-          } else if (order === "after") {
-            assert.equal(
-              yield* accounts.withLoginSession(owner, createSession),
-              sessionId
-            );
+            if (order === "before") {
+              yield* accounts.revokeIdentity(owner);
+              yield* rejected(
+                accounts.withLoginSession(owner, createSession),
+                "identity_inactive"
+              );
+            } else if (order === "after") {
+              assert.equal(
+                yield* accounts.withLoginSession(owner, createSession),
+                sessionId
+              );
 
-            const inserted =
-              yield* sql`SELECT id FROM public.session WHERE id = ${sessionId}`;
+              const inserted =
+                yield* sql`SELECT id FROM public.session WHERE id = ${sessionId}`;
 
-            assert.equal(inserted.length, 1);
-            yield* accounts.revokeIdentity(owner);
-          } else {
-            const entered = yield* Deferred.make<undefined>();
-            const release = yield* Deferred.make<undefined>();
+              assert.equal(inserted.length, 1);
+              yield* accounts.revokeIdentity(owner);
+            } else {
+              const entered = yield* Deferred.make<undefined>();
+              const release = yield* Deferred.make<undefined>();
 
-            const finalization = yield* accounts
-              .withLoginSession(
-                owner,
-                Effect.gen(function* () {
-                  yield* Deferred.succeed(entered, undefined);
-                  yield* Deferred.await(release);
+              const finalization = yield* accounts
+                .withLoginSession(
+                  owner,
+                  Effect.gen(function* () {
+                    yield* Deferred.succeed(entered, undefined);
+                    yield* Deferred.await(release);
 
-                  return yield* createSession;
-                })
-              )
-              .pipe(Effect.forkChild);
+                    return yield* createSession;
+                  }).pipe(Effect.catch((error) => Effect.die(error)))
+                )
+                .pipe(Effect.forkChild);
 
-            yield* Deferred.await(entered);
+              yield* Deferred.await(entered);
 
-            const revocation = yield* accounts
-              .revokeIdentity(owner)
-              .pipe(Effect.forkChild);
+              const revocation = yield* accounts
+                .revokeIdentity(owner)
+                .pipe(Effect.forkChild);
 
-            yield* sql<{
-              waiting: boolean;
-            }>`SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory'
+              yield* sql<{
+                waiting: boolean;
+              }>`SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory'
             AND classid = 724193 AND objid = 1 AND NOT granted) AS waiting`.pipe(
-              Effect.repeat({
-                until: (rows) => rows[0]?.waiting === true,
-                schedule: Schedule.spaced("10 millis"),
-              }),
-              Effect.timeout("5 seconds"),
-              Effect.ensuring(Deferred.succeed(release, undefined))
-            );
-            assert.equal(yield* Fiber.join(finalization), sessionId);
-            yield* Fiber.join(revocation);
-          }
+                Effect.repeat({
+                  until: (rows) => rows[0]?.waiting === true,
+                  schedule: Schedule.spaced("10 millis"),
+                }),
+                Effect.timeout("5 seconds"),
+                Effect.ensuring(Deferred.succeed(release, undefined))
+              );
+              assert.equal(yield* Fiber.join(finalization), sessionId);
+              yield* Fiber.join(revocation);
+            }
 
-          const sessions =
-            yield* sql`SELECT id FROM public.session WHERE "userId" = ${owner.userId}`;
+            const sessions =
+              yield* sql`SELECT id FROM public.session WHERE "userId" = ${owner.userId}`;
 
-          assert.equal(sessions.length, 0);
-        } finally {
-          yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
-          yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
-          yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
-          yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
-        }
-      }
+            assert.equal(sessions.length, 0);
+          }).pipe(
+            Effect.ensuring(
+              Effect.gen(function* () {
+                yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
+                yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
+                yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
+                yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
+              }).pipe(Effect.catch((error) => Effect.die(error)))
+            )
+          );
+        }),
+        { concurrency: 1 }
+      );
     }).pipe(Effect.provide(live))
   );
 });

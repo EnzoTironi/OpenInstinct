@@ -5,10 +5,22 @@ import {
   sendMessageOutputSchema,
   sendMessageToolResultSchema,
 } from "./message-delivery";
-const decodeSendMessageOutputSchema = Schema.decodeUnknownSync(sendMessageOutputSchema);
-const decodeSendMessageOutputSchema2 = Schema.decodeUnknownResult(sendMessageOutputSchema);
-const decodeSendMessageToolResultSchema = Schema.decodeUnknownSync(sendMessageToolResultSchema);
-const decodeSendMessageToolResultSchema2 = Schema.decodeUnknownResult(sendMessageToolResultSchema);
+
+const decodeSendMessageOutputSchema = Schema.decodeUnknownSync(
+  sendMessageOutputSchema
+);
+
+const decodeSendMessageOutputSchema2 = Schema.decodeUnknownResult(
+  sendMessageOutputSchema
+);
+
+const decodeSendMessageToolResultSchema = Schema.decodeUnknownSync(
+  sendMessageToolResultSchema
+);
+
+const decodeSendMessageToolResultSchema2 = Schema.decodeUnknownResult(
+  sendMessageToolResultSchema
+);
 
 describe("message delivery contract", () => {
   it("trims text and URL edges without normalizing the URL itself", () => {
@@ -72,9 +84,7 @@ describe("message delivery contract", () => {
         },
       },
     ])
-      expect(decodeSendMessageOutputSchema(input)).toEqual(
-        input
-      );
+      expect(decodeSendMessageOutputSchema(input)).toEqual(input);
   });
 
   it("enforces message, attachment, metadata and native-link bounds", () => {
@@ -121,9 +131,9 @@ describe("message delivery contract", () => {
       },
       { kind: "link", url: `${link}x` },
     ])
-      expect(() =>
-        decodeSendMessageOutputSchema(input)
-      ).toThrow(Schema.SchemaError);
+      expect(() => decodeSendMessageOutputSchema(input)).toThrow(
+        Schema.SchemaError
+      );
   });
 
   it("rejects invalid content, protocols, discriminants and excess strict-object keys", () => {
@@ -160,9 +170,9 @@ describe("message delivery contract", () => {
         attachments: [{ kind: "unknown", url: "https://example.com" }],
       },
     ])
-      expect(() =>
-        decodeSendMessageOutputSchema(input)
-      ).toThrow(Schema.SchemaError);
+      expect(() => decodeSendMessageOutputSchema(input)).toThrow(
+        Schema.SchemaError
+      );
   });
 
   it("returns a typed failure for malformed URLs without throwing a URL defect", () => {
@@ -205,10 +215,8 @@ describe("message delivery contract", () => {
         output: { kind: "message", text: "ok", extra: true },
       },
     ])
-      expect(
-        Result.isSuccess(
-          decodeSendMessageToolResultSchema2(input)
-        )
-      ).toBe(false);
+      expect(Result.isSuccess(decodeSendMessageToolResultSchema2(input))).toBe(
+        false
+      );
   });
 });

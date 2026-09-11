@@ -144,55 +144,64 @@ export function PendingAuthorization({
     );
 
     if (status === "pending") {
+      const expiresAtMs = Date.parse(challenge.expiresAt);
+
       const poll = Effect.gen(function* pollConfirmation() {
         let failures = 0;
 
-        while (
-          (yield* Clock.currentTimeMillis) < Date.parse(challenge.expiresAt)
-        ) {
-          const result = yield* checkChannelAuthorization(challenge.id).pipe(
-            Effect.result
-          );
-
-          let delay = 2000;
-
-          if (Result.isSuccess(result)) {
-            failures = 0;
-            setError(undefined);
-
-            if (result.success.status !== "pending") {
-              setStatus(result.success.status);
-
-              return;
-            }
-          } else {
-            const next = channelPollFailure(
-              result.failure,
-              failures,
-              yield* Clock.currentTimeMillis,
-              Date.parse(challenge.expiresAt)
-            );
-
-            setError(
-              next.status === "invalid"
-                ? `${channelFailureMessage(result.failure, purpose)} Start a new request to continue.`
-                : channelFailureMessage(result.failure, purpose)
-            );
-
-            if (next.status !== "pending") {
-              setStatus(next.status);
+        const tick: Effect.Effect<void> = Effect.suspend(() =>
+          Effect.gen(function* () {
+            if ((yield* Clock.currentTimeMillis) >= expiresAtMs) {
+              setStatus("expired");
 
               return;
             }
 
-            failures = next.failures;
-            delay = next.delay;
-          }
+            const result = yield* checkChannelAuthorization(challenge.id).pipe(
+              Effect.result
+            );
 
-          yield* Effect.sleep(delay);
-        }
+            let delay = 2000;
 
-        setStatus("expired");
+            if (Result.isSuccess(result)) {
+              failures = 0;
+              setError(undefined);
+
+              if (result.success.status !== "pending") {
+                setStatus(result.success.status);
+
+                return;
+              }
+            } else {
+              const next = channelPollFailure(
+                result.failure,
+                failures,
+                yield* Clock.currentTimeMillis,
+                expiresAtMs
+              );
+
+              setError(
+                next.status === "invalid"
+                  ? `${channelFailureMessage(result.failure, purpose)} Start a new request to continue.`
+                  : channelFailureMessage(result.failure, purpose)
+              );
+
+              if (next.status !== "pending") {
+                setStatus(next.status);
+
+                return;
+              }
+
+              failures = next.failures;
+              delay = next.delay;
+            }
+
+            yield* Effect.sleep(delay);
+            yield* tick;
+          })
+        );
+
+        yield* tick;
       });
 
       void Effect.runPromise(poll, { signal: controller.signal }).catch(() => {

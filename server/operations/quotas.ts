@@ -115,6 +115,7 @@ const quotaDemandStruct = Schema.Struct({
   /** 1 when admitting work for a user not yet counted in today's active set. */
   activeUser: Schema.optionalKey(Schema.Literals([0, 1])),
 });
+
 const decodeQuotaDemandStruct = Schema.decodeUnknownEffect(quotaDemandStruct);
 
 export interface QuotaDemand {

@@ -13,8 +13,13 @@ import {
   validateChannelConsent,
 } from "./channel-consent";
 import { readChannelInputs } from "./channel-input";
-const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
-const decodeMessagePayloadSchema = Schema.decodeUnknownEffect(MessagePayloadSchema);
+
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(
+  channelProviderSchema
+);
+
+const decodeMessagePayloadSchema =
+  Schema.decodeUnknownEffect(MessagePayloadSchema);
 
 type ResponseInput =
   (typeof internalCallbackBodies)["/internal/channel-input/respond"]["Type"];
@@ -37,9 +42,7 @@ const readResponseIdentity = Effect.fn("readResponseIdentity")(function* (
   const rows =
     yield* sql`SELECT channel FROM channel_identity WHERE id = ${identityId}`;
 
-  const channel = yield* decodeChannelProviderSchema(
-    rows[0]?.channel
-  );
+  const channel = yield* decodeChannelProviderSchema(rows[0]?.channel);
 
   const transport = yield* ChannelTransport;
 
@@ -60,9 +63,7 @@ export const readChannelResponseContext = Effect.fn(
     return yield* new ChannelResponseRejected({ reason: "invalid_source" });
   }
 
-  const payload = yield* decodeMessagePayloadSchema(
-    rows[0]?.payload
-  );
+  const payload = yield* decodeMessagePayloadSchema(rows[0]?.payload);
 
   if (!payload.text || payload.sourceOccurredAtMs === undefined) {
     return yield* new ChannelResponseRejected({ reason: "invalid_source" });
@@ -79,6 +80,37 @@ export const readChannelResponseContext = Effect.fn(
   return { identity, source };
 });
 
+interface TurnStreamState {
+  activeTurnId: string | undefined;
+  matchingMessages: number;
+  exactText: boolean;
+  closed: boolean;
+}
+
+function applyChannelResponseStreamEvent(
+  state: TurnStreamState,
+  event: MessageStreamEvent,
+  source: { readonly turnId: string; readonly text: string }
+) {
+  if (event.type === "turn.started") state.activeTurnId = event.data.turnId;
+
+  if (
+    event.type === "message.received" &&
+    event.data.turnId === source.turnId
+  ) {
+    state.matchingMessages++;
+    state.exactText = event.data.message === source.text;
+  }
+
+  if (
+    (event.type === "turn.completed" ||
+      event.type === "turn.cancelled" ||
+      event.type === "turn.failed") &&
+    event.data.turnId === source.turnId
+  )
+    state.closed = true;
+}
+
 export async function readChannelResponseTurnStream(
   stream: ReadableStream<MessageStreamEvent>,
   tail: number,
@@ -92,10 +124,13 @@ export async function readChannelResponseTurnStream(
   };
 
   signal.addEventListener("abort", cancel, { once: true });
-  let activeTurnId: string | undefined;
-  let matchingMessages = 0;
-  let exactText = false;
-  let closed = false;
+
+  const state: TurnStreamState = {
+    activeTurnId: undefined,
+    matchingMessages: 0,
+    exactText: false,
+    closed: false,
+  };
 
   try {
     for (let index = 0; index <= tail; index++) {
@@ -105,34 +140,17 @@ export async function readChannelResponseTurnStream(
 
       if (item.done)
         throw new Error("Session stream ended before its captured tail.");
-      const event = item.value;
 
-      if (event.type === "turn.started") activeTurnId = event.data.turnId;
-
-      if (
-        event.type === "message.received" &&
-        event.data.turnId === source.turnId
-      ) {
-        matchingMessages++;
-        exactText = event.data.message === source.text;
-      }
-
-      if (
-        (event.type === "turn.completed" ||
-          event.type === "turn.cancelled" ||
-          event.type === "turn.failed") &&
-        event.data.turnId === source.turnId
-      )
-        closed = true;
+      applyChannelResponseStreamEvent(state, item.value, source);
     }
 
     signal.throwIfAborted();
 
     return (
-      activeTurnId === source.turnId &&
-      matchingMessages === 1 &&
-      exactText &&
-      !closed
+      state.activeTurnId === source.turnId &&
+      state.matchingMessages === 1 &&
+      state.exactText &&
+      !state.closed
     );
   } finally {
     signal.removeEventListener("abort", cancel);

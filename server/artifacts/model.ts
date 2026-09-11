@@ -115,6 +115,7 @@ export class ArtifactError extends Schema.TaggedError<ArtifactError>()(
   }
 ) {}
 
+/* oxlint-disable anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion -- WeakMap-cached generic Schema.decodeUnknownEffect; required by agent-doctor hoist-schema-codecs. */
 const decodeArtifactInputCache = new WeakMap<
   object,
   (input: unknown) => Effect.Effect<unknown, unknown>
@@ -124,7 +125,7 @@ export const decodeArtifactInput = <S extends Schema.Constraint>(
   schema: S,
   input: S["Type"]
 ) => {
-  let decoder = decodeArtifactInputCache.get(schema as object) as
+  let decoder = decodeArtifactInputCache.get(schema) as
     | ((input: S["Type"]) => Effect.Effect<S["Type"], unknown>)
     | undefined;
 
@@ -132,7 +133,8 @@ export const decodeArtifactInput = <S extends Schema.Constraint>(
     const built = Schema.decodeUnknownEffect(schema, {
       onExcessProperty: "error",
     });
-    decodeArtifactInputCache.set(schema as object, built as never);
+
+    decodeArtifactInputCache.set(schema, built as never);
     decoder = built as (input: S["Type"]) => Effect.Effect<S["Type"], unknown>;
   }
 
@@ -141,3 +143,4 @@ export const decodeArtifactInput = <S extends Schema.Constraint>(
     Effect.mapError(() => new ArtifactError({ reason: "invalid_input" }))
   );
 };
+/* oxlint-enable anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion */

@@ -1,8 +1,9 @@
+/* oxlint-disable vitest/no-standalone-expect -- @effect/vitest it.effect bodies are test blocks */
 import { randomUUID } from "node:crypto";
 
 import { PgClient } from "@effect/sql-pg";
+import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Result } from "effect";
-import { expect, test } from "vitest";
 
 import { readChannelResponseContext } from "../../agent/lib/channel-response";
 import { ChannelAccounts } from "../../server/accounts";
@@ -55,8 +56,9 @@ const fixture = Effect.gen(function* () {
   };
 });
 
-test("response source requires accepted inbox state in the exact session", () =>
-  Effect.runPromise(
+it.effect(
+  "response source requires accepted inbox state in the exact session",
+  () =>
     Effect.gen(function* () {
       const { messaging, input } = yield* fixture;
 
@@ -123,10 +125,11 @@ test("response source requires accepted inbox state in the exact session", () =>
 
       expect(Result.isFailure(result5)).toBe(true);
     }).pipe(Effect.scoped, Effect.provide(live))
-  ));
+);
 
-test("accepted sources without provider occurrence time do not acquire consent", () =>
-  Effect.runPromise(
+it.effect(
+  "accepted sources without provider occurrence time do not acquire consent",
+  () =>
     Effect.gen(function* () {
       const { messaging, input } = yield* fixture;
       yield* messaging.accept({
@@ -159,39 +162,44 @@ test("accepted sources without provider occurrence time do not acquire consent",
         failure: { reason: "invalid_source" },
       });
     }).pipe(Effect.scoped, Effect.provide(live))
-  ));
+);
 
-test("revocation and ambiguous accepted source records reject response context", () =>
-  Effect.runPromise(
+it.effect(
+  "revocation and ambiguous accepted source records reject response context",
+  () =>
     Effect.gen(function* () {
       const { sql, messaging, input } = yield* fixture;
 
-      for (let index = 0; index < 2; index++) {
-        yield* messaging.accept({
-          identityId: input.identityId,
-          eventId: randomUUID(),
-          sourceMessageId: input.sourceMessageId,
-          payload: { text: "pode fazer", sourceOccurredAtMs: 1788880000000 },
-        });
+      yield* Effect.forEach(
+        Array.from({ length: 2 }, (_, index) => index),
+        Effect.fn("response.doubleAccept")(function* (_index) {
+          yield* messaging.accept({
+            identityId: input.identityId,
+            eventId: randomUUID(),
+            sourceMessageId: input.sourceMessageId,
+            payload: { text: "pode fazer", sourceOccurredAtMs: 1788880000000 },
+          });
 
-        const lease = yield* messaging.claimInbox({
-          identityId: input.identityId,
-          leaseSeconds: 60,
-        });
+          const lease = yield* messaging.claimInbox({
+            identityId: input.identityId,
+            leaseSeconds: 60,
+          });
 
-        if (!lease)
-          return yield* Effect.fail(
-            new Error("Expected a claimed synthetic inbox fixture")
-          );
-        yield* messaging.markAccepted({
-          lease: {
-            id: lease.id,
-            identityId: lease.identityId,
-            leaseToken: lease.leaseToken,
-          },
-          receipt: { status: "accepted", sessionId: input.sessionId },
-        });
-      }
+          if (!lease)
+            return yield* Effect.fail(
+              new Error("Expected a claimed synthetic inbox fixture")
+            );
+          yield* messaging.markAccepted({
+            lease: {
+              id: lease.id,
+              identityId: lease.identityId,
+              leaseToken: lease.leaseToken,
+            },
+            receipt: { status: "accepted", sessionId: input.sessionId },
+          });
+        }),
+        { concurrency: 1 }
+      );
 
       expect(
         yield* readChannelResponseContext(input).pipe(Effect.result)
@@ -205,4 +213,4 @@ test("revocation and ambiguous accepted source records reject response context",
         failure: { reason: "identity_inactive" },
       });
     }).pipe(Effect.scoped, Effect.provide(live))
-  ));
+);

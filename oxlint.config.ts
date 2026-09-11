@@ -71,6 +71,8 @@ export default defineConfig({
       specifier: "eslint-plugin-react-hooks",
     },
     "oxlint-tailwindcss",
+    // Cognitive complexity gate (user limit 6). Built-in `complexity` is cyclomatic-only.
+    "oxlint-plugin-complexity",
     // Declared on the root for Knip/analyzers (Ultracite #784); also loaded via
     // `reactDoctorJsPlugins` / `nextJsPlugins` extends.
     ...(reactDoctorJsPlugins.jsPlugins ?? []),
@@ -136,7 +138,18 @@ export default defineConfig({
     "prefer-template": "off",
     "prefer-object-spread": "off",
     "require-unicode-regexp": "off",
-    complexity: "off",
+    // Built-in cyclomatic complexity (keep on as a coarse gate).
+    complexity: ["error", 20],
+    // Cognitive complexity — user-facing limit is 6 (agent-doctor stays at default 15).
+    "complexity/complexity": [
+      "error",
+      {
+        cyclomatic: 20,
+        cognitive: 6,
+        // Analyze short helpers too — default minLines:10 would skip many Effect.fn bodies.
+        minLines: 0,
+      },
+    ],
     "max-classes-per-file": "off",
     "default-case": "off",
     "no-nested-ternary": "off",

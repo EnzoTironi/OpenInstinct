@@ -17,6 +17,7 @@ import {
   requireCleanProjectionForNextModelStep,
   type RecalledProjection,
 } from "../personal-memory-recall-refresh";
+import { executeErasedTool } from "./_lib/execute-erased-tool";
 
 const forgottenText = "My favorite color is orange.";
 
@@ -118,13 +119,13 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const saveMemory = tools.save_memory;
     const removeMemory = tools.remove_memory;
 
-    await saveMemory.execute(
-      // @ts-expect-error heterogeneous tool map
+    await executeErasedTool(
+      saveMemory,
       { text: forgottenText },
       toolExecution(context, "profile__save_memory")
     );
-    await saveMemory.execute(
-      // @ts-expect-error heterogeneous tool map
+    await executeErasedTool(
+      saveMemory,
       { text: keptText },
       toolExecution(context, "profile__save_memory")
     );
@@ -144,8 +145,8 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const { projection, phase } = await Effect.runPromise(
       executeMemoryMutationWithRecallRefresh({
         mutate: () =>
-          removeMemory.execute(
-            // @ts-expect-error heterogeneous tool map
+          executeErasedTool(
+            removeMemory,
             { index: Number(index) },
             toolExecution(context, "profile__remove_memory")
           ),
@@ -179,8 +180,8 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const saveMemory = tools.save_memory;
     const removeMemory = tools.remove_memory;
 
-    await saveMemory.execute(
-      // @ts-expect-error heterogeneous tool map
+    await executeErasedTool(
+      saveMemory,
       { text: forgottenText },
       toolExecution(context, "profile__save_memory")
     );
@@ -200,8 +201,8 @@ describe("personal memory unstructured forget + recall-refresh", () => {
       Effect.runPromise(
         executeMemoryMutationWithRecallRefresh({
           mutate: async () => {
-            await removeMemory.execute(
-              // @ts-expect-error heterogeneous tool map
+            await executeErasedTool(
+              removeMemory,
               { index: Number(index) },
               toolExecution(context, "profile__remove_memory")
             );
@@ -263,8 +264,8 @@ describe("personal memory unstructured forget + recall-refresh", () => {
           Effect.tryPromise({
             try: () =>
               Promise.resolve(
-                saveMemory.execute(
-                  // @ts-expect-error heterogeneous tool map
+                executeErasedTool(
+                  saveMemory,
                   { text },
                   toolExecution(context, "profile__save_memory")
                 )
@@ -298,23 +299,23 @@ describe("personal memory unstructured forget + recall-refresh", () => {
         yield* Effect.forEach(
           indexes,
           Effect.fn("personal-memory.removeIndex")(function* (index) {
-              const refreshed = yield* executeMemoryMutationWithRecallRefresh({
-                mutate: () =>
-                  removeMemory.execute(
-                    // @ts-expect-error heterogeneous tool map
-                    { index },
-                    toolExecution(context, "profile__remove_memory")
-                  ),
-                recall: (ctx) => provider.recall["turn.started"](ctx),
-                context,
-                priorProjection: projection,
-              });
+            const refreshed = yield* executeMemoryMutationWithRecallRefresh({
+              mutate: () =>
+                executeErasedTool(
+                  removeMemory,
+                  { index },
+                  toolExecution(context, "profile__remove_memory")
+                ),
+              recall: (ctx) => provider.recall["turn.started"](ctx),
+              context,
+              priorProjection: projection,
+            });
 
-              projection = yield* requireCleanProjectionForNextModelStep(
-                refreshed.phase
-              );
-              expect(projection).toEqual(refreshed.projection);
-            }),
+            projection = yield* requireCleanProjectionForNextModelStep(
+              refreshed.phase
+            );
+            expect(projection).toEqual(refreshed.projection);
+          }),
           { concurrency: 1 }
         );
 

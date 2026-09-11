@@ -97,8 +97,13 @@ const telegramRetryAfterSchema = Schema.Struct({
     })
   ),
 });
-const decodeSchema_fromJsonString_telegramRetryAfterSchema = Schema.decodeUnknownOption(Schema.fromJsonString(telegramRetryAfterSchema));
-const decodeSchema_fromJsonString_Schema_Json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Json));
+
+const decodeSchema_fromJsonString_telegramRetryAfterSchema =
+  Schema.decodeUnknownOption(Schema.fromJsonString(telegramRetryAfterSchema));
+
+const decodeSchema_fromJsonString_Schema_Json = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(Schema.Json)
+);
 
 const readBoundedChunks = (
   response: HttpClientResponse.HttpClientResponse,
@@ -220,7 +225,9 @@ export const requestProviderJson = Effect.fn("requestProviderJson")(
 
     const body = yield* readBoundedChunks(response, channel);
 
-    return yield* decodeSchema_fromJsonString_Schema_Json(Buffer.concat(body.chunks, body.size).toString("utf8")).pipe(
+    return yield* decodeSchema_fromJsonString_Schema_Json(
+      Buffer.concat(body.chunks, body.size).toString("utf8")
+    ).pipe(
       Effect.mapError(
         () =>
           new ProviderUncertain({

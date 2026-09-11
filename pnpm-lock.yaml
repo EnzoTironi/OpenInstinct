@@ -162,6 +162,9 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.11(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)))
       '@electric-sql/pglite':
         specifier: ^0.5.8
         version: 0.5.8
@@ -207,6 +210,9 @@ importers:
       oxlint:
         specifier: 1.82.0
         version: 1.82.0(oxlint-tsgolint@7.0.2001)
+      oxlint-plugin-complexity:
+        specifier: ^2.1.8
+        version: 2.1.8(diff@8.0.4)(estree-walker@3.0.3)(oxc-parser@0.146.0)
       oxlint-plugin-react-doctor:
         specifier: ^0.9.13
         version: 0.9.13
@@ -724,6 +730,12 @@ packages:
     resolution: {integrity: sha512-UYUA3LAGH1Pg88Yau7eTlTLHRrIb/uTdxdPGxVcRdIjjrTzxtA7iKHR4hcmUeq5lQEcGLCopN7E4ffsAKF8vEQ==}
     peerDependencies:
       effect: ^4.0.0-rc.112
+
+  '@effect/vitest@4.0.0-rc.112':
+    resolution: {integrity: sha512-mEKh/FI64mt8JK1/v9mpOrJYdnp+UFZdRUBMEdZMiKz7klg6NPqVgg/oeAGH6wOOQc2iAPcfc2H9BbAv1KyzMQ==}
+    peerDependencies:
+      effect: ^4.0.0-rc.112
+      vitest: '>=4.1.0 <5.0.0'
 
   '@electric-sql/pglite@0.5.8':
     resolution: {integrity: sha512-n9tsbUOhwx2epK1V0ZG9Ar4SHWUju04dhmzZXiSBXwBoleOvIfals33NAaWgagQVAL4Rbvx/Ptsu3P+pA09f6Q==}
@@ -6759,6 +6771,21 @@ packages:
       vite-plus:
         optional: true
 
+  oxlint-plugin-complexity@2.1.8:
+    resolution: {integrity: sha512-4BnfNeQkeuEwUti+QAOBaCUuEWZaubk7L94dNl60RXzrs/pjzNOXhWx4rAmK8g/HoBrkIyJ8kqyto5nU0vDG9g==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      diff: '>=5.0.0'
+      estree-walker: '>=3.0.0'
+      oxc-parser: '>=0.60.0'
+    peerDependenciesMeta:
+      diff:
+        optional: true
+      estree-walker:
+        optional: true
+      oxc-parser:
+        optional: true
+
   oxlint-plugin-react-doctor@0.9.13:
     resolution: {integrity: sha512-JuGpGSZ2mmzRaZlhSDdDu3+TZZ+d1q9HPyptU3XW3yL7YMDsJqq9QCPZqTwphPohOByvk+sypBI1+kKgovsPcg==}
     engines: {node: ^20.19.0 || >=22.13.0}
@@ -8920,6 +8947,11 @@ snapshots:
       pg-types: 4.1.0
     transitivePeerDependencies:
       - pg-native
+
+  '@effect/vitest@4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.11(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)))':
+    dependencies:
+      effect: 4.0.0-rc.112
+      vitest: 4.1.11(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
 
   '@electric-sql/pglite@0.5.8': {}
 
@@ -14615,6 +14647,14 @@ snapshots:
       '@oxfmt/binding-win32-arm64-msvc': 0.67.0
       '@oxfmt/binding-win32-ia32-msvc': 0.67.0
       '@oxfmt/binding-win32-x64-msvc': 0.67.0
+
+  oxlint-plugin-complexity@2.1.8(diff@8.0.4)(estree-walker@3.0.3)(oxc-parser@0.146.0):
+    dependencies:
+      '@oxlint/plugins': 1.82.0
+    optionalDependencies:
+      diff: 8.0.4
+      estree-walker: 3.0.3
+      oxc-parser: 0.146.0
 
   oxlint-plugin-react-doctor@0.9.13:
     dependencies:

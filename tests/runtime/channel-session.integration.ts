@@ -1,8 +1,9 @@
+/* oxlint-disable vitest/no-standalone-expect -- @effect/vitest it.effect bodies are test blocks */
 import { randomUUID } from "node:crypto";
 
 import { PgClient } from "@effect/sql-pg";
+import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Result } from "effect";
-import { expect, test } from "vitest";
 
 import { ChannelAccounts } from "../../server/accounts";
 import { Kapso } from "../../server/channels/kapso";
@@ -25,8 +26,9 @@ const infrastructure = Layer.mergeAll(
 
 const live = ChannelTransport.layer.pipe(Layer.provideMerge(infrastructure));
 
-test("channel callbacks require the current identity, owner, workspace and conversation", () =>
-  Effect.runPromise(
+it.effect(
+  "channel callbacks require the current identity, owner, workspace and conversation",
+  () =>
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
       const sql = yield* PgClient.PgClient;
@@ -76,14 +78,18 @@ test("channel callbacks require the current identity, owner, workspace and conve
         },
       ];
 
-      for (const principal of invalid) {
-        const invalidResult = yield* requireChannelPrincipal(
-          "telegram",
-          principal
-        ).pipe(Effect.result);
+      yield* Effect.forEach(
+        invalid,
+        Effect.fn("session.invalidPrincipal")(function* (principal) {
+          const invalidResult = yield* requireChannelPrincipal(
+            "telegram",
+            principal
+          ).pipe(Effect.result);
 
-        expect(Result.isFailure(invalidResult)).toBe(true);
-      }
+          expect(Result.isFailure(invalidResult)).toBe(true);
+        }),
+        { concurrency: 1 }
+      );
 
       yield* sql`UPDATE public.channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identity.id}`;
 
@@ -94,4 +100,4 @@ test("channel callbacks require the current identity, owner, workspace and conve
 
       expect(Result.isFailure(revokedResult)).toBe(true);
     }).pipe(Effect.scoped, Effect.provide(live))
-  ));
+);

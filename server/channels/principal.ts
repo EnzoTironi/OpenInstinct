@@ -4,7 +4,10 @@ import type { ChannelSendOptions } from "eve/channels";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import type { Identity } from "../accounts";
 import { ChannelTransport } from "./transport";
-const decodeSchema_String_check_Schema_isUUID = Schema.decodeUnknownEffect(Schema.String.check(Schema.isUUID()));
+
+const decodeSchema_String_check_Schema_isUUID = Schema.decodeUnknownEffect(
+  Schema.String.check(Schema.isUUID())
+);
 
 export class ChannelDispatchError extends Schema.TaggedError<ChannelDispatchError>()(
   "ChannelDispatchError",
@@ -47,7 +50,9 @@ export const requireChannelPrincipal = Effect.fn("requireChannelPrincipal")(
     if (!auth)
       return yield* new ChannelDispatchError({ reason: "unauthorized" });
 
-    const identityId = yield* decodeSchema_String_check_Schema_isUUID(auth.attributes.channelIdentityId).pipe(
+    const identityId = yield* decodeSchema_String_check_Schema_isUUID(
+      auth.attributes.channelIdentityId
+    ).pipe(
       Effect.mapError(
         () => new ChannelDispatchError({ reason: "unauthorized" })
       )

@@ -2,6 +2,7 @@ import { deviceRequestSchema } from "@shared/identity/channel-auth";
 import { NativeDeviceForm } from "@web/auth/channel/device";
 import { Schema } from "effect";
 import { notFound } from "next/navigation";
+
 const decodeDeviceRequestSchema = Schema.decodeUnknownSync(deviceRequestSchema);
 
 export default async function DeviceSignInPage({

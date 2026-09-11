@@ -30,7 +30,10 @@ const fixture = Effect.fn("messaging.fixture")(function* (
   yield* Effect.acquireRelease(
     sql`INSERT INTO "user" (id, name, email)
       VALUES (${userId}, 'Messaging proof', ${`${userId}@example.invalid`})`,
-    () => sql`DELETE FROM "user" WHERE id = ${userId}`.pipe(Effect.catch((error) => Effect.die(error)))
+    () =>
+      sql`DELETE FROM "user" WHERE id = ${userId}`.pipe(
+        Effect.catch((error) => Effect.die(error))
+      )
   );
   yield* sql`INSERT INTO channel_identity
     (id, channel, installation_id, sender_id, user_id)
@@ -45,7 +48,8 @@ function run(body: Parameters<typeof fixture>[0]) {
 }
 
 test("input response fence survives concurrent replay and refuses uncertain redispatch", () =>
-  run(Effect.fn("run.1")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.1")(function* (messaging, sql, identityId) {
       const sessionId = randomUUID();
 
       const input = {
@@ -106,16 +110,22 @@ test("input response fence survives concurrent replay and refuses uncertain redi
       if (!first)
         return yield* Effect.fail(new Error("Missing response claim"));
 
-      for (const changed of [
-        { decision: "cancel" as const },
-        { revision: "b".repeat(64) },
-        { turnId: "later-turn" },
-      ]) {
-        expect(
-          (yield* messaging.claimChannelInputResponse({ ...input, ...changed }))
-            .kind
-        ).toBe("conflict");
-      }
+      yield* Effect.forEach(
+        [
+          { decision: "cancel" as const },
+          { revision: "b".repeat(64) },
+          { turnId: "later-turn" },
+        ],
+        Effect.fn("messaging.conflictClaim")(function* (changed) {
+          expect(
+            (yield* messaging.claimChannelInputResponse({
+              ...input,
+              ...changed,
+            })).kind
+          ).toBe("conflict");
+        }),
+        { concurrency: 1 }
+      );
 
       expect(
         yield* messaging.markChannelInputResponse({
@@ -171,29 +181,38 @@ test("input response fence survives concurrent replay and refuses uncertain redi
   ));
 
 test("different accepted sources cannot race approval and cancellation of one request", () =>
-  run(Effect.fn("run.2")(function* (messaging, _sql, identityId) {
+  run(
+    Effect.fn("run.2")(function* (messaging, _sql, identityId) {
       const sessionId = randomUUID();
 
-      for (const sourceMessageId of ["yes", "no"]) {
-        yield* messaging.accept({
-          identityId,
-          eventId: sourceMessageId,
-          sourceMessageId,
-          payload: { text: sourceMessageId },
-        });
+      yield* Effect.forEach(
+        ["yes", "no"] as const,
+        Effect.fn("messaging.acceptSource")(function* (sourceMessageId) {
+          yield* messaging.accept({
+            identityId,
+            eventId: sourceMessageId,
+            sourceMessageId,
+            payload: { text: sourceMessageId },
+          });
 
-        const source = yield* messaging.claimInbox({
-          identityId,
-          leaseSeconds: 30,
-        });
+          const source = yield* messaging.claimInbox({
+            identityId,
+            leaseSeconds: 30,
+          });
 
-        if (!source)
-          return yield* Effect.fail(new Error("Missing source claim"));
-        yield* messaging.markAccepted({
-          lease: { identityId, id: source.id, leaseToken: source.leaseToken },
-          receipt: { status: "accepted", sessionId },
-        });
-      }
+          if (!source)
+            return yield* Effect.fail(new Error("Missing source claim"));
+          yield* messaging.markAccepted({
+            lease: {
+              identityId,
+              id: source.id,
+              leaseToken: source.leaseToken,
+            },
+            receipt: { status: "accepted", sessionId },
+          });
+        }),
+        { concurrency: 1 }
+      );
 
       const common = {
         identityId,
@@ -228,7 +247,8 @@ test("different accepted sources cannot race approval and cancellation of one re
   ));
 
 test("concurrent duplicate ingress commits one canonical receipt and rejects changed payload", () =>
-  run(Effect.fn("run.3")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.3")(function* (messaging, sql, identityId) {
       const first = {
         identityId,
         eventId: "event-1",
@@ -321,7 +341,8 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
   ));
 
 test("rejects hash/selector injection and invalid payload before persistence", () =>
-  run(Effect.fn("run.4")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.4")(function* (messaging, sql, identityId) {
       const input = {
         identityId,
         eventId: "invalid",
@@ -363,7 +384,8 @@ test("rejects hash/selector injection and invalid payload before persistence", (
   ));
 
 test("claims FIFO once per identity under concurrency and fences completion", () =>
-  run(Effect.fn("run.5")(function* (messaging, _sql, identityId) {
+  run(
+    Effect.fn("run.5")(function* (messaging, _sql, identityId) {
       const first = yield* messaging.accept({
         identityId,
         eventId: "first",
@@ -432,7 +454,8 @@ test("claims FIFO once per identity under concurrency and fences completion", ()
   ));
 
 test("an input without native protocol evidence remains uncertain and blocks later input", () =>
-  run(Effect.fn("run.6")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.6")(function* (messaging, sql, identityId) {
       yield* messaging.accept({
         identityId,
         eventId: "first",
@@ -486,7 +509,8 @@ test("an input without native protocol evidence remains uncertain and blocks lat
   ));
 
 test("outbox deduplicates intent, fences sends, and keeps lanes independent", () =>
-  run(Effect.fn("run.7")(function* (messaging, _sql, identityId) {
+  run(
+    Effect.fn("run.7")(function* (messaging, _sql, identityId) {
       const intent = {
         identityId,
         deliveryKey: "reply-1",
@@ -564,7 +588,8 @@ test("outbox deduplicates intent, fences sends, and keeps lanes independent", ()
   ));
 
 test("expired outbox is uncertain, cannot resend, and blocks later output", () =>
-  run(Effect.fn("run.8")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.8")(function* (messaging, sql, identityId) {
       yield* messaging.enqueue({
         identityId,
         deliveryKey: "first",
@@ -599,7 +624,8 @@ test("expired outbox is uncertain, cannot resend, and blocks later output", () =
   ));
 
 test("revocation blocks acceptance, dispatch, and completion and cancels queued output", () =>
-  run(Effect.fn("run.9")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.9")(function* (messaging, sql, identityId) {
       yield* messaging.accept({
         identityId,
         eventId: "first",
@@ -664,7 +690,8 @@ test("revocation blocks acceptance, dispatch, and completion and cancels queued 
   ));
 
 test("explicit uncertainty stores only categorical errors and remains visible", () =>
-  run(Effect.fn("run.10")(function* (messaging, _sql, identityId) {
+  run(
+    Effect.fn("run.10")(function* (messaging, _sql, identityId) {
       yield* messaging.enqueue({
         identityId,
         deliveryKey: "first",
@@ -680,13 +707,12 @@ test("explicit uncertainty stores only categorical errors and remains visible", 
         return yield* Effect.fail(new Error("Expected outgoing lease"));
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       const unsafe = { lease, reason: "token=secret provider traceback" };
+
       // Untrusted adapter errors must never be persisted as diagnostic strings.
       expect(
         yield* messaging
-          .markOutboxUncertain(
-            // @ts-expect-error Exercise runtime rejection of an untrusted adapter error.
-            unsafe
-          )
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion -- intentional invalid adapter error
+          .markOutboxUncertain(unsafe as never)
           .pipe(Effect.flip)
       ).toBeInstanceOf(InvalidMessage);
       yield* messaging.markOutboxUncertain({
@@ -702,7 +728,8 @@ test("explicit uncertainty stores only categorical errors and remains visible", 
   ));
 
 test("a confirmed rejection releases the lane but ambiguous errors cannot be terminal", () =>
-  run(Effect.fn("run.11")(function* (messaging, _sql, identityId) {
+  run(
+    Effect.fn("run.11")(function* (messaging, _sql, identityId) {
       yield* messaging.accept({
         identityId,
         eventId: "first",
@@ -725,12 +752,11 @@ test("a confirmed rejection releases the lane but ambiguous errors cannot be ter
       if (!claim) return yield* Effect.fail(new Error("Expected lease"));
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       const ambiguous = { lease, reason: "handoff_unknown" };
+
       expect(
         yield* messaging
-          .markInboxFailed(
-            // @ts-expect-error Runtime validation must also reject an ambiguous failure.
-            ambiguous
-          )
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion -- intentional ambiguous failure
+          .markInboxFailed(ambiguous as never)
           .pipe(Effect.flip)
       ).toBeInstanceOf(InvalidMessage);
       expect(
@@ -746,7 +772,8 @@ test("a confirmed rejection releases the lane but ambiguous errors cannot be ter
   ));
 
 test("independent identities can claim the same event key without blocking each other", () =>
-  run(Effect.fn("run.12")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.12")(function* (messaging, sql, identityId) {
       const otherId = randomUUID();
       yield* sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
       SELECT ${otherId}, channel, installation_id, ${otherId}, user_id
@@ -778,7 +805,8 @@ test("independent identities can claim the same event key without blocking each 
   ));
 
 test("prepared native input survives uncertain recovery with immutable content and a new lease", () =>
-  run(Effect.fn("run.13")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.13")(function* (messaging, sql, identityId) {
       const first = yield* messaging.accept({
         identityId,
         eventId: "keyed-first",
@@ -816,6 +844,7 @@ test("prepared native input survives uncertain recovery with immutable content a
       for (const snapshot of snapshots) {
         expect(snapshot).toEqual(snapshots[0]);
       }
+
       expect(snapshots[0]).toMatchObject({
         protocol: "eve-keyed-input-v1",
         inputId: first.id,
@@ -873,7 +902,8 @@ test("prepared native input survives uncertain recovery with immutable content a
   ));
 
 test("expired prepared input can be recovered but a revoked identity cannot prepare or retry", () =>
-  run(Effect.fn("run.14")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.14")(function* (messaging, sql, identityId) {
       yield* messaging.accept({
         identityId,
         eventId: "expired-keyed",
@@ -926,7 +956,8 @@ test("expired prepared input can be recovered but a revoked identity cannot prep
   ));
 
 test("a lease expiring before media preparation retains its native key and fences the old worker", () =>
-  run(Effect.fn("run.15")(function* (messaging, _sql, identityId) {
+  run(
+    Effect.fn("run.15")(function* (messaging, _sql, identityId) {
       const input = yield* messaging.accept({
         identityId,
         eventId: "early-crash",
@@ -1000,7 +1031,8 @@ test("a lease expiring before media preparation retains its native key and fence
   ));
 
 test("the first prepared transcript intents commit together and never mix or resurrect on replay", () =>
-  run(Effect.fn("run.16")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.16")(function* (messaging, sql, identityId) {
       const input = yield* messaging.accept({
         identityId,
         eventId: "transcript-race",
@@ -1073,7 +1105,8 @@ test("the first prepared transcript intents commit together and never mix or res
   ));
 
 test("a conflicting transcript intent rolls back both preparation and earlier intents", () =>
-  run(Effect.fn("run.17")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.17")(function* (messaging, sql, identityId) {
       const input = yield* messaging.accept({
         identityId,
         eventId: "transcript-rollback",
@@ -1116,7 +1149,8 @@ test("a conflicting transcript intent rolls back both preparation and earlier in
   ));
 
 test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate-risk retry with audit", () =>
-  run(Effect.fn("run.18")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.18")(function* (messaging, sql, identityId) {
       const actor = "better-auth:operator-proof";
 
       const makeUncertain = Effect.fn("messaging.makeUncertain")(function* (
@@ -1235,8 +1269,8 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
             identityId,
             id: retryId,
             actorPrincipalId: actor,
-            // @ts-expect-error Exercise runtime rejection of a missing acknowledgment.
-            decision: { kind: "authorize_retry" },
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion -- intentional incomplete decision
+            decision: { kind: "authorize_retry" } as never,
           })
           .pipe(Effect.flip)
       ).toBeInstanceOf(InvalidMessage);
@@ -1288,7 +1322,8 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
   ));
 
 test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery or retry", () =>
-  run(Effect.fn("run.19")(function* (messaging, sql, identityId) {
+  run(
+    Effect.fn("run.19")(function* (messaging, sql, identityId) {
       const actor = "better-auth:operator-proof";
       yield* messaging.enqueue({
         identityId,

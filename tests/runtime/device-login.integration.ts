@@ -16,7 +16,11 @@ import { channelAuthPlugin } from "../../server/channel-auth";
 import { channelPrincipal } from "../../server/channels/principal";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
-const decodeSchema_Struct_user_Schema_Struct_id_Schema_String = Schema.decodeUnknownSync(Schema.Struct({ user: Schema.Struct({ id: Schema.String }) }));
+
+const decodeSchema_Struct_user_Schema_Struct_id_Schema_String =
+  Schema.decodeUnknownSync(
+    Schema.Struct({ user: Schema.Struct({ id: Schema.String }) })
+  );
 
 const cookies = (response: Response) =>
   response.headers
@@ -121,8 +125,12 @@ test("native browser binding requires same-session approval before BetterAuth ca
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;
 
-        for (const id of [source.sessionId, otherSession])
-          yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${id}, ${scope.workspaceId}, ${scope.userId})`;
+        yield* Effect.forEach(
+          [source.sessionId, otherSession],
+          (id) =>
+            sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${id}, ${scope.workspaceId}, ${scope.userId})`,
+          { concurrency: 1 }
+        );
       })
     );
     await run(
@@ -397,7 +405,9 @@ test("native browser binding requires same-session approval before BetterAuth ca
     assert.equal(complete.status, 200);
     const session = await request("/get-session", undefined, cookies(complete));
 
-    const sessionBody = decodeSchema_Struct_user_Schema_Struct_id_Schema_String(await session.json());
+    const sessionBody = decodeSchema_Struct_user_Schema_Struct_id_Schema_String(
+      await session.json()
+    );
 
     assert.equal(sessionBody.user.id, identity.userId);
     assert.equal(

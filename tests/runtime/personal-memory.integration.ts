@@ -24,8 +24,12 @@ import { serverRuntime } from "../../server/runtime";
 import { applicationOrigin } from "../../shared/environment/origin";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { channelChallengeSchema } from "../../shared/identity/channel-auth";
+import { executeErasedTool } from "./_lib/execute-erased-tool";
 import { runtimeDatabase } from "./database";
-const decodeSchema_fromJsonString_Schema_Struct_status_Schema_ = Schema.decodeUnknownSync(Schema.fromJsonString(
+
+const decodeSchema_fromJsonString_Schema_Struct_status_Schema_ =
+  Schema.decodeUnknownSync(
+    Schema.fromJsonString(
       Schema.Struct({
         status: Schema.String,
         reason: Schema.optionalKey(Schema.String),
@@ -33,13 +37,21 @@ const decodeSchema_fromJsonString_Schema_Struct_status_Schema_ = Schema.decodeUn
           Schema.Struct({ profile: Schema.Unknown, notes: Schema.Unknown })
         ),
       })
-    ));
-const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
-const decodeSchema_Struct_scope_Schema_String_profile_Schema_U = Schema.decodeUnknownSync(Schema.Struct({
-        scope: Schema.String,
-        profile: Schema.Unknown,
-        notes: Schema.Unknown,
-      }));
+    )
+  );
+
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(
+  channelChallengeSchema
+);
+
+const decodeSchema_Struct_scope_Schema_String_profile_Schema_U =
+  Schema.decodeUnknownSync(
+    Schema.Struct({
+      scope: Schema.String,
+      profile: Schema.Unknown,
+      notes: Schema.Unknown,
+    })
+  );
 
 const memoryDocumentBackend = createMemoryDocumentBackend(Effect.void);
 
@@ -167,9 +179,7 @@ test("actual account auth, profile store, Eve provider, private tool and export 
 
     assert.equal(started.status, 200);
 
-    const challenge = decodeChannelChallengeSchema(
-      await started.json()
-    );
+    const challenge = decodeChannelChallengeSchema(await started.json());
 
     const token = new URL(challenge.deepLink).searchParams.get("start");
     assert.ok(token);
@@ -298,7 +308,9 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       /attachment/
     );
 
-    const exported = decodeSchema_Struct_scope_Schema_String_profile_Schema_U(await response.json());
+    const exported = decodeSchema_Struct_scope_Schema_String_profile_Schema_U(
+      await response.json()
+    );
 
     assert.equal(exported.scope, "stored-personal-memory");
     assert.deepEqual(exported.profile, snapshot.profile);
@@ -308,7 +320,8 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       /Foreign-only|personal-memory-test:/
     );
 
-    const native = await inspectStoredPersonalMemory.execute(
+    const native = await executeErasedTool(
+      inspectStoredPersonalMemory,
       {},
       toolContext(ownerContext)
     );
@@ -338,8 +351,8 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     const remove = nativeTools?.remove_memory;
     assert.ok(save && remove);
     await assert.rejects(async () =>
-      save.execute(
-        // @ts-expect-error The native heterogeneous tool map erases its input type.
+      executeErasedTool(
+        save,
         { text: "Another account cannot use this bound tool" },
         toolContext(otherContext)
       )
@@ -427,13 +440,16 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     await assert.rejects(
       personalMemoryProvider.recall["turn.started"](webContext)
     );
-    await assert.rejects(async () =>
-      webTools.save_memory?.execute(
-        // @ts-expect-error Synthetic input exercises the real native save_memory tool.
+    await assert.rejects(async () => {
+      const saveMemory = webTools.save_memory;
+      assert.ok(saveMemory);
+
+      return executeErasedTool(
+        saveMemory,
         { text: "Must not use another active browser session" },
         toolContext(webContext)
-      )
-    );
+      );
+    });
     const browserSecret = randomBytes(32).toString("base64url");
 
     const link = await serverRuntime.runPromise(
@@ -489,19 +505,14 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     );
     await assert.rejects(createNativeTools(ownerContext));
     await assert.rejects(async () =>
-      save.execute(
-        // The public heterogeneous memory-tool map erases each tool's input type.
-        // @ts-expect-error Synthetic input exercises the real native save_memory tool.
+      executeErasedTool(
+        save,
         { text: "Must never be saved through a revoked channel" },
         toolContext(ownerContext)
       )
     );
     await assert.rejects(async () =>
-      remove.execute(
-        // @ts-expect-error Synthetic input exercises the real native remove_memory tool.
-        { index: 0 },
-        toolContext(ownerContext)
-      )
+      executeErasedTool(remove, { index: 0 }, toolContext(ownerContext))
     );
     assert.deepEqual(
       await memoryDocumentBackend.read({
@@ -521,7 +532,11 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       { reason: "unauthenticated" }
     );
     await assert.rejects(async () =>
-      inspectStoredPersonalMemory.execute({}, toolContext(otherContext))
+      executeErasedTool(
+        inspectStoredPersonalMemory,
+        {},
+        toolContext(otherContext)
+      )
     );
     assert.deepEqual(await fromProcess(other.cookie), {
       status: "Failure",
@@ -558,16 +573,24 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;
 
-        for (const key of keys)
-          yield* sql`DELETE FROM memory_document WHERE key = ${key}`;
+        yield* Effect.forEach(
+          keys,
+          (key) => sql`DELETE FROM memory_document WHERE key = ${key}`,
+          { concurrency: 1 }
+        );
 
-        for (const identity of users) {
-          const scope = accessScopeForUser(`better-auth:${identity.userId}`);
-          yield* sql`DELETE FROM public.channel_auth_challenge WHERE identity_id = ${identity.id}`;
-          yield* sql`DELETE FROM public.channel_identity WHERE id = ${identity.id}`;
-          yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
-          yield* sql`DELETE FROM public."user" WHERE id = ${identity.userId}`;
-        }
+        yield* Effect.forEach(
+          users,
+          Effect.fn("personalMemory.cleanupUser")(function* (identity) {
+            const scope = accessScopeForUser(`better-auth:${identity.userId}`);
+
+            yield* sql`DELETE FROM public.channel_auth_challenge WHERE identity_id = ${identity.id}`;
+            yield* sql`DELETE FROM public.channel_identity WHERE id = ${identity.id}`;
+            yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
+            yield* sql`DELETE FROM public."user" WHERE id = ${identity.userId}`;
+          }),
+          { concurrency: 1 }
+        );
       })
     );
   }

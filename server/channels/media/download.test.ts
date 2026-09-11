@@ -12,7 +12,10 @@ import { describe, expect, it } from "vitest";
 
 import { downloadMediaBytes } from "./download";
 import { decodeMediaText } from "./policy";
-const decodeSchema_Struct_port_Schema_Number = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }));
+
+const decodeSchema_Struct_port_Schema_Number = Schema.decodeUnknownSync(
+  Schema.Struct({ port: Schema.Number })
+);
 
 function fixtureUrl(server: Server) {
   const address = decodeSchema_Struct_port_Schema_Number(server.address());

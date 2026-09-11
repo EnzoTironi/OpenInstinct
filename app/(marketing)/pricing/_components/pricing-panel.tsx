@@ -42,35 +42,39 @@ function formatPrice(planId: BillingPlanId, amount: number) {
   return `$${dollars}/mo`;
 }
 
-function PlanAction({
-  plan,
+function FreePlanAction({
   signedIn,
-  currentPlan,
+  isCurrent,
+}: {
+  readonly signedIn: boolean;
+  readonly isCurrent: boolean;
+}) {
+  return (
+    <Button
+      className="w-full"
+      render={<Link href={signedIn ? "/account" : "/get-started"} />}
+      variant={isCurrent ? "secondary" : "outline"}
+    >
+      {isCurrent ? "Current plan" : "Start free"}
+    </Button>
+  );
+}
+
+function PaidPlanAction({
+  planId,
+  signedIn,
+  isCurrent,
   stripeConfigured,
   busyPlan,
   onCheckout,
 }: {
-  readonly plan: Plan;
+  readonly planId: "pro" | "org";
   readonly signedIn: boolean;
-  readonly currentPlan: BillingPlanId;
+  readonly isCurrent: boolean;
   readonly stripeConfigured: boolean;
   readonly busyPlan: BillingPlanId | null;
   readonly onCheckout: (plan: "pro" | "org") => void;
 }) {
-  const isCurrent = currentPlan === plan.id;
-
-  if (plan.id === "free") {
-    return (
-      <Button
-        className="w-full"
-        render={<Link href={signedIn ? "/account" : "/get-started"} />}
-        variant={isCurrent ? "secondary" : "outline"}
-      >
-        {isCurrent ? "Current plan" : "Start free"}
-      </Button>
-    );
-  }
-
   if (!stripeConfigured) {
     return (
       <Button className="w-full" disabled variant="secondary">
@@ -90,7 +94,7 @@ function PlanAction({
     );
   }
 
-  if (plan.id === "org") {
+  if (planId === "org") {
     return (
       <Button
         className="w-full"
@@ -117,6 +121,39 @@ function PlanAction({
           ? "Current plan"
           : "Upgrade to Pro"}
     </Button>
+  );
+}
+
+function PlanAction({
+  plan,
+  signedIn,
+  currentPlan,
+  stripeConfigured,
+  busyPlan,
+  onCheckout,
+}: {
+  readonly plan: Plan;
+  readonly signedIn: boolean;
+  readonly currentPlan: BillingPlanId;
+  readonly stripeConfigured: boolean;
+  readonly busyPlan: BillingPlanId | null;
+  readonly onCheckout: (plan: "pro" | "org") => void;
+}) {
+  const isCurrent = currentPlan === plan.id;
+
+  if (plan.id === "free") {
+    return <FreePlanAction isCurrent={isCurrent} signedIn={signedIn} />;
+  }
+
+  return (
+    <PaidPlanAction
+      busyPlan={busyPlan}
+      isCurrent={isCurrent}
+      onCheckout={onCheckout}
+      planId={plan.id}
+      signedIn={signedIn}
+      stripeConfigured={stripeConfigured}
+    />
   );
 }
 

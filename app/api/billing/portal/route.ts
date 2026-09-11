@@ -9,6 +9,7 @@ import {
 const bodySchema = Schema.Struct({
   organizationId: Schema.optionalKey(Schema.String),
 });
+
 const decodeBodySchema = Schema.decodeUnknownEffect(bodySchema);
 
 function portalErrorResponse(error: BillingPortalError) {

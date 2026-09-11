@@ -135,11 +135,12 @@ const malformed = () =>
 
 const digits = (value: string) => value.replace(/^\+/, "");
 
-const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
+const assertKapsoEnvelopeInstallation = Effect.fn(
+  "Kapso.assertEnvelopeInstallation"
+)(function* (
   item: typeof envelope.Type,
-  installation: KapsoInstallation,
-  nowMs: number
-): Effect.fn.Return<InboundEvent | null, ProviderInputError> {
+  installation: KapsoInstallation
+): Effect.fn.Return<void, ProviderInputError> {
   if (
     item.phone_number_id !== installation.phoneNumberId ||
     item.conversation.phone_number_id !== installation.phoneNumberId
@@ -150,28 +151,36 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
     });
   }
 
-  const incoming = item.message;
+  return yield* Effect.void;
+});
 
-  if (
-    incoming?.kapso.direction !== "inbound" ||
-    (incoming.kapso.status !== "received" &&
-      incoming.kapso.status !== "delivered")
-  )
-    return null;
+const kapsoInboundAttachment = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>
+): typeof media.Type | undefined | null => {
+  switch (incoming.type) {
+    case "text":
+      return undefined;
+    case "image":
+      return incoming.image;
+    case "document":
+      return incoming.document;
+    case "audio":
+      return incoming.audio;
+    case "video":
+      return incoming.video;
+    case "sticker":
+      return incoming.sticker;
+    default:
+      return null;
+  }
+};
 
-  // Documented live origins; direction/status still exclude Business App sends.
-  // https://docs.kapso.ai/docs/platform/webhooks/advanced#message-origin
-  // History imports, missing and future origins must never become login commands.
-  if (
-    incoming.kapso.origin !== "cloud_api" &&
-    incoming.kapso.origin !== "business_app"
-  )
-    return null;
-  // Groups stay closed unless provider mention / reply-to-business signals exist.
-  const chatKind = detectKapsoChatKind(item.conversation);
-
-  if (incoming.type === "system") return null;
-
+const authorizeKapsoSender = Effect.fn("Kapso.authorizeSender")(function* (
+  item: typeof envelope.Type,
+  incoming: NonNullable<(typeof envelope.Type)["message"]>,
+  installation: KapsoInstallation,
+  chatKind: ReturnType<typeof detectKapsoChatKind>
+): Effect.fn.Return<string | null, ProviderInputError> {
   const sender = yield* decodeEffect_phone(incoming.from).pipe(
     Effect.mapError(
       () =>
@@ -216,35 +225,56 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
     });
   }
 
+  return senderId;
+});
+
+const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
+  item: typeof envelope.Type,
+  installation: KapsoInstallation,
+  nowMs: number
+): Effect.fn.Return<InboundEvent | null, ProviderInputError> {
+  yield* assertKapsoEnvelopeInstallation(item, installation);
+
+  const incoming = item.message;
+
+  if (
+    incoming?.kapso.direction !== "inbound" ||
+    (incoming.kapso.status !== "received" &&
+      incoming.kapso.status !== "delivered")
+  )
+    return null;
+
+  // Documented live origins; direction/status still exclude Business App sends.
+  // https://docs.kapso.ai/docs/platform/webhooks/advanced#message-origin
+  // History imports, missing and future origins must never become login commands.
+  if (
+    incoming.kapso.origin !== "cloud_api" &&
+    incoming.kapso.origin !== "business_app"
+  )
+    return null;
+  // Groups stay closed unless provider mention / reply-to-business signals exist.
+  const chatKind = detectKapsoChatKind(item.conversation);
+
+  if (incoming.type === "system") return null;
+
+  const senderId = yield* authorizeKapsoSender(
+    item,
+    incoming,
+    installation,
+    chatKind
+  );
+
+  if (senderId === null) return null;
+
   const occurredAt = yield* validateEventAge(
     "kapso",
     Number(incoming.timestamp),
     nowMs
   );
 
-  let attachment: typeof media.Type | undefined;
+  const attachment = kapsoInboundAttachment(incoming);
 
-  switch (incoming.type) {
-    case "text":
-      break;
-    case "image":
-      attachment = incoming.image;
-      break;
-    case "document":
-      attachment = incoming.document;
-      break;
-    case "audio":
-      attachment = incoming.audio;
-      break;
-    case "video":
-      attachment = incoming.video;
-      break;
-    case "sticker":
-      attachment = incoming.sticker;
-      break;
-    default:
-      return null;
-  }
+  if (attachment === null) return null;
 
   if (incoming.type !== "text" && attachment === undefined)
     return yield* malformed();
@@ -297,7 +327,10 @@ export const parseKapsoWebhook = Effect.fn("parseKapsoWebhook")(function* (
     configuration
   ).pipe(Effect.mapError(malformed));
 
-  const marker = yield* decodeSchema_Struct_batch_Schema_optionalKey_Schema_Bool(value).pipe(Effect.mapError(malformed));
+  const marker =
+    yield* decodeSchema_Struct_batch_Schema_optionalKey_Schema_Bool(value).pipe(
+      Effect.mapError(malformed)
+    );
 
   const items = marker.batch
     ? (yield* decodeEffect_batch(value).pipe(Effect.mapError(malformed))).data
@@ -327,7 +360,12 @@ const sendInput = Schema.Struct({
   text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
   reply: Schema.optional(messageId),
 });
-const decodeSchema_Struct_batch_Schema_optionalKey_Schema_Bool = Schema.decodeUnknownEffect(Schema.Struct({ batch: Schema.optionalKey(Schema.Boolean) }));
+
+const decodeSchema_Struct_batch_Schema_optionalKey_Schema_Bool =
+  Schema.decodeUnknownEffect(
+    Schema.Struct({ batch: Schema.optionalKey(Schema.Boolean) })
+  );
+
 const decodeSendInput = Schema.decodeUnknownEffect(sendInput);
 
 const receipt = Schema.Struct({

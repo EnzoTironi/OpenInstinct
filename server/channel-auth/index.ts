@@ -23,8 +23,15 @@ import {
 } from "../../shared/identity/channel-auth.ts";
 import { NativeDeviceAuth } from "../accounts/device";
 import { ChannelAccountError, ChannelAccounts } from "../accounts/index.ts";
-const decodeChannelConversationEntrySchema = Schema.decodeUnknownEffect(channelConversationEntrySchema);
-const decodeChannelChallengeSchema = Schema.decodeUnknownEffect(channelChallengeSchema);
+
+const decodeChannelConversationEntrySchema = Schema.decodeUnknownEffect(
+  channelConversationEntrySchema
+);
+
+const decodeChannelChallengeSchema = Schema.decodeUnknownEffect(
+  channelChallengeSchema
+);
+
 const decodeDeviceBoundSchema = Schema.decodeUnknownEffect(deviceBoundSchema);
 
 type EndpointContext = Parameters<typeof setSessionCookie>[0];

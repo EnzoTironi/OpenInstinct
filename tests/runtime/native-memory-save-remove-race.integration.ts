@@ -14,6 +14,7 @@ import { authorizePersonalMemoryContext } from "../../agent/lib/personal-memory-
 import { personalMemoryProvider } from "../../agent/lib/personal-memory-provider";
 import { PersonalMemoryError } from "../../server/personal-memory/access";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
+import { executeErasedTool } from "./_lib/execute-erased-tool";
 import { runtimeDatabase } from "./database";
 import { waitForBlocked } from "./pg-locks";
 
@@ -118,8 +119,8 @@ async function fixture() {
     });
 
     assert.ok(tools?.save_memory && tools.remove_memory);
-    await tools.save_memory.execute(
-      // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
+    await executeErasedTool(
+      tools.save_memory,
       { text: forgottenText },
       execution
     );
@@ -204,8 +205,8 @@ async function runRace(blockedOperation: 1 | 2, text: string) {
 
     assert.ok(tools?.save_memory);
     pending = Promise.resolve(
-      tools.save_memory.execute(
-        // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
+      executeErasedTool(
+        tools.save_memory,
         { text },
         { ...owner.execution, callId: randomUUID() }
       )
@@ -218,8 +219,8 @@ async function runRace(blockedOperation: 1 | 2, text: string) {
     );
 
     assert.equal(operations, blockedOperation);
-    await owner.remove.execute(
-      // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
+    await executeErasedTool(
+      owner.remove,
       { index: owner.originalIndex },
       {
         ...owner.execution,

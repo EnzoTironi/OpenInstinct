@@ -18,7 +18,10 @@ import type { LinqChannelConfig } from "eve/channels/linq";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // oxlint-disable-next-line import/no-unassigned-import -- Loads the production module so the mocked channel factory can capture its configuration.
 import "@agent/channels/linq";
-const decodeSendMessageOutputSchema = Schema.decodeUnknownResult(sendMessageOutputSchema);
+
+const decodeSendMessageOutputSchema = Schema.decodeUnknownResult(
+  sendMessageOutputSchema
+);
 
 interface BrowserImage {
   bytes: Uint8Array;
@@ -613,9 +616,7 @@ describe("Linq message delivery", () => {
       )
     ).toBe(true);
     expect(
-      Result.isSuccess(
-        decodeSendMessageOutputSchema({ kind: "message" })
-      )
+      Result.isSuccess(decodeSendMessageOutputSchema({ kind: "message" }))
     ).toBe(false);
     expect(
       Result.isSuccess(

@@ -1,4 +1,4 @@
-/* oxlint-disable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion -- PgClient stub is intentionally incomplete; fail-closed auth returns before any SQL method runs. */
+/* oxlint-disable typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion -- PgClient stub is intentionally incomplete; fail-closed auth returns before any SQL method runs. */
 import { PgClient } from "@effect/sql-pg";
 import type { AccessScope } from "@shared/identity/access-scope";
 import { Effect, Layer, ManagedRuntime } from "effect";
@@ -62,7 +62,9 @@ const sqlMock = vi.hoisted(() =>
 
 function mockPgClientService(
   sql: typeof sqlMock & {
-    withTransaction: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+    withTransaction: <A, E, R>(
+      effect: Effect.Effect<A, E, R>
+    ) => Effect.Effect<A, E, R>;
   }
 ): typeof PgClient.PgClient.Service {
   return sql as never;

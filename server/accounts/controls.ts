@@ -21,7 +21,11 @@ const linkedIdentitySchema = Schema.Struct({
   channel: IdentitySchema.fields.channel,
   senderId: IdentitySchema.fields.senderId,
 });
-const decodeSchema_Array_linkedIdentitySchema = Schema.decodeUnknownEffect(Schema.Array(linkedIdentitySchema));
+
+const decodeSchema_Array_linkedIdentitySchema = Schema.decodeUnknownEffect(
+  Schema.Array(linkedIdentitySchema)
+);
+
 const decodeId = Schema.decodeUnknownEffect(IdentitySchema.fields.id);
 
 const requireControlSession = Effect.fn("requireControlSession")(function* (
@@ -67,9 +71,7 @@ export const revokeLinkedChannelIdentity = Effect.fn(
   "revokeLinkedChannelIdentity"
 )(
   function* (headers: Headers, identityId: string) {
-    const id = yield* decodeId(
-      identityId
-    ).pipe(
+    const id = yield* decodeId(identityId).pipe(
       Effect.mapError(
         () => new AccountControlError({ reason: "identity_inactive" })
       )

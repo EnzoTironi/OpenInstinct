@@ -15,7 +15,11 @@ import { serverRuntime } from "../../server/runtime";
 import { applicationOrigin } from "../../shared/environment/origin";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { channelChallengeSchema } from "../../shared/identity/channel-auth";
-const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
+import { executeErasedTool } from "./_lib/execute-erased-tool";
+
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(
+  channelChallengeSchema
+);
 
 const cookieHeader = (response: Response) =>
   response.headers
@@ -63,9 +67,7 @@ for (const authority of ["channel", "web"] as const) {
 
       assert.equal(started.status, 200);
 
-      const challenge = decodeChannelChallengeSchema(
-        await started.json()
-      );
+      const challenge = decodeChannelChallengeSchema(await started.json());
 
       const token = new URL(challenge.deepLink).searchParams.get("start");
       assert.ok(token);
@@ -180,8 +182,7 @@ for (const authority of ["channel", "web"] as const) {
       assert.ok(save);
 
       const invoke = async (text: string) => {
-        // @ts-expect-error The heterogeneous public map erases the native tool input type.
-        await save.execute({ text }, execution);
+        await executeErasedTool(save, { text }, execution);
       };
 
       await invoke("Before revocation");

@@ -69,13 +69,14 @@ const invalid = () => new ChannelAccountError({ reason: "invalid_challenge" });
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 
+/* oxlint-disable anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion -- WeakMap-cached generic Schema.decodeUnknownEffect; required by agent-doctor hoist-schema-codecs. */
 const decodeUnknownEffectCache = new WeakMap<
   object,
   (input: unknown) => Effect.Effect<unknown, unknown>
 >();
 
 const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) => {
-  let decoder = decodeUnknownEffectCache.get(schema as object) as
+  let decoder = decodeUnknownEffectCache.get(schema) as
     | ((input: S["Type"]) => Effect.Effect<S["Type"], unknown>)
     | undefined;
 
@@ -83,14 +84,14 @@ const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) => {
     const built = Schema.decodeUnknownEffect(schema, {
       onExcessProperty: "error",
     });
-    decodeUnknownEffectCache.set(schema as object, built as never);
+
+    decodeUnknownEffectCache.set(schema, built as never);
     decoder = built as (input: S["Type"]) => Effect.Effect<S["Type"], unknown>;
   }
 
-  return decoder(input).pipe(
-    Effect.mapError(() => invalid())
-  );
+  return decoder(input).pipe(Effect.mapError(() => invalid()));
 };
+/* oxlint-enable anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion */
 
 /** Native initiation and browser binding on the existing account challenge. */
 export class NativeDeviceAuth extends Context.Service<

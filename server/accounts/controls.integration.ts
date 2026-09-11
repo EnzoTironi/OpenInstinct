@@ -13,7 +13,10 @@ import {
   revokeLinkedChannelIdentity,
 } from "./controls";
 import { ChannelAccounts } from "./index";
-const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
+
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(
+  channelChallengeSchema
+);
 
 const runtime = ManagedRuntime.make(
   ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase))
@@ -64,9 +67,7 @@ try {
 
     assert.equal(started.status, 200);
 
-    const challenge = decodeChannelChallengeSchema(
-      await started.json()
-    );
+    const challenge = decodeChannelChallengeSchema(await started.json());
 
     const token = new URL(challenge.deepLink).searchParams.get("start");
     assert.ok(token);
@@ -188,11 +189,15 @@ try {
       yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
       yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
 
-      for (const userId of userIds) {
-        yield* sql`DELETE FROM public."user" WHERE id = ${userId}`;
-        const scope = accessScopeForUser(`better-auth:${userId}`);
-        yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
-      }
+      yield* Effect.forEach(
+        [...userIds],
+        Effect.fn("controls.deleteUser")(function* (userId) {
+          yield* sql`DELETE FROM public."user" WHERE id = ${userId}`;
+          const scope = accessScopeForUser(`better-auth:${userId}`);
+          yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
+        }),
+        { concurrency: 1 }
+      );
     })
   );
   await runtime.dispose();

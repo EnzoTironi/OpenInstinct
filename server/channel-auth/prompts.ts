@@ -12,7 +12,9 @@ import {
   PreviewChallenge,
   VerifiedSender,
 } from "../accounts/index.ts";
-const decodeSchema_String_check_Schema_isMinLength_32 = Schema.decodeUnknownEffect(Schema.String.check(Schema.isMinLength(32)));
+
+const decodeSchema_String_check_Schema_isMinLength_32 =
+  Schema.decodeUnknownEffect(Schema.String.check(Schema.isMinLength(32)));
 
 const Id = Schema.String.check(Schema.isUUID(4));
 
@@ -98,26 +100,26 @@ interface Prompts {
 const error = (reason: ChannelAuthPromptError["reason"]) =>
   new ChannelAuthPromptError({ reason });
 
+/* oxlint-disable anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion -- WeakMap-cached generic Schema.decodeUnknownEffect; required by agent-doctor hoist-schema-codecs. */
 const decodeUnknownEffectCache = new WeakMap<
   object,
   (input: unknown) => Effect.Effect<unknown, unknown>
 >();
 
 const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) => {
-  let decoder = decodeUnknownEffectCache.get(schema as object) as
+  let decoder = decodeUnknownEffectCache.get(schema) as
     | ((input: S["Type"]) => Effect.Effect<S["Type"], unknown>)
     | undefined;
 
   if (!decoder) {
     const built = Schema.decodeUnknownEffect(schema);
-    decodeUnknownEffectCache.set(schema as object, built as never);
+    decodeUnknownEffectCache.set(schema, built as never);
     decoder = built as (input: S["Type"]) => Effect.Effect<S["Type"], unknown>;
   }
 
-  return decoder(input).pipe(
-    Effect.mapError(() => error("invalid_input"))
-  );
+  return decoder(input).pipe(Effect.mapError(() => error("invalid_input")));
 };
+/* oxlint-enable anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion */
 
 /** A single encrypted confirmation prompt per challenge. No provider I/O or polling. */
 export class ChannelAuthPrompts extends Context.Service<
@@ -133,7 +135,9 @@ export class ChannelAuthPrompts extends Context.Service<
 
       const encryptionKey = Effect.gen(function* () {
         const key = installation.betterAuthSecret;
-        yield* decodeSchema_String_check_Schema_isMinLength_32(Redacted.value(key));
+        yield* decodeSchema_String_check_Schema_isMinLength_32(
+          Redacted.value(key)
+        );
 
         return key;
       }).pipe(Effect.mapError(() => error("crypto_unavailable")));

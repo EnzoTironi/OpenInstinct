@@ -16,9 +16,11 @@ import messaging from "../../tools/messaging";
 const decodeJsonObject = Schema.decodeSync(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))
 );
+
 const decodeReactToMessageOutput = Schema.decodeUnknownSync(
   reactToMessageOutputSchema
 );
+
 const decodeAddReactionToMessageOutput = Schema.decodeUnknownSync(
   addReactionToMessageOutputSchema
 );

@@ -16,6 +16,7 @@ const decodePlainTextMedia = Schema.decodeUnknownEffect(
     )
   )
 );
+
 export type MediaReference = NonNullable<MessagePayload["attachments"]>[number];
 
 export const mediaLimits = {

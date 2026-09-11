@@ -2,7 +2,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { channelProviderSchema } from "@shared/identity/channel-auth";
 import { Effect, Redacted, Schema, Stream } from "effect";
-const decodeSchema_fromJsonString_Schema_Json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Json));
+
+const decodeSchema_fromJsonString_Schema_Json = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(Schema.Json)
+);
 
 const maximumBodyBytes = 256 * 1024;
 

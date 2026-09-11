@@ -53,6 +53,7 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@effect/vitest": "4.0.0-rc.112",
     "@electric-sql/pglite": "^0.5.8",
     "@linqapp/chat-sdk-adapter": "0.5.1",
     "@next/env": "16.3.3",
@@ -68,6 +69,7 @@
     "knip": "6.32.3",
     "oxfmt": "0.67.0",
     "oxlint": "1.82.0",
+    "oxlint-plugin-complexity": "^2.1.8",
     "oxlint-plugin-react-doctor": "^0.9.13",
     "oxlint-tailwindcss": "1.10.0",
     "oxlint-tsgolint": "7.0.2001",

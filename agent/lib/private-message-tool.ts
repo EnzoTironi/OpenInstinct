@@ -5,6 +5,7 @@ import { requireChannelPrincipal } from "../../server/channels/principal";
 import { ChannelTransport } from "../../server/channels/transport";
 import { serverRuntime } from "../../server/runtime";
 import { taskReportDeliveryId } from "./task-report";
+
 const decodeNonEmptyString = Schema.decodeUnknownEffect(Schema.NonEmptyString);
 
 const Message = Schema.Struct({
@@ -42,9 +43,7 @@ export const privateMessageTool = (channel: "telegram" | "kapso") =>
           const identity = yield* requireChannelPrincipal(channel, auth);
 
           const reply = input.replyTo
-            ? yield* decodeNonEmptyString(
-                auth?.attributes.sourceMessageId
-              )
+            ? yield* decodeNonEmptyString(auth?.attributes.sourceMessageId)
             : undefined;
 
           const transport = yield* ChannelTransport;

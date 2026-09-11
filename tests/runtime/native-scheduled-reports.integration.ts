@@ -105,36 +105,37 @@ test.each(["telegram", "kapso"] as const)(
   (channel) =>
     run(
       Effect.fn("scheduled.case1")(function* ({ runId, identityId }) {
-          const sql = yield* PgClient.PgClient;
-          yield* Effect.all(
-            [
-              dispatchNativeScheduledReport(runId),
-              dispatchNativeScheduledReport(runId),
-            ],
-            { concurrency: 2 }
-          );
+        const sql = yield* PgClient.PgClient;
+        yield* Effect.all(
+          [
+            dispatchNativeScheduledReport(runId),
+            dispatchNativeScheduledReport(runId),
+          ],
+          { concurrency: 2 }
+        );
 
-          const first =
-            yield* sql`SELECT b.chunk_index, b.outbox_id FROM scheduled_agent_report_outputs b
+        const first =
+          yield* sql`SELECT b.chunk_index, b.outbox_id FROM scheduled_agent_report_outputs b
       WHERE run_id = ${runId} ORDER BY chunk_index`;
 
-          expect(first).toHaveLength(3);
-          yield* sql`UPDATE scheduled_agent_runs SET outcome = '{}'::jsonb WHERE id = ${runId}`;
-          yield* dispatchNativeScheduledReport(runId);
-          expect(
-            yield* sql`SELECT b.chunk_index, b.outbox_id FROM scheduled_agent_report_outputs b
+        expect(first).toHaveLength(3);
+        yield* sql`UPDATE scheduled_agent_runs SET outcome = '{}'::jsonb WHERE id = ${runId}`;
+        yield* dispatchNativeScheduledReport(runId);
+        expect(
+          yield* sql`SELECT b.chunk_index, b.outbox_id FROM scheduled_agent_report_outputs b
       WHERE run_id = ${runId} ORDER BY chunk_index`
-          ).toEqual(first);
-          expect(
-            yield* sql`SELECT id FROM channel_outbox WHERE identity_id = ${identityId}`
-          ).toHaveLength(3);
-        }),
+        ).toEqual(first);
+        expect(
+          yield* sql`SELECT id FROM channel_outbox WHERE identity_id = ${identityId}`
+        ).toHaveLength(3);
+      }),
       channel
     )
 );
 
 test("outer PostgreSQL rollback removes both output chunks and their bindings", () =>
-  run(Effect.fn("run.1")(function* ({ runId, identityId }) {
+  run(
+    Effect.fn("run.1")(function* ({ runId, identityId }) {
       const sql = yield* PgClient.PgClient;
       yield* sql
         .withTransaction(
@@ -161,7 +162,13 @@ test("outer PostgreSQL rollback removes both output chunks and their bindings", 
 test.each(["membership", "identity"] as const)(
   "revoked %s prevents waiting-input delivery",
   (revoke) =>
-    run(Effect.fn("run.2")(function* ({ runId, identityId, workspaceId, userId }) {
+    run(
+      Effect.fn("run.2")(function* ({
+        runId,
+        identityId,
+        workspaceId,
+        userId,
+      }) {
         const sql = yield* PgClient.PgClient;
         yield* sql`UPDATE scheduled_agent_runs SET status = 'waiting_for_input' WHERE id = ${runId}`;
 
@@ -185,7 +192,8 @@ test.each(["membership", "identity"] as const)(
 );
 
 test("identity owner and current membership are independently required", () =>
-  run(Effect.fn("run.3")(function* ({ identityId, workspaceId, userId }) {
+  run(
+    Effect.fn("run.3")(function* ({ identityId, workspaceId, userId }) {
       yield* requireScheduledChannelOwner({
         conversationChannel: "telegram",
         conversationId: identityId,
@@ -216,7 +224,8 @@ test("identity owner and current membership are independently required", () =>
   ));
 
 test("uncertain output blocks recovery and is never enqueued again", () =>
-  run(Effect.fn("run.4")(function* ({ runId, identityId }) {
+  run(
+    Effect.fn("run.4")(function* ({ runId, identityId }) {
       const sql = yield* PgClient.PgClient;
       const messaging = yield* Messaging;
       yield* dispatchNativeScheduledReport(runId);
@@ -247,7 +256,8 @@ test("uncertain output blocks recovery and is never enqueued again", () =>
   ));
 
 test("revocation cancels queued chunks and preserves their durable bindings", () =>
-  run(Effect.fn("run.5")(function* ({ runId, identityId }) {
+  run(
+    Effect.fn("run.5")(function* ({ runId, identityId }) {
       const sql = yield* PgClient.PgClient;
       const messaging = yield* Messaging;
       yield* dispatchNativeScheduledReport(runId);
@@ -280,7 +290,8 @@ test("revocation cancels queued chunks and preserves their durable bindings", ()
   ));
 
 test("membership deletion after enqueue denies transport before configuration or provider I/O", () =>
-  run(Effect.fn("run.6")(function* ({ runId, identityId, workspaceId, userId }) {
+  run(
+    Effect.fn("run.6")(function* ({ runId, identityId, workspaceId, userId }) {
       const sql = yield* PgClient.PgClient;
       const transport = yield* ChannelTransport;
       yield* dispatchNativeScheduledReport(runId);
@@ -296,25 +307,29 @@ test("membership deletion after enqueue denies transport before configuration or
           .pipe(Effect.flip)
       ).toMatchObject({ reason: "identity_inactive" });
 
-      for (const output of before) {
-        expect(
-          yield* transport
-            .drainOutbox(identityId)
-            .pipe(
-              Effect.provideService(
-                ConfigProvider.ConfigProvider,
-                ConfigProvider.fromUnknown({})
-              ),
-              Effect.flip
-            )
-        ).toMatchObject({ reason: "identity_inactive" });
-        expect(
-          (yield* sql<{
-            status: string;
-          }>`SELECT status FROM channel_outbox WHERE id = ${output.id}`)[0]
-            ?.status
-        ).toBe("failed");
-      }
+      yield* Effect.forEach(
+        before,
+        Effect.fn("scheduled.drainInactive")(function* (output) {
+          expect(
+            yield* transport
+              .drainOutbox(identityId)
+              .pipe(
+                Effect.provideService(
+                  ConfigProvider.ConfigProvider,
+                  ConfigProvider.fromUnknown({})
+                ),
+                Effect.flip
+              )
+          ).toMatchObject({ reason: "identity_inactive" });
+          expect(
+            (yield* sql<{
+              status: string;
+            }>`SELECT status FROM channel_outbox WHERE id = ${output.id}`)[0]
+              ?.status
+          ).toBe("failed");
+        }),
+        { concurrency: 1 }
+      );
 
       expect(
         yield* sql`SELECT id, payload FROM channel_outbox WHERE identity_id = ${identityId} ORDER BY delivery_key`
@@ -335,7 +350,8 @@ test("membership deletion after enqueue denies transport before configuration or
 test.each(["last", "all"] as const)(
   "missing %s bindings block recovery without regenerating existing chunks",
   (missing) =>
-    run(Effect.fn("run.7")(function* ({ runId, identityId }) {
+    run(
+      Effect.fn("run.7")(function* ({ runId, identityId }) {
         const sql = yield* PgClient.PgClient;
         yield* dispatchNativeScheduledReport(runId);
 
@@ -369,40 +385,40 @@ test.each(["telegram", "kapso"] as const)(
   (channel) =>
     run(
       Effect.fn("scheduled.case2")(function* ({ runId }) {
-          const sql = yield* PgClient.PgClient;
-          expect(
-            yield* Effect.tryPromise({
-              try: () => getScheduledReportChannel(runId),
-              catch: (c) => (c instanceof Error ? c : new Error(String(c))),
-            })
-          ).toBe(channel);
-          expect(
-            yield* Effect.tryPromise({
-              try: () => claimScheduledReport(runId),
-              catch: (c) => (c instanceof Error ? c : new Error(String(c))),
-            })
-          ).toBeUndefined();
-          expect(
-            (yield* sql<{
-              status: string;
-              lease: string | null;
-            }>`SELECT report_status AS status, report_lease_token AS lease
+        const sql = yield* PgClient.PgClient;
+        expect(
+          yield* Effect.tryPromise({
+            try: () => getScheduledReportChannel(runId),
+            catch: (c) => (c instanceof Error ? c : new Error(String(c))),
+          })
+        ).toBe(channel);
+        expect(
+          yield* Effect.tryPromise({
+            try: () => claimScheduledReport(runId),
+            catch: (c) => (c instanceof Error ? c : new Error(String(c))),
+          })
+        ).toBeUndefined();
+        expect(
+          (yield* sql<{
+            status: string;
+            lease: string | null;
+          }>`SELECT report_status AS status, report_lease_token AS lease
       FROM scheduled_agent_runs WHERE id = ${runId}`)[0]
-          ).toEqual({ status: "pending", lease: null });
-          expect(
-            yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
-          ).toHaveLength(0);
-          yield* dispatchNativeScheduledReport(runId);
-          expect(
-            (yield* sql<{
-              status: string;
-            }>`SELECT report_status AS status FROM scheduled_agent_runs WHERE id = ${runId}`)[0]
-              ?.status
-          ).toBe("queued");
-          expect(
-            yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
-          ).toHaveLength(3);
-        }),
+        ).toEqual({ status: "pending", lease: null });
+        expect(
+          yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
+        ).toHaveLength(0);
+        yield* dispatchNativeScheduledReport(runId);
+        expect(
+          (yield* sql<{
+            status: string;
+          }>`SELECT report_status AS status FROM scheduled_agent_runs WHERE id = ${runId}`)[0]
+            ?.status
+        ).toBe("queued");
+        expect(
+          yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
+        ).toHaveLength(3);
+      }),
       channel
     )
 );
@@ -412,48 +428,49 @@ test.each(["telegram", "kapso"] as const)(
   (channel) =>
     run(
       Effect.fn("scheduled.case3")(function* ({ runId, identityId }) {
-          const sql = yield* PgClient.PgClient;
-          yield* sql`UPDATE scheduled_agent_runs SET outcome = ${sql.json({ kind: "result", summary: "Lembrete: revisar a demonstração do Companion.", urgency: "normal" })} WHERE id = ${runId}`;
+        const sql = yield* PgClient.PgClient;
+        yield* sql`UPDATE scheduled_agent_runs SET outcome = ${sql.json({ kind: "result", summary: "Lembrete: revisar a demonstração do Companion.", urgency: "normal" })} WHERE id = ${runId}`;
 
-          // Actual provider adapter configuration is absent: it must reject before HTTP,
-          // after the outbox transaction commits. No response or service is fabricated.
-          const delivery = yield* deliverNativeScheduledReport(runId).pipe(
-            Effect.provideService(
-              ConfigProvider.ConfigProvider,
-              ConfigProvider.fromUnknown({})
-            ),
-            Effect.result
-          );
+        // Actual provider adapter configuration is absent: it must reject before HTTP,
+        // after the outbox transaction commits. No response or service is fabricated.
+        const delivery = yield* deliverNativeScheduledReport(runId).pipe(
+          Effect.provideService(
+            ConfigProvider.ConfigProvider,
+            ConfigProvider.fromUnknown({})
+          ),
+          Effect.result
+        );
 
-          expect(Result.isFailure(delivery)).toBe(true);
-          expect(
-            yield* sql`SELECT status, attempts, payload->>'text' AS text, provider_message_id
+        expect(Result.isFailure(delivery)).toBe(true);
+        expect(
+          yield* sql`SELECT status, attempts, payload->>'text' AS text, provider_message_id
       FROM channel_outbox WHERE identity_id = ${identityId}`
-          ).toEqual([
-            {
-              status: "failed",
-              attempts: 1,
-              text: "Lembrete: revisar a demonstração do Companion.",
-              provider_message_id: null,
-            },
-          ]);
-          expect(
-            yield* sql`SELECT report_status FROM scheduled_agent_runs WHERE id = ${runId}`
-          ).toEqual([{ report_status: "failed" }]);
-          expect(
-            yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
-          ).toHaveLength(1);
-          yield* deliverNativeScheduledReport(runId);
-          expect(
-            yield* sql`SELECT status, attempts FROM channel_outbox WHERE identity_id = ${identityId}`
-          ).toEqual([{ status: "failed", attempts: 1 }]);
-        }),
+        ).toEqual([
+          {
+            status: "failed",
+            attempts: 1,
+            text: "Lembrete: revisar a demonstração do Companion.",
+            provider_message_id: null,
+          },
+        ]);
+        expect(
+          yield* sql`SELECT report_status FROM scheduled_agent_runs WHERE id = ${runId}`
+        ).toEqual([{ report_status: "failed" }]);
+        expect(
+          yield* sql`SELECT outbox_id FROM scheduled_agent_report_outputs WHERE run_id = ${runId}`
+        ).toHaveLength(1);
+        yield* deliverNativeScheduledReport(runId);
+        expect(
+          yield* sql`SELECT status, attempts FROM channel_outbox WHERE identity_id = ${identityId}`
+        ).toEqual([{ status: "failed", attempts: 1 }]);
+      }),
       channel
     )
 );
 
 test("native completion hook persists and attempts the report before returning", () =>
-  run(Effect.fn("run.8")(function* ({ runId, identityId, userId, workspaceId }) {
+  run(
+    Effect.fn("run.8")(function* ({ runId, identityId, userId, workspaceId }) {
       const sql = yield* PgClient.PgClient;
       const leaseToken = randomUUID();
       const sessionId = randomUUID();
