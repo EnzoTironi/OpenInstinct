@@ -1,7 +1,8 @@
-import { typescriptRuleTester as tester } from "./rule-tester.ts";
+import { RuleTester } from "oxlint/plugins-dev";
 
-import { noUnsafeDictionaryTypeRule } from "@tools/oxlint/anti-slop/rules/no-unsafe-dictionary-type.ts";
+import { noUnsafeDictionaryTypeRule } from "./no-unsafe-dictionary-type.ts";
 
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } });
 
 const error = { messageId: "unsafeDictionary" };
 

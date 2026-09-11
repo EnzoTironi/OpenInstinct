@@ -31,6 +31,7 @@ const vaultItemSchema = z.object({
 });
 
 const boundedValue = z.string().trim().min(1).max(20_000);
+
 const optionalBoundedValue = z
   .string()
   .trim()
@@ -43,6 +44,7 @@ export const loginIdentifierTypeSchema = z.enum(["email", "phone", "username"]);
 export const loginOriginSchema = z.url().refine((value) => {
   if (!URL.canParse(value)) return false;
   const url = new URL(value);
+
   return ["http:", "https:"].includes(url.protocol) && url.origin === value;
 }, "Enter a website origin such as https://www.ubereats.com.");
 
@@ -117,6 +119,7 @@ function validateLoginVaultPayload(
       path: ["identifier", "type"],
     });
   }
+
   if (
     payload.authentication.type === "sms_otp" &&
     payload.identifier.type !== "phone"
@@ -179,10 +182,12 @@ export const loginVaultPayloadStringSchema = serializedPayloadSchema(
   loginVaultPayloadSchema,
   "Enter complete login details."
 );
+
 export const addressVaultPayloadStringSchema = serializedPayloadSchema(
   addressVaultPayloadSchema,
   "Enter a complete address."
 );
+
 export const contactVaultPayloadStringSchema = serializedPayloadSchema(
   contactVaultPayloadSchema,
   "Enter at least one contact value."
@@ -218,6 +223,7 @@ export const vaultCreateItemSchema = z
       login: loginVaultPayloadStringSchema,
       payment: paymentCardSecretStringSchema,
     }[input.kind];
+
     if (!secretSchema.safeParse(input.secret).success) {
       context.addIssue({
         code: "custom",
@@ -256,9 +262,13 @@ export const vaultSetupRequestSchema = z.union([
 ]);
 
 export type VaultCreateItem = z.infer<typeof vaultCreateItemSchema>;
+
 export type VaultImportItems = z.infer<typeof vaultImportItemsSchema>;
+
 export type VaultItem = z.infer<typeof vaultItemSchema>;
+
 export type VaultItemKind = z.infer<typeof vaultItemKindSchema>;
+
 export type VaultSetupRequest = z.infer<typeof vaultSetupRequestSchema>;
 
 export function serializeLoginVaultPayload(
@@ -287,8 +297,10 @@ export function serializePaymentCard(
 
 export function parsePaymentCardSecret(value: string) {
   const card = parseSerializedPayload(paymentCardSecretSchema, value);
+
   if (!card)
     throw new Error("The saved payment card is incomplete or invalid.");
+
   return card;
 }
 
@@ -298,9 +310,11 @@ export function paymentCardBrand(number: string) {
 
 export function paymentCardType(number: string) {
   const digits = number.replaceAll(/\D/gu, "");
+
   if (!digits) return undefined;
 
   const matches = creditCardType(digits);
+
   return matches.length === 1 ? matches[0] : undefined;
 }
 
@@ -324,16 +338,21 @@ export function loginAccountHint(
     switch (identifier.type) {
       case "email": {
         const [localPart, domain] = identifier.value.split("@", 2);
+
         if (!localPart || !domain) return "Saved email";
+
         return `${localPart.slice(0, 1)}•••@${domain}`;
       }
+
       case "phone":
         return `Phone · •••• ${lastCharacters(identifier.value, 4)}`;
       case "username":
         return `Username · ${identifier.value.slice(0, 2)}•••`;
     }
+
     throw new Error("Unsupported login identifier type.");
   })();
+
   return origin
     ? `${new URL(origin).hostname} · ${identifierHint}`
     : identifierHint;
@@ -344,6 +363,7 @@ export function parseVaultSetupSearchParams(
 ) {
   const identifierType = firstQueryValue(query.identifier_type);
   const origin = firstQueryValue(query.origin);
+
   const input = {
     kind: firstQueryValue(query.kind),
     label: firstQueryValue(query.label),
@@ -364,13 +384,16 @@ export function createVaultSetupUrl(
   const url = new URL("/vault", baseUrl);
   url.searchParams.set("setup", request.target);
   url.searchParams.set("kind", request.kind);
+
   if (request.kind === "login") {
     url.searchParams.set("identifier_type", request.identifierType);
     url.searchParams.set("origin", request.origin);
   }
+
   // The label goes last: a messaging client that runs following text into the
   // link only corrupts the editable nickname instead of a validated field.
   if (request.label) url.searchParams.set("label", request.label);
+
   return url.toString();
 }
 
@@ -380,7 +403,9 @@ function lastCharacters(value: string, count: number) {
 
 function firstQueryValue(value: string | readonly string[] | undefined) {
   const parsed = z.union([z.string(), z.array(z.string())]).safeParse(value);
+
   if (!parsed.success) return undefined;
+
   return Array.isArray(parsed.data) ? parsed.data[0] : parsed.data;
 }
 

@@ -1,8 +1,9 @@
-import { scheduledConversationChannelSchema } from "../../shared/schedules/conversation";
-import { scheduledReportStatusSchema } from "../../shared/schedules/report-status";
 import { PgClient } from "@effect/sql-pg";
 import { Effect, Schema } from "effect";
+
 import type { AccessScope } from "../../shared/identity/access-scope";
+import { scheduledConversationChannelSchema } from "../../shared/schedules/conversation";
+import { scheduledReportStatusSchema } from "../../shared/schedules/report-status";
 
 const reminderSchema = Schema.Struct({
   id: Schema.String,
@@ -23,6 +24,7 @@ const reminderSchema = Schema.Struct({
   latestReportStatus: Schema.NullOr(scheduledReportStatusSchema),
   latestScheduledFor: Schema.NullOr(Schema.Date),
 });
+
 const decodeReminders = Schema.decodeUnknownEffect(
   Schema.Array(reminderSchema)
 );
@@ -35,6 +37,7 @@ class RemindersUnavailable extends Schema.TaggedError<RemindersUnavailable>()(
 export const listReminders = Effect.fn("listReminders")(
   function* (scope: AccessScope) {
     const sql = yield* PgClient.PgClient;
+
     const rows = yield* sql`
       SELECT j.id, j.prompt, j.status, j.next_run_at AS "nextRunAt",
         j.conversation_channel AS "conversationChannel",
@@ -60,7 +63,9 @@ export const listReminders = Effect.fn("listReminders")(
       ORDER BY CASE j.status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 ELSE 2 END,
         j.next_run_at ASC NULLS LAST, j.updated_at DESC, j.id ASC
       LIMIT 51`;
+
     const reminders = yield* decodeReminders(rows);
+
     return {
       reminders: reminders.slice(0, 50),
       hasMore: reminders.length > 50,

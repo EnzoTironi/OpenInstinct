@@ -4,13 +4,16 @@ import { z } from "zod";
 
 const backgroundWorkerDelivery =
   /^Background task (\S+) \((?:browser-agent|agent)\) (?:update: |needs input\.$|is cancelled\.$|is completed\.\n\nResult:\n|failed\.\n\nError:\n)/u;
+
 const backgroundWorkerAuthorization =
   /^Background task (\S+) needs authorization\.$/u;
+
 const taskCancelResultSchema = z.object({
   kind: z.literal("tool-result"),
   output: z.object({ tasks: z.array(z.unknown()) }),
   toolName: z.literal("task_cancel"),
 });
+
 const cancelledWorkerTaskSchema = z.object({
   metadata: z.object({ name: z.enum(["browser-agent", "agent"]) }),
   status: z.literal("cancelled"),
@@ -26,6 +29,7 @@ export function messagesForTraceView(
 ) {
   if (traceView === "trace") return messages;
   const hiddenMessageIds = backgroundWorkerDeliveryMessageIds(events);
+
   return messages.filter((message) => !hiddenMessageIds.has(message.id));
 }
 
@@ -39,21 +43,28 @@ export function backgroundWorkerDeliveryMessageIds(
   for (const event of events) {
     if (event.type === "action.result") {
       const result = taskCancelResultSchema.safeParse(event.data.result);
+
       if (!result.success) continue;
+
       for (const value of result.data.output.tasks) {
         const task = cancelledWorkerTaskSchema.safeParse(value);
+
         if (task.success) cancelledTaskIds.add(task.data.taskId);
       }
+
       continue;
     }
 
     if (event.type !== "message.received" || event.data.source !== "task")
       continue;
     const taskId = deliveredTaskId(event.data.message);
+
     if (taskId) {
       const isCancellation =
         /\((?:browser-agent|agent)\) is cancelled\.$/u.test(event.data.message);
+
       messageIds.add(`${event.data.turnId}:user`);
+
       if (isCancellation && cancelledTaskIds.delete(taskId)) {
         messageIds.add(`${event.data.turnId}:user`);
         messageIds.add(`${event.data.turnId}:assistant`);
@@ -71,6 +82,7 @@ export function hasPendingBackgroundWorker(
 
   for (const event of events) {
     const accepted = genericTaskReceipt(event);
+
     if (accepted) {
       taskIds.add(accepted);
       continue;
@@ -87,6 +99,7 @@ export function hasPendingBackgroundWorker(
 
     if (event.type === "action.result") {
       const result = event.data.result;
+
       if (
         result.kind === "subagent-result" &&
         ["browser-agent", "agent"].includes(result.subagentName) &&
@@ -98,17 +111,22 @@ export function hasPendingBackgroundWorker(
       }
 
       const cancellation = taskCancelResultSchema.safeParse(result);
+
       if (!cancellation.success) continue;
+
       for (const value of cancellation.data.output.tasks) {
         const task = cancelledWorkerTaskSchema.safeParse(value);
+
         if (task.success) taskIds.delete(task.data.taskId);
       }
+
       continue;
     }
 
     if (event.type !== "message.received" || event.data.source !== "task")
       continue;
     const taskId = deliveredTaskId(event.data.message);
+
     if (
       taskId &&
       /^Background task \S+ \((?:browser-agent|agent)\) (?:is cancelled\.$|is completed\.\n\nResult:\n|failed\.\n\nError:\n)/u.test(
@@ -139,5 +157,6 @@ function genericTaskReceipt(event: MessageStreamEvent) {
   if (event.type !== "action.result" || event.data.status !== "completed")
     return undefined;
   const receipt = genericTaskReceiptSchema.safeParse(event.data.result);
+
   return receipt.success ? receipt.data.output.taskId : undefined;
 }

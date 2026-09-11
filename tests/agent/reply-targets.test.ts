@@ -13,6 +13,7 @@ vi.mock("eve/context", () => ({
     stateControls.reset.push(() => {
       value = initial();
     });
+
     return {
       get: () => value,
       update(update: (current: T) => T) {

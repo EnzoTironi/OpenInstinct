@@ -1,20 +1,25 @@
-import type { ToolContext } from "eve/tools";
-import { Option, Schema } from "effect";
-import { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
-import { ScheduleOwnerInactive } from "../../../server/schedules/channel-owner";
 import type {
   createScheduledAgentJob,
   listScheduledAgentJobs,
 } from "@db/services/scheduled-agent-jobs";
+import { Option, Schema } from "effect";
+import type { ToolContext } from "eve/tools";
+
+import { ScheduleOwnerInactive } from "../../../server/schedules/channel-owner";
 import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
+import { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
 
 export function scheduleOwner(context: ToolContext) {
   const auth = context.session.auth.current;
+
   if (auth?.principalType !== "user") throw new ScheduleOwnerInactive();
+
   const conversationChannel = Schema.decodeUnknownSync(
     scheduledConversationChannelSchema
   )(auth.attributes.conversationChannel);
+
   const scope = scopeFromPrincipal(auth);
+
   const conversationId =
     conversationChannel === "eve"
       ? context.session.id
@@ -23,12 +28,15 @@ export function scheduleOwner(context: ToolContext) {
             ? Schema.String.check(Schema.isStartsWith("linq:"))
             : Schema.String.check(Schema.isUUID())
         )(auth.attributes.conversationId);
+
   return { conversation: { conversationChannel, conversationId }, scope };
 }
 
 export function scheduleReplyAnchor(context: ToolContext) {
   const auth = context.session.auth.current;
+
   if (auth?.attributes.conversationChannel !== "linq") return undefined;
+
   return Option.getOrUndefined(
     Schema.decodeUnknownOption(Schema.NonEmptyString)(
       auth.attributes.linqMessageId
@@ -55,6 +63,7 @@ export function scheduleListSummary(
   job: Awaited<ReturnType<typeof listScheduledAgentJobs>>[number]
 ) {
   const latestRun = job.latestRun;
+
   return {
     ...scheduleSummary(job),
     latestRun: latestRun

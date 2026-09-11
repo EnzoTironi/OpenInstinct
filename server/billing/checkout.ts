@@ -1,13 +1,14 @@
-import { Effect, Schema } from "effect";
-import { and, eq } from "drizzle-orm";
+import { db, organizationMemberships } from "@db";
 import {
   findEntitlementByStripeCustomer,
   readEntitlement,
   upsertEntitlement,
 } from "@db/services/billing";
-import { db, organizationMemberships } from "@db";
-import { applicationOrigin } from "@shared/environment/origin";
 import { isPaidPlan, type BillingPlanId } from "@shared/billing/plans";
+import { applicationOrigin } from "@shared/environment/origin";
+import { and, eq } from "drizzle-orm";
+import { Effect, Schema } from "effect";
+
 import {
   requireStripe,
   stripePriceIdForPlan,
@@ -40,6 +41,7 @@ async function assertOrgAdmin(organizationId: string, userId: string) {
       )
     )
     .limit(1);
+
   return rows[0]?.role === "admin";
 }
 
@@ -60,6 +62,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
 
     let stripe;
     let priceId: string;
+
     try {
       stripe = requireStripe();
       priceId = stripePriceIdForPlan(input.plan);
@@ -70,6 +73,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
           message: error.message,
         });
       }
+
       throw error;
     }
 
@@ -77,6 +81,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
       input.plan === "org" ? Math.max(1, Math.floor(input.seatCount ?? 1)) : 1;
 
     const organizationId = input.organizationId;
+
     if (input.plan === "org") {
       if (!organizationId) {
         return yield* new BillingCheckoutError({
@@ -84,6 +89,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
           message: "Org Checkout requires an organizationId.",
         });
       }
+
       const allowed = yield* Effect.tryPromise({
         try: () => assertOrgAdmin(organizationId, input.userId),
         catch: () =>
@@ -92,6 +98,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
             message: "Unable to verify organization admin.",
           }),
       });
+
       if (!allowed) {
         return yield* new BillingCheckoutError({
           reason: "org_forbidden",
@@ -101,6 +108,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
     }
 
     const subjectType = input.plan === "org" ? "organization" : "user";
+
     const subjectId =
       input.plan === "org" && organizationId ? organizationId : input.userId;
 
@@ -114,6 +122,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
     });
 
     let customerId = entitlement.stripeCustomerId;
+
     if (!customerId) {
       const existingUser = yield* Effect.tryPromise({
         try: () => readEntitlement("user", input.userId),
@@ -123,15 +132,18 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
             message: "Unable to load user billing customer.",
           }),
       });
+
       customerId = existingUser.stripeCustomerId;
     }
 
     if (customerId) {
       const existingCustomerId = customerId;
+
       const bound = yield* Effect.tryPromise({
         try: () => findEntitlementByStripeCustomer(existingCustomerId),
         catch: () => null,
       });
+
       if (
         bound &&
         (bound.subjectType !== subjectType || bound.subjectId !== subjectId)
@@ -157,6 +169,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
             message: "Unable to create Stripe customer.",
           }),
       });
+
       customerId = customer.id;
       yield* Effect.tryPromise({
         try: () =>
@@ -185,6 +198,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
 
     const stripeCustomerId = customerId;
     const origin = applicationOrigin();
+
     const session = yield* Effect.tryPromise({
       try: () =>
         stripe.checkout.sessions.create({

@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { Button } from "@web/components/ui/button";
+import Link from "next/link";
+
 import { MarketingShell } from "../../_components/marketing-shell";
 
 const steps = [

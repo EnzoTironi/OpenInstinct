@@ -1,5 +1,3 @@
-import { and, eq, sql } from "drizzle-orm";
-import { Effect, Schema } from "effect";
 import {
   db,
   organizationMemberships,
@@ -15,6 +13,8 @@ import {
   type WorkspaceRole,
   RbacDenied,
 } from "@shared/identity/org-rbac";
+import { and, eq, sql } from "drizzle-orm";
+import { Effect, Schema } from "effect";
 
 export class OrganizationMembershipMissing extends Schema.TaggedError<OrganizationMembershipMissing>()(
   "OrganizationMembershipMissing",
@@ -39,6 +39,7 @@ async function loadOrgMembership(organizationId: string, userId: string) {
       )
     )
     .limit(1);
+
   return rows[0];
 }
 
@@ -57,6 +58,7 @@ async function loadWorkspaceMembership(workspaceId: string, userId: string) {
       )
     )
     .limit(1);
+
   return rows[0];
 }
 
@@ -100,6 +102,7 @@ export function createCompanyWorkspace(input: {
           userId: input.actorUserId,
         }),
     });
+
     if (membership === undefined) {
       yield* Effect.fail(
         new OrganizationMembershipMissing({
@@ -107,6 +110,7 @@ export function createCompanyWorkspace(input: {
           userId: input.actorUserId,
         })
       );
+
       return;
     }
 
@@ -149,6 +153,7 @@ export function setOrganizationMemberRole(input: {
     const actor = yield* Effect.promise(() =>
       loadOrgMembership(input.organizationId, input.actorUserId)
     );
+
     if (actor === undefined) {
       yield* Effect.fail(
         new OrganizationMembershipMissing({
@@ -156,6 +161,7 @@ export function setOrganizationMemberRole(input: {
           userId: input.actorUserId,
         })
       );
+
       return;
     }
 
@@ -193,6 +199,7 @@ export function setWorkspaceMemberRole(input: {
     const actor = yield* Effect.promise(() =>
       loadWorkspaceMembership(input.workspaceId, input.actorUserId)
     );
+
     if (actor === undefined) {
       yield* Effect.fail(
         new WorkspaceMembershipMissing({
@@ -200,6 +207,7 @@ export function setWorkspaceMemberRole(input: {
           userId: input.actorUserId,
         })
       );
+
       return;
     }
 
@@ -241,5 +249,6 @@ export async function countOrganizationAdmins(organizationId: string) {
         eq(organizationMemberships.role, "admin")
       )
     );
+
   return rows[0]?.count ?? 0;
 }

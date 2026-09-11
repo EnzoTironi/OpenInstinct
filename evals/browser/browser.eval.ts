@@ -1,4 +1,18 @@
 import {
+  browserBenchmarkReporter,
+  reportBrowserBenchmarkActivity,
+} from "@evals/browser/benchmark-reporter";
+import { browserBenchmarkEnv } from "@evals/browser/env";
+import {
+  browserBenchmarkFixtureContext,
+  browserBenchmarkTasks,
+} from "@evals/browser/tasks";
+import {
+  didCompleteWorker,
+  didFinishWorker,
+  readTaskCompletion,
+} from "@evals/browser/worker-events";
+import {
   defineEval,
   type EveEvalContext,
   type EveEvalLiveTurn,
@@ -6,22 +20,9 @@ import {
 } from "eve/evals";
 import { satisfies } from "eve/evals/expect";
 import { z } from "zod";
-import {
-  browserBenchmarkReporter,
-  reportBrowserBenchmarkActivity,
-} from "@evals/browser/benchmark-reporter";
-import {
-  didCompleteWorker,
-  didFinishWorker,
-  readTaskCompletion,
-} from "@evals/browser/worker-events";
-import {
-  browserBenchmarkFixtureContext,
-  browserBenchmarkTasks,
-} from "@evals/browser/tasks";
-import { browserBenchmarkEnv } from "@evals/browser/env";
 
 const repetitions = browserBenchmarkEnv.BROWSER_BENCH_REPETITIONS;
+
 const tasks = browserBenchmarkTasks(browserBenchmarkEnv.BROWSER_BENCH_SUITE);
 
 export default tasks.flatMap((task) =>
@@ -30,6 +31,7 @@ export default tasks.flatMap((task) =>
       repetitions === 1
         ? task.description
         : `${task.description} [${String(repetitionIndex + 1)}/${String(repetitions)}]`;
+
     return defineEval({
       description,
       reporters: [browserBenchmarkReporter],
@@ -54,16 +56,20 @@ export default tasks.flatMap((task) =>
               workerEvents,
               (milliseconds) => t.sleep(milliseconds)
             );
+
             turn.expectOk();
             workerEvents.push(...turn.events);
+
             if (didFinishWorker(workerEvents)) {
               completed = turn;
               break;
             }
+
             turnStartIndex = requireStreamIndex(child.session);
           } catch (error) {
             if (!isIdleStreamClosure(error)) throw error;
           }
+
           if (completed === null) {
             child = t.target.watchTurn(childSessionId, {
               startIndex: turnStartIndex,
@@ -100,8 +106,10 @@ export default tasks.flatMap((task) =>
         );
         t.succeeded();
         const workerCompletion = readTaskCompletion(child.events);
+
         const taskJudgeContext =
           "judgeContext" in task ? task.judgeContext : undefined;
+
         t.judge.autoevals
           .closedQA(
             taskCompletionCriteria(task.successCriteria, taskJudgeContext),
@@ -131,6 +139,7 @@ async function resultWithLiveActivity(
   sleep: (milliseconds?: number) => Promise<void>
 ) {
   const result = turn.result();
+
   return pollForResult(result, turn, taskName, sessionId, priorEvents, sleep);
 }
 
@@ -146,10 +155,12 @@ async function pollForResult(
     result.then((completed) => ({ completed, status: "completed" }) as const),
     sleep(1_000).then(() => ({ status: "poll" }) as const),
   ]);
+
   await reportBrowserBenchmarkActivity(taskName, sessionId, [
     ...priorEvents,
     ...turn.events,
   ]);
+
   return outcome.status === "completed"
     ? outcome.completed
     : pollForResult(result, turn, taskName, sessionId, priorEvents, sleep);
@@ -166,9 +177,11 @@ function requireStreamIndex(session: {
   readonly state?: { readonly streamIndex?: number };
 }) {
   const streamIndex = session.state?.streamIndex;
+
   if (streamIndex === undefined) {
     throw new Error("Browser benchmark session has no stream index.");
   }
+
   return streamIndex;
 }
 
@@ -201,10 +214,12 @@ async function requireWorkerSessionId(
   }
 
   const startIndex = requireStreamIndex(context);
+
   const response = await context.target.fetch(
     `/eve/v1/session/${encodeURIComponent(turn.sessionId)}/stream?startIndex=${String(startIndex)}`,
     { signal: context.signal }
   );
+
   if (!response.ok || !response.body) {
     throw new Error(
       `Could not follow the root session for its worker child (${String(response.status)}).`
@@ -214,6 +229,7 @@ async function requireWorkerSessionId(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let pending = "";
+
   try {
     for (;;) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- the child-session binding arrives on this ordered stream
@@ -221,17 +237,22 @@ async function requireWorkerSessionId(
       pending += decoder.decode(chunk.value, { stream: !chunk.done });
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
+
       for (const line of lines) {
         if (!line.trim()) continue;
         let value: unknown;
+
         try {
           value = JSON.parse(line);
         } catch {
           continue;
         }
+
         const parsed = workerCalledSchema.safeParse(value);
+
         if (parsed.success) return parsed.data.data.childSessionId;
       }
+
       if (chunk.done) break;
     }
   } finally {

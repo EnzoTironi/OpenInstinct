@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { calendarEventTime } from "../calendar-time";
 
 describe("calendar list event timezone", () => {
@@ -8,6 +9,7 @@ describe("calendar list event timezone", () => {
     dateTime: "2026-09-09T09:00:00-04:00",
     timeZone: "America/Sao_Paulo",
   };
+
   it("formats the real returned instant as 10:00 Sao Paulo, not 09:00", () => {
     expect(calendarEventTime(actualStart, "America/Sao_Paulo")).toEqual({
       instant: "2026-09-09T13:00:00.000Z",

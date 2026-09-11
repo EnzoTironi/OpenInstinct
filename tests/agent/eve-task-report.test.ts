@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import type { SessionTaskIndexEntry } from "../../node_modules/eve/dist/src/tasks/session-index.js";
+
 import type { SessionParent } from "eve/context";
 import { test } from "vitest";
+
+import { buildCallbackContext } from "../../node_modules/eve/dist/src/context/build-callback-context.js";
 import {
   ContextContainer,
   contextStorage,
 } from "../../node_modules/eve/dist/src/context/container.js";
-import { buildCallbackContext } from "../../node_modules/eve/dist/src/context/build-callback-context.js";
 import {
   SessionKey,
   TurnTaskDeliveryKey,
@@ -21,6 +22,7 @@ import {
   resolveInitiatingTaskContext,
   resolveTaskDeliveryContext,
 } from "../../node_modules/eve/dist/src/tasks/delivery-context.js";
+import type { SessionTaskIndexEntry } from "../../node_modules/eve/dist/src/tasks/session-index.js";
 
 // Pure native-state fixtures, not simulated provider responses or runtime proof.
 function task(
@@ -29,6 +31,7 @@ function task(
   status: "completed" | "cancelled" | "pending" = "completed"
 ): SessionTaskIndexEntry {
   const metadata = { kind: "tool", name: "fixture" };
+
   const base = {
     taskId,
     createdByTurnId,
@@ -37,9 +40,12 @@ function task(
     taskRunId: `run:${taskId}`,
     executor: { kind: "tool", data: {} },
   };
+
   if (status === "pending") return base;
+
   if (status === "cancelled")
     return { ...base, terminalView: { taskId, metadata, status } };
+
   return {
     ...base,
     terminalView: {
@@ -55,16 +61,19 @@ test("cohort identity is the native initiating turn, independent of order or ter
   const a = task("a", "turn_launch");
   const b = task("b", "turn_launch", "cancelled");
   const other = task("c", "turn_other");
+
   for (const tasks of [
     [a, b, other],
     [other, b, a],
   ]) {
     const state = { "eve.tasks": { version: 2, tasks } };
+
     for (const taskDeliveryId of ["a:result", "b:cancelled"]) {
       const projected = resolveTaskDeliveryContext({ state, taskDeliveryId });
       assert.equal(projected?.cohortId, "turn_launch");
       assert.equal(projected.phase, "settled");
     }
+
     assert.equal(
       resolveTaskDeliveryContext({ state, taskDeliveryId: "c:result" })
         ?.cohortId,
@@ -84,6 +93,7 @@ test("pending and initiating projections preserve the same cohort identity witho
       tasks: [task("a", "launch"), task("b", "launch", "pending")],
     },
   };
+
   assert.equal(
     resolveTaskDeliveryContext({ state, taskDeliveryId: "a:result" })?.phase,
     "pending"
@@ -119,6 +129,7 @@ function callbackContainer(
   });
   container.set(TurnTaskDeliveryKey, phase);
   container.set(TurnTaskReportKey, { cohortId: "launch" });
+
   return container;
 }
 
@@ -136,6 +147,7 @@ test("public callback exposes an immutable cohort only for root settled delivery
     Object.assign(callback.session, { taskReport: { cohortId: "forged" } });
   }, TypeError);
   assert.deepEqual(container.get(TurnTaskReportKey), { cohortId: "launch" });
+
   for (const phase of ["none", "initiating", "pending"] as const) {
     assert.equal(
       contextStorage.run(callbackContainer(phase), buildCallbackContext).session
@@ -143,6 +155,7 @@ test("public callback exposes an immutable cohort only for root settled delivery
       undefined
     );
   }
+
   assert.equal(
     contextStorage.run(
       callbackContainer("settled", {

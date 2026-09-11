@@ -1,7 +1,9 @@
 import { Effect, Schema } from "effect";
+
 import { ProviderReferenceSchema } from "./inbound";
 
 const ChatKindSchema = Schema.Literals(["private", "group"]);
+
 export type ChatKind = typeof ChatKindSchema.Type;
 
 export interface GroupMentionSignals {
@@ -18,7 +20,9 @@ export const detectTelegramChatKind = (
   chatType: string
 ): ChatKind | "unsupported" => {
   if (chatType === "private") return "private";
+
   if (chatType === "group" || chatType === "supergroup") return "group";
+
   return "unsupported";
 };
 
@@ -28,11 +32,13 @@ export const detectKapsoChatKind = (conversation: {
 }): ChatKind => {
   if (conversation.is_group === true || conversation.type === "group")
     return "group";
+
   return "private";
 };
 
 const telegramMentionPattern = (botUsername: string) => {
   const name = botUsername.replace(/^@/, "");
+
   return new RegExp(`(?:^|\\s)@${name}(?:\\b|$)`, "i");
 };
 
@@ -51,15 +57,21 @@ export const telegramTextMentionsBot = (
   botId: string
 ): boolean => {
   const name = botUsername.replace(/^@/, "");
+
   if (!text) return false;
+
   if (telegramMentionPattern(name).test(text)) return true;
+
   if (!entities?.length) return false;
+
   for (const entity of entities) {
     if (entity.type === "mention") {
       const slice = text.slice(entity.offset, entity.offset + entity.length);
+
       if (slice.replace(/^@/, "").toLowerCase() === name.toLowerCase())
         return true;
     }
+
     if (
       entity.type === "text_mention" &&
       entity.user !== undefined &&
@@ -67,6 +79,7 @@ export const telegramTextMentionsBot = (
     )
       return true;
   }
+
   return false;
 };
 
@@ -100,6 +113,7 @@ export const bindGroupChannelIdentity = Effect.fn("bindGroupChannelIdentity")(
     readonly chatId: string;
   }) {
     const conversationScope = `group:${input.channel}:${input.installationId}:${input.chatId}`;
+
     return yield* Schema.decodeUnknownEffect(GroupIdentityBindingSchema)({
       identityId: input.identityId,
       channel: input.channel,
@@ -133,12 +147,15 @@ export const extractKapsoGroupMentionSignals = (input: {
   readonly contextFromMe?: boolean;
 }): GroupMentionSignals => {
   const biz = digitsOnly(input.installationPhoneDigits);
+
   const mentionedBot =
     input.kapso?.mentioned === true ||
     input.kapso?.mentioned_business === true ||
     Boolean(input.mentions?.some((m) => digitsOnly(m) === biz)) ||
     Boolean(input.mentionedIds?.some((m) => digitsOnly(m) === biz));
+
   const replyToBot =
     input.kapso?.reply_to_business === true || input.contextFromMe === true;
+
   return { mentionedBot, replyToBot };
 };

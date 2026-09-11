@@ -1,13 +1,12 @@
 "use client";
 /* oxlint-disable jsx-a11y/label-has-associated-control -- Consumers provide the label-control association at the callsite. */
 
-import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
-
 import { cn } from "@web/components/class-names";
+import { cva, type VariantProps } from "class-variance-authority";
+import * as React from "react";
 
 const labelVariants = cva(
-  "type-label flex items-center gap-2 select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
+  "flex items-center gap-2 type-label select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
   {
     variants: {
       variant: {

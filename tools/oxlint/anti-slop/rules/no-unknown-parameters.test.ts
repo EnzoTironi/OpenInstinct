@@ -1,7 +1,8 @@
-import { typescriptRuleTester as tester } from "./rule-tester.ts";
+import { RuleTester } from "oxlint/plugins-dev";
 
-import { noUnknownParametersRule } from "@tools/oxlint/anti-slop/rules/no-unknown-parameters.ts";
+import { noUnknownParametersRule } from "./no-unknown-parameters.ts";
 
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } });
 const error = { messageId: "unknownParameter" };
 
 tester.run("anti-slop/no-unknown-parameters", noUnknownParametersRule, {

@@ -1,13 +1,15 @@
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { recordBrowserTraceDomains } from "@db/services/browser-traces";
 import type { AccessScope } from "@shared/identity/access-scope";
-import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 
 const maximumTelemetryEvents = 5000;
 
 export function domainFromUrl(url: string) {
   try {
     const { hostname, protocol } = new URL(url);
+
     if (protocol !== "http:" && protocol !== "https:") return undefined;
+
     return hostname || undefined;
   } catch {
     return undefined;
@@ -20,6 +22,7 @@ async function collectNavigationDomains(
 ) {
   const domains = new Set<string>();
   let seen = 0;
+
   for await (const { event } of getKernel().browsers.telemetry.events(
     browser.sessionId,
     { category: ["page"], limit: 1000, since: browser.createdAt },
@@ -27,13 +30,18 @@ async function collectNavigationDomains(
   )) {
     if (seen >= maximumTelemetryEvents) break;
     seen += 1;
+
     if (event.type !== "page_navigation") continue;
     const data = event.data;
+
     if (!data?.url || data.parent_frame_id) continue;
+
     if (data.target_type && data.target_type !== "page") continue;
     const domain = domainFromUrl(data.url);
+
     if (domain) domains.add(domain);
   }
+
   return domains;
 }
 

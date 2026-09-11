@@ -1,5 +1,11 @@
 "use client";
 
+import { isBrowserImageArtifactUrl } from "@shared/browser/artifact";
+import { cjk } from "@streamdown/cjk";
+import { code } from "@streamdown/code";
+import { math } from "@streamdown/math";
+import { mermaid } from "@streamdown/mermaid";
+import { cn } from "@web/components/class-names";
 import { Button } from "@web/components/ui/button";
 import { ButtonGroup, ButtonGroupText } from "@web/components/ui/button-group";
 import {
@@ -8,11 +14,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@web/components/ui/tooltip";
-import { cn } from "@web/components/class-names";
-import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
-import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
 import type { UIMessage } from "ai";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
@@ -28,7 +29,6 @@ import {
 } from "react";
 import { Streamdown, type Components } from "streamdown";
 import { z } from "zod";
-import { isBrowserImageArtifactUrl } from "@shared/browser/artifact";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -54,7 +54,7 @@ export const MessageContent = ({
 }: MessageContentProps) => (
   <div
     className={cn(
-      "flex w-fit min-w-0 max-w-full flex-col gap-3 overflow-hidden type-supporting-body",
+      "type-supporting-body flex w-fit max-w-full min-w-0 flex-col gap-3 overflow-hidden",
       "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
       "group-[.is-assistant]:text-foreground",
       className
@@ -163,12 +163,14 @@ export const MessageBranch = ({
   const goToPrevious = useCallback(() => {
     const newBranch =
       currentBranch > 0 ? currentBranch - 1 : branches.length - 1;
+
     handleBranchChange(newBranch);
   }, [currentBranch, branches.length, handleBranchChange]);
 
   const goToNext = useCallback(() => {
     const newBranch =
       currentBranch < branches.length - 1 ? currentBranch + 1 : 0;
+
     handleBranchChange(newBranch);
   }, [currentBranch, branches.length, handleBranchChange]);
 
@@ -201,6 +203,7 @@ export const MessageBranchContent = ({
   ...props
 }: MessageBranchContentProps) => {
   const { currentBranch, setBranches, branches } = useMessageBranch();
+
   const childrenArray = useMemo(
     () => Children.toArray(children).filter(isValidElement),
     [children]
@@ -322,6 +325,7 @@ export const MessageBranchPage = ({
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 const streamdownPlugins = { cjk, code, math, mermaid };
+
 const streamdownComponents: Components = { img: ArtifactMessageImage };
 
 export function ArtifactMessageImage({
@@ -333,6 +337,7 @@ export function ArtifactMessageImage({
 }: ComponentProps<"img"> & { readonly node?: unknown }) {
   void _node;
   const parsedSource = z.string().safeParse(src);
+
   if (!parsedSource.success || !isBrowserImageArtifactUrl(parsedSource.data)) {
     return (
       <span className="text-muted-foreground">

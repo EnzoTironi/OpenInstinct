@@ -1,13 +1,14 @@
-import type { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
-import { serverRuntime } from "../../../server/runtime";
-import { deliverNativeScheduledReport } from "../../../server/schedules/native-report";
-import type { AttachSessionFn } from "eve/channels";
-import type { ScheduleToFn } from "eve/schedules";
 import {
   claimScheduledReport,
   finalizeScheduledReport,
   releaseScheduledReport,
 } from "@db/services/scheduled-agent-jobs";
+import type { AttachSessionFn } from "eve/channels";
+import type { ScheduleToFn } from "eve/schedules";
+
+import { serverRuntime } from "../../../server/runtime";
+import { deliverNativeScheduledReport } from "../../../server/schedules/native-report";
+import type { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
 import linq from "../../channels/linq";
 
 type ClaimedScheduledReport = NonNullable<
@@ -24,10 +25,13 @@ export async function dispatchScheduledReport(
 ) {
   if (conversationChannel === "telegram" || conversationChannel === "kapso") {
     await serverRuntime.runPromise(deliverNativeScheduledReport(runId));
+
     return;
   }
+
   const claimed = await claimScheduledReport(runId);
   const leaseToken = claimed?.run.reportLeaseToken;
+
   if (!claimed || !leaseToken) return;
   console.info("[scheduled-run] dispatching report", {
     channel: claimed.job.conversationChannel,
@@ -36,6 +40,7 @@ export async function dispatchScheduledReport(
     runStatus: claimed.run.status,
   });
   const attributes = scheduledReportAttributes(claimed, leaseToken);
+
   const options = {
     auth: {
       attributes,
@@ -46,8 +51,10 @@ export async function dispatchScheduledReport(
     },
     turnPolicy: "queue" as const,
   };
+
   try {
     const prompt = scheduledReportPrompt(claimed);
+
     if (claimed.job.conversationChannel === "linq") {
       const session = await delivery
         .to(linq, {
@@ -55,23 +62,29 @@ export async function dispatchScheduledReport(
           threadId: claimed.job.conversationId,
         })
         .send(prompt, options);
+
       console.info("[scheduled-run] report session accepted", {
         channel: claimed.job.conversationChannel,
         reportSequence: claimed.run.reportSequence,
         runId: claimed.run.id,
         sessionId: session.id,
       });
+
       return;
     }
+
     if (!delivery.attachSession) {
       throw new Error("Eve debug reports require an active session handle.");
     }
+
     const result = await delivery
       .attachSession(claimed.job.conversationId)
       .send(prompt, options);
+
     if (result.status === "session_not_active") {
       await finalizeScheduledReport(claimed.run.id, leaseToken, "suppressed");
     }
+
     console.info("[scheduled-run] report turn accepted", {
       channel: claimed.job.conversationChannel,
       reportSequence: claimed.run.reportSequence,
@@ -84,6 +97,7 @@ export async function dispatchScheduledReport(
       leaseToken,
       error instanceof Error ? error.message : String(error)
     );
+
     console.warn("[scheduled-run] report dispatch failed", {
       cause: error,
       released,
@@ -97,6 +111,7 @@ function scheduledReportPrompt(claimed: ClaimedScheduledReport) {
   const replyContext = claimed.job.replyAnchorMessageId
     ? `Reply handle: {"kind":"automation","id":"${claimed.job.id}"}. Pass this exact value as send_message.replyTo for every user-visible message about this scheduled task. Omit replyTo only when the message is genuinely unrelated to the scheduled task.`
     : "No reply handle is available for this automation. Omit send_message.replyTo.";
+
   if (claimed.run.pendingInputRequests) {
     return [
       "A background scheduled run is waiting for the user before it can continue.",
@@ -108,9 +123,11 @@ function scheduledReportPrompt(claimed: ClaimedScheduledReport) {
       "First check whether the existing conversation clearly answers the request. If it does, call schedules-answer now. Otherwise ask the user clearly, keeping the internal run ID out of the user-visible message so schedules-answer can resume this run after they reply.",
     ].join("\n\n");
   }
+
   if (!claimed.run.outcome) {
     throw new Error("A completed scheduled run requires an outcome.");
   }
+
   return [
     "A background scheduled run has completed.",
     `Original task: ${claimed.job.prompt}`,
@@ -133,6 +150,7 @@ function scheduledReportAttributes(
     ["scheduledRunId", claimed.run.id],
     ["workspaceId", claimed.job.workspaceId],
   ]);
+
   if (
     claimed.job.conversationChannel === "linq" &&
     claimed.job.replyAnchorMessageId
@@ -142,8 +160,10 @@ function scheduledReportAttributes(
       claimed.job.replyAnchorMessageId
     );
   }
+
   if (claimed.run.workerSessionId) {
     attributes.set("scheduledRunSessionId", claimed.run.workerSessionId);
   }
+
   return Object.fromEntries(attributes);
 }

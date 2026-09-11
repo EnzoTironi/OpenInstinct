@@ -27,7 +27,9 @@ const autofillClaimSchema = z.object({
 });
 
 export type AutofillClaim = z.infer<typeof autofillClaimSchema>;
+
 export type AutofillSuggestion = z.infer<typeof autofillSuggestionSchema>;
+
 export type DetectedAutofillSurface = z.infer<
   typeof detectedAutofillSurfaceSchema
 >;

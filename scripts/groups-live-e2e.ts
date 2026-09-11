@@ -7,7 +7,9 @@
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+
 import { Effect } from "effect";
+
 import { runTelegramGroupMentionHarness } from "../server/channels/groups-e2e-harness";
 
 const OUT = "/tmp/companion-groups-live-e2e";

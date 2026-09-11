@@ -1,35 +1,41 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { EveEvalResult, EveEvalRunSummary } from "eve/evals";
-import type { EvalReporter } from "eve/evals/reporters";
-import type { MessageStreamEvent } from "eve/client";
-import { z } from "zod";
+
 import { traceTimelineRows } from "@agent/subagents/browser-agent/lib/trace/timeline";
 import {
   browserBenchmarkActivity,
   browserBenchmarkActivityDurations,
   browserBenchmarkLiveViewUrl,
 } from "@evals/browser/benchmark-activity";
-import { browserBenchmarkEnv } from "@evals/browser/env";
-import {
-  measureWorkerTask,
-  terminalWorkerMessage,
-} from "@evals/browser/worker-events";
 import type { BrowserBenchmark } from "@evals/browser/benchmark-schema";
+import { browserBenchmarkEnv } from "@evals/browser/env";
 import {
   type BrowserBenchmarkLiveStatus,
   updateBrowserBenchmarkLiveStatus,
 } from "@evals/browser/live-status";
+import {
+  measureWorkerTask,
+  terminalWorkerMessage,
+} from "@evals/browser/worker-events";
+import type { MessageStreamEvent } from "eve/client";
+import type { EveEvalResult, EveEvalRunSummary } from "eve/evals";
+import type { EvalReporter } from "eve/evals/reporters";
+import { z } from "zod";
 
 const tableWidths = [34, 8, 10, 12, 64] as const;
+
 const taskNames = new Map<string, string>();
+
 const completedTasks = new Map<
   string,
   ReturnType<typeof summarizeTaskResult>
 >();
+
 const liveActivities = new Map<string, string>();
+
 const liveActivityDurations = new Map<string, string>();
+
 const liveViewUrls = new Map<string, string>();
 
 export const browserBenchmarkReporter: EvalReporter = {
@@ -111,6 +117,7 @@ export const browserBenchmarkReporter: EvalReporter = {
       result,
       taskNames.get(result.id) ?? result.id
     );
+
     completedTasks.set(result.id, task);
     console.log(
       tableRow([
@@ -164,29 +171,40 @@ export async function reportBrowserBenchmarkActivity(
   const activityDurationsMs = browserBenchmarkActivityDurations(events);
   const browserLiveViewUrl = browserBenchmarkLiveViewUrl(events);
   const durationSignature = JSON.stringify(activityDurationsMs);
+
   const activityChanged =
     activity !== null && liveActivities.get(taskName) !== activity;
+
   const durationsChanged =
     liveActivityDurations.get(taskName) !== durationSignature;
+
   const liveViewChanged =
     browserLiveViewUrl !== null &&
     liveViewUrls.get(taskName) !== browserLiveViewUrl;
+
   await writeLiveTrace(taskName, sessionId, events);
+
   if (!activityChanged && !durationsChanged && !liveViewChanged) return;
+
   if (activity !== null) liveActivities.set(taskName, activity);
   liveActivityDurations.set(taskName, durationSignature);
+
   if (browserLiveViewUrl !== null) {
     liveViewUrls.set(taskName, browserLiveViewUrl);
   }
+
   await updateLiveVariant((variant) => ({
     ...variant,
     tasks: variant.tasks.map((task) => {
       if (task.name !== taskName) return task;
       const updated = { ...task, activityDurationsMs };
+
       if (activity !== null) updated.activity = activity;
+
       if (browserLiveViewUrl !== null) {
         updated.browserLiveViewUrl = browserLiveViewUrl;
       }
+
       return updated;
     }),
   }));
@@ -198,6 +216,7 @@ async function writeLiveTrace(
   events: readonly MessageStreamEvent[]
 ) {
   const config = liveStatusConfig();
+
   if (!config || !/^[A-Za-z0-9._:-]+$/u.test(sessionId)) return;
   const traceDirectory = join(dirname(config.path), config.runId, "traces");
   const tracePath = join(traceDirectory, `${sessionId}.json`);
@@ -226,31 +245,40 @@ function summarizeTaskResult(result: EveEvalResult, name: string) {
     result.result.events,
     elapsedMs(result.startedAt, result.completedAt)
   );
+
   const fallbackMessage =
     result.result.finalMessage ??
     result.error ??
     result.skipReason ??
     "No reply";
+
   const workerSession = result.result.sessions
     ?.filter((session) => !session.primary)
     .toSorted((left, right) => right.events.length - left.events.length)
     .at(0);
+
   const workerEvents = workerSession?.events;
+
   const terminalMessage = terminalWorkerMessage(
     fallbackMessage,
     workerEvents ?? result.result.events
   );
+
   const workerFacts = workerSession ? [workerSession.derived] : [];
   const facts = workerFacts.length > 0 ? workerFacts : [result.result.derived];
   const calls = facts.flatMap((derived) => derived.toolCalls);
+
   const toolCalls = calls.reduce<Record<string, number>>((counts, call) => {
     counts[call.name] = (counts[call.name] ?? 0) + 1;
+
     return counts;
   }, {});
+
   const judge = result.assertions.find(
     (assertion) =>
       assertion.name === "judge.autoevals.closedQA [task completed]"
   );
+
   const rationale = z.string().safeParse(judge?.metadata?.rationale);
 
   return {
@@ -292,28 +320,37 @@ async function buildBenchmark(
       completedTasks.get(result.id) ??
       summarizeTaskResult(result, taskNames.get(result.id) ?? result.id)
   );
+
   const successfulDurations = tasks
     .filter((task) => task.success)
     .map((task) => task.durationMs)
     .toSorted((left, right) => left - right);
+
   const measuredCosts = tasks.flatMap((task) =>
     task.costUsd === null ? [] : [task.costUsd]
   );
+
   const judgeScores = tasks.flatMap((task) =>
     task.judgeScore === null ? [] : [task.judgeScore]
   );
+
   const inputTokens = tasks.flatMap((task) =>
     task.inputTokens === null ? [] : [task.inputTokens]
   );
+
   const outputTokens = tasks.flatMap((task) =>
     task.outputTokens === null ? [] : [task.outputTokens]
   );
+
   const passed = tasks.filter((task) => task.success).length;
+
   const runtimeIdentity = summary.results.find(
     (result) => result.result.runtimeIdentity !== undefined
   )?.result.runtimeIdentity;
+
   const gitSha =
     runtimeIdentity?.build?.gitSha ?? (await readCurrentGitSha()) ?? null;
+
   const environmentLabel = browserBenchmarkEnv.BROWSER_BENCH_LABEL?.trim();
 
   return {
@@ -387,8 +424,10 @@ async function readCurrentGitSha() {
     }
 
     const reference = head.slice(referencePrefix.length);
+
     if (!/^refs\/[a-zA-Z0-9._/-]+$/u.test(reference)) return undefined;
     const sha = (await readFile(join(gitDirectory, reference), "utf8")).trim();
+
     return /^[0-9a-f]{40}$/u.test(sha) ? sha : undefined;
   } catch {
     return undefined;
@@ -397,17 +436,22 @@ async function readCurrentGitSha() {
 
 async function writeBenchmark(benchmark: BrowserBenchmark) {
   const explicitPath = browserBenchmarkEnv.BROWSER_BENCH_ARTIFACT_PATH?.trim();
+
   const directory = explicitPath
     ? dirname(explicitPath)
     : join(process.cwd(), ".eve", "browser-benchmarks");
+
   const safeLabel = benchmark.label.replaceAll(/[^a-zA-Z0-9._-]/gu, "-");
   const timestamp = benchmark.startedAt.replaceAll(":", "-");
+
   const artifactPath =
     explicitPath ?? join(directory, `${timestamp}-${safeLabel}.json`);
+
   const serialized = `${JSON.stringify(benchmark, null, 2)}\n`;
 
   await mkdir(directory, { recursive: true });
   await writeFile(artifactPath, serialized, "utf8");
+
   if (!explicitPath) {
     await writeFile(join(directory, "latest.json"), serialized, "utf8");
   }
@@ -418,6 +462,7 @@ async function writeBenchmark(benchmark: BrowserBenchmark) {
 function percentile(sortedValues: readonly number[], percentileValue: number) {
   if (sortedValues.length === 0) return null;
   const index = Math.ceil(sortedValues.length * percentileValue) - 1;
+
   return sortedValues[Math.max(0, index)] ?? null;
 }
 
@@ -437,6 +482,7 @@ function formatOptionalDuration(milliseconds: number | null) {
 
 function formatCost(costUsd: number | null, complete: boolean) {
   if (costUsd === null) return "—";
+
   return `${complete ? "" : "~"}$${costUsd.toFixed(6)}`;
 }
 
@@ -447,22 +493,27 @@ function tableBorder() {
 function tableRow(values: readonly string[]) {
   const cells = tableWidths.map((width, index) => {
     const value = values[index] ?? "";
+
     const clipped =
       value.length > width
         ? `${value.slice(0, Math.max(0, width - 1))}…`
         : value;
+
     return ` ${clipped.padEnd(width)} `;
   });
+
   return `|${cells.join("|")}|`;
 }
 
 type LiveVariant = BrowserBenchmarkLiveStatus["variants"]["baseline"];
+
 type LiveTask = LiveVariant["tasks"][number];
 
 async function updateLiveVariant(
   update: (variant: LiveVariant) => LiveVariant
 ) {
   const config = liveStatusConfig();
+
   if (!config) return;
   await updateBrowserBenchmarkLiveStatus(
     config.path,
@@ -492,6 +543,7 @@ function liveStatusConfig() {
   const path = browserBenchmarkEnv.BROWSER_BENCH_STATUS_PATH?.trim();
   const runId = browserBenchmarkEnv.BROWSER_BENCH_RUN_ID?.trim();
   const variant = browserBenchmarkEnv.BROWSER_BENCH_VARIANT;
+
   return path && runId && variant ? { path, runId, variant } : null;
 }
 

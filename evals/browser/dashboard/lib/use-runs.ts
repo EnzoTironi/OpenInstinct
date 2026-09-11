@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import {
   browserBenchmarkRunListSchema,
   type BrowserBenchmarkLiveStatus,
@@ -16,15 +17,20 @@ export function useRuns() {
 
     async function poll() {
       let nextDelay = 5_000;
+
       try {
         const response = await fetch("/api/runs", { cache: "no-store" });
+
         if (cancelled) return;
+
         if (response.ok) {
           const next = browserBenchmarkRunListSchema.parse(
             await response.json()
           );
+
           setRuns(next.runs);
           setError(null);
+
           if (
             next.runs.some(
               (run) => run.status === "preparing" || run.status === "running"
@@ -38,6 +44,7 @@ export function useRuns() {
       } catch {
         if (!cancelled) setError("Dashboard server is unreachable.");
       }
+
       if (!cancelled) {
         timer = setTimeout(() => {
           void poll();
@@ -46,6 +53,7 @@ export function useRuns() {
     }
 
     void poll();
+
     return () => {
       cancelled = true;
       clearTimeout(timer);

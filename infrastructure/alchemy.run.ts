@@ -3,6 +3,7 @@ import * as Docker from "alchemy/Docker";
 import * as Provider from "alchemy/Provider";
 import * as RemovalPolicy from "alchemy/RemovalPolicy";
 import { Config, Effect, Layer } from "effect";
+
 import { CompanionStagePolicy } from "./companion-stage.ts";
 
 const providers = Layer.effect(
@@ -39,14 +40,17 @@ export default Alchemy.Stack(
   Effect.gen(function* () {
     const policy = yield* CompanionStagePolicy;
     const password = yield* Config.redacted("COMPANION_POSTGRES_PASSWORD");
+
     const image = yield* Docker.RemoteImage("PostgresImage", {
       name: "postgres",
       tag: "17-alpine",
       alwaysPull: false,
     });
+
     const data = yield* Docker.Volume("PostgresData", {}).pipe(
       RemovalPolicy.retain(policy.retainPostgresData)
     );
+
     const postgres = yield* Docker.Container("Postgres", {
       image,
       environment: {
@@ -66,6 +70,7 @@ export default Alchemy.Stack(
       },
       start: true,
     });
+
     return {
       stage: policy.stage,
       documented: policy.documented,

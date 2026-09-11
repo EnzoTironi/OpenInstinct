@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  defaultMessageReducer,
-  type MessageStreamEvent,
-  type SubagentCalledStreamEvent,
-} from "eve/client";
-import { BotIcon, LoaderCircleIcon } from "lucide-react";
-import { useMemo } from "react";
+import type { SubagentStatus } from "@app/_lib/subagent-sessions";
 import { Shimmer } from "@web/components/ai-elements/shimmer";
 import {
   Alert,
@@ -16,9 +10,16 @@ import {
 } from "@web/components/ui/alert";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
-import { getLatestTurnFailure } from "../../_lib/turn-failure";
+import {
+  defaultMessageReducer,
+  type MessageStreamEvent,
+  type SubagentCalledStreamEvent,
+} from "eve/client";
+import { BotIcon, LoaderCircleIcon } from "lucide-react";
+import { useMemo } from "react";
+
 import { messageTimestamps } from "../../_lib/message-events";
-import type { SubagentStatus } from "@app/_lib/subagent-sessions";
+import { getLatestTurnFailure } from "../../_lib/turn-failure";
 import { AgentMessage } from "../conversation/message";
 
 const messageReducer = defaultMessageReducer();
@@ -50,16 +51,19 @@ export function SubagentTrace({
       ),
     [events]
   );
+
   const timestamps = useMemo(() => messageTimestamps(events), [events]);
   const isRunning = status === "starting" || status === "working";
   const turnFailure = useMemo(() => getLatestTurnFailure(events), [events]);
   const error = streamError ?? turnFailure;
   const statusLabel = error ? "Failed" : isRunning ? "Running" : status;
+
   const badgeVariant = error
     ? "destructive"
     : isRunning
       ? "information"
       : "secondary";
+
   const alertVariant = error
     ? "destructive"
     : isRunning

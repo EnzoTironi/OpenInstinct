@@ -29,6 +29,7 @@ export function collectSubagentSessions(
       completions.set(event.data.callId, event.data);
       continue;
     }
+
     if (event.type === "actions.requested") {
       for (const action of event.data.actions) {
         if (
@@ -49,6 +50,7 @@ export function collectSubagentSessions(
       completion: completions.get(event.data.callId),
       task: tasks.get(event.data.callId),
     };
+
     sessions.delete(session.childSessionId);
     sessions.set(session.childSessionId, session);
   }
@@ -76,7 +78,9 @@ export function getSubagentStatus(
     .find((event) =>
       ["session.completed", "session.failed"].includes(event.type)
     );
+
   if (terminalSession?.type === "session.completed") return "complete";
+
   if (terminalSession?.type === "session.failed") return "failed";
 
   const latestTurnBoundary = events
@@ -89,18 +93,26 @@ export function getSubagentStatus(
         "turn.started",
       ].includes(event.type)
     );
+
   if (latestTurnBoundary?.type === "turn.failed") return "failed";
+
   if (latestTurnBoundary?.type === "turn.cancelled") return "cancelled";
+
   if (latestTurnBoundary?.type === "turn.completed") return "ready";
+
   if (latestTurnBoundary?.type === "turn.started") return "working";
+
   if (events.some((event) => event.type === "session.waiting")) return "ready";
+
   if (session.completion && !session.completion.backgroundTask) return "ready";
+
   return "starting";
 }
 
 export function getSubagentTask(events: readonly MessageStreamEvent[]) {
   const message = events.find((event) => event.type === "message.received")
     ?.data.message;
+
   return message
     ?.split(/\r?\n/u)
     .map((line) => line.trim())

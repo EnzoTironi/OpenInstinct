@@ -1,5 +1,6 @@
 import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
+
 import {
   addReactionToMessageOutputSchema,
   reactionTextFor,
@@ -26,6 +27,7 @@ describe("reaction contract", () => {
         type: "heart",
         operation: "add",
       });
+
       for (const operation of [undefined, null]) {
         expect(
           Result.isFailure(
@@ -34,6 +36,7 @@ describe("reaction contract", () => {
         ).toBe(true);
       }
     }
+
     expect(
       Schema.decodeUnknownSync(reactToMessageToolResultSchema)({
         kind: "tool-result",
@@ -45,6 +48,7 @@ describe("reaction contract", () => {
       toolName: "react_to_message",
       output: { type: "heart", operation: "add" },
     });
+
     for (const operation of [undefined, null]) {
       expect(
         Result.isFailure(
@@ -65,6 +69,7 @@ describe("reaction contract", () => {
     expect(
       Schema.decodeUnknownSync(addReactionToMessageOutputSchema)({ type })
     ).toEqual({ operation: "add", type });
+
     for (const operation of ["add", "remove"]) {
       expect(
         Schema.decodeUnknownSync(reactToMessageOutputSchema)({
@@ -131,6 +136,7 @@ describe("reaction contract", () => {
       toolName: "react_to_message",
       output: { type: "heart", operation: "add" },
     });
+
     for (const input of [
       {
         kind: "other",

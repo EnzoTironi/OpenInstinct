@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+
 import { organizations } from "./organizations";
 
 /** Owner-typed audit metadata (no unknown dictionary escape hatch). */

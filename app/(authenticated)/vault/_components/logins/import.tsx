@@ -1,13 +1,10 @@
 "use client";
 
 import {
-  ExternalLinkIcon,
-  FileKeyIcon,
-  ShieldCheckIcon,
-  UploadIcon,
-} from "lucide-react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+  loginIdentifierSchema,
+  serializeLoginVaultPayload,
+  type VaultImportItems,
+} from "@shared/vault/schema";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import {
@@ -18,21 +15,27 @@ import {
 } from "@web/components/ui/dialog";
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
-import {
-  loginIdentifierSchema,
-  serializeLoginVaultPayload,
-  type VaultImportItems,
-} from "@shared/vault/schema";
 import { api } from "@web/trpc/client";
+import {
+  ExternalLinkIcon,
+  FileKeyIcon,
+  ShieldCheckIcon,
+  UploadIcon,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
 const GOOGLE_PASSWORD_MANAGER_URL = "https://passwords.google.com/options";
 
 export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
   const router = useRouter();
   const importPasswords = api.vault.import.useMutation();
+
   const [selection, setSelection] =
     useState<ReturnType<typeof parseChromePasswordsCsv>>();
+
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState<string>();
   const [importedCount, setImportedCount] = useState<number>();
@@ -44,9 +47,12 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
     setImportedCount(undefined);
     setSelection(undefined);
     setFileName(file?.name ?? "");
+
     if (!file) return;
+
     if (file.size > MAX_FILE_SIZE) {
       setError("Choose a CSV smaller than 10 MB.");
+
       return;
     }
 
@@ -84,6 +90,7 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
     setImportedCount(undefined);
     setInputKey((key) => key + 1);
   };
+
   const importError =
     error ??
     (importPasswords.error
@@ -214,12 +221,14 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
 
 function parseChromePasswordsCsv(csv: string) {
   const rows = parseCsv(csv);
+
   const headers = rows.shift()?.map((header) =>
     header
       .replace(/^\uFEFF/, "")
       .trim()
       .toLowerCase()
   );
+
   if (!headers) throw new Error("Choose a Chrome passwords CSV file.");
 
   const indexes = {
@@ -228,6 +237,7 @@ function parseChromePasswordsCsv(csv: string) {
     url: headers.indexOf("url"),
     username: headers.indexOf("username"),
   };
+
   if (indexes.url < 0 || indexes.username < 0 || indexes.password < 0) {
     throw new Error(
       "This CSV needs url, username, and password columns. Export it from Google Password Manager and try again."
@@ -285,6 +295,7 @@ function parseChromePasswordsCsv(csv: string) {
   if (items.length === 0) {
     throw new Error("No valid saved passwords were found in this CSV.");
   }
+
   if (items.length > 3_000) {
     throw new Error(
       `This file contains ${items.length.toLocaleString()} passwords. Import up to 3,000 at a time.`
@@ -296,8 +307,10 @@ function parseChromePasswordsCsv(csv: string) {
 
 function labelFromUrl(value: string) {
   if (!value) return "";
+
   try {
     const url = new URL(value);
+
     return url.hostname.replace(/^www\./, "") || value;
   } catch {
     return value.slice(0, 120);
@@ -307,6 +320,7 @@ function labelFromUrl(value: string) {
 function originFromUrl(value: string) {
   try {
     const url = new URL(value);
+
     return url.protocol === "http:" || url.protocol === "https:"
       ? url.origin
       : undefined;
@@ -323,6 +337,7 @@ function parseCsv(csv: string) {
 
   for (let index = 0; index < csv.length; index += 1) {
     const character = csv.charAt(index);
+
     if (quoted) {
       if (character === '"') {
         if (csv[index + 1] === '"') {
@@ -334,6 +349,7 @@ function parseCsv(csv: string) {
       } else {
         field += character;
       }
+
       continue;
     }
 
@@ -354,9 +370,11 @@ function parseCsv(csv: string) {
   }
 
   if (quoted) throw new Error("This CSV has an unfinished quoted value.");
+
   if (field.length > 0 || row.length > 0) {
     row.push(field);
     rows.push(row);
   }
+
   return rows;
 }

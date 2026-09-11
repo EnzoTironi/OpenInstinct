@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   createVaultSetupUrl,
   parseVaultSetupSearchParams,
@@ -7,6 +6,7 @@ import {
   vaultImportItemsSchema,
   vaultSetupRequestSchema,
 } from "@shared/vault/schema";
+import { describe, expect, it } from "vitest";
 
 describe("vault setup", () => {
   it("creates and validates a secret-free setup link", () => {
@@ -61,6 +61,7 @@ describe("vault setup", () => {
         version: 2,
       }),
     };
+
     expect(vaultImportItemsSchema.safeParse([login]).success).toBe(true);
     expect(
       vaultImportItemsSchema.safeParse([

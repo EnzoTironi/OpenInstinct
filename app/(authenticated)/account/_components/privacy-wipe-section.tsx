@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { Option, Schema } from "effect";
 import {
   accountOnlineWipeLimits,
   accountOnlineWipeNotWiped,
@@ -9,6 +7,8 @@ import {
 } from "@shared/identity/account-privacy-limits";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button, buttonVariants } from "@web/components/ui/button";
+import { Option, Schema } from "effect";
+import { useState } from "react";
 
 const wipeResponseSchema = Schema.Struct({
   status: Schema.optionalKey(Schema.String),
@@ -22,6 +22,7 @@ export function AccountPrivacyWipeSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultLimits, setResultLimits] = useState<string | null>(null);
+
   const [resultNotWiped, setResultNotWiped] = useState<
     readonly string[] | null
   >(null);
@@ -29,8 +30,10 @@ export function AccountPrivacyWipeSection() {
   async function runWipe() {
     setBusy(true);
     setError(null);
+
     try {
       const response = await fetch("/api/account/delete", { method: "POST" });
+
       if (!response.ok) {
         const text = await response.text();
         setError(
@@ -41,19 +44,24 @@ export function AccountPrivacyWipeSection() {
         );
         setBusy(false);
         setConfirming(false);
+
         return;
       }
+
       const raw: unknown = await response.json();
       const decoded = Schema.decodeUnknownOption(wipeResponseSchema)(raw);
       const body = Option.isSome(decoded) ? decoded.value : {};
+
       if (body.status && body.status !== "partial_online_wipe") {
         setError(
           "Unexpected wipe status. This is not full account deletion; reload Account."
         );
         setBusy(false);
         setConfirming(false);
+
         return;
       }
+
       setResultLimits(body.limits ?? accountOnlineWipeLimits);
       setResultNotWiped(body.notWiped ?? [...accountOnlineWipeNotWiped]);
       // Sessions are invalidated; send the user to sign-in.

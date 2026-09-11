@@ -1,15 +1,17 @@
+import { readVaultItems } from "@db/services/vault";
+import { requireRequestScope } from "@web/auth/request-scope";
+
 import { VaultAddresses } from "./_components/addresses";
 import { VaultCards } from "./_components/cards";
 import { VaultContacts } from "./_components/contacts";
 import { VaultLogins } from "./_components/logins";
 import { VaultOtherItems } from "./_components/other";
-import { readVaultItems } from "@db/services/vault";
-import { requireRequestScope } from "@web/auth/request-scope";
 
 export default async function Page() {
   const scope = await requireRequestScope();
   const items = await readVaultItems(scope);
   const itemsByKind = Object.groupBy(items, (item) => item.kind);
+
   const otherItems = items.filter(
     (item) =>
       item.kind === "identity" || item.kind === "phone" || item.kind === "token"

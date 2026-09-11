@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+
 import { PgClient } from "@effect/sql-pg";
 import { Effect } from "effect";
 import { expect, test } from "vitest";
-import type { AccessScope } from "../../shared/identity/access-scope";
+
 import { listReminders } from "../../server/schedules/queries";
+import type { AccessScope } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
 
 const fixture = Effect.fn("reminders.fixture")(function* (
@@ -15,10 +17,12 @@ const fixture = Effect.fn("reminders.fixture")(function* (
   const prefix = `reminders-test-${randomUUID()}`;
   const owner = { workspaceId: prefix, userId: `${prefix}-owner` };
   const neighbor = { workspaceId: prefix, userId: `${prefix}-neighbor` };
+
   const elsewhere = {
     workspaceId: `${prefix}-elsewhere`,
     userId: owner.userId,
   };
+
   yield* sql.withTransaction(
     Effect.gen(function* () {
       yield* sql`INSERT INTO workspaces (id) VALUES (${owner.workspaceId}), (${elsewhere.workspaceId})`;
@@ -31,6 +35,7 @@ const fixture = Effect.fn("reminders.fixture")(function* (
     })
   );
 });
+
 const run = (body: Parameters<typeof fixture>[0]) =>
   Effect.runPromise(fixture(body).pipe(Effect.provide(runtimeDatabase)));
 
@@ -48,6 +53,7 @@ const insertJob = Effect.fn("reminders.insertFixtureJob")(function* (
       '{"kind":"once","at":"2030-01-01T12:00:00Z"}'::jsonb, ${status},
       CASE WHEN ${status} = 'completed' THEN NULL ELSE '2030-01-01T12:00:00Z'::timestamptz END,
       '2029-01-01T00:00:00Z'::timestamptz)`;
+
   return id;
 });
 
@@ -99,12 +105,14 @@ test("links only a currently owned original Eve session and drops the link after
       const foreign = randomUUID();
       const ownedId = yield* insertJob(owner, original);
       const foreignId = yield* insertJob(owner, foreign);
+
       const linqId = yield* insertJob(
         owner,
         `linq:${original}`,
         "active",
         "linq"
       );
+
       yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES
     (${original}, ${owner.workspaceId}, ${owner.userId}),
     (${foreign}, ${neighbor.workspaceId}, ${neighbor.userId}),

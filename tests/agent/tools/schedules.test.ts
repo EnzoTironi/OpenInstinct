@@ -1,13 +1,3 @@
-import { Predicate } from "effect";
-import { isToolSchema } from "../../../node_modules/eve/dist/src/tools/schema.js";
-import { accessScopeForUser } from "@shared/identity/access-scope";
-import type {
-  DynamicResolveContext,
-  ToolContext,
-  ToolDefinition,
-} from "eve/tools";
-import { z } from "zod";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   createScheduledAgentJob,
   getScheduledAgentRunInput,
@@ -15,6 +5,17 @@ import type {
   listScheduledAgentJobs,
   updateScheduledAgentJob,
 } from "@db/services/scheduled-agent-jobs";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import { Predicate } from "effect";
+import type {
+  DynamicResolveContext,
+  ToolContext,
+  ToolDefinition,
+} from "eve/tools";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+
+import { isToolSchema } from "../../../node_modules/eve/dist/src/tools/schema.js";
 
 const services = vi.hoisted(() => ({
   create: vi.fn<typeof createScheduledAgentJob>(),
@@ -48,6 +49,7 @@ describe("schedule tools", () => {
   it("lets interactive and reporting turns resume scheduled input", async () => {
     const resolve = schedules.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     expect(await resolve({}, dynamicContext("scheduled-worker"))).toBeNull();
@@ -56,13 +58,16 @@ describe("schedule tools", () => {
       await resolve({}, dynamicContext("scheduled-result"))
     ).not.toBeNull();
     const interactiveTools = await resolve({}, dynamicContext("linq"));
+
     const answer =
       interactiveTools && !("execute" in interactiveTools)
         ? interactiveTools["schedules-answer"]
         : null;
+
     if (!answer) {
       throw new Error("Expected the schedules-answer tool.");
     }
+
     services.getInput.mockResolvedValue({
       leaseToken: "00000000-0000-4000-8000-000000000003",
       runId: "00000000-0000-4000-8000-000000000002",
@@ -96,13 +101,16 @@ describe("schedule tools", () => {
       runId: "00000000-0000-4000-8000-000000000002",
     });
     const reportTools = await resolve({}, dynamicContext("scheduled-result"));
+
     const reportAnswer =
       reportTools && !("execute" in reportTools)
         ? reportTools["schedules-answer"]
         : null;
+
     if (!reportAnswer) {
       throw new Error("Expected the schedules-answer reporting tool.");
     }
+
     await reportAnswer.execute(
       {
         answer: "LGA",
@@ -231,26 +239,31 @@ describe("schedule tools", () => {
   it("omits messaging capabilities outside their valid turns", async () => {
     const resolveMessaging = messaging.events["turn.started"];
     expect(resolveMessaging).toBeDefined();
+
     if (!resolveMessaging) return;
 
     expect(
       await resolveMessaging({}, dynamicContext("scheduled-worker"))
     ).toBeNull();
     expect(await resolveMessaging({}, resumedWorkerContext())).toBeNull();
+
     const reportMessaging = await resolveMessaging(
       {},
       dynamicContext("scheduled-result", "channel:linq")
     );
+
     expect(Object.keys(reportMessaging ?? {})).toEqual(["send_message"]);
 
     const debugMessaging = await resolveMessaging(
       {},
       dynamicContext("test", "http")
     );
+
     const interactiveMessaging = await resolveMessaging(
       {},
       dynamicContext("test", "channel:linq")
     );
+
     expect(Object.keys(debugMessaging ?? {}).toSorted()).toEqual([
       "react_to_message",
       "send_message",
@@ -259,35 +272,42 @@ describe("schedule tools", () => {
       "react_to_message",
       "send_message",
     ]);
+
     const reportSend =
       Predicate.isObject(reportMessaging) &&
       !("execute" in reportMessaging) &&
       "send_message" in reportMessaging
         ? reportMessaging.send_message
         : undefined;
+
     const interactiveSend =
       Predicate.isObject(interactiveMessaging) &&
       !("execute" in interactiveMessaging) &&
       "send_message" in interactiveMessaging
         ? interactiveMessaging.send_message
         : undefined;
+
     const debugSend =
       Predicate.isObject(debugMessaging) &&
       !("execute" in debugMessaging) &&
       "send_message" in debugMessaging
         ? debugMessaging.send_message
         : undefined;
+
     const reply = {
       kind: "message",
       replyTo: { kind: "current" as const },
       text: "This one.",
     };
+
     await Promise.all(
       [interactiveSend, debugSend, reportSend].map(async (tool) => {
         const schema = tool?.inputSchema;
+
         if (!isToolSchema(schema)) {
           throw new Error("Expected authored send_message schemas.");
         }
+
         const result = await schema["~standard"].validate(reply);
         expect(result.issues).toBeUndefined();
         expect(result).toEqual({ value: reply });
@@ -300,6 +320,7 @@ describe("schedule tools", () => {
       conversationChannel: "eve",
       conversationId: "session-1",
     });
+
     services.create.mockResolvedValue(job);
 
     await createSchedule.execute(
@@ -350,6 +371,7 @@ function dynamicContext(authenticator: string, kind = "channel:scheduled-run") {
 
 function resumedWorkerContext() {
   const context = dynamicContext("linq");
+
   return {
     ...context,
     session: {
@@ -413,6 +435,7 @@ function toolContext(
 function scheduledReportToolContext() {
   const context = toolContext("schedules-answer", "scheduled-result");
   const current = context.session.auth.current;
+
   return {
     ...context,
     session: {
@@ -438,6 +461,7 @@ function inputProperties(schema: ToolDefinition["inputSchema"]) {
   if (!(schema instanceof z.ZodType)) {
     throw new TypeError("Expected an authored Zod input schema.");
   }
+
   return Object.keys(z.toJSONSchema(schema).properties ?? {});
 }
 

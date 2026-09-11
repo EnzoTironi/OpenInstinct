@@ -1,11 +1,12 @@
-import type { RouteHandlerArgs } from "eve/channels";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import eveChannel, { sessionIdFromPath } from "@agent/channels/eve";
 import * as AuthSession from "@db/services/auth/session";
 import * as SessionService from "@db/services/sessions";
 import { authSessionFor } from "@tests/helpers/auth-session";
-import eveChannel, { sessionIdFromPath } from "@agent/channels/eve";
+import type { RouteHandlerArgs } from "eve/channels";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getAuthSessionMock = vi.spyOn(AuthSession, "getAuthSession");
+
 const isSessionOwnedMock = vi.spyOn(SessionService, "isSessionOwned");
 
 beforeEach(() => {
@@ -33,6 +34,7 @@ describe("Eve channel authentication", () => {
         candidate.method === "GET" &&
         candidate.path === "/eve/v1/session/:sessionId/stream"
     );
+
     if (!route || route.transport === "websocket") {
       throw new Error("The Eve session stream route is unavailable.");
     }
@@ -43,6 +45,7 @@ describe("Eve channel authentication", () => {
       ),
       unexpectedRouteContext()
     );
+
     await vi.runAllTimersAsync();
     const response = await responsePromise;
 
@@ -63,6 +66,7 @@ describe("Eve channel authentication", () => {
       ),
       unexpectedRouteContext()
     );
+
     await vi.runAllTimersAsync();
     const response = await responsePromise;
 
@@ -98,10 +102,12 @@ describe("Eve channel authentication", () => {
     "guards %s %s before invoking the callback",
     async (method, pattern, path) => {
       const route = findRoute(method, pattern);
+
       const pending = route.handler(
         new Request(`https://assistant.example${path}`, { method }),
         unexpectedRouteContext()
       );
+
       await vi.runAllTimersAsync();
       expect((await pending).status).toBe(403);
       expect(isSessionOwnedMock).toHaveBeenCalledWith(
@@ -161,9 +167,11 @@ function findRoute(method: string, path: string) {
       candidate.method === method &&
       candidate.path === path
   );
+
   if (!route || route.transport === "websocket") {
     throw new Error(`The Eve route ${method} ${path} is unavailable.`);
   }
+
   return route;
 }
 

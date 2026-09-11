@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import {
   computeLatestRun,
   computeNextRun,
   scheduleTimingSchema,
 } from "@shared/schedules/timing";
+import { describe, expect, it } from "vitest";
 
 describe("schedule timing", () => {
   it("finds the latest elapsed interval without walking every occurrence", () => {

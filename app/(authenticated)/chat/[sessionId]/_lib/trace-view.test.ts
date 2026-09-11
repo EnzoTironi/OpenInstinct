@@ -1,6 +1,7 @@
 import type { MessageStreamEvent } from "eve/client";
 import type { EveMessage } from "eve/react";
 import { describe, expect, it } from "vitest";
+
 import {
   backgroundWorkerDeliveryMessageIds,
   hasPendingBackgroundWorker,
@@ -47,10 +48,12 @@ describe("trace view", () => {
     "hides native delivery without a receipt in the current page: %s",
     (status) => {
       const text = `Background task task_generic (agent) ${status}`;
+
       const events = [
         receivedMessage("recent-task", text),
         receivedMessage("recent-user", text, "user"),
       ];
+
       expect(backgroundWorkerDeliveryMessageIds(events)).toEqual(
         new Set(["recent-task:user"])
       );
@@ -74,14 +77,17 @@ describe("trace view", () => {
   it("hides task deliveries only in the iMessage projection", () => {
     const deliveryText =
       "Background task task_worker (browser-agent) is cancelled.";
+
     const ordinaryText =
       "Background task task_someone_else (browser-agent) is cancelled.";
+
     const events = [
       workerActionReceipt("task_worker"),
       workerCancellationResult("task_worker"),
       receivedMessage("task-delivery", deliveryText),
       receivedMessage("ordinary-user-message", ordinaryText, "user"),
     ] satisfies MessageStreamEvent[];
+
     const messages = [
       userMessage("task-delivery", deliveryText),
       userMessage("ordinary-user-message", ordinaryText),
@@ -96,12 +102,14 @@ describe("trace view", () => {
 
   it("keeps identical user-authored cancellation text visible", () => {
     const text = "Background task task_worker (browser-agent) is cancelled.";
+
     const events = [
       workerActionReceipt("task_worker"),
       receivedMessage("user-spoof", text, "user"),
       workerCancellationResult("task_worker"),
       receivedMessage("framework-delivery", text),
     ] satisfies MessageStreamEvent[];
+
     const messages = [
       userMessage("user-spoof", text),
       assistantMessage("user-spoof", "Visible reply"),
@@ -117,10 +125,12 @@ describe("trace view", () => {
   it("keeps user text visible even when it copies a known task's completion", () => {
     const text =
       'Background task task_worker (browser-agent) is completed.\n\nResult:\n{"message":"Done"}';
+
     const events = [
       workerActionReceipt("task_worker"),
       receivedMessage("user-copy", text, "user"),
     ];
+
     expect(backgroundWorkerDeliveryMessageIds(events).size).toBe(0);
     expect(hasPendingBackgroundWorker(events)).toBe(true);
   });
@@ -170,14 +180,17 @@ describe("trace view", () => {
         },
       },
     };
+
     const waiting = receivedMessage(
       "generic-wait",
       "Background task task_generic (agent) needs input."
     );
+
     const done = receivedMessage(
       "generic-done",
       'Background task task_generic (agent) is completed.\n\nResult:\n{"message":"Done"}'
     );
+
     expect(hasPendingBackgroundWorker([receipt, waiting])).toBe(true);
     expect(hasPendingBackgroundWorker([receipt, waiting, done])).toBe(false);
     expect(
@@ -190,10 +203,12 @@ describe("trace view", () => {
 
   it("tracks a worker only between its receipt and terminal delivery", () => {
     const receipt = workerActionReceipt("task_worker");
+
     const update = receivedMessage(
       "task-update",
       "Background task task_worker (browser-agent) update: Still working"
     );
+
     const completed = receivedMessage(
       "task-completed",
       'Background task task_worker (browser-agent) is completed.\n\nResult:\n{"message":"Done"}'

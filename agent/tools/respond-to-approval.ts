@@ -1,12 +1,14 @@
 import { Effect, Schema } from "effect";
 import { defineTool } from "eve/tools";
+
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { internalCallbackBodies } from "../../server/internal/callback-auth";
 import { serverRuntime } from "../../server/runtime";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
-import { requireChannelPrincipal } from "../../server/channels/principal";
 import { postInternalRequest } from "../lib/internal-request";
 
 const callback = internalCallbackBodies["/internal/channel-input/respond"];
+
 export const inputSchema = Schema.Struct({
   requestId: callback.fields.requestId,
   decision: callback.fields.decision,
@@ -26,10 +28,13 @@ export default defineTool({
     return serverRuntime.runPromise(
       Effect.gen(function* () {
         const auth = context.session.auth.current;
+
         const channel = yield* Schema.decodeUnknownEffect(
           channelProviderSchema
         )(auth?.attributes.conversationChannel);
+
         const identity = yield* requireChannelPrincipal(channel, auth);
+
         const body = yield* Schema.decodeUnknownEffect(callback, {
           onExcessProperty: "error",
         })({
@@ -39,12 +44,15 @@ export default defineTool({
           identityId: identity.id,
           sourceMessageId: auth?.attributes.sourceMessageId,
         });
+
         const response = yield* Effect.tryPromise(() =>
           postInternalRequest("/internal/channel-input/respond", body)
         );
+
         if (response.status === 202) {
           return { status: "accepted" as const, requestId: input.requestId };
         }
+
         return {
           status: [400, 401, 403, 409, 422].includes(response.status)
             ? ("rejected" as const)

@@ -1,21 +1,21 @@
-import { Result, Schema } from "effect";
-import { accessScopeForUser } from "@shared/identity/access-scope";
-import type { LinqChannelConfig } from "eve/channels/linq";
+import type {
+  finalizeScheduledReport,
+  releaseScheduledReport,
+} from "@db/services/scheduled-agent-jobs";
 import {
   createLinqAdapter,
   type LinqSendOptions,
 } from "@linqapp/chat-sdk-adapter";
 import type { LinqAPIV3 } from "@linqapp/sdk";
-import type { AdapterPostableMessage } from "chat";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as Blob from "@vercel/blob";
-import type * as EnvModule from "@shared/environment";
 import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
+import type * as EnvModule from "@shared/environment";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import type { AccessScope } from "@shared/identity/access-scope";
-import type {
-  finalizeScheduledReport,
-  releaseScheduledReport,
-} from "@db/services/scheduled-agent-jobs";
+import type * as Blob from "@vercel/blob";
+import type { AdapterPostableMessage } from "chat";
+import { Result, Schema } from "effect";
+import type { LinqChannelConfig } from "eve/channels/linq";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 // oxlint-disable-next-line import/no-unassigned-import -- Loads the production module so the mocked channel factory can capture its configuration.
 import "@agent/channels/linq";
 
@@ -27,6 +27,7 @@ interface BrowserImage {
 }
 
 type NativeMessageBody = Parameters<LinqAPIV3["chats"]["messages"]["send"]>[1];
+
 type NativeMessageOptions = Parameters<
   LinqAPIV3["chats"]["messages"]["send"]
 >[2];
@@ -71,26 +72,32 @@ const linqChannelCapture = vi.hoisted(() => ({
     >()
     .mockResolvedValue({ message: { id: "native-message-1" } }),
 }));
+
 const scheduleDeliveryCapture = vi.hoisted(() => ({
   finalize: vi.fn<typeof finalizeScheduledReport>(),
   release: vi.fn<typeof releaseScheduledReport>(),
 }));
+
 vi.mock("@db/services/scheduled-agent-jobs", () => ({
   finalizeScheduledReport: scheduleDeliveryCapture.finalize,
   releaseScheduledReport: scheduleDeliveryCapture.release,
 }));
+
 vi.mock("@shared/environment", async (importOriginal) => {
   const original = await importOriginal<typeof EnvModule>();
+
   return {
     ...original,
     env: { ...original.env, LINQ_CONNECTOR: "linq/test" },
   };
 });
+
 vi.mock("@vercel/connect/eve", () => ({
   connectLinqCredentials: () => ({
     apiKey: linqChannelCapture.resolveApiKey,
   }),
 }));
+
 vi.mock("@linqapp/sdk", () => ({
   LinqAPIV3: class {
     constructor(options: Pick<LinqAPIV3, "apiKey">) {
@@ -102,16 +109,20 @@ vi.mock("@linqapp/sdk", () => ({
     };
   },
 }));
+
 vi.mock(import("eve/channels/linq"), async (importOriginal) => {
   const original = await importOriginal();
+
   return {
     ...original,
     linqChannel(config: LinqChannelConfig) {
       linqChannelCapture.config = config;
+
       return original.linqChannel(config);
     },
   };
 });
+
 vi.mock("@db/services/browser-images", () => ({
   async readReadyBrowserImageArtifact(
     scope: AccessScope,
@@ -119,8 +130,10 @@ vi.mock("@db/services/browser-images", () => ({
     options: { readonly rootSessionId: string; readonly signal?: AbortSignal }
   ) {
     const image = await linqChannelCapture.readImage(scope, id, options);
+
     if (!image) return undefined;
     linqChannelCapture.images.set(id, image);
+
     return {
       byteSize: image.bytes.byteLength,
       contentHash:
@@ -134,13 +147,17 @@ vi.mock("@db/services/browser-images", () => ({
     };
   },
 }));
+
 vi.mock("@vercel/blob", async (importOriginal) => {
   const blob = await importOriginal<typeof Blob>();
+
   return {
     ...blob,
     async get(pathname: string) {
       const image = linqChannelCapture.images.get(pathname);
+
       if (!image) return null;
+
       return {
         blob: { contentType: image.mediaType, size: image.bytes.byteLength },
         statusCode: 200,
@@ -149,7 +166,9 @@ vi.mock("@vercel/blob", async (importOriginal) => {
     },
   };
 });
+
 const handleActionResult = linqChannelCapture.config?.events?.["action.result"];
+
 if (!handleActionResult) {
   throw new Error("The Linq channel must configure action result delivery.");
 }
@@ -191,6 +210,7 @@ describe("Linq message delivery", () => {
       "Spider-Man: Brand New Day",
       "$15.00 total",
     ].join("\n");
+
     const { context, post } = handlerContext();
 
     await handleActionResult(
@@ -271,11 +291,13 @@ describe("Linq message delivery", () => {
         { headers: { "content-type": "application/json" }, status: 200 }
       )
     );
+
     const adapter = createLinqAdapter({
       apiKey: "linq-test-api-key",
       baseURL: "https://linq.test",
       signingSecret: "linq-test-signing-secret",
     });
+
     let body: unknown;
 
     try {
@@ -451,6 +473,7 @@ describe("Linq message delivery", () => {
 
   it("uses the same Linq idempotency key when a report turn is retried", async () => {
     const { context } = handlerContext();
+
     const event = sendMessageResult({
       kind: "message",
       text: "The price fell.",
@@ -931,12 +954,15 @@ function reactToMessageResult(
 function handlerContext(currentMessageId: string | null = "message-1") {
   const post = vi.fn<(message: LinqTestMessage) => Promise<{ id: string }>>();
   post.mockResolvedValue(rawMessage("message-2"));
+
   const addReaction = vi
     .fn<(threadId: string, messageId: string, emoji: string) => Promise<void>>()
     .mockResolvedValue(undefined);
+
   const removeReaction = vi
     .fn<(threadId: string, messageId: string, emoji: string) => Promise<void>>()
     .mockResolvedValue(undefined);
+
   const context = handlerEventContext({
     bot: {
       getAdapter: () => ({
@@ -1000,12 +1026,15 @@ function sessionContext(
           conversationId: "linq:dm:chat-1",
           workspaceId: accessScopeForUser("user-1").workspaceId,
         };
+
   if (authenticator !== "scheduled-result" && currentMessageId) {
     attributes.linqMessageId = currentMessageId;
   }
+
   if (replyAnchorMessageId) {
     attributes.linqReplyAnchorMessageId = replyAnchorMessageId;
   }
+
   return {
     async getSandbox() {
       throw new Error("Sandbox access is outside this focused test.");

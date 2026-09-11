@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+
 import { workspaceMemberships } from "./workspaces";
 
 export const agentSessions = pgTable(

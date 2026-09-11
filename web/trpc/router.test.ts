@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as BrowserTraces from "@db/services/browser-traces";
 import * as Chats from "@db/services/chats";
 import type { AccessScope } from "@shared/identity/access-scope";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { appRouter } from "./router";
 
 const listBrowserTracesMock = vi.spyOn(BrowserTraces, "listBrowserTraces");
+
 const saveChatMock = vi.spyOn(Chats, "saveChat");
 
 const scope = {

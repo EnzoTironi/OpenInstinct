@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import {
   nativeReportReceiptStatus,
   nativeReportOutputSetComplete,
@@ -64,6 +65,7 @@ test("renders pending questions and choices with a usable response instruction",
       },
     ],
   });
+
   expect(text).toContain("Book lunch");
   expect(text).toContain("Which day?\nTuesday — Next week");
   expect(text).toContain("Reply in this conversation");
@@ -88,6 +90,7 @@ test("pending task summary never splits surrogate pairs", () => {
       },
     ],
   });
+
   expect(text?.isWellFormed()).toBe(true);
   expect(text).toContain("😀…");
 });
@@ -117,6 +120,7 @@ test("oversized approval request asks for the complete waiting task instead of t
       },
     ],
   });
+
   expect(text).toContain("Ask me to review the waiting task");
   expect(text).toContain("Book lunch");
   expect(text?.length).toBeLessThanOrEqual(16_384);
@@ -127,14 +131,17 @@ test("oversized approval request asks for the complete waiting task instead of t
 
 test("complete output seal requires exact IDs, every chunk and contiguous indices", () => {
   const prefix = "schedulereport:run:1:";
+
   const chunks = [
     { id: "first", key: `${prefix}0` },
     { id: "second", key: `${prefix}1` },
   ];
+
   const bindings = [
     { chunkIndex: 0, outboxId: "first" },
     { chunkIndex: 1, outboxId: "second" },
   ];
+
   expect(nativeReportOutputSetComplete(bindings, chunks, prefix)).toBe(true);
   expect(
     nativeReportOutputSetComplete(bindings.slice(0, 1), chunks, prefix)

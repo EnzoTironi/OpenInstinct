@@ -1,9 +1,9 @@
-import { defineEval } from "eve/evals";
 import {
   agentEvalTags,
   assertPlainTextDelivery,
   requireDeliveredText,
 } from "@evals/agent/shared";
+import { defineEval } from "eve/evals";
 
 export default defineEval({
   description: "Delegates browser work and cancels it through task steering",
@@ -12,6 +12,7 @@ export default defineEval({
     const delegated = await t.send(
       "Use the browser-agent subagent to visually inspect https://example.com and report the exact primary heading. Do not use web_fetch because this specifically requires browser interaction."
     );
+
     delegated.expectOk();
     delegated.succeeded();
     delegated.calledSubagent("browser-agent", {

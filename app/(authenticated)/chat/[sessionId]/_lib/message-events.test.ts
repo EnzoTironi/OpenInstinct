@@ -1,5 +1,6 @@
 import type { MessageStreamEvent } from "eve/client";
 import { describe, expect, it } from "vitest";
+
 import {
   imessageTimestamps,
   messageTimestamps,
@@ -193,6 +194,7 @@ describe("iMessage event projection", () => {
       "completed",
       "call-first"
     );
+
     const retry = toolResult(
       "send_message",
       { kind: "message", text: "Reworded report", deliveryId: "report-a" },
@@ -201,9 +203,11 @@ describe("iMessage event projection", () => {
       "completed",
       "call-retry"
     );
+
     if (retry.type !== "action.result")
       throw new Error("Expected result fixture");
     const later = { ...retry, data: { ...retry.data, turnId: "turn-2" } };
+
     const next = toolResult(
       "send_message",
       { kind: "message", text: "Different task", deliveryId: "report-b" },
@@ -212,6 +216,7 @@ describe("iMessage event projection", () => {
       "completed",
       "call-next"
     );
+
     const ordinary = toolResult(
       "send_message",
       { kind: "message", text: "An ordinary answer" },
@@ -220,9 +225,11 @@ describe("iMessage event projection", () => {
       "completed",
       "call-ordinary"
     );
+
     const messages = [
       ...sentMessages([first, retry, later, next, ordinary]).values(),
     ].flat();
+
     expect(messages).toHaveLength(3);
     expect(messages.map((message) => message.parts)).toEqual([
       [expect.objectContaining({ text: "Original report" })],

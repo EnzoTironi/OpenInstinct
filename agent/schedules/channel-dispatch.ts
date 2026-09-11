@@ -1,11 +1,12 @@
+import kapso from "@agent/channels/kapso";
+import telegram from "@agent/channels/telegram";
 import { Effect } from "effect";
 import { defineSchedule, type ScheduleToFn } from "eve/schedules";
-import telegram from "@agent/channels/telegram";
-import kapso from "@agent/channels/kapso";
-import { channelPrincipal } from "../../server/channels/principal";
-import { Messaging } from "../../server/messaging";
-import { ChannelTransport } from "../../server/channels/transport";
+
 import { drainAuthPrompts, dispatchItem } from "../../server/channels/dispatch";
+import { channelPrincipal } from "../../server/channels/principal";
+import { ChannelTransport } from "../../server/channels/transport";
+import { Messaging } from "../../server/messaging";
 import { serverRuntime } from "../../server/runtime";
 
 const dispatchChannels = Effect.fn("dispatchChannels")(function* (
@@ -14,6 +15,7 @@ const dispatchChannels = Effect.fn("dispatchChannels")(function* (
   const transport = yield* ChannelTransport;
   const messaging = yield* Messaging;
   yield* dispatchItem("auth-prompts", drainAuthPrompts);
+
   for (const channel of ["telegram", "kapso"] as const) {
     const candidates = yield* transport.inboxCandidates(channel, 25);
     yield* Effect.forEach(
@@ -26,6 +28,7 @@ const dispatchChannels = Effect.fn("dispatchChannels")(function* (
               identityId: identity.id,
               leaseSeconds: 150,
             });
+
             if (!claim) return;
             // The destination validates this lease and loads its stored payload.
             yield* Effect.tryPromise({

@@ -1,3 +1,4 @@
+import { Match } from "effect";
 import type { HookEvent } from "eve/hooks";
 import { z } from "zod";
 
@@ -14,12 +15,16 @@ const detailCharacterLimit = 600;
 function compactJson(value: Parameters<typeof JSON.stringify>[0]) {
   const serialized = JSON.stringify(value, (_key, entry) => {
     const text = z.string().safeParse(entry);
+
     if (text.success && text.data.length > 200) {
       return `${text.data.slice(0, 200)}… [${String(text.data.length)} chars]`;
     }
+
     const jsonValue = z.json().safeParse(entry);
+
     return jsonValue.success ? jsonValue.data : undefined;
   });
+
   return serialized.length > detailCharacterLimit
     ? `${serialized.slice(0, detailCharacterLimit)}…`
     : serialized;
@@ -27,8 +32,10 @@ function compactJson(value: Parameters<typeof JSON.stringify>[0]) {
 
 export function traceTimelineRows(event: HookEvent): TraceTimelineRow[] {
   const id = event.meta.id;
+
   if (!id) return [];
   const at = event.meta.at;
+
   const row = (label: string, detail: string): TraceTimelineRow => ({
     at,
     detail: detail.slice(0, detailCharacterLimit),
@@ -55,12 +62,13 @@ export function traceTimelineRows(event: HookEvent): TraceTimelineRow[] {
       }));
     case "action.result": {
       const result = event.data.result;
-      const name =
-        result.kind === "tool-result"
-          ? result.toolName
-          : result.kind === "subagent-result"
-            ? result.subagentName
-            : "load-skill";
+
+      const name = Match.value(result).pipe(
+        Match.when({ kind: "tool-result" }, (value) => value.toolName),
+        Match.when({ kind: "subagent-result" }, (value) => value.subagentName),
+        Match.orElse(() => "load-skill" as const)
+      );
+
       return [
         row(
           `${name} → ${result.isError ? "error" : "result"}`,
@@ -68,6 +76,7 @@ export function traceTimelineRows(event: HookEvent): TraceTimelineRow[] {
         ),
       ];
     }
+
     case "message.completed":
       return [row("Assistant", event.data.message ?? "")];
     case "result.completed":

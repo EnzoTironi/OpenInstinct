@@ -1,8 +1,10 @@
 "use client";
 
-import { type SubmitEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { z } from "zod";
+import {
+  paymentCardBrand,
+  paymentCardType,
+  serializePaymentCard,
+} from "@shared/vault/schema";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import { DialogFooter } from "@web/components/ui/dialog";
@@ -13,12 +15,10 @@ import {
   FieldLabel,
 } from "@web/components/ui/field";
 import { Input } from "@web/components/ui/input";
-import {
-  paymentCardBrand,
-  paymentCardType,
-  serializePaymentCard,
-} from "@shared/vault/schema";
 import { api } from "@web/trpc/client";
+import { useRouter } from "next/navigation";
+import { type SubmitEvent, useState } from "react";
+import { z } from "zod";
 
 const paymentCardFormSchema = z.object({
   billingPostalCode: z.string().trim().min(1, "Enter the billing postal code."),
@@ -47,13 +47,16 @@ export function CardForm({
   readonly onSaved: () => void;
 }) {
   const router = useRouter();
+
   const create = api.vault.create.useMutation({
     onSuccess: () => {
       router.refresh();
       onSaved();
     },
   });
+
   const [attempted, setAttempted] = useState(false);
+
   const [form, setForm] = useState({
     billingPostalCode: "",
     cardNumber: "",
@@ -62,8 +65,10 @@ export function CardForm({
     expiration: "",
     nickname: initialLabel,
   });
+
   const cardType = paymentCardType(form.cardNumber);
   const result = paymentCardFormSchema.safeParse(form);
+
   const errors =
     attempted && !result.success
       ? z.flattenError(result.error).fieldErrors
@@ -72,9 +77,11 @@ export function CardForm({
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAttempted(true);
+
     if (!result.success) return;
 
     const [month, shortYear] = result.data.expiration.split(" / ");
+
     if (month === undefined || shortYear === undefined) return;
 
     const brand = paymentCardBrand(result.data.cardNumber);
@@ -253,6 +260,7 @@ function formatCardNumber(value: string) {
 
 function formatExpiration(value: string) {
   const digits = value.replaceAll(/\D/gu, "").slice(0, 4);
+
   return digits.length <= 2
     ? digits
     : `${digits.slice(0, 2)} / ${digits.slice(2)}`;
@@ -264,10 +272,13 @@ function passesLuhnCheck(number: string) {
 
   for (const character of number.split("").toReversed()) {
     let digit = Number(character);
+
     if (doubleDigit) {
       digit *= 2;
+
       if (digit > 9) digit -= 9;
     }
+
     sum += digit;
     doubleDigit = !doubleDigit;
   }
@@ -277,10 +288,12 @@ function passesLuhnCheck(number: string) {
 
 function isCurrentExpiration(value: string) {
   const [month, shortYear] = value.split(" / ");
+
   if (month === undefined || shortYear === undefined) return false;
 
   const expirationYear = 2000 + Number(shortYear);
   const today = new Date();
+
   return (
     expirationYear > today.getFullYear() ||
     (expirationYear === today.getFullYear() &&

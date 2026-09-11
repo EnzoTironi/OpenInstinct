@@ -1,5 +1,6 @@
-import { describe, expect, test } from "vitest";
 import type { InputRequest } from "eve/client";
+import { describe, expect, test } from "vitest";
+
 import {
   channelConsentRevision,
   validateChannelConsent,
@@ -28,6 +29,7 @@ const request: InputRequest = {
     { id: "cancel", label: "Cancelar" },
   ],
 };
+
 const source: ChannelConsentSource = {
   sourceMessageId: "message-response",
   identityId: "native-identity",
@@ -35,6 +37,7 @@ const source: ChannelConsentSource = {
   text: "pode enviar",
   sourceOccurredAtMs: 20_000,
 };
+
 const delivered: ChannelConsentDelivery = {
   receiptId: "provider-receipt",
   providerMessageIds: ["provider-receipt"],
@@ -45,6 +48,7 @@ const delivered: ChannelConsentDelivery = {
   revision: channelConsentRevision(request),
   deliveredAtMs: 10_000,
 };
+
 const snapshot: ChannelConsentSnapshot = {
   identityId: source.identityId,
   sessionId: source.sessionId,
@@ -52,6 +56,7 @@ const snapshot: ChannelConsentSnapshot = {
   deliveries: [delivered],
   consumedSourceMessageIds: [],
 };
+
 const interpretation: ChannelConsentInterpretation = {
   sourceMessageId: source.sourceMessageId,
   sourceText: source.text,
@@ -88,6 +93,7 @@ describe("a decision belongs to its verified source and exact delivered proposal
     (intent) => {
       const text =
         intent === "correct" ? "sim, mas às onze" : "deixa, não envia";
+
       expect(
         validateChannelConsent(
           { ...source, text },
@@ -266,6 +272,7 @@ describe("pending identity, revision and delivery are independent requirements",
         input: { ...request.action.input, start: "2026-09-10T11:00:00-03:00" },
       },
     };
+
     expect(
       validateChannelConsent(source, interpretation, {
         ...snapshot,
@@ -389,6 +396,7 @@ describe("argument revision preserves JSON meaning", () => {
         },
       },
     };
+
     expect(channelConsentRevision(reordered)).toBe(
       channelConsentRevision(request)
     );
@@ -400,6 +408,7 @@ describe("argument revision preserves JSON meaning", () => {
       { ...request, prompt: "enviar amanhã?" },
       { ...request, options: request.options?.toReversed() },
     ];
+
     for (const changed of changes)
       expect(channelConsentRevision(changed)).not.toBe(
         channelConsentRevision(request)
@@ -425,10 +434,12 @@ describe("unavailable source provenance and structural revision collisions", () 
       ...request,
       action: { ...request.action, input: { value: ["x"] } },
     };
+
     const object = {
       ...request,
       action: { ...request.action, input: { value: { "0": "x" } } },
     };
+
     expect(channelConsentRevision(array)).not.toBe(
       channelConsentRevision(object)
     );
@@ -438,10 +449,12 @@ describe("unavailable source provenance and structural revision collisions", () 
       ...request,
       action: { ...request.action, input: { nested: { values: ["a", "b"] } } },
     };
+
     const second = {
       ...request,
       action: { ...request.action, input: { nested: { values: ["b", "a"] } } },
     };
+
     expect(channelConsentRevision(first)).not.toBe(
       channelConsentRevision(second)
     );

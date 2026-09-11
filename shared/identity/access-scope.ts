@@ -7,6 +7,7 @@ export interface AccessScope {
 
 export function accessScopeForUser(userId: string): AccessScope {
   const normalizedUserId = userId.trim();
+
   if (!normalizedUserId) throw new Error("An authenticated user is required.");
 
   return {

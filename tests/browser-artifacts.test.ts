@@ -1,18 +1,18 @@
-import { describe, expect, it } from "vitest";
+import {
+  extractImageArtifactMarkdownReferences,
+  stripImageArtifactMarkdownReferences,
+} from "@agent/lib/linq-image-artifact/markdown";
+import {
+  taskCompletionOutputSchema,
+  taskCompletionSchema,
+} from "@agent/subagents/browser-agent/lib/completion";
 import {
   browserImageArtifactReferenceSchema,
   browserImageArtifactUrl,
   isBrowserImageArtifactUrl,
   sniffBrowserImageMediaType,
 } from "@shared/browser/artifact";
-import {
-  taskCompletionOutputSchema,
-  taskCompletionSchema,
-} from "@agent/subagents/browser-agent/lib/completion";
-import {
-  extractImageArtifactMarkdownReferences,
-  stripImageArtifactMarkdownReferences,
-} from "@agent/lib/linq-image-artifact/markdown";
+import { describe, expect, it } from "vitest";
 
 const artifactId = "0d01e667-d128-4bb7-a248-1ae21db72f4f";
 
@@ -49,6 +49,7 @@ describe("browser image contracts", () => {
       mediaType: "image/png",
       url: browserImageArtifactUrl(artifactId),
     });
+
     const markdown = `![Product](${artifact.url})`;
     const message = `Here it is.\n\n${markdown}\n\n${markdown}`;
 
@@ -84,6 +85,7 @@ describe("browser image contracts", () => {
       taskCompletionSchema.safeParse({ message: "Done", status: "success" })
         .success
     ).toBe(false);
+
     const image = {
       byteSize: 4,
       filename: "product.png",
@@ -92,6 +94,7 @@ describe("browser image contracts", () => {
       mediaType: "image/png" as const,
       url: browserImageArtifactUrl(artifactId),
     };
+
     expect(
       taskCompletionSchema.safeParse({
         images: Array.from({ length: 5 }, () => image),

@@ -23,6 +23,7 @@ vi.mock("motion/react", () => {
       {...props}
     />
   );
+
   // oxlint-disable-next-line unicorn/consistent-function-scoping -- Vitest hoists mock factories above module-scope component values.
   const MotionSpan = ({
     layout,
@@ -60,6 +61,7 @@ vi.mock("motion/react", () => {
     useReducedMotion: () => false,
   };
 });
+
 import {
   PromptInput,
   PromptInputFooter,
@@ -98,6 +100,7 @@ describe("prompt input", () => {
         <PromptInputTextarea placeholder="Compact placeholder" />
       </PromptInput>
     );
+
     const regularMarkup = renderToStaticMarkup(
       <PromptInput onSubmit={() => undefined}>
         <PromptInputTextarea placeholder="Regular placeholder" />

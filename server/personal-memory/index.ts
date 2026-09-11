@@ -1,11 +1,12 @@
+import { readUserProfile } from "@db/services/user-profile";
 import { PgClient } from "@effect/sql-pg";
+import type { AccessScope } from "@shared/identity/access-scope";
 import { Context, DateTime, Effect, Layer, Schema } from "effect";
 import type { MemoryOperationContext } from "eve/memory";
-import { readUserProfile } from "@db/services/user-profile";
-import type { AccessScope } from "@shared/identity/access-scope";
-import { storedNoteSchema, type PersonalMemorySnapshot } from "./model";
+
 import { PersonalMemoryError, requirePersonalMemoryMembership } from "./access";
 import { admitPersonalWipeTarget } from "./group-memory-policy";
+import { storedNoteSchema, type PersonalMemorySnapshot } from "./model";
 
 const bindingSchema = Schema.Struct({
   key: Schema.String.check(
@@ -19,9 +20,11 @@ const bindingSchema = Schema.Struct({
 
 const makePersonalMemory = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
+
   const bind = Effect.fn("PersonalMemory.bind")(
     function* (scope: AccessScope, memory: MemoryOperationContext["memory"]) {
       yield* requirePersonalMemoryMembership(scope);
+
       const binding = yield* Schema.decodeUnknownEffect(bindingSchema)(
         memory.scope
       ).pipe(
@@ -29,17 +32,21 @@ const makePersonalMemory = Effect.gen(function* () {
           () => new PersonalMemoryError({ reason: "invalid_binding" })
         )
       );
+
       if (memory.slot !== "profile" || binding.value !== scope.workspaceId)
         return yield* new PersonalMemoryError({ reason: "invalid_binding" });
       // Only a trusted Eve callback supplies this opaque key. Never accept it from a route or tool input.
       yield* sql`INSERT INTO personal_memory_binding (key, workspace_id, namespace, slot)
         VALUES (${binding.key}, ${scope.workspaceId}, ${binding.namespace}, ${memory.slot})
         ON CONFLICT DO NOTHING`;
+
       const matches = yield* sql`SELECT key FROM personal_memory_binding
         WHERE key = ${binding.key} AND workspace_id = ${scope.workspaceId}
         AND namespace = ${binding.namespace} AND slot = ${memory.slot}`;
+
       if (matches.length !== 1)
         return yield* new PersonalMemoryError({ reason: "invalid_binding" });
+
       return undefined;
     },
     sql.withTransaction,
@@ -52,6 +59,7 @@ const makePersonalMemory = Effect.gen(function* () {
   const inspect = Effect.fn("PersonalMemory.inspect")(
     function* (scope: AccessScope) {
       yield* requirePersonalMemoryMembership(scope);
+
       const profile = yield* readUserProfile(
         requirePersonalMemoryMembership(scope)
       ).pipe(
@@ -59,13 +67,16 @@ const makePersonalMemory = Effect.gen(function* () {
           () => new PersonalMemoryError({ reason: "unavailable" })
         )
       );
+
       const bindings = yield* sql`SELECT key FROM personal_memory_binding
         WHERE workspace_id = ${scope.workspaceId} AND slot = 'profile'`;
+
       const rows =
         yield* sql`SELECT d.content, d.version, d.updated_at::text AS "updatedAt"
         FROM personal_memory_binding b INNER JOIN memory_document d ON d.key = b.key
         WHERE b.workspace_id = ${scope.workspaceId} AND b.slot = 'profile'
         ORDER BY b.namespace, b.key`;
+
       const documents = yield* Schema.decodeUnknownEffect(
         Schema.Array(storedNoteSchema)
       )(rows).pipe(
@@ -73,7 +84,9 @@ const makePersonalMemory = Effect.gen(function* () {
           () => new PersonalMemoryError({ reason: "unavailable" })
         )
       );
+
       yield* requirePersonalMemoryMembership(scope);
+
       return {
         scope: "stored-personal-memory",
         generatedAt: DateTime.formatIso(yield* DateTime.now),
@@ -107,6 +120,7 @@ const makePersonalMemory = Effect.gen(function* () {
         conversationScope: null,
         chatKind: "private",
       });
+
       yield* requirePersonalMemoryMembership(scope);
       // Bound profile documents only — unbound keys are intentionally out of coverage.
       yield* sql`DELETE FROM memory_document d
@@ -118,6 +132,7 @@ const makePersonalMemory = Effect.gen(function* () {
         WHERE workspace_id = ${scope.workspaceId} AND slot = 'profile'`;
       yield* sql`DELETE FROM user_profiles WHERE workspace_id = ${scope.workspaceId}`;
       yield* requirePersonalMemoryMembership(scope);
+
       return {
         wiped: coverage.wiped,
         neverWiped: coverage.neverWiped,

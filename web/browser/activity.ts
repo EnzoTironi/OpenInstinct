@@ -11,6 +11,7 @@ export const browserActivityKinds = [
 ] as const;
 
 export type BrowserActivityKind = (typeof browserActivityKinds)[number];
+
 export type BrowserActivityDurations = Partial<
   Record<BrowserActivityKind, number>
 >;
@@ -47,6 +48,7 @@ export function browserTraceActivityDurations(
   return sumBrowserActivityDurations(
     events.flatMap((event) => {
       const kind = browserTraceActivityKind(event);
+
       return kind ? [{ at: Date.parse(event.at), kind }] : [];
     }),
     now
@@ -65,14 +67,18 @@ export function sumBrowserActivityDurations(
 
   for (const point of points) {
     if (!Number.isFinite(point.at)) continue;
+
     if (current) {
       addDuration(durations, current.kind, Math.max(0, point.at - current.at));
     }
+
     current = point;
   }
+
   if (current) {
     addDuration(durations, current.kind, Math.max(0, now - current.at));
   }
+
   return durations;
 }
 
@@ -85,12 +91,14 @@ function browserTraceActivityKind(event: {
       ? "setup"
       : browserActivityKindForTool(event.label);
   }
+
   if (
     event.type === "input.requested" ||
     event.type === "authorization.required"
   ) {
     return "waiting";
   }
+
   if (
     event.type === "message.received" ||
     event.type === "message.completed" ||
@@ -101,6 +109,7 @@ function browserTraceActivityKind(event: {
   ) {
     return "model";
   }
+
   return null;
 }
 

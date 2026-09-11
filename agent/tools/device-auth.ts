@@ -1,18 +1,20 @@
-import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
-import { always } from "eve/tools/approval";
-import { Effect } from "effect";
-import { z } from "zod";
 import { approvalMessageSchema } from "@agent/lib/approval-message";
 import { authorizeApprovalResponse } from "@agent/lib/approval-response";
-import { requireChannelPrincipal } from "../../server/channels/principal";
 import { resolveModeValue } from "@agent/lib/mode";
 import { applicationOrigin } from "@shared/environment/origin";
+import { Effect } from "effect";
+import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
+import { always } from "eve/tools/approval";
+import { z } from "zod";
+
 import { NativeDeviceAuth } from "../../server/accounts/device";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { serverRuntime } from "../../server/runtime";
 
 async function nativeSource(context: Pick<ToolContext, "session">) {
   const current = context.session.auth.current;
   const channel = current?.attributes.conversationChannel;
+
   if (
     context.session.parent ||
     current?.authenticator !== "verified-channel" ||
@@ -23,9 +25,11 @@ async function nativeSource(context: Pick<ToolContext, "session">) {
       "Use the original private messenger conversation to sign in."
     );
   }
+
   const identity = await serverRuntime.runPromise(
     requireChannelPrincipal(channel, current)
   );
+
   return { identityId: identity.id, sessionId: context.session.id };
 }
 
@@ -36,9 +40,11 @@ export const deviceAuthStart = defineTool({
   async execute(input, context) {
     const source = await nativeSource(context);
     const origin = applicationOrigin();
+
     const issued = await serverRuntime.runPromise(
       Effect.gen(function* () {
         const devices = yield* NativeDeviceAuth;
+
         return yield* devices.issue({
           ...source,
           callId: context.callId,
@@ -46,6 +52,7 @@ export const deviceAuthStart = defineTool({
         });
       })
     );
+
     return {
       ...issued.challenge,
       browserUrl: issued.entryToken
@@ -61,9 +68,11 @@ export const deviceAuthStatus = defineTool({
   inputSchema: z.object({}),
   async execute(_input, context) {
     const source = await nativeSource(context);
+
     return serverRuntime.runPromise(
       Effect.gen(function* () {
         const devices = yield* NativeDeviceAuth;
+
         return { requests: yield* devices.pending(source) };
       })
     );
@@ -82,9 +91,11 @@ export const deviceAuthConfirm = defineTool({
   }),
   async execute(input, context) {
     const source = await nativeSource(context);
+
     return serverRuntime.runPromise(
       Effect.gen(function* () {
         const devices = yield* NativeDeviceAuth;
+
         return yield* devices.confirm({
           ...source,
           challengeId: input.challengeId,
@@ -100,7 +111,9 @@ export default defineDynamic({
   events: {
     "turn.started": (_event, context) => {
       const current = context.session.auth.current;
+
       if (current?.authenticator !== "verified-channel") return null;
+
       return resolveModeValue(context, {
         interactive: {
           "device-auth-start": deviceAuthStart,

@@ -1,9 +1,5 @@
 "use client";
 
-import { useEveAgent } from "eve/react";
-import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import { Button } from "@web/components/ui/button";
 import {
   PromptInput,
   PromptInputBody,
@@ -13,8 +9,13 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@web/components/ai-elements/prompt-input";
-import { chatTitle, messageContent } from "../../_lib/message-input";
+import { Button } from "@web/components/ui/button";
 import { api } from "@web/trpc/client";
+import { useEveAgent } from "eve/react";
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
+
+import { chatTitle, messageContent } from "../../_lib/message-input";
 import { chatStarters } from "../_lib/starters";
 
 export function NewChat({
@@ -32,6 +33,7 @@ export function NewChat({
   const [draft, setDraft] = useState(initialDraft);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(false);
+
   const agent = useEveAgent({
     onError() {
       sendFailed.current = true;
@@ -48,6 +50,7 @@ export function NewChat({
         .catch(() => undefined)
         .then(() => {
           router.replace(path);
+
           return undefined;
         });
       pendingTitle.current = undefined;
@@ -56,6 +59,7 @@ export function NewChat({
 
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text.trim();
+
     if (
       (text.length === 0 && message.files.length === 0) ||
       isSubmitting.current ||
@@ -63,14 +67,16 @@ export function NewChat({
     ) {
       return;
     }
+
     isSubmitting.current = true;
     setSending(true);
     setSendError(false);
     sendFailed.current = false;
     pendingTitle.current = chatTitle(message);
+
     try {
       await agent.send(messageContent(message));
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- Eve's onError callback updates this ref while send awaits.
+
       if (sendFailed.current) {
         throw new Error("Unable to open the conversation");
       }

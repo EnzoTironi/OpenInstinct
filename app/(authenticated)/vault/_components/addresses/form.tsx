@@ -1,13 +1,14 @@
 "use client";
 
-import { type SubmitEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { z } from "zod";
+import { serializeAddressVaultPayload } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
 import { DialogFooter } from "@web/components/ui/dialog";
 import { FieldGroup } from "@web/components/ui/field";
-import { serializeAddressVaultPayload } from "@shared/vault/schema";
 import { api } from "@web/trpc/client";
+import { useRouter } from "next/navigation";
+import { type SubmitEvent, useState } from "react";
+import { z } from "zod";
+
 import { FormField } from "../field";
 
 const addressFormSchema = z.object({
@@ -29,13 +30,16 @@ export function AddressForm({
   readonly onSaved: () => void;
 }) {
   const router = useRouter();
+
   const create = api.vault.create.useMutation({
     onSuccess: () => {
       router.refresh();
       onSaved();
     },
   });
+
   const [attempted, setAttempted] = useState(false);
+
   const [form, setForm] = useState({
     city: "",
     countryCode: "US",
@@ -46,7 +50,9 @@ export function AddressForm({
     recipientName: "",
     region: "",
   });
+
   const result = addressFormSchema.safeParse(form);
+
   const errors =
     attempted && !result.success
       ? z.flattenError(result.error).fieldErrors
@@ -55,6 +61,7 @@ export function AddressForm({
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAttempted(true);
+
     if (!result.success) return;
     create.mutate({
       account: "",

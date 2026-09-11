@@ -1,6 +1,4 @@
-import type { ApprovalContext } from "eve/tools/approval";
 import { authorizeApprovalResponse } from "@agent/lib/approval-response";
-import { describe, expect, it } from "vitest";
 import { parseCalendarAvailability } from "@agent/lib/google-workspace/calendar";
 import { googleApiErrorStatus } from "@agent/lib/google-workspace/client";
 import {
@@ -12,6 +10,8 @@ import {
 import { calendarCreateEvent } from "@agent/tools/calendar";
 import { gmailSend, gmailUpdate } from "@agent/tools/gmail";
 import { googleWorkspaceScopes } from "@shared/google-workspace/connection";
+import type { ApprovalContext } from "eve/tools/approval";
+import { describe, expect, it } from "vitest";
 
 describe("Google Workspace", () => {
   it("reads only a numeric provider status from unknown errors", () => {
@@ -48,6 +48,7 @@ describe("Google Workspace", () => {
       callId: "call-1",
       session: { id: "session-1" },
     });
+
     expect(key).toMatch(/^openinstinct-send-[0-9a-f]{40}$/u);
     expect(gmailSendIdempotencyQuery(key)).toBe(`"${key}"`);
     expect(
@@ -75,12 +76,15 @@ describe("Google Workspace", () => {
     async (toolName, tool) => {
       const approval = tool.approval;
       expect(approval).toBeDefined();
+
       if (!approval || !("request" in approval)) {
         throw new Error(
           "Consequential writes require request and response policies."
         );
       }
+
       expect(approval.response).toBe(authorizeApprovalResponse);
+
       for (const approvedTools of [new Set<string>(), new Set([toolName])]) {
         // Request decisions must remain independent of sandbox and skill I/O.
         const context = {
@@ -99,6 +103,7 @@ describe("Google Workspace", () => {
             throw new Error("Request policy must not access a skill.");
           },
         } satisfies ApprovalContext<never>;
+
         // oxlint-disable-next-line eslint/no-await-in-loop
         expect(await approval.request(context)).toBe("user-approval");
       }

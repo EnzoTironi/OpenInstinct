@@ -1,4 +1,19 @@
+import workstreamMemory from "@agent/memory/workstreams";
+import * as Database from "@db";
+import * as schema from "@db/schema";
+import {
+  findWorkstreams,
+  forgetWorkstream,
+  readWorkstream,
+  recallWorkstreams,
+  saveWorkstream,
+} from "@db/services/workstreams";
 import { PGlite } from "@electric-sql/pglite";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import {
+  saveWorkstreamSchema,
+  type WorkstreamContent,
+} from "@shared/workstreams/schema";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import type {
@@ -16,26 +31,15 @@ import {
   it,
   vi,
 } from "vitest";
-import * as Database from "@db";
-import * as schema from "@db/schema";
-import {
-  findWorkstreams,
-  forgetWorkstream,
-  readWorkstream,
-  recallWorkstreams,
-  saveWorkstream,
-} from "@db/services/workstreams";
-import workstreamMemory from "@agent/memory/workstreams";
-import {
-  saveWorkstreamSchema,
-  type WorkstreamContent,
-} from "@shared/workstreams/schema";
-import { accessScopeForUser } from "@shared/identity/access-scope";
 
 const client = new PGlite();
+
 const database = drizzle(client, { schema });
+
 const alice = accessScopeForUser("alice");
+
 const bob = accessScopeForUser("bob");
+
 const content = {
   title: "Autumn trip",
   objective: "Choose train tickets for the autumn trip.",
@@ -72,18 +76,24 @@ describe("workstream memory", () => {
   it("recalls an undertaking in a new session and preserves a corrected constraint", async () => {
     const firstContext = context("first");
     const tools = await workstreamMemory.provider.tools(firstContext);
+
     if (!tools) throw new Error("Expected interactive workstream tools.");
+
     const first = await tools.save.execute(
       { id: "autumn-trip", expectedRevision: 0, content },
       { ...firstContext, callId: "save", toolName: "workstreams__save" }
     );
+
     expect(first).toMatchObject({ revision: 1, sessionId: "first" });
 
     const later = context("later");
+
     const recall =
       await workstreamMemory.provider.recall["turn.started"](later);
+
     expect(recall?.messages[0]?.content).toContain("Autumn trip");
     const laterTools = await workstreamMemory.provider.tools(later);
+
     if (!laterTools) throw new Error("Expected tools in the later session.");
     expect(
       await laterTools.read.execute(
@@ -91,11 +101,13 @@ describe("workstream memory", () => {
         { ...later, callId: "read", toolName: "workstreams__read" }
       )
     ).toMatchObject({ content });
+
     const corrected = {
       ...content,
       notes:
         "Aisle seat, replacing the window preference. First option departs at 09:00; second at 11:00. Nothing booked.",
     };
+
     await laterTools.save.execute(
       { id: "autumn-trip", expectedRevision: 1, content: corrected },
       { ...later, callId: "correct", toolName: "workstreams__save" }
@@ -150,6 +162,7 @@ describe("workstream memory", () => {
 
   it("deduplicates an interrupted save and rejects concurrent stale updates", async () => {
     const input = { id: "autumn-trip", expectedRevision: 0, content };
+
     const first = await saveWorkstream(
       alice,
       "key-a",
@@ -157,9 +170,11 @@ describe("workstream memory", () => {
       "same-call",
       "first"
     );
+
     expect(
       await saveWorkstream(alice, "key-a", input, "same-call", "first")
     ).toEqual(first);
+
     const results = await Promise.allSettled([
       saveWorkstream(
         alice,
@@ -184,6 +199,7 @@ describe("workstream memory", () => {
         "b"
       ),
     ]);
+
     expect(
       results.filter((result) => result.status === "fulfilled")
     ).toHaveLength(1);
@@ -206,9 +222,11 @@ describe("workstream memory", () => {
       "save",
       "first"
     );
+
     const before = await workstreamMemory.provider.recall["turn.started"](
       context("first")
     );
+
     await saveWorkstream(
       alice,
       "key-a",
@@ -220,9 +238,11 @@ describe("workstream memory", () => {
       "complete",
       "later"
     );
+
     const after = await workstreamMemory.provider.recall[
       "compaction.completed"
     ](context("later"));
+
     expect(after?.messages[0]?.id).toBe(before?.messages[0]?.id);
     expect(after?.messages[0]?.content).not.toContain("Autumn trip");
     expect(
@@ -324,9 +344,11 @@ describe("workstream memory", () => {
     });
     expect((await recallWorkstreams(alice, "key-a")).items).toHaveLength(8);
     const first = await findWorkstreams(alice, "key-a", {});
+
     const second = await findWorkstreams(alice, "key-a", {
       offset: first.nextOffset ?? 0,
     });
+
     expect(first.items).toHaveLength(20);
     expect(second.items).toHaveLength(20);
     expect(
@@ -375,10 +397,12 @@ describe("workstream memory", () => {
         ).toBeNull();
       })
     );
+
     const anonymous = {
       ...context("anonymous"),
       session: { id: "anonymous", auth: { current: null, initiator: null } },
     };
+
     expect(workstreamMemory.scope(anonymous)).toBeNull();
     expect(await workstreamMemory.provider.tools(anonymous)).toBeNull();
     const unscoped = context("unscoped");

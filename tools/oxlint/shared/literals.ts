@@ -1,6 +1,5 @@
-import { z } from "zod";
-
 import type { ESTree } from "@oxlint/plugins";
+import { z } from "zod";
 
 const stringLiteralValueSchema = z.string();
 

@@ -1,6 +1,7 @@
-import { getVercelOidcToken } from "@vercel/oidc";
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
+import { getVercelOidcToken } from "@vercel/oidc";
 import { Config, ConfigProvider, Effect, Option, Schema } from "effect";
+
 import {
   InternalCallbackRejected,
   internalCallbackBodies,
@@ -15,20 +16,25 @@ export const postInternalRequestEffect = Effect.fn("postInternalRequestEffect")(
     body: (typeof internalCallbackBodies)[Route]["Type"]
   ) {
     const schema: Schema.Codec<unknown> = internalCallbackBodies[route];
+
     const value = yield* Schema.decodeUnknownEffect(schema, {
       onExcessProperty: "error",
     })(body);
+
     const serialized = JSON.stringify(value);
     const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
     let origin: string;
     let headers: Headers;
+
     if (Option.isSome(vercel)) {
       const hostname = yield* Config.string("VERCEL_URL");
       origin = new URL(`https://${hostname}`).origin;
+
       const token = yield* Effect.tryPromise({
         try: () => getVercelOidcToken(),
         catch: () => new InternalCallbackRejected({ status: 503 }),
       });
+
       headers = new Headers({
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
@@ -38,6 +44,7 @@ export const postInternalRequestEffect = Effect.fn("postInternalRequestEffect")(
       origin = yield* internalCallbackOrigin;
       headers = yield* internalCallbackHeaders(route, serialized);
     }
+
     return yield* Effect.tryPromise({
       try: (signal) =>
         fetch(new URL(route, origin), {

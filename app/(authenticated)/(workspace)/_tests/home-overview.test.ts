@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
 import { HomeOverview } from "../_components/home-overview";
 
 describe("Companion home", () => {
@@ -10,6 +11,7 @@ describe("Companion home", () => {
         identities: [{ channel: "telegram", senderId: "42" }],
       })
     );
+
     expect(html).toContain('href="/chat"');
     expect(html).toContain("Start a conversation");
     expect(html).toContain("Your setup");

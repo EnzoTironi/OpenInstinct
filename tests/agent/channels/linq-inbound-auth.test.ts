@@ -1,7 +1,7 @@
-import type { LinqChannelConfig } from "eve/channels/linq";
-import { Message } from "chat";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as EnvModule from "@shared/environment";
+import { Message } from "chat";
+import type { LinqChannelConfig } from "eve/channels/linq";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 // oxlint-disable-next-line import/no-unassigned-import -- Loads the production module so the mocked channel factory can capture its configuration.
 import "@agent/channels/linq";
 
@@ -18,24 +18,30 @@ const capture = vi.hoisted(() => ({
 
 vi.mock("@shared/environment", async (importOriginal) => {
   const original = await importOriginal<typeof EnvModule>();
+
   return {
     ...original,
     env: { ...original.env, LINQ_CONNECTOR: "linq/test" },
   };
 });
+
 vi.mock("@vercel/connect/eve", () => ({
   connectLinqCredentials: () => ({ apiKey: async () => "linq-test-api-key" }),
 }));
+
 vi.mock(import("eve/channels/linq"), async (importOriginal) => {
   const original = await importOriginal();
+
   return {
     ...original,
     linqChannel(config: LinqChannelConfig) {
       capture.config = config;
+
       return original.linqChannel(config);
     },
   };
 });
+
 vi.mock("@db/services/auth", () => ({
   getAuth: async () => ({
     $context: Promise.resolve({ adapter: { findOne: capture.findOne } }),
@@ -43,7 +49,9 @@ vi.mock("@db/services/auth", () => ({
 }));
 
 const verifier = capture.config?.credentials?.webhookVerifier;
+
 const onMessage = capture.config?.onMessage;
+
 if (!verifier || !onMessage) {
   throw new Error("The Linq channel must verify webhooks and route messages.");
 }
@@ -58,6 +66,7 @@ describe("Linq inbound authentication", () => {
       body: "{}",
       method: "POST",
     });
+
     await expect(verifier(request, new Uint8Array())).resolves.toBe(false);
   });
 
@@ -67,6 +76,7 @@ describe("Linq inbound authentication", () => {
       headers: { authorization: "Bearer aaa.bbb.ccc" },
       method: "POST",
     });
+
     await expect(verifier(request, new Uint8Array())).resolves.toBe(false);
   });
 
@@ -127,6 +137,7 @@ interface ThreadIdentity {
 
 function threadContext(): InboundContext {
   const identity: ThreadIdentity = { thread: { id: "linq:dm:chat-1" } };
+
   // SAFETY: The inbound policy reads only the thread id from this context.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- A complete Chat SDK thread mock would add unrelated methods.
   return identity as InboundContext;

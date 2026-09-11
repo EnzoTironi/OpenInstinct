@@ -1,6 +1,7 @@
 import * as React from "react";
 
 type LogoProps = React.ComponentPropsWithoutRef<"svg">;
+
 type LogoCssProperties = React.CSSProperties & Record<`--${string}`, string>;
 
 const logoThemeStyles = {
@@ -76,4 +77,5 @@ function Logo({ className, style, ...props }: LogoProps) {
 }
 
 export { Logo };
+
 export type { LogoProps };

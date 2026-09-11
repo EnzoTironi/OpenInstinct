@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+
 import { Effect } from "effect";
 import type { MemoryTurnStartedContext } from "eve/memory";
 import { fileMemory, inMemory } from "eve/memory/file";
 import type { ToolContext } from "eve/tools";
 import { describe, expect, it } from "vitest";
+
 import {
   executeMemoryMutationWithRecallRefresh,
   isMutatingMemoryTool,
@@ -17,16 +19,19 @@ import {
 } from "../personal-memory-recall-refresh";
 
 const forgottenText = "My favorite color is orange.";
+
 const keptText = "My favorite drink is tea.";
 
 function memoryContext(key: string): MemoryTurnStartedContext {
   const sessionId = randomUUID();
+
   const principal = {
     principalId: "user-1",
     principalType: "user" as const,
     authenticator: "authjs",
     attributes: {},
   };
+
   return {
     memory: {
       scope: {
@@ -86,11 +91,13 @@ describe("personal memory unstructured forget + recall-refresh", () => {
         { id: "file-memory-document", content: `keep ${forgottenText}` },
       ],
     };
+
     const refreshed: RecalledProjection = {
       messages: [
         { id: "file-memory-document", content: `keep ${keptText} only` },
       ],
     };
+
     const next = projectNotesForNextModelStep(prior, refreshed);
     expect(projectionContainsNote(next, forgottenText)).toBe(false);
     expect(projectionContainsNote(next, keptText)).toBe(true);
@@ -101,10 +108,12 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const backend = inMemory();
     const provider = fileMemory({ backend });
     const context = memoryContext(`recall-refresh:${randomUUID()}`);
+
     const tools = await provider.tools?.({
       ...context,
       channel: { kind: "eve" },
     });
+
     assert.ok(tools?.save_memory && tools.remove_memory);
     const saveMemory = tools.save_memory;
     const removeMemory = tools.remove_memory;
@@ -123,11 +132,13 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const prior = recalledProjectionFrom(
       await provider.recall["turn.started"](context)
     );
+
     expect(projectionContainsNote(prior, forgottenText)).toBe(true);
 
     const index = /(?:^|\n)(\d+):.*orange/mu.exec(
       prior.messages[0]?.content ?? ""
     )?.[1];
+
     assert.ok(index);
 
     const { projection, phase } = await Effect.runPromise(
@@ -147,6 +158,7 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const forNextModelStep = await Effect.runPromise(
       requireCleanProjectionForNextModelStep(phase)
     );
+
     expect(forNextModelStep).toEqual(projection);
     expect(projectionContainsNote(forNextModelStep, forgottenText)).toBe(false);
     expect(projectionContainsNote(forNextModelStep, keptText)).toBe(true);
@@ -157,10 +169,12 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const backend = inMemory();
     const provider = fileMemory({ backend });
     const context = memoryContext(`recall-refresh-fail:${randomUUID()}`);
+
     const tools = await provider.tools?.({
       ...context,
       channel: { kind: "eve" },
     });
+
     assert.ok(tools?.save_memory && tools.remove_memory);
     const saveMemory = tools.save_memory;
     const removeMemory = tools.remove_memory;
@@ -170,12 +184,15 @@ describe("personal memory unstructured forget + recall-refresh", () => {
       { text: forgottenText },
       toolExecution(context, "profile__save_memory")
     );
+
     const prior = recalledProjectionFrom(
       await provider.recall["turn.started"](context)
     );
+
     const index = /(?:^|\n)(\d+):.*orange/mu.exec(
       prior.messages[0]?.content ?? ""
     )?.[1];
+
     assert.ok(index);
 
     let stored = false;
@@ -215,6 +232,7 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const fromStorage = recalledProjectionFrom(
       await provider.recall["turn.started"](context)
     );
+
     expect(projectionContainsNote(fromStorage, forgottenText)).toBe(false);
   });
 
@@ -222,10 +240,12 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const backend = inMemory();
     const provider = fileMemory({ backend });
     const context = memoryContext(`unstructured-forget:${randomUUID()}`);
+
     const tools = await provider.tools?.({
       ...context,
       channel: { kind: "eve" },
     });
+
     assert.ok(tools?.save_memory && tools.remove_memory);
     const saveMemory = tools.save_memory;
     const removeMemory = tools.remove_memory;
@@ -259,14 +279,17 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     const prior = recalledProjectionFrom(
       await provider.recall["turn.started"](context)
     );
+
     for (const text of notes) {
       expect(projectionContainsNote(prior, text)).toBe(true);
     }
 
     const recalledContent = prior.messages[0]?.content ?? "";
+
     const indexes = [...recalledContent.matchAll(/(?:^|\n)(\d+):/gmu)].map(
       (match) => Number(match[1])
     );
+
     expect(indexes.length).toBe(notes.length);
 
     const finalProjection = await Effect.runPromise(
@@ -287,6 +310,7 @@ describe("personal memory unstructured forget + recall-refresh", () => {
                 context,
                 priorProjection: projection,
               });
+
               projection = yield* requireCleanProjectionForNextModelStep(
                 refreshed.phase
               );
@@ -294,6 +318,7 @@ describe("personal memory unstructured forget + recall-refresh", () => {
             }),
           { concurrency: 1 }
         );
+
         return projection;
       })
     );
@@ -301,6 +326,7 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     for (const text of notes) {
       expect(projectionContainsNote(finalProjection, text)).toBe(false);
     }
+
     expect(
       projectionContainsNote(finalProjection, "No memories are saved.")
     ).toBe(true);
@@ -314,6 +340,7 @@ describe("personal memory unstructured forget + recall-refresh", () => {
         { content: "unkeyed stale summary mentioning orange" },
       ],
     };
+
     const refreshed: RecalledProjection = { messages: [] };
     const next = projectNotesForNextModelStep(prior, refreshed);
     expect(next.messages).toEqual([]);

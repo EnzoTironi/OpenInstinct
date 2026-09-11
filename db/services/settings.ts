@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
-import type { AccessScope } from "@shared/identity/access-scope";
 import { db, settings } from "@db";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { and, eq } from "drizzle-orm";
 
 const gatewayModelKey = "gateway_model";
+
 const defaultGatewayModel = "openai/gpt-5.6-sol-fast";
 
 async function readGatewayModel(scope: AccessScope) {
@@ -16,6 +17,7 @@ async function readGatewayModel(scope: AccessScope) {
       )
     )
     .limit(1);
+
   return rows[0]?.value;
 }
 

@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+
 import {
   admitQuota,
   emptyQuotaUsage,
@@ -40,11 +41,13 @@ describe("Release-1 minimum quota admission", () => {
 
   it("admits work within limits and reserves usage", async () => {
     const usage = emptyQuotaUsage();
+
     const demand = {
       concurrentTurns: 1,
       modelTokens: 1_000,
       activeUser: 1 as const,
     };
+
     await expect(Effect.runPromise(admitQuota(usage, demand))).resolves.toEqual(
       demand
     );
@@ -57,9 +60,11 @@ describe("Release-1 minimum quota admission", () => {
 
   it("fails closed when a user exceeds concurrent turns", async () => {
     const usage = withUser({ concurrentTurns: 2 });
+
     const error = await Effect.runPromise(
       admitQuota(usage, { concurrentTurns: 1 }).pipe(Effect.flip)
     );
+
     expect(error).toEqual(
       new QuotaAdmissionError({
         reason: "exceeded",
@@ -77,9 +82,11 @@ describe("Release-1 minimum quota admission", () => {
     const usage = emptyQuotaUsage();
     usage.installation.concurrentTurns =
       release1QuotaLimits.installation.concurrentTurns;
+
     const error = await Effect.runPromise(
       admitQuota(usage, { concurrentTurns: 1 }).pipe(Effect.flip)
     );
+
     expect(error).toMatchObject({
       reason: "exceeded",
       scope: "installation",
@@ -92,6 +99,7 @@ describe("Release-1 minimum quota admission", () => {
     const atUserCap = withUser({
       dailyModelTokens: release1QuotaLimits.user.dailyModelTokens,
     });
+
     await expect(
       Effect.runPromise(
         admitQuota(atUserCap, { modelTokens: 1 }).pipe(Effect.flip)
@@ -198,5 +206,6 @@ describe("Release-1 minimum quota admission", () => {
 function withUser(partial: Partial<QuotaUsage["user"]>): QuotaUsage {
   const usage = emptyQuotaUsage();
   usage.user = { ...usage.user, ...partial };
+
   return usage;
 }

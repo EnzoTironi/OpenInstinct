@@ -1,12 +1,13 @@
-import { describe, expect, test } from "vitest";
-import { ZodError } from "zod";
-import { ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
-import askQuestion from "../../tools/ask_question";
 import {
   defaultMessageReducer,
   type InputRequest,
   type MessageStreamEvent,
 } from "eve/client";
+import { ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
+import { describe, expect, test } from "vitest";
+import { ZodError } from "zod";
+
+import askQuestion from "../../tools/ask_question";
 import {
   channelQuestionSchema,
   pendingChannelInputs,
@@ -36,6 +37,7 @@ const request: InputRequest = {
     },
   },
 };
+
 describe("native input responses", () => {
   test("rejects an oversized question in the authored tool input schema", () => {
     expect(askQuestion.inputSchema).toBe(channelQuestionSchema);
@@ -85,6 +87,7 @@ describe("native input responses", () => {
   });
   test("projects a real public input event through Eve's reducer", () => {
     const reducer = defaultMessageReducer();
+
     const data = reducer.reduce(reducer.initial(), {
       type: "input.requested",
       meta: { at: "2026-09-08T19:00:00Z", id: "event-1" },
@@ -95,7 +98,9 @@ describe("native input responses", () => {
         sequence: 1,
       },
     });
+
     expect(pendingChannelInputs(data)).toEqual([request]);
+
     const resolved = reducer.reduce(data, {
       type: "input.resolved",
       meta: { at: "2026-09-08T19:00:01Z", id: "event-2" },
@@ -113,6 +118,7 @@ describe("native input responses", () => {
         sequence: 2,
       },
     });
+
     expect(pendingChannelInputs(resolved)).toEqual([]);
   });
 });
@@ -123,6 +129,7 @@ test("an incomplete durable snapshot cannot resolve a pending request", async ()
       controller.close();
     },
   });
+
   await expect(
     readChannelInputStream(stream, 0, new AbortController().signal)
   ).rejects.toThrow("before its captured tail");

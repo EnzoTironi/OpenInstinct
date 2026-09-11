@@ -1,10 +1,11 @@
+import { account, db, session, user, verification } from "@db";
+import { getInstallationSecrets } from "@db/services/installation-secrets";
+import { env } from "@shared/environment";
+import { betterAuthBaseURL } from "@shared/environment/origin";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { Duration, Effect, Redacted, Schema } from "effect";
-import { account, db, session, user, verification } from "@db";
-import { betterAuthBaseURL } from "@shared/environment/origin";
-import { env } from "@shared/environment";
-import { getInstallationSecrets } from "@db/services/installation-secrets";
+
 import { channelAuthPlugin } from "../../../server/channel-auth";
 import { serverRuntime } from "../../../server/runtime";
 
@@ -18,6 +19,7 @@ const initializeAuth = Effect.fn("initializeAuth")(function* () {
     try: () => getInstallationSecrets(),
     catch: () => new AuthUnavailable(),
   });
+
   return yield* Effect.try({
     try: () =>
       betterAuth({

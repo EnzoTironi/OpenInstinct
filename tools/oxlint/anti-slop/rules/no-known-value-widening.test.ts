@@ -1,7 +1,8 @@
-import { typescriptRuleTester as tester } from "./rule-tester.ts";
+import { RuleTester } from "oxlint/plugins-dev";
 
-import { noKnownValueWideningRule } from "@tools/oxlint/anti-slop/rules/no-known-value-widening.ts";
+import { noKnownValueWideningRule } from "./no-known-value-widening.ts";
 
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } });
 
 const error = { messageId: "widening" };
 

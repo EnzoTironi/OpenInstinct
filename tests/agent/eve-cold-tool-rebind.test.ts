@@ -1,15 +1,15 @@
 // Exercise the installed, pinned Eve runtime; its callback registry and context must share one package instance.
 import { randomUUID } from "node:crypto";
-import { expect, it } from "vitest";
+
 import { defineDynamic } from "eve/tools";
-import { markDynamicCallbackRebind } from "../../node_modules/eve/dist/src/internal/dynamic-tool-rebind.js";
+import { expect, it } from "vitest";
 
 import type { SessionAuthContext } from "../../node_modules/eve/dist/src/channel/types.js";
+import { buildResponseAuthorizationTools } from "../../node_modules/eve/dist/src/context/build-dynamic-tools.js";
 import {
   ContextContainer,
   contextStorage,
 } from "../../node_modules/eve/dist/src/context/container.js";
-import { buildResponseAuthorizationTools } from "../../node_modules/eve/dist/src/context/build-dynamic-tools.js";
 import {
   SessionIdKey,
   SessionKey,
@@ -25,6 +25,7 @@ import {
 import { hasPendingApprovalBatch } from "../../node_modules/eve/dist/src/harness/input-requests.js";
 import { appendPendingInputBatch } from "../../node_modules/eve/dist/src/harness/pending-input-batches.js";
 import type { HarnessSession } from "../../node_modules/eve/dist/src/harness/types.js";
+import { markDynamicCallbackRebind } from "../../node_modules/eve/dist/src/internal/dynamic-tool-rebind.js";
 import { createTurnStartedEvent } from "../../node_modules/eve/dist/src/protocol/message.js";
 import type { ResolvedDynamicToolResolver } from "../../node_modules/eve/dist/src/runtime/types.js";
 import type { InputRequest } from "../../node_modules/eve/dist/src/shared/input.js";
@@ -44,6 +45,7 @@ function callbackOwner(name: string): DynamicToolCallbackOwner {
     name,
   };
 }
+
 import { restoreTurnDynamicToolCallbacks } from "../../node_modules/eve/dist/src/execution/restore-turn-dynamic-tools.js";
 import { normalizeToolDefinition } from "../../node_modules/eve/dist/src/internal/authored-definition/schema-backed.js";
 
@@ -57,6 +59,7 @@ it.each([
     const defined = defineDynamic({
       events: { "turn.started": () => null },
     });
+
     const tool = enabled ? markDynamicCallbackRebind(defined) : defined;
     expect(normalizeToolDefinition(tool, "Expected a dynamic tool.")).toEqual({
       eventNames: ["turn.started"],
@@ -98,6 +101,7 @@ function coldTurn() {
     },
   ]);
   const calls = { resolver: 0, policy: 0, execute: 0 };
+
   const entry = defineTool({
     description: "Local approval gate",
     inputSchema: { type: "object" },
@@ -107,11 +111,13 @@ function coldTurn() {
       response: () => ({ status: "allowed" }),
     },
   });
+
   stampDurableDynamicToolCallbacks(entry, {
     execute: {
       closure: {},
       callback: () => {
         calls.execute += 1;
+
         return { local: true };
       },
     },
@@ -120,16 +126,19 @@ function coldTurn() {
       closure: {},
       callback: () => {
         calls.policy += 1;
+
         return { status: "allowed" };
       },
     },
   });
+
   const resolver: ResolvedDynamicToolResolver = {
     slug: name,
     eventNames: ["turn.started"],
     events: {
       "turn.started": () => {
         calls.resolver += 1;
+
         return { [name]: entry };
       },
     },
@@ -138,6 +147,7 @@ function coldTurn() {
     sourceKind: "module",
     logicalPath: `agent/tools/${name}.ts`,
   };
+
   const session: HarnessSession = setHarnessEmissionState(
     {
       agent: {
@@ -152,6 +162,7 @@ function coldTurn() {
     },
     { sessionStarted: true, sequence: 0, stepIndex: 1, turnId: "turn_0" }
   );
+
   const request: InputRequest = {
     action: {
       callId: "local-call",
@@ -169,14 +180,17 @@ function coldTurn() {
     prompt: "Approve local computation",
     requestId: "local-approval",
   };
+
   expect(
     lookupDurableDynamicCallback(callbackOwner(name), "approvalResponse")
   ).toBeUndefined();
+
   return { ctx, calls, name, resolver, session, request };
 }
 
 async function endTurn(session: HarnessSession): Promise<HarnessSession> {
   const events: string[] = [];
+
   const emission = await emitTurnEpilogue(
     async (event) => {
       events.push(event.type);
@@ -189,7 +203,9 @@ async function endTurn(session: HarnessSession): Promise<HarnessSession> {
     },
     "conversation"
   );
+
   expect(events).toEqual(["turn.completed", "session.waiting"]);
+
   return setHarnessEmissionState(session, emission);
 }
 
@@ -198,6 +214,7 @@ async function endTurn(session: HarnessSession): Promise<HarnessSession> {
 // oxlint-disable-next-line vitest/no-disabled-tests -- 0.52 fail-closed rebind needs transformed durable descriptors this helper surface does not stamp.
 it.skip("restores a cold parked approval before its response policy is coordinated", async () => {
   const fixture = coldTurn();
+
   const parked = await endTurn(
     appendPendingInputBatch({
       requests: [fixture.request],
@@ -206,6 +223,7 @@ it.skip("restores a cold parked approval before its response policy is coordinat
       session: fixture.session,
     })
   );
+
   expect(isHarnessBetweenTurns(parked)).toBe(true);
   expect(hasPendingApprovalBatch(parked)).toBe(true);
 
@@ -217,6 +235,7 @@ it.skip("restores a cold parked approval before its response policy is coordinat
       messages: [],
       resolvers: [fixture.resolver],
     });
+
     const accepted = await coordinateApprovalDelivery({
       now: 100,
       session: parked,
@@ -233,17 +252,21 @@ it.skip("restores a cold parked approval before its response policy is coordinat
       },
       tools: new Map(),
     });
+
     expect(accepted.kind).toBe("continue-coordination");
     expect(isHarnessBetweenTurns(accepted.session)).toBe(true);
+
     const tools = buildResponseAuthorizationTools({
       context: fixture.ctx,
       authoredTools: new Map(),
     });
+
     const authorized = await coordinateApprovalDelivery({
       now: 101,
       session: accepted.session,
       tools,
     });
+
     expect(getApprovalAuditState(authorized.session.state).settlements).toEqual(
       [
         expect.objectContaining({
@@ -277,6 +300,7 @@ it("does not restore obsolete interactive callbacks for a settled report turn", 
         events: {
           "turn.started": () => {
             fixture.calls.resolver += 1;
+
             // The new caller no longer exposes the old interactive tools.
             return {};
           },

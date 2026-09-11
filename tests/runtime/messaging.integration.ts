@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+
 import { PgClient } from "@effect/sql-pg";
 import { Context, Effect, Layer } from "effect";
 import { expect, test } from "vitest";
+
 import {
   IdentityInactive,
   InvalidMessage,
@@ -11,7 +13,6 @@ import {
   Messaging,
   type Lease,
 } from "../../server/messaging";
-
 import { runtimeDatabase } from "./database";
 
 const services = Messaging.layer.pipe(Layer.provideMerge(runtimeDatabase));
@@ -47,6 +48,7 @@ test("input response fence survives concurrent replay and refuses uncertain redi
   run((messaging, sql, identityId) =>
     Effect.gen(function* () {
       const sessionId = randomUUID();
+
       const input = {
         identityId,
         sessionId,
@@ -56,6 +58,7 @@ test("input response fence survives concurrent replay and refuses uncertain redi
         decision: "approve" as const,
         turnId: "user-turn",
       };
+
       expect(
         yield* messaging.claimChannelInputResponse(input).pipe(Effect.flip)
       ).toBeInstanceOf(InvalidMessage);
@@ -68,10 +71,12 @@ test("input response fence survives concurrent replay and refuses uncertain redi
       expect(
         yield* messaging.claimChannelInputResponse(input).pipe(Effect.flip)
       ).toBeInstanceOf(InvalidMessage);
+
       const acceptedSource = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!acceptedSource) throw new Error("Missing source claim");
       yield* messaging.markAccepted({
         lease: {
@@ -81,12 +86,14 @@ test("input response fence survives concurrent replay and refuses uncertain redi
         },
         receipt: { status: "accepted", sessionId },
       });
+
       const results = yield* Effect.all(
         Array.from({ length: 12 }, () =>
           messaging.claimChannelInputResponse(input)
         ),
         { concurrency: 8 }
       );
+
       expect(
         results.filter((result) => result.kind === "acquired")
       ).toHaveLength(1);
@@ -95,7 +102,9 @@ test("input response fence survives concurrent replay and refuses uncertain redi
       ).toHaveLength(11);
       expect(new Set(results.map((result) => result.id)).size).toBe(1);
       const first = results[0];
+
       if (!first) throw new Error("Missing response claim");
+
       for (const changed of [
         { decision: "cancel" as const },
         { revision: "b".repeat(64) },
@@ -106,6 +115,7 @@ test("input response fence survives concurrent replay and refuses uncertain redi
             .kind
         ).toBe("conflict");
       }
+
       expect(
         yield* messaging.markChannelInputResponse({
           id: first.id,
@@ -118,6 +128,7 @@ test("input response fence survives concurrent replay and refuses uncertain redi
           status: "accepted",
         })
       ).toBe(false);
+
       const persisted = yield* Messaging.layer.pipe(
         Layer.build,
         Effect.flatMap((context) =>
@@ -126,15 +137,18 @@ test("input response fence survives concurrent replay and refuses uncertain redi
         Effect.provideService(PgClient.PgClient, sql),
         Effect.scoped
       );
+
       expect(persisted).toEqual({
         kind: "duplicate",
         id: first.id,
         status: "uncertain",
       });
+
       const otherRequest = yield* messaging.claimChannelInputResponse({
         ...input,
         requestId: "approval-2",
       });
+
       expect(otherRequest.kind).toBe("acquired");
       expect(
         yield* messaging.markChannelInputResponse({
@@ -159,6 +173,7 @@ test("different accepted sources cannot race approval and cancellation of one re
   run((messaging, _sql, identityId) =>
     Effect.gen(function* () {
       const sessionId = randomUUID();
+
       for (const sourceMessageId of ["yes", "no"]) {
         yield* messaging.accept({
           identityId,
@@ -166,16 +181,19 @@ test("different accepted sources cannot race approval and cancellation of one re
           sourceMessageId,
           payload: { text: sourceMessageId },
         });
+
         const source = yield* messaging.claimInbox({
           identityId,
           leaseSeconds: 30,
         });
+
         if (!source) throw new Error("Missing source claim");
         yield* messaging.markAccepted({
           lease: { identityId, id: source.id, leaseToken: source.leaseToken },
           receipt: { status: "accepted", sessionId },
         });
       }
+
       const common = {
         identityId,
         sessionId,
@@ -183,6 +201,7 @@ test("different accepted sources cannot race approval and cancellation of one re
         revision: "a".repeat(64),
         turnId: "turn",
       };
+
       const results = yield* Effect.all(
         [
           messaging.claimChannelInputResponse({
@@ -198,6 +217,7 @@ test("different accepted sources cannot race approval and cancellation of one re
         ],
         { concurrency: 2 }
       );
+
       expect(results.map((result) => result.kind).toSorted()).toEqual([
         "acquired",
         "conflict",
@@ -221,6 +241,7 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
           ],
         },
       };
+
       const reordered = {
         identityId,
         eventId: "event-1",
@@ -233,21 +254,28 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
           sourceOccurredAtMs: 1_788_900_000_000,
         },
       };
+
       const receipts = yield* Effect.all(
         Array.from({ length: 12 }, (_, index) =>
           messaging.accept(index % 2 ? first : reordered)
         ),
         { concurrency: 8 }
       );
+
       expect(new Set(receipts.map((receipt) => receipt.id)).size).toBe(1);
+
       const rows = yield* sql<{ count: number }>`SELECT count(*)::int AS count
       FROM channel_inbox WHERE identity_id = ${identityId}`;
+
       expect(rows[0]?.count).toBe(1);
+
       const conflict = yield* messaging
         .accept({ ...first, payload: { text: "changed" } })
         .pipe(Effect.flip);
+
       expect(conflict).toBeInstanceOf(PayloadConflict);
       const original = receipts[0];
+
       if (!original) throw new Error("Missing receipt");
       expect(original.status).toBe("queued");
       expect(original.sourceMessageId).toBe("source-event-1");
@@ -256,19 +284,24 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
           .accept({ ...first, sourceMessageId: "different-provider-message" })
           .pipe(Effect.flip)
       ).toBeInstanceOf(PayloadConflict);
+
       const persisted = yield* sql<{
         source: string;
       }>`SELECT source_message_id AS source FROM channel_inbox WHERE id = ${original.id}`;
+
       expect(persisted[0]?.source).toBe("source-event-1");
+
       const claim = yield* Messaging.layer.pipe(
         Layer.build,
         Effect.flatMap((context) => {
           const fresh = Context.get(context, Messaging);
+
           return fresh.claimInbox({ identityId, leaseSeconds: 30 });
         }),
         Effect.provideService(PgClient.PgClient, sql),
         Effect.scoped
       );
+
       expect(claim?.sourceMessageId).toBe("source-event-1");
       expect(claim?.payload.sourceOccurredAtMs).toBe(1_788_900_000_000);
       expect(
@@ -297,6 +330,7 @@ test("rejects hash/selector injection and invalid payload before persistence", (
         payload: { text: "hello" },
         eventHash: "0".repeat(64),
       };
+
       expect(yield* messaging.accept(input).pipe(Effect.flip)).toBeInstanceOf(
         InvalidMessage
       );
@@ -310,17 +344,21 @@ test("rejects hash/selector injection and invalid payload before persistence", (
           })
           .pipe(Effect.flip)
       ).toBeInstanceOf(InvalidMessage);
+
       const unsafe = {
         identityId,
         eventId: "url",
         sourceMessageId: "source-url",
         payload: { text: "hello", url: "https://example.invalid/private" },
       };
+
       expect(yield* messaging.accept(unsafe).pipe(Effect.flip)).toBeInstanceOf(
         InvalidMessage
       );
+
       const rows =
         yield* sql`SELECT id FROM channel_inbox WHERE identity_id = ${identityId}`;
+
       expect(rows).toHaveLength(0);
     })
   ));
@@ -334,28 +372,34 @@ test("claims FIFO once per identity under concurrency and fences completion", ()
         sourceMessageId: "source-first",
         payload: { text: "one" },
       });
+
       const second = yield* messaging.accept({
         identityId,
         eventId: "second",
         sourceMessageId: "source-second",
         payload: { text: "two" },
       });
+
       const claims = yield* Effect.all(
         Array.from({ length: 10 }, () =>
           messaging.claimInbox({ identityId, leaseSeconds: 30 })
         ),
         { concurrency: 8 }
       );
+
       const winners = claims.filter((claim) => claim !== null);
       expect(winners).toHaveLength(1);
       const winner = winners[0];
+
       if (!winner) throw new Error("Expected a lease holder");
       expect(winner.id).toBe(first.id);
+
       const lease: Lease = {
         identityId,
         id: winner.id,
         leaseToken: winner.leaseToken,
       };
+
       const forged = { ...lease, leaseToken: randomUUID() };
       expect(
         yield* messaging
@@ -368,6 +412,7 @@ test("claims FIFO once per identity under concurrency and fences completion", ()
           })
           .pipe(Effect.flip)
       ).toBeInstanceOf(LeaseLost);
+
       const completed = yield* messaging.markAccepted({
         lease,
         receipt: {
@@ -375,6 +420,7 @@ test("claims FIFO once per identity under concurrency and fences completion", ()
           sessionId: "storage-fixture-session",
         },
       });
+
       expect(completed.status).toBe("accepted");
       expect(completed.resultId).toBe("storage-fixture-session");
       expect(
@@ -401,10 +447,12 @@ test("an input without native protocol evidence remains uncertain and blocks lat
         sourceMessageId: "source-second",
         payload: { text: "two" },
       });
+
       const claim = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected a lease holder");
       yield* sql`UPDATE channel_inbox SET native_input = NULL, lease_expires_at = clock_timestamp() - interval '1 second'
       WHERE id = ${claim.id}`;
@@ -446,10 +494,12 @@ test("outbox deduplicates intent, fences sends, and keeps lanes independent", ()
         deliveryKey: "reply-1",
         payload: { text: "reply" },
       };
+
       const receipts = yield* Effect.all(
         [messaging.enqueue(intent), messaging.enqueue(intent)],
         { concurrency: 2 }
       );
+
       expect(receipts[0].id).toBe(receipts[1].id);
       expect(
         receipts.every((receipt) => receipt.sourceMessageId === null)
@@ -465,23 +515,29 @@ test("outbox deduplicates intent, fences sends, and keeps lanes independent", ()
         sourceMessageId: "source-input",
         payload: { text: "input" },
       });
+
       const incoming = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       const outgoing = yield* messaging.claimOutbox({
         identityId,
         leaseSeconds: 30,
       });
+
       expect(incoming).not.toBeNull();
+
       if (!outgoing)
         throw new Error("Expected outgoing lease independently of inbox");
       expect(outgoing.sourceMessageId).toBeNull();
+
       const lease = {
         identityId,
         id: outgoing.id,
         leaseToken: outgoing.leaseToken,
       };
+
       const completed = yield* messaging.markSent({
         lease,
         receipt: {
@@ -489,6 +545,7 @@ test("outbox deduplicates intent, fences sends, and keeps lanes independent", ()
           providerMessageId: "storage-fixture-provider-id",
         },
       });
+
       expect(completed.status).toBe("sent");
       expect(completed.sourceMessageId).toBeNull();
       expect(completed.resultId).toBe("storage-fixture-provider-id");
@@ -519,10 +576,12 @@ test("expired outbox is uncertain, cannot resend, and blocks later output", () =
         deliveryKey: "second",
         payload: { text: "two" },
       });
+
       const claim = yield* messaging.claimOutbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected outgoing lease");
       yield* sql`UPDATE channel_outbox SET lease_expires_at = clock_timestamp() - interval '1 second'
       WHERE id = ${claim.id}`;
@@ -553,10 +612,12 @@ test("revocation blocks acceptance, dispatch, and completion and cancels queued 
         deliveryKey: "first",
         payload: { text: "reply" },
       });
+
       const claim = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected incoming lease");
       yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
       expect(
@@ -610,10 +671,12 @@ test("explicit uncertainty stores only categorical errors and remains visible", 
         deliveryKey: "first",
         payload: { text: "reply" },
       });
+
       const claim = yield* messaging.claimOutbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected outgoing lease");
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       const unsafe = { lease, reason: "token=secret provider traceback" };
@@ -647,16 +710,19 @@ test("a confirmed rejection releases the lane but ambiguous errors cannot be ter
         sourceMessageId: "source-first",
         payload: { text: "one" },
       });
+
       const second = yield* messaging.accept({
         identityId,
         eventId: "second",
         sourceMessageId: "source-second",
         payload: { text: "two" },
       });
+
       const claim = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected lease");
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       const ambiguous = { lease, reason: "handoff_unknown" };
@@ -687,23 +753,28 @@ test("independent identities can claim the same event key without blocking each 
       yield* sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
       SELECT ${otherId}, channel, installation_id, ${otherId}, user_id
       FROM channel_identity WHERE id = ${identityId}`;
+
       const inputs = [identityId, otherId].map((id) => ({
         identityId: id,
         eventId: "same-key",
         sourceMessageId: "source-same-key",
         payload: { text: "hello" },
       }));
+
       const accepted = yield* Effect.all(
         inputs.map((input) => messaging.accept(input)),
         { concurrency: 2 }
       );
+
       expect(new Set(accepted.map((receipt) => receipt.id)).size).toBe(2);
+
       const claims = yield* Effect.all(
         [identityId, otherId].map((id) =>
           messaging.claimInbox({ identityId: id, leaseSeconds: 30 })
         ),
         { concurrency: 2 }
       );
+
       expect(claims.every((claim) => claim !== null)).toBe(true);
     })
   ));
@@ -717,27 +788,33 @@ test("prepared native input survives uncertain recovery with immutable content a
         sourceMessageId: "keyed-source",
         payload: { text: "first" },
       });
+
       yield* messaging.accept({
         identityId,
         eventId: "keyed-second",
         sourceMessageId: "later-source",
         payload: { text: "second" },
       });
+
       const claim = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected initial claim");
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
+
       const content = [
         { type: "text" as const, text: "Frozen extracted content" },
       ];
+
       const snapshots = yield* Effect.all(
         Array.from({ length: 8 }, () =>
           messaging.prepareInboxHandoff({ transcripts: [], lease, content })
         ),
         { concurrency: 4 }
       );
+
       expect(
         snapshots.every(
           (snapshot) =>
@@ -751,10 +828,13 @@ test("prepared native input survives uncertain recovery with immutable content a
         address: identityId,
         content,
       });
+
       const owner = yield* sql<{
         userId: string;
       }>`SELECT user_id AS "userId" FROM channel_identity WHERE id = ${identityId}`;
+
       const account = owner[0];
+
       if (!account) throw new Error("Missing identity owner");
       expect(snapshots[0]?.principalId).toBe(`better-auth:${account.userId}`);
       expect(
@@ -763,15 +843,18 @@ test("prepared native input survives uncertain recovery with immutable content a
           .pipe(Effect.flip)
       ).toBeInstanceOf(PayloadConflict);
       yield* messaging.markInboxUncertain({ lease, reason: "handoff_unknown" });
+
       const claims = yield* Effect.all(
         Array.from({ length: 8 }, () =>
           messaging.claimInbox({ identityId, leaseSeconds: 30 })
         ),
         { concurrency: 4 }
       );
+
       const recovered = claims.filter((candidate) => candidate !== null);
       expect(recovered).toHaveLength(1);
       const next = recovered[0];
+
       if (!next) throw new Error("Expected recovered claim");
       expect(next.id).toBe(first.id);
       expect(next.nativeInput).toEqual(snapshots[0]);
@@ -801,10 +884,12 @@ test("expired prepared input can be recovered but a revoked identity cannot prep
         sourceMessageId: "source",
         payload: { text: "one" },
       });
+
       const claim = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 1,
       });
+
       if (!claim) throw new Error("Expected initial claim");
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       yield* messaging.prepareInboxHandoff({
@@ -813,11 +898,14 @@ test("expired prepared input can be recovered but a revoked identity cannot prep
         content: "one",
       });
       yield* Effect.sleep("1100 millis");
+
       const recovered = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       expect(recovered?.id).toBe(claim.id);
+
       if (!recovered) throw new Error("Expected expired input recovery");
       yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
       expect(
@@ -848,10 +936,12 @@ test("a lease expiring before media preparation retains its native key and fence
         sourceMessageId: "source",
         payload: { text: "pending media" },
       });
+
       const first = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 1,
       });
+
       if (!first) throw new Error("Expected initial claim");
       expect(first.nativeInput).toMatchObject({
         inputId: input.id,
@@ -860,18 +950,22 @@ test("a lease expiring before media preparation retains its native key and fence
         content: null,
       });
       yield* Effect.sleep("1100 millis");
+
       const next = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!next) throw new Error("Expected recovery before preparation");
       expect(next.nativeInput).toEqual(first.nativeInput);
       expect(next.leaseToken).not.toBe(first.leaseToken);
+
       const staleLease = {
         identityId,
         id: first.id,
         leaseToken: first.leaseToken,
       };
+
       expect(
         yield* messaging
           .prepareInboxHandoff({
@@ -881,11 +975,13 @@ test("a lease expiring before media preparation retains its native key and fence
           })
           .pipe(Effect.flip)
       ).toBeInstanceOf(LeaseLost);
+
       const prepared = yield* messaging.prepareInboxHandoff({
         transcripts: [],
         lease: { identityId, id: next.id, leaseToken: next.leaseToken },
         content: "current extraction",
       });
+
       expect(prepared).toEqual({
         ...first.nativeInput,
         content: "current extraction",
@@ -911,16 +1007,20 @@ test("the first prepared transcript intents commit together and never mix or res
         sourceMessageId: "voice",
         payload: { text: "voice fixture" },
       });
+
       const claim = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected claim");
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
+
       const candidates = [
         ["alpha one", "alpha two"],
         ["beta one", "beta two"],
       ];
+
       yield* Effect.all(
         candidates.map((transcripts) =>
           messaging.prepareInboxHandoff({
@@ -931,10 +1031,12 @@ test("the first prepared transcript intents commit together and never mix or res
         ),
         { concurrency: 2 }
       );
+
       const intents = yield* sql<{
         key: string;
         text: string;
       }>`SELECT delivery_key AS key, payload->>'text' AS text FROM channel_outbox WHERE identity_id = ${identityId} ORDER BY sequence`;
+
       expect(intents).toHaveLength(2);
       expect(intents.map((item) => item.key)).toEqual([
         `transcript:${input.id}:0:0`,
@@ -979,15 +1081,18 @@ test("a conflicting transcript intent rolls back both preparation and earlier in
         sourceMessageId: "voice",
         payload: { text: "voice fixture" },
       });
+
       yield* messaging.enqueue({
         identityId,
         deliveryKey: `transcript:${input.id}:1:0`,
         payload: { text: "conflicting existing intent" },
       });
+
       const claim = yield* messaging.claimInbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected claim");
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       expect(
@@ -1002,9 +1107,11 @@ test("a conflicting transcript intent rolls back both preparation and earlier in
       expect(
         (yield* messaging.checkInboxLease(lease)).nativeInput?.content
       ).toBeNull();
+
       const rows = yield* sql<{
         key: string;
       }>`SELECT delivery_key AS key FROM channel_outbox WHERE identity_id = ${identityId}`;
+
       expect(rows).toEqual([{ key: `transcript:${input.id}:1:0` }]);
     })
   ));
@@ -1013,6 +1120,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
   run((messaging, sql, identityId) =>
     Effect.gen(function* () {
       const actor = "better-auth:operator-proof";
+
       const makeUncertain = Effect.fn("messaging.makeUncertain")(function* (
         deliveryKey: string,
         text: string
@@ -1022,10 +1130,12 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
           deliveryKey,
           payload: { text },
         });
+
         const claim = yield* messaging.claimOutbox({
           identityId,
           leaseSeconds: 30,
         });
+
         if (!claim) throw new Error(`Expected claim for ${deliveryKey}`);
         yield* messaging.markOutboxUncertain({
           lease: {
@@ -1035,6 +1145,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
           },
           reason: "handoff_unknown",
         });
+
         return claim.id;
       });
 
@@ -1042,6 +1153,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
       expect(
         yield* messaging.claimOutbox({ identityId, leaseSeconds: 30 })
       ).toBeNull();
+
       const delivered = yield* messaging.resolveOutboxUncertain({
         identityId,
         id: deliveredId,
@@ -1052,6 +1164,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
           providerMessageId: "tg:1001",
         },
       });
+
       expect(delivered).toMatchObject({
         id: deliveredId,
         status: "sent",
@@ -1084,12 +1197,14 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
       ).toBeInstanceOf(OutboxResolutionRejected);
 
       const cancelledId = yield* makeUncertain("cancelled", "two");
+
       const cancelled = yield* messaging.resolveOutboxUncertain({
         identityId,
         id: cancelledId,
         actorPrincipalId: actor,
         decision: { kind: "cancel", reason: "abandoned" },
       });
+
       expect(cancelled).toMatchObject({
         id: cancelledId,
         status: "cancelled",
@@ -1097,6 +1212,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
       });
 
       const retryId = yield* makeUncertain("retry", "three");
+
       const retried = yield* messaging.resolveOutboxUncertain({
         identityId,
         id: retryId,
@@ -1106,6 +1222,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
           acknowledgment: "duplicate_delivery_risk_accepted",
         },
       });
+
       expect(retried).toMatchObject({
         id: retryId,
         status: "queued",
@@ -1127,6 +1244,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
         identityId,
         leaseSeconds: 30,
       });
+
       expect(reclaim?.id).toBe(retryId);
       expect(reclaim?.attempts).toBe(2);
 
@@ -1141,6 +1259,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
         FROM channel_outbox_resolution
         WHERE identity_id = ${identityId}
         ORDER BY created_at, id`;
+
       expect(audits).toEqual([
         {
           decision: "mark_delivered",
@@ -1176,10 +1295,13 @@ test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery 
         deliveryKey: "queued-only",
         payload: { text: "still queued" },
       });
+
       const queued = yield* sql<{ id: string }>`
         SELECT id FROM channel_outbox
         WHERE identity_id = ${identityId} AND delivery_key = 'queued-only'`;
+
       const queuedId = queued[0]?.id;
+
       if (!queuedId) throw new Error("Expected queued outbox row");
       expect(
         yield* messaging
@@ -1201,10 +1323,12 @@ test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery 
         deliveryKey: "stuck",
         payload: { text: "stuck" },
       });
+
       const claim = yield* messaging.claimOutbox({
         identityId,
         leaseSeconds: 30,
       });
+
       if (!claim) throw new Error("Expected claim");
       yield* messaging.markOutboxUncertain({
         lease: {
@@ -1242,12 +1366,14 @@ test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery 
           })
           .pipe(Effect.flip)
       ).toBeInstanceOf(IdentityInactive);
+
       const cancelled = yield* messaging.resolveOutboxUncertain({
         identityId,
         id: claim.id,
         actorPrincipalId: actor,
         decision: { kind: "cancel", reason: "operator_cancelled" },
       });
+
       expect(cancelled.status).toBe("cancelled");
     })
   ));

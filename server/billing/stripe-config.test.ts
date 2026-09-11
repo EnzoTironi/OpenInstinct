@@ -13,9 +13,11 @@ describe("Stripe billing configuration gates", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
+
     for (const [name, value] of Object.entries(requiredEnvironment)) {
       vi.stubEnv(name, value);
     }
+
     vi.stubEnv("STRIPE_SECRET_KEY", "");
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
     vi.stubEnv("STRIPE_PRICE_PRO", "");
@@ -33,6 +35,7 @@ describe("Stripe billing configuration gates", () => {
       isStripeCheckoutConfigured,
       isStripePortalConfigured,
     } = await import("./stripe");
+
     expect(isStripeBillingConfigured()).toBe(false);
     expect(isStripeCheckoutConfigured("pro")).toBe(false);
     expect(isStripeCheckoutConfigured("org")).toBe(false);
@@ -42,11 +45,13 @@ describe("Stripe billing configuration gates", () => {
   it("enables Pro Checkout when secret and Pro price are set", async () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_synthetic");
     vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_synthetic");
+
     const {
       isStripeBillingConfigured,
       isStripeCheckoutConfigured,
       isStripePortalConfigured,
     } = await import("./stripe");
+
     expect(isStripeBillingConfigured()).toBe(true);
     expect(isStripeCheckoutConfigured("pro")).toBe(true);
     expect(isStripeCheckoutConfigured("org")).toBe(false);

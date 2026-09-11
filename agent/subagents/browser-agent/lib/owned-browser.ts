@@ -6,6 +6,8 @@ export async function requireOwnedBrowserSession(
   sessionId: string
 ) {
   const record = await readBrowserSession(scope, sessionId);
+
   if (!record) throw new Error("Browser session not found.");
+
   return record;
 }

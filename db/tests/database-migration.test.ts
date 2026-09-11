@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+
 import { PGlite } from "@electric-sql/pglite";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -67,6 +68,7 @@ describe("database migrations", () => {
            'verification'
          )`
     );
+
     const pendingConstraints = await pendingConstraintCount(database);
 
     expect(tables.rows[0]?.count).toBe(19);
@@ -139,6 +141,7 @@ describe("database migrations", () => {
     const vault = await database.query<{ id: string; kind: string }>(
       "SELECT id, kind FROM vault_items WHERE id = 'legacy-item'"
     );
+
     const chat = await database.query<{
       costUsd: number | null;
       inputTokens: number;
@@ -297,6 +300,7 @@ describe("database migrations", () => {
 function createDatabase() {
   const database = new PGlite();
   databases.push(database);
+
   return database;
 }
 
@@ -305,6 +309,7 @@ async function applyMigration(database: PGlite, name: string) {
     new URL(`../migrations/${name}`, import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -319,6 +324,7 @@ async function pendingConstraintCount(database: PGlite) {
      WHERE NOT convalidated
        AND connamespace = 'public'::regnamespace`
   );
+
   return result.rows[0]?.count;
 }
 

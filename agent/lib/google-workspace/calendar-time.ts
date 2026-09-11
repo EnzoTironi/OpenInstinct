@@ -8,9 +8,12 @@ export function calendarEventTime(
   timezone: string
 ) {
   if (!value) return null;
+
   if (value.date) return { date: value.date, allDay: true };
+
   if (!value.dateTime) return null;
   const instant = new Date(value.dateTime);
+
   const display = new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone,
     year: "numeric",
@@ -22,5 +25,6 @@ export function calendarEventTime(
     hourCycle: "h23",
     timeZoneName: "longOffset",
   }).format(instant);
+
   return { instant: instant.toISOString(), timezone, display };
 }

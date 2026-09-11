@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
-import { get } from "@vercel/blob";
-import type { AccessScope } from "@shared/identity/access-scope";
+
+import { maximumWorkerCompletionImages } from "@agent/subagents/browser-agent/lib/completion";
 import { readReadyBrowserImageArtifact } from "@db/services/browser-images";
 import { maximumBrowserImageBytes } from "@shared/browser/artifact";
 import { env } from "@shared/environment";
-import { maximumWorkerCompletionImages } from "@agent/subagents/browser-agent/lib/completion";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { get } from "@vercel/blob";
+
 import {
   extractImageArtifactMarkdownReferences,
   stripImageArtifactMarkdownReferences,
@@ -25,11 +27,13 @@ export async function prepareLinqImageArtifactDelivery(
   }
 ) {
   const references = extractImageArtifactMarkdownReferences(message);
+
   if (references.length === 0) {
     return { failedArtifactIds: [], files: [], text: message };
   }
 
   const selected = references.slice(0, maximumWorkerCompletionImages);
+
   const loaded = await Promise.all(
     selected.map(async (reference) => ({
       image: await readLinqImageArtifact(input.scope, reference.id, {
@@ -39,6 +43,7 @@ export async function prepareLinqImageArtifactDelivery(
       reference,
     }))
   );
+
   const failedArtifactIds = [
     ...loaded
       .filter((item) => item.image === undefined)
@@ -47,6 +52,7 @@ export async function prepareLinqImageArtifactDelivery(
       .slice(maximumWorkerCompletionImages)
       .map((reference) => reference.id),
   ];
+
   const files = loaded.flatMap(({ image }) =>
     image
       ? [
@@ -74,6 +80,7 @@ async function readLinqImageArtifact(
   const artifact = await readReadyBrowserImageArtifact(scope, artifactId, {
     rootSessionId: options.rootSessionId,
   });
+
   if (
     !artifact?.byteSize ||
     !artifact.contentHash ||
@@ -81,12 +88,16 @@ async function readLinqImageArtifact(
     !artifact.mediaType
   )
     return undefined;
+
   if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) return undefined;
+
   const result = await get(artifact.storagePathname, {
     access: "private",
     abortSignal: options.signal,
   });
+
   if (result?.statusCode !== 200) return undefined;
+
   if (
     result.blob.size !== artifact.byteSize ||
     result.blob.contentType !== artifact.mediaType
@@ -95,12 +106,15 @@ async function readLinqImageArtifact(
   const reader = result.stream.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+
   try {
     /* oxlint-disable eslint/no-await-in-loop -- Blob response chunks form an ordered stream. */
     for (;;) {
       const { done, value } = await reader.read();
+
       if (done) break;
       total += value.byteLength;
+
       if (total > maximumBrowserImageBytes) return undefined;
       chunks.push(value);
     }
@@ -108,14 +122,18 @@ async function readLinqImageArtifact(
   } finally {
     reader.releaseLock();
   }
+
   const bytes = new Uint8Array(total);
   let offset = 0;
+
   for (const chunk of chunks) {
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
+
   if (createHash("sha256").update(bytes).digest("hex") !== artifact.contentHash)
     return undefined;
+
   return {
     bytes,
     filename: artifact.filename,

@@ -1,23 +1,24 @@
-import { gateway } from "ai";
-import { z } from "zod";
-import { Effect, Schema } from "effect";
-import { TRPCError } from "@trpc/server";
 import { listBrowserTraces } from "@db/services/browser-traces";
 import { saveChat } from "@db/services/chats";
-import { replacePersonalProfile } from "../../server/personal-memory/profile";
 import { selectGatewayModel } from "@db/services/settings";
 import { deleteVaultItem, saveVaultItem } from "@db/services/vault";
 import { saveChatSchema } from "@shared/chat/schema";
 import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
-import { serverRuntime } from "../../server/runtime";
-import { disconnectGoogleWorkspace } from "../../server/google-workspace";
-import { IdentitySchema } from "../../server/accounts";
-import { revokeLinkedChannelIdentity } from "../../server/accounts/controls";
 import { userProfileSchema } from "@shared/user-profile/schema";
 import {
   vaultCreateItemSchema,
   vaultImportItemsSchema,
 } from "@shared/vault/schema";
+import { TRPCError } from "@trpc/server";
+import { gateway } from "ai";
+import { Effect, Schema } from "effect";
+import { z } from "zod";
+
+import { IdentitySchema } from "../../server/accounts";
+import { revokeLinkedChannelIdentity } from "../../server/accounts/controls";
+import { disconnectGoogleWorkspace } from "../../server/google-workspace";
+import { replacePersonalProfile } from "../../server/personal-memory/profile";
+import { serverRuntime } from "../../server/runtime";
 import { createTRPCRouter, protectedProcedure } from "./init";
 
 export const appRouter = createTRPCRouter({
@@ -64,18 +65,22 @@ export const appRouter = createTRPCRouter({
       )
       .mutation(async ({ ctx, input }) => {
         const returnTo = googleWorkspaceReturnTo(input.returnTo);
+
         if (input.action === "disconnect") {
           await serverRuntime.runPromise(
             disconnectGoogleWorkspace(ctx.requestHeaders)
           );
+
           const query = new URLSearchParams({
             google: "disconnected",
             returnTo,
           });
+
           return { redirectTo: `/?${query}` };
         }
 
         const query = new URLSearchParams({ returnTo });
+
         return {
           redirectTo: `/api/google-workspace/connect?${query}`,
         };
@@ -164,5 +169,6 @@ async function readModelCatalog() {
 
 function perMillion(value: string) {
   const parsed = Number(value);
+
   return Number.isFinite(parsed) ? parsed * 1_000_000 : undefined;
 }

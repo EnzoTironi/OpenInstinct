@@ -1,5 +1,3 @@
-import { and, eq } from "drizzle-orm";
-import { Effect, Schema } from "effect";
 import { db, organizationInvites, organizationMemberships } from "@db";
 import {
   assertCanAssignRole,
@@ -13,6 +11,9 @@ import {
   type GoogleLinkedIdentity,
   type OrgSsoDenied,
 } from "@shared/identity/org-sso";
+import { and, eq } from "drizzle-orm";
+import { Effect, Schema } from "effect";
+
 import { appendOrganizationAuditReceipt } from "./organization-audit";
 import type { OrganizationAuditAppendFailed } from "./organization-audit";
 import { OrganizationMembershipMissing } from "./organizations";
@@ -33,6 +34,7 @@ async function loadOrgMembership(organizationId: string, userId: string) {
       )
     )
     .limit(1);
+
   return rows[0];
 }
 
@@ -61,6 +63,7 @@ export function createOrganizationInvite(input: {
     const actor = yield* Effect.promise(() =>
       loadOrgMembership(input.organizationId, input.actorUserId)
     );
+
     if (actor === undefined) {
       yield* Effect.fail(
         new OrganizationMembershipMissing({
@@ -68,6 +71,7 @@ export function createOrganizationInvite(input: {
           userId: input.actorUserId,
         })
       );
+
       return { inviteId: input.inviteId };
     }
 
@@ -131,12 +135,15 @@ export function acceptOrganizationInvite(input: {
         .from(organizationInvites)
         .where(eq(organizationInvites.id, input.inviteId))
         .limit(1);
+
       return rows[0];
     });
+
     if (invite === undefined) {
       yield* Effect.fail(
         new OrganizationInviteMissing({ inviteId: input.inviteId })
       );
+
       return { organizationId: "", role: "member" as const };
     }
 
@@ -217,6 +224,7 @@ export function removeOrganizationMember(input: {
     const actor = yield* Effect.promise(() =>
       loadOrgMembership(input.organizationId, input.actorUserId)
     );
+
     if (actor === undefined) {
       yield* Effect.fail(
         new OrganizationMembershipMissing({
@@ -224,6 +232,7 @@ export function removeOrganizationMember(input: {
           userId: input.actorUserId,
         })
       );
+
       return;
     }
 
@@ -276,6 +285,7 @@ export function setOrganizationMemberRoleAudited(input: {
     const { setOrganizationMemberRole } = yield* Effect.promise(
       () => import("./organizations")
     );
+
     yield* setOrganizationMemberRole({
       organizationId: input.organizationId,
       actorUserId: input.actorUserId,
@@ -310,6 +320,7 @@ export function revokeOrganizationInvite(input: {
     const actor = yield* Effect.promise(() =>
       loadOrgMembership(input.organizationId, input.actorUserId)
     );
+
     if (actor === undefined) {
       yield* Effect.fail(
         new OrganizationMembershipMissing({
@@ -317,6 +328,7 @@ export function revokeOrganizationInvite(input: {
           userId: input.actorUserId,
         })
       );
+
       return;
     }
 
@@ -328,8 +340,10 @@ export function revokeOrganizationInvite(input: {
         .from(organizationInvites)
         .where(eq(organizationInvites.id, input.inviteId))
         .limit(1);
+
       return rows[0];
     });
+
     if (
       invite === undefined ||
       invite.organizationId !== input.organizationId
@@ -337,6 +351,7 @@ export function revokeOrganizationInvite(input: {
       yield* Effect.fail(
         new OrganizationInviteMissing({ inviteId: input.inviteId })
       );
+
       return;
     }
 

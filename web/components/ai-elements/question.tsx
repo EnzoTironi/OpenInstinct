@@ -1,5 +1,8 @@
 "use client";
 
+import { cn } from "@web/components/class-names";
+import { Button } from "@web/components/ui/button";
+import { Textarea } from "@web/components/ui/textarea";
 import type {
   ChangeEvent,
   ComponentProps,
@@ -7,10 +10,6 @@ import type {
   ReactNode,
   SubmitEvent,
 } from "react";
-
-import { Button } from "@web/components/ui/button";
-import { Textarea } from "@web/components/ui/textarea";
-import { cn } from "@web/components/class-names";
 import {
   createContext,
   useCallback,
@@ -106,6 +105,7 @@ export const Question = ({
       if (controlledValue === undefined) {
         setInternalValue(nextValue);
       }
+
       onValueChange?.(nextValue);
     },
     [controlledValue, onValueChange]
@@ -125,6 +125,7 @@ export const Question = ({
         optionValue,
         selectionMode
       );
+
       setValue({ ...value, selectedValues });
     },
     [selectionMode, setValue, value]
@@ -145,11 +146,13 @@ export const Question = ({
   const handleSubmit = useCallback(
     async (event: SubmitEvent<HTMLFormElement>) => {
       event.preventDefault();
+
       if (disabled) {
         return;
       }
 
       const text = value.text.trim();
+
       if (value.selectedValues.length === 0 && text.length === 0) {
         return;
       }
@@ -189,7 +192,7 @@ export const QuestionPrompt = ({
   className,
   ...props
 }: QuestionPromptProps) => (
-  <p className={cn("font-medium text-sm", className)} {...props} />
+  <p className={cn("text-sm font-medium", className)} {...props} />
 );
 
 export type QuestionDescriptionProps = HTMLAttributes<HTMLParagraphElement>;
@@ -198,7 +201,7 @@ export const QuestionDescription = ({
   className,
   ...props
 }: QuestionDescriptionProps) => (
-  <p className={cn("text-muted-foreground text-sm", className)} {...props} />
+  <p className={cn("text-sm text-muted-foreground", className)} {...props} />
 );
 
 export type QuestionOptionsProps = HTMLAttributes<HTMLDivElement>;
@@ -237,6 +240,7 @@ export const QuestionOption = ({
   const question = useQuestion();
   const isSelected = question.selectedValues.includes(value);
   const role = question.selectionMode === "single" ? "radio" : "checkbox";
+
   const handleClick = useCallback<NonNullable<QuestionOptionProps["onClick"]>>(
     (event) => {
       question.toggleValue(value);
@@ -273,6 +277,7 @@ export const QuestionInput = ({
   ...props
 }: QuestionInputProps) => {
   const question = useQuestion();
+
   const handleChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
       question.setText(event.currentTarget.value);
@@ -314,6 +319,7 @@ export const QuestionSubmit = ({
   ...props
 }: QuestionSubmitProps) => {
   const question = useQuestion();
+
   const hasResponse =
     question.selectedValues.length > 0 || question.text.trim().length > 0;
 

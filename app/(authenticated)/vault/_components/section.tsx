@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  ArrowLeftIcon,
-  ChevronRightIcon,
-  Globe2Icon,
-  SearchIcon,
-  Trash2Icon,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { type ReactNode, useState } from "react";
+import type { VaultItem } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
 import {
   Dialog,
@@ -21,8 +13,16 @@ import {
   InputGroupInput,
 } from "@web/components/ui/input-group";
 import { Label } from "@web/components/ui/label";
-import type { VaultItem } from "@shared/vault/schema";
 import { api } from "@web/trpc/client";
+import {
+  ArrowLeftIcon,
+  ChevronRightIcon,
+  Globe2Icon,
+  SearchIcon,
+  Trash2Icon,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { type ReactNode, useState } from "react";
 
 const VAULT_DIALOG_PAGE_SIZE = 50;
 
@@ -34,6 +34,7 @@ export function useVaultSection(initialView: VaultSectionView) {
 
   const onOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
+
     if (!nextOpen) setView("list");
   };
 
@@ -131,6 +132,7 @@ export function VaultItemBrowser({
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(VAULT_DIALOG_PAGE_SIZE);
   const normalizedQuery = query.trim().toLocaleLowerCase();
+
   const filteredItems = normalizedQuery
     ? items.filter((item) =>
         `${item.label}\n${item.account}`
@@ -138,6 +140,7 @@ export function VaultItemBrowser({
           .includes(normalizedQuery)
       )
     : items;
+
   const visibleItems = filteredItems.slice(0, visibleCount);
 
   return (
@@ -172,8 +175,10 @@ export function VaultItemBrowser({
         className="-mx-4 no-scrollbar min-h-0 overflow-y-auto px-4"
         onScroll={(event) => {
           const list = event.currentTarget;
+
           const nearEnd =
             list.scrollHeight - list.scrollTop - list.clientHeight < 96;
+
           if (nearEnd && visibleCount < filteredItems.length) {
             setVisibleCount((count) =>
               Math.min(count + VAULT_DIALOG_PAGE_SIZE, filteredItems.length)
@@ -213,6 +218,7 @@ export function VaultItemList({
 
 function VaultItemRow({ item }: { readonly item: VaultItem }) {
   const router = useRouter();
+
   const remove = api.vault.remove.useMutation({
     onSuccess: () => {
       router.refresh();
@@ -248,6 +254,7 @@ function VaultItemRow({ item }: { readonly item: VaultItem }) {
 
 function VaultItemIcon({ item }: { readonly item: VaultItem }) {
   const faviconUrl = loginFaviconUrl(item);
+
   return (
     <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-muted-foreground">
       <Globe2Icon className="size-4" />
@@ -271,9 +278,11 @@ function VaultItemIcon({ item }: { readonly item: VaultItem }) {
 function loginFaviconUrl(item: VaultItem): string | undefined {
   if (item.kind !== "login") return undefined;
   const hostname = item.account.split(" · ", 1)[0]?.trim();
+
   if (!hostname || !hostname.includes(".") || hostname.includes(" ")) {
     return undefined;
   }
+
   try {
     return new URL("/favicon.ico", `https://${hostname}`).toString();
   } catch {

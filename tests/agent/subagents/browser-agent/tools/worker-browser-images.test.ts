@@ -1,9 +1,11 @@
+import { toolContextFor } from "@tests/helpers/tool-context";
 /* oxlint-disable vitest/require-mock-type-parameters -- The test fixtures implement only the external API surface exercised by the tool. */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { toolContextFor } from "@tests/helpers/tool-context";
 
 const artifactId = "0d01e667-d128-4bb7-a248-1ae21db72f4f";
+
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 const image = {
   byteSize: png.byteLength,
   filename: "Product.png",
@@ -32,20 +34,25 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@agent/subagents/browser-agent/lib/access", () => ({
   requireWorkerScope: mocks.requireWorkerScope,
 }));
+
 vi.mock("@agent/subagents/browser-agent/lib/owned-browser", () => ({
   requireOwnedBrowserSession: mocks.requireOwnedBrowserSession,
 }));
+
 vi.mock("@agent/subagents/browser-agent/lib/vault-screenshot-mask", () => ({
   withVaultScreenshotMask: mocks.mask,
 }));
+
 vi.mock("@db/services/browser-images", () => ({
   finalizeBrowserImageArtifact: mocks.persist,
   reserveBrowserImageArtifact: mocks.reserve,
 }));
+
 vi.mock("@vercel/blob", () => ({
   del: mocks.del,
   put: mocks.put,
 }));
+
 vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
   getKernel: () => ({
     browsers: {
@@ -61,6 +68,7 @@ vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
 import captureBrowserImage from "@agent/subagents/browser-agent/tools/capture_browser_image";
 
 const scope = { userId: "user-1", workspaceId: "workspace-1" };
+
 const reservation = {
   id: artifactId,
   storagePathname: `browser-images/workspace/${artifactId}`,
@@ -108,6 +116,7 @@ beforeEach(() => {
 describe("capture_browser_image", () => {
   it("captures a masked viewport and returns only the artifact descriptor", async () => {
     const toolContext = context();
+
     const result = await captureBrowserImage.execute(
       {
         label: "Product",
@@ -153,6 +162,7 @@ describe("capture_browser_image", () => {
               source,
             }
           : { label: "Product", session_id: "browser-1", source };
+
       await captureBrowserImage.execute(input, context());
 
       expect(JSON.stringify(mocks.playwrightExecute.mock.calls)).toContain(

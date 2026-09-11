@@ -24,5 +24,6 @@ let client: Kernel | undefined;
 
 export function getKernel() {
   client ??= Effect.runSync(configuredKernel);
+
   return client;
 }

@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+
 import { bindGroupChannelIdentity } from "../channels/group-policy";
 import { PersonalMemoryError } from "./access";
 import {
@@ -16,6 +17,7 @@ import {
 } from "./group-memory-policy";
 
 const groupScope = "group:telegram:123456:-100123";
+
 const otherGroupScope = "group:telegram:123456:-100999";
 
 describe("G02 shared vs personal memory boundary", () => {
@@ -41,6 +43,7 @@ describe("G02 shared vs personal memory boundary", () => {
         chatId: "-100123",
       })
     );
+
     expect(binding.conversationScope).toBe(groupScope);
     const parsed = parseConversationMemoryScope(binding.conversationScope);
     expect(parsed).toEqual({
@@ -66,6 +69,7 @@ describe("G02 shared vs personal memory boundary", () => {
         chatKind: "group",
       }).pipe(Effect.flip)
     );
+
     expect(error).toEqual(new PersonalMemoryError({ reason: "cross_scope" }));
 
     const fromSession = await Effect.runPromise(
@@ -80,6 +84,7 @@ describe("G02 shared vs personal memory boundary", () => {
         },
       }).pipe(Effect.flip)
     );
+
     expect(fromSession).toEqual(
       new PersonalMemoryError({ reason: "cross_scope" })
     );
@@ -92,6 +97,7 @@ describe("G02 shared vs personal memory boundary", () => {
         chatKind: "group",
       }).pipe(Effect.flip)
     );
+
     expect(error).toEqual(new PersonalMemoryError({ reason: "cross_scope" }));
   });
 
@@ -102,6 +108,7 @@ describe("G02 shared vs personal memory boundary", () => {
         chatKind: "private",
       })
     );
+
     expect(coverage.wiped).toEqual([
       "structured-profile",
       "bound-profile-notes",
@@ -158,6 +165,7 @@ describe("G02 shared vs personal memory boundary", () => {
         sessionScope: otherGroupScope,
       }).pipe(Effect.flip)
     );
+
     expect(cross).toEqual(new PersonalMemoryError({ reason: "cross_scope" }));
 
     const same = await Effect.runPromise(
@@ -166,6 +174,7 @@ describe("G02 shared vs personal memory boundary", () => {
         sessionScope: groupScope,
       })
     );
+
     expect(same.personalProjection).toBeNull();
     expect(same.documents).toEqual([]);
   });
@@ -174,11 +183,13 @@ describe("G02 shared vs personal memory boundary", () => {
     expect(parseConversationMemoryScope("group:not-a-valid").kind).toBe(
       "shared-group"
     );
+
     const error = await Effect.runPromise(
       admitPersonalMemoryAccess({
         conversationScope: "group:broken",
       }).pipe(Effect.flip)
     );
+
     expect(error).toEqual(new PersonalMemoryError({ reason: "cross_scope" }));
   });
 });

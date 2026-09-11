@@ -1,5 +1,4 @@
 import type { channelProviderSchema } from "@shared/identity/channel-auth";
-import { Effect, Result, Schema } from "effect";
 import {
   channelStartResultSchema,
   deviceBindingSchema,
@@ -10,11 +9,13 @@ import {
   channelChallengeIdSchema,
   channelChallengeRequestSchema,
 } from "@shared/identity/channel-auth";
+import { Effect, Result, Schema } from "effect";
 
 const localCallbackSchema = Schema.String.check(
   Schema.makeFilter((value) => {
     try {
       const decoded = decodeURIComponent(value);
+
       return (
         value.startsWith("/") &&
         !value.startsWith("//") &&
@@ -60,6 +61,7 @@ export function reauthenticationDestination(
     outcome.value.data?.success !== true
   )
     return undefined;
+
   return `/sign-in?callbackUrl=${encodeURIComponent(safeCallbackUrl(callbackUrl))}`;
 }
 
@@ -78,6 +80,7 @@ export function channelHttpError(
   retryAfter: string | null = null
 ) {
   const terminal = [400, 401, 403, 404, 409, 410].includes(status);
+
   return new ChannelAuthorizationError({
     status,
     retryAfter,
@@ -110,6 +113,7 @@ export type ChannelAuthorizationStatus =
   | "invalid";
 
 const retrySecondsSchema = Schema.String.check(Schema.isPattern(/^\d+$/u));
+
 const retryDateSchema = Schema.String.check(
   Schema.isPattern(
     /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/u
@@ -124,13 +128,17 @@ export function channelPollFailure(
 ) {
   if (now >= expiresAt)
     return { status: "expired" as const, failures, delay: 0 };
+
   if (failure.category === "terminal")
     return { status: "invalid" as const, failures, delay: 0 };
+
   const nextFailures =
     failure.category === "transient" ? failures + 1 : failures;
+
   if (nextFailures >= 5)
     return { status: "invalid" as const, failures: nextFailures, delay: 0 };
   const header = failure.retryAfter;
+
   const retryAfter =
     header === null
       ? Number.NaN
@@ -139,14 +147,17 @@ export function channelPollFailure(
         : Schema.is(retryDateSchema)(header)
           ? Date.parse(header) - now
           : Number.NaN;
+
   const fallback =
     failure.category === "rate-limit"
       ? 30_000
       : Math.min(2000 * 2 ** nextFailures, 30_000);
+
   const delay = Math.max(
     2000,
     Number.isFinite(retryAfter) ? retryAfter : fallback
   );
+
   return {
     status: "pending" as const,
     failures: nextFailures,
@@ -171,15 +182,18 @@ const requestJson = Effect.fn("channelAuthorization.request")(
         }),
       catch: () => channelHttpError(0),
     });
+
     if (!response.ok)
       return yield* channelHttpError(
         response.status,
         response.headers.get("Retry-After")
       );
+
     const body = yield* Effect.tryPromise({
       try: () => response.text(),
       catch: () => channelHttpError(0),
     });
+
     return yield* Schema.decodeEffect(Schema.fromJsonString(responseSchema))(
       body
     ).pipe(Effect.mapError(() => invalidChannelChallenge(response.status)));
@@ -198,6 +212,7 @@ export const startChannelAuthorization = Effect.fn(
     channel,
     purpose,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
+
   const challenge = yield* requestJson(
     "start",
     {
@@ -207,7 +222,9 @@ export const startChannelAuthorization = Effect.fn(
     },
     channelStartResultSchema
   );
+
   if (challenge.channel !== channel) return yield* invalidChannelChallenge(200);
+
   return challenge;
 });
 
@@ -217,6 +234,7 @@ export const checkChannelAuthorization = Effect.fn(
   const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
     id,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
+
   return yield* requestJson(
     `status?id=${encodeURIComponent(input.id)}`,
     { method: "GET" },
@@ -230,6 +248,7 @@ export const completeChannelAuthorization = Effect.fn(
   const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
     id,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
+
   yield* requestJson(
     "complete",
     {
@@ -246,12 +265,16 @@ export function channelFailureMessage(
   purpose: typeof channelChallengeRequestSchema.Type.purpose
 ) {
   if (purpose === "login") return failure.message;
+
   if (failure.status === 401)
     return "Sign in again before linking another channel, then return to Account to start a new request.";
+
   if (failure.status === 409)
     return "This messenger is already associated with another Companion account. Accounts cannot be combined here. Sign in to its existing account instead.";
+
   if (failure.category === "terminal")
     return "This account-linking request could not be verified. Start a new request and confirm it in the messenger account you want to link.";
+
   return failure.message;
 }
 
@@ -260,6 +283,7 @@ export const bindNativeBrowser = Effect.fn("channelAuthorization.bind")(
     const body = yield* Schema.decodeEffect(deviceBindingSchema)(input).pipe(
       Effect.mapError(() => channelHttpError(400))
     );
+
     return yield* requestJson(
       "device-bind",
       {

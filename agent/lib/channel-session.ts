@@ -1,20 +1,21 @@
 import { Effect, Schema } from "effect";
 import type { ChannelReceiveContext, ChannelSendOptions } from "eve/channels";
+
 import type { Identity } from "../../server/accounts";
+import { Artifacts } from "../../server/artifacts";
+import { loadChannelContent } from "../../server/channels/media/content";
+import { mediaFailureMessage } from "../../server/channels/media/policy";
 import {
   ChannelDispatchError,
   channelPrincipal,
   requireChannelPrincipal,
 } from "../../server/channels/principal";
-import { Artifacts } from "../../server/artifacts";
+import { ChannelTransport } from "../../server/channels/transport";
 import {
   Messaging,
   NativeInboxContentSchema,
   type Lease,
 } from "../../server/messaging";
-import { ChannelTransport } from "../../server/channels/transport";
-import { loadChannelContent } from "../../server/channels/media/content";
-import { mediaFailureMessage } from "../../server/channels/media/policy";
 
 export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
   function* (
@@ -24,15 +25,18 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
     context: ChannelReceiveContext
   ) {
     const identity = yield* requireChannelPrincipal(channel, auth);
+
     if (lease.identityId !== identity.id)
       return yield* new ChannelDispatchError({ reason: "unauthorized" });
     const messaging = yield* Messaging;
     const receipt = yield* messaging.checkInboxLease(lease);
     const snapshot = receipt.nativeInput;
+
     const principal = channelPrincipal(
       identity,
       receipt.sourceMessageId ?? undefined
     );
+
     if (
       !snapshot ||
       snapshot.inputId !== receipt.id ||
@@ -42,6 +46,7 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
     )
       return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
     const address = context.from(snapshot.address);
+
     const session = yield* Effect.gen(function* () {
       // Native acceptance must be checked before media access: an accepted input may
       // outlive its source artifact, and a missing artifact is not evidence of rejection.
@@ -49,6 +54,7 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
         try: () => address.getInputAcceptance(snapshot.inputId, principal),
         catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
       }).pipe(Effect.timeout("25 seconds"));
+
       if (acceptedInput) {
         if (
           snapshot.content === null ||
@@ -57,11 +63,13 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
           return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
         yield* requireChannelPrincipal(channel, auth);
         yield* messaging.checkInboxLease(lease);
+
         const recovered = yield* Effect.tryPromise({
           try: () =>
             address.recoverInputAcceptance(snapshot.inputId, principal),
           catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
         }).pipe(Effect.timeout("25 seconds"));
+
         if (
           !recovered ||
           recovered.inputId !== acceptedInput.inputId ||
@@ -70,12 +78,15 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
           recovered.payloadDigest !== acceptedInput.payloadDigest
         )
           return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
+
         return context.attachSession(recovered.sessionId);
       }
+
       // Only a successful lookup returning absence permits preparation or another send.
       yield* requireChannelPrincipal(channel, auth);
       yield* messaging.checkInboxLease(lease);
       let content = snapshot.content;
+
       if (content === null) {
         const loaded = yield* loadChannelContent(
           identity,
@@ -96,14 +107,17 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
                 lease,
                 reason: "adapter_rejected",
               });
+
               return yield* new ChannelDispatchError({
                 reason: "unsupported_media",
               });
             })
           )
         );
+
         yield* requireChannelPrincipal(channel, auth);
         yield* messaging.checkInboxLease(lease);
+
         const prepared = yield* messaging.prepareInboxHandoff({
           lease,
           transcripts: loaded.transcripts,
@@ -111,23 +125,28 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
             loaded.content
           ),
         });
+
         content = prepared.content;
       } else if (receipt.payload.attachments?.length) {
         const artifacts = yield* Artifacts;
+
         for (const attachment of receipt.payload.attachments) {
           const artifact = yield* artifacts.readForSource({
             identityId: identity.id,
             sourceInboxId: receipt.id,
             mediaId: attachment.id,
           });
+
           if (!artifact)
             return yield* new ChannelDispatchError({
               reason: "handoff_unknown",
             });
         }
       }
+
       yield* requireChannelPrincipal(channel, auth);
       yield* messaging.checkInboxLease(lease);
+
       const sent = yield* Effect.tryPromise({
         try: () =>
           address.send(
@@ -140,12 +159,14 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
           ),
         catch: () => new ChannelDispatchError({ reason: "handoff_unknown" }),
       }).pipe(Effect.timeout("25 seconds"));
+
       if (
         !sent.acceptedInput ||
         sent.acceptedInput.inputId !== snapshot.inputId ||
         sent.acceptedInput.sessionId !== sent.id
       )
         return yield* new ChannelDispatchError({ reason: "handoff_unknown" });
+
       return sent;
     }).pipe(
       Effect.catchTag(
@@ -158,10 +179,12 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
           : Effect.void
       )
     );
+
     yield* messaging.markAccepted({
       lease,
       receipt: { status: "accepted", sessionId: session.id },
     });
+
     return session;
   }
 );
@@ -171,11 +194,13 @@ export const drainChannelInbox = Effect.fn("drainChannelInbox")(function* (
   context: ChannelReceiveContext
 ) {
   const messaging = yield* Messaging;
+
   for (let index = 0; index < 8; index++) {
     const claim = yield* messaging.claimInbox({
       identityId: identity.id,
       leaseSeconds: 150,
     });
+
     if (!claim) return;
     yield* handoffChannelMessage(
       identity.channel,

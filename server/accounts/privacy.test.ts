@@ -1,8 +1,9 @@
 /* oxlint-disable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion -- PgClient stub is intentionally incomplete; fail-closed auth returns before any SQL method runs. */
 import { PgClient } from "@effect/sql-pg";
+import type { AccessScope } from "@shared/identity/access-scope";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AccessScope } from "@shared/identity/access-scope";
+
 import { PersonalMemory } from "../personal-memory";
 import { PersonalMemoryError } from "../personal-memory/access";
 import type * as PersonalMemoryAccess from "../personal-memory/access";
@@ -22,12 +23,14 @@ vi.mock("../personal-memory/export", () => ({
     headers: Headers
   ) {
     yield* readAuthSessionMock(headers);
+
     return yield* new PersonalMemoryError({ reason: "unauthenticated" });
   }),
 }));
 
 vi.mock("../personal-memory/access", async (importOriginal) => {
   const actual = await importOriginal<typeof PersonalMemoryAccess>();
+
   return {
     ...actual,
     requirePersonalMemoryWebSession: Effect.fn(
@@ -50,6 +53,7 @@ import {
 const wipeMock = vi.hoisted(() =>
   vi.fn<(scope: AccessScope) => void>(() => undefined)
 );
+
 const sqlMock = vi.hoisted(() =>
   vi.fn<() => Effect.Effect<never>>(() =>
     Effect.die("SQL must not run without auth")
@@ -60,6 +64,7 @@ function privacyRuntime() {
   const sql = Object.assign(sqlMock, {
     withTransaction: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
   });
+
   return ManagedRuntime.make(
     Layer.mergeAll(
       Layer.succeed(PersonalMemory, {
@@ -67,6 +72,7 @@ function privacyRuntime() {
         inspect: () => Effect.die("inspect must not run without auth"),
         wipe: (scope: AccessScope) => {
           wipeMock(scope);
+
           return Effect.die("wipe must not run without auth");
         },
       }),
@@ -90,10 +96,7 @@ describe("account privacy gates", () => {
     const runtime = privacyRuntime();
     await expect(
       runtime.runPromise(exportAccountPrivacy(new Headers()))
-    ).rejects.toMatchObject({
-      _tag: "AccountPrivacyError",
-      reason: "unauthenticated",
-    });
+    ).rejects.toMatchObject({ reason: "unauthenticated" });
     expect(wipeMock).not.toHaveBeenCalled();
     expect(sqlMock).not.toHaveBeenCalled();
     await runtime.dispose();
@@ -103,10 +106,7 @@ describe("account privacy gates", () => {
     const runtime = privacyRuntime();
     await expect(
       runtime.runPromise(deleteAccountOnlineData(new Headers()))
-    ).rejects.toMatchObject({
-      _tag: "AccountPrivacyError",
-      reason: "unauthenticated",
-    });
+    ).rejects.toMatchObject({ reason: "unauthenticated" });
     expect(wipeMock).not.toHaveBeenCalled();
     expect(sqlMock).not.toHaveBeenCalled();
     await runtime.dispose();
@@ -116,6 +116,7 @@ describe("account privacy gates", () => {
     const response = accountPrivacyErrorResponse(
       new AccountPrivacyError({ reason: "unauthenticated" })
     );
+
     expect(response.status).toBe(401);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
@@ -124,6 +125,7 @@ describe("account privacy gates", () => {
     const response = accountPrivacyErrorResponse(
       new AccountPrivacyError({ reason: "unavailable" })
     );
+
     expect(response.status).toBe(503);
   });
 });

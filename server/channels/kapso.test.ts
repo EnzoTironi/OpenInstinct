@@ -1,14 +1,17 @@
 import { Effect, type Schema } from "effect";
 import { expect, test } from "vitest";
+
+import receivedDelivery from "./fixtures/kapso-received.redacted.json";
 import { parseKapsoWebhook } from "./kapso";
 import { ProviderInputError } from "./provider-errors";
-import receivedDelivery from "./fixtures/kapso-received.redacted.json";
 
 const now = 1_800_000_000_000;
+
 const installation = {
   phoneNumberId: "123456789",
   phoneNumber: "+15550001111",
 };
+
 const baseMessage = {
   id: "wamid.incoming",
   timestamp: String(now / 1000),
@@ -17,6 +20,7 @@ const baseMessage = {
   text: { body: "hello" },
   kapso: { direction: "inbound", status: "received", origin: "cloud_api" },
 };
+
 const base = {
   phone_number_id: installation.phoneNumberId,
   message: baseMessage,
@@ -26,6 +30,7 @@ const base = {
     contact_name: "Never an identity",
   },
 };
+
 const parse = (value: Schema.Json) =>
   Effect.runPromise(parseKapsoWebhook(value, installation, now));
 
@@ -42,6 +47,7 @@ test("preserves wamid/from and ignores display names and derived content", async
       },
     },
   });
+
   expect(events[0]).toMatchObject({
     kind: "message",
     eventId: "wamid.incoming",
@@ -71,6 +77,7 @@ test("normalizes media references and login commands without media URLs or raw t
       },
     },
   });
+
   expect(media[0]).toMatchObject({
     kind: "message",
     payload: {
@@ -82,10 +89,12 @@ test("normalizes media references and login commands without media URLs or raw t
   });
   expect(JSON.stringify(media)).not.toContain("https://");
   const token = "a".repeat(43);
+
   const command = await parse({
     ...base,
     message: { ...baseMessage, text: { body: `/confirm ${token}` } },
   });
+
   expect(command[0]).toMatchObject({
     kind: "message",
     payload: { text: `/confirm ${token}` },
@@ -154,11 +163,13 @@ test("accepts 100 batched events and rejects larger or stale/future input", asyn
     ...base,
     message: { ...baseMessage, id: `wamid.${String(index)}` },
   }));
+
   const events = await parse({
     batch: true,
     type: "whatsapp.message.received",
     data,
   });
+
   expect(events).toHaveLength(100);
   expect(events.at(-1)?.eventId).toBe("wamid.99");
   await expect(
@@ -185,6 +196,7 @@ test("accepts the provider default batch of 50", async () => {
     ...base,
     message: { ...baseMessage, id: `wamid.${String(index)}` },
   }));
+
   expect(
     await parse({ batch: true, type: "whatsapp.message.received", data })
   ).toHaveLength(50);
@@ -197,6 +209,7 @@ test.each(["cloud_api", "business_app"])(
     expect(
       await parse({ ...base, message: { ...baseMessage, kapso } })
     ).toHaveLength(1);
+
     const events = await parse({
       ...base,
       message: {
@@ -205,6 +218,7 @@ test.each(["cloud_api", "business_app"])(
         text: { body: `/confirm ${"a".repeat(43)}` },
       },
     });
+
     expect(events[0]).toMatchObject({
       kind: "message",
       payload: { text: `/confirm ${"a".repeat(43)}` },
@@ -225,6 +239,7 @@ test.each(["history_sync", "unknown_future_origin", undefined])(
       direction: "inbound",
       status: "received",
     };
+
     if (origin !== undefined) kapso.origin = origin;
     await Promise.all(
       [
@@ -254,6 +269,7 @@ test("accepts the live inbound delivery with null context and delivered status",
       Number(receivedDelivery.message.timestamp) * 1000
     )
   );
+
   expect(events).toHaveLength(1);
   expect(events[0]).toMatchObject({
     kind: "message",
@@ -265,6 +281,7 @@ test("accepts the live inbound delivery with null context and delivered status",
 
 test("kapso group mention signals open ingress; bare group stays closed", async () => {
   const { phone_number: _peerPhone, ...groupConversation } = base.conversation;
+
   const groupBase = {
     ...base,
     conversation: {
@@ -283,6 +300,7 @@ test("kapso group mention signals open ingress; bare group stays closed", async 
       },
     },
   };
+
   const opened = await parse(groupBase);
   expect(opened).toHaveLength(1);
   expect(opened[0]).toMatchObject({

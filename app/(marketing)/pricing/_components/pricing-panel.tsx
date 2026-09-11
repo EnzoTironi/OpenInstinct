@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { Option, Schema } from "effect";
-import { useState } from "react";
 import { billingPlanCatalog, type BillingPlanId } from "@shared/billing/plans";
+import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import {
   Card,
@@ -13,7 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@web/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
+import { Option, Schema } from "effect";
+import Link from "next/link";
+import { useState } from "react";
 
 const plans = [
   billingPlanCatalog.free,
@@ -30,7 +30,9 @@ const checkoutResponseSchema = Schema.Struct({
 function formatPrice(planId: BillingPlanId, amount: number) {
   if (planId === "free") return "Free";
   const dollars = String(amount);
+
   if (planId === "org") return `$${dollars}/seat · mo`;
+
   return `$${dollars}/mo`;
 }
 
@@ -49,6 +51,7 @@ export function PricingPanel({
   async function startCheckout(plan: "pro" | "org") {
     setBusyPlan(plan);
     setError(null);
+
     try {
       const response = await fetch("/api/billing/checkout", {
         method: "POST",
@@ -58,9 +61,11 @@ export function PricingPanel({
           seatCount: plan === "org" ? 1 : undefined,
         }),
       });
+
       const raw: unknown = await response.json();
       const decoded = Schema.decodeUnknownOption(checkoutResponseSchema)(raw);
       const body = Option.isSome(decoded) ? decoded.value : {};
+
       if (!response.ok || !body.url) {
         if (body.reason === "stripe_not_configured") {
           setError(
@@ -73,8 +78,10 @@ export function PricingPanel({
         } else {
           setError(body.error ?? "Unable to start Checkout.");
         }
+
         return;
       }
+
       window.location.assign(body.url);
     } catch {
       setError(
@@ -123,6 +130,7 @@ export function PricingPanel({
         {plans.map((plan) => {
           const isCurrent = currentPlan === plan.id;
           const highlight = plan.id === "pro";
+
           return (
             <Card
               className={

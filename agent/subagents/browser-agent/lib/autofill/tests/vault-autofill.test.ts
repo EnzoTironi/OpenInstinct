@@ -1,14 +1,5 @@
 import { runInNewContext } from "node:vm";
-import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
-import type { AccessScope } from "@shared/identity/access-scope";
-import {
-  serializeAddressVaultPayload,
-  serializeContactVaultPayload,
-  serializeLoginVaultPayload,
-  serializePaymentCard,
-  type VaultItemKind,
-} from "@shared/vault/schema";
+
 import {
   classifyNativeLoginControl,
   frameOriginExpression,
@@ -21,12 +12,22 @@ import {
   nativeAutofillSecretMarkingExpression,
   nativeAutofillTokens,
 } from "@agent/subagents/browser-agent/lib/autofill/native";
+import { vaultAutofillProvider } from "@agent/subagents/browser-agent/lib/autofill/provider";
 import {
   listAutofillSuggestions,
   materializeAutofillClaims,
   type AutofillVaultAdapter,
 } from "@agent/subagents/browser-agent/lib/autofill/service";
-import { vaultAutofillProvider } from "@agent/subagents/browser-agent/lib/autofill/provider";
+import type { AccessScope } from "@shared/identity/access-scope";
+import {
+  serializeAddressVaultPayload,
+  serializeContactVaultPayload,
+  serializeLoginVaultPayload,
+  serializePaymentCard,
+  type VaultItemKind,
+} from "@shared/vault/schema";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 interface VaultStore {
   items: { id: string }[];
@@ -63,10 +64,12 @@ const paymentSurface = {
   id: "payment-card",
   kind: "payment-card" as const,
 };
+
 const credentialsSurface = surface("credentials", [
   "username",
   "current-password",
 ]);
+
 const contactSurface = surface("contact", [
   "email",
   "tel",
@@ -74,6 +77,7 @@ const contactSurface = surface("contact", [
   "bday-month",
   "bday-year",
 ]);
+
 const addressSurface = surface("postal-address", [
   "street-address",
   "address-line1",
@@ -95,6 +99,7 @@ describe("vault browser autofill", () => {
       label: "Travel card",
       updatedAt: "2026-08-27T00:00:00.000Z",
     };
+
     const provider = providerFor(
       card,
       serializePaymentCard({
@@ -135,6 +140,7 @@ describe("vault browser autofill", () => {
       origin: "https://merchant.example",
       surface: paymentSurface,
     });
+
     expect(
       Object.fromEntries(claims.map(({ token, value }) => [token, value]))
     ).toEqual({
@@ -152,6 +158,7 @@ describe("vault browser autofill", () => {
       "Primary login",
       "checkout.example · a•••@example.com"
     );
+
     const provider = providerFor(
       login,
       serializeLoginVaultPayload({
@@ -188,6 +195,7 @@ describe("vault browser autofill", () => {
       origin: "https://checkout.example",
       surface: credentialsSurface,
     });
+
     expect(claimValues(claims)).toEqual({
       "current-password": "correct horse",
       username: "ada@example.com",
@@ -204,6 +212,7 @@ describe("vault browser autofill", () => {
 
   it("materializes passwordless identifiers without an OTP", async () => {
     const login = vaultItem("login", "Email code", "a•••@example.com");
+
     const provider = providerFor(
       login,
       serializeLoginVaultPayload({
@@ -220,11 +229,13 @@ describe("vault browser autofill", () => {
       origin: "https://checkout.example",
       surface: contactSurface,
     });
+
     expect(claimValues(claims)).toEqual({ email: "ada@example.com" });
   });
 
   it("fails closed for legacy logins without an origin", async () => {
     const login = vaultItem("login", "Legacy", "a•••@example.com");
+
     const provider = providerFor(
       login,
       JSON.stringify({
@@ -253,6 +264,7 @@ describe("vault browser autofill", () => {
 
   it("maps structured addresses and contacts to standard tokens", async () => {
     const address = vaultItem("address", "Home", "");
+
     const addressProvider = providerFor(
       address,
       serializeAddressVaultPayload({
@@ -267,6 +279,7 @@ describe("vault browser autofill", () => {
         version: 1,
       })
     );
+
     const addressClaims = await addressProvider.materializeClaims(
       scope,
       address.id,
@@ -278,6 +291,7 @@ describe("vault browser autofill", () => {
         surface: addressSurface,
       }
     );
+
     expect(claimValues(addressClaims)).toEqual({
       "address-level1": "London",
       "address-level2": "London",
@@ -290,6 +304,7 @@ describe("vault browser autofill", () => {
     });
 
     const contact = vaultItem("contact", "Checkout", "");
+
     const contactProvider = providerFor(
       contact,
       serializeContactVaultPayload({
@@ -301,6 +316,7 @@ describe("vault browser autofill", () => {
         version: 1,
       })
     );
+
     const contactClaims = await contactProvider.materializeClaims(
       scope,
       contact.id,
@@ -312,6 +328,7 @@ describe("vault browser autofill", () => {
         surface: contactSurface,
       }
     );
+
     expect(claimValues(contactClaims)).toEqual({
       "bday-day": "10",
       "bday-month": "12",
@@ -326,6 +343,7 @@ describe("vault browser autofill", () => {
       async listSuggestions(_scope, origin, targetSurface) {
         expect(origin).toBe("https://merchant.example");
         expect(targetSurface.kind).toBe("payment-card");
+
         return [
           {
             candidateId: "opaque-card",
@@ -338,6 +356,7 @@ describe("vault browser autofill", () => {
       async materializeClaims(_scope, candidateId, target) {
         expect(candidateId).toBe("opaque-card");
         expect(target.surface.kind).toBe("payment-card");
+
         return [
           {
             id: "84e90f49-68d0-45ba-a183-3ca18ef087dc",
@@ -474,19 +493,24 @@ describe("vault browser autofill", () => {
           return this.form;
         }
       }
+
       class FakeNodeList extends Array<FakeInput> {
         item(index: number) {
           return this[index] ?? null;
         }
       }
+
       const controls = new FakeNodeList(
         new FakeInput("4111111111111111"),
         new FakeInput("09/31"),
         new FakeInput("")
       );
+
       const form = { querySelectorAll: () => controls };
+
       for (const control of controls) control.form = form;
       const document = { querySelectorAll: () => controls };
+
       const markedCount = z.number().parse(
         runInNewContext(nativeAutofillSecretMarkingExpression(0), {
           document,
@@ -528,11 +552,14 @@ describe("vault browser autofill", () => {
         return true;
       }
     }
+
     class FakeEvent {
       readonly bubbles = true;
     }
+
     const fill = (documentOrigin: string, expectedOrigin: string) => {
       const input = new FakeInput();
+
       const accepted = z.boolean().parse(
         runInNewContext(
           `(${nativeLoginFillFunctionDeclaration}).call(input, "hunter2", expectedOrigin)`,
@@ -546,6 +573,7 @@ describe("vault browser autofill", () => {
           }
         )
       );
+
       return { accepted, value: input.value };
     };
 
@@ -658,6 +686,7 @@ describe("vault browser autofill", () => {
       label: "Email or MileagePlus number",
       token: "email",
     });
+
     expect(
       selectNativeLoginFills(
         [combinedIdentifier],
@@ -721,6 +750,7 @@ function vaultItem(kind: VaultItemKind, label: string, account: string) {
 function providerFor(item: ReturnType<typeof vaultItem>, secret: string) {
   vaultStore.items = [item];
   vaultStore.secret = secret;
+
   return vaultAutofillProvider;
 }
 

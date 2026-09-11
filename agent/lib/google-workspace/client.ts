@@ -8,10 +8,11 @@ import {
 } from "eve/connections";
 import type { SessionAuthContext } from "eve/context";
 import type { ToolContext } from "eve/tools";
-import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
-import { serverRuntime } from "../../../server/runtime";
+
 import { getGoogleWorkspaceToken } from "../../../server/google-workspace";
 import { createGoogleWorkspaceChallenge } from "../../../server/google-workspace/challenge";
+import { serverRuntime } from "../../../server/runtime";
+import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 
 function googleScope(principal: ConnectionPrincipal) {
   if (principal.type !== "user")
@@ -19,6 +20,7 @@ function googleScope(principal: ConnectionPrincipal) {
       reason: "principal_required",
       retryable: false,
     });
+
   return scopeFromPrincipal(principal);
 }
 
@@ -31,6 +33,7 @@ function liveGoogleConsentPrincipal(
       reason: "principal_required",
       retryable: false,
     });
+
   return {
     attributes: principal.attributes ?? {},
     // Eve stores the session authenticator on issuer when no IdP issuer is set.
@@ -84,6 +87,7 @@ const googleWorkspaceAuth = defineInteractiveAuthorization({
         )
       )
     );
+
     return { challenge: { url, displayName: "Google Workspace" } };
   },
   completeAuthorization({ principal, callback }) {
@@ -92,6 +96,7 @@ const googleWorkspaceAuth = defineInteractiveAuthorization({
         reason: "authorization_denied",
         retryable: false,
       });
+
     return readToken(principal);
   },
 });
@@ -100,6 +105,7 @@ class GoogleApiError extends Schema.TaggedError<GoogleApiError>()(
   "GoogleApiError",
   { status: Schema.optionalKey(Schema.Number) }
 ) {}
+
 const googleApiErrorSchema = Schema.Struct({
   response: Schema.Struct({
     status: Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 599 })),
@@ -123,6 +129,7 @@ export async function withGoogleAuth<T>(
   const { token } = await ctx.getToken(googleWorkspaceAuth);
   const authClient = new auth.OAuth2();
   authClient.setCredentials({ access_token: token });
+
   return Effect.runPromise(
     Effect.tryPromise({
       try: () => execute(authClient),
@@ -131,6 +138,7 @@ export async function withGoogleAuth<T>(
       Effect.catchTag("GoogleApiError", (error) => {
         if (error.status === 401)
           return Effect.sync(() => ctx.requireAuth(googleWorkspaceAuth));
+
         return Effect.fail(error);
       })
     ),

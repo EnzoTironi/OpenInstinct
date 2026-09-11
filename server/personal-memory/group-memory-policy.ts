@@ -1,5 +1,6 @@
 import { Effect, Result, Schema } from "effect";
 import type { SessionAuthContext } from "eve/context";
+
 import { ProviderReferenceSchema } from "../channels/inbound";
 import { PersonalMemoryError } from "./access";
 
@@ -85,9 +86,12 @@ export const parseConversationMemoryScope = (
   if (raw === null || raw === undefined) {
     return { kind: "personal", conversationScope: null };
   }
+
   const trimmed = raw.trim();
+
   if (!trimmed) return { kind: "personal", conversationScope: null };
   const match = groupConversationScopePattern.exec(trimmed);
+
   if (match) {
     const decoded = decodeGroupScopeParts({
       kind: "shared-group",
@@ -96,13 +100,17 @@ export const parseConversationMemoryScope = (
       installationId: match[2],
       chatId: match[3],
     });
+
     const parts = Result.getOrElse(decoded, () => null);
+
     if (parts) return parts;
   }
+
   // Malformed `group:` prefixes fail closed as shared-group (deny personal).
   if (trimmed.startsWith("group:")) {
     return { kind: "shared-group", conversationScope: trimmed };
   }
+
   return { kind: "personal", conversationScope: null };
 };
 
@@ -122,6 +130,7 @@ export const classifySessionMemoryKind = (input: {
   readonly chatKind?: "private" | "group" | null;
 }): MemoryConversationKind => {
   if (input.chatKind === "group") return "shared-group";
+
   return parseConversationMemoryScope(input.conversationScope ?? null).kind;
 };
 
@@ -146,6 +155,7 @@ const sessionConversationHints = (
     decodeSessionMemoryHints(principal?.attributes ?? {}),
     (): typeof SessionMemoryHintsSchema.Type => ({})
   );
+
   return {
     conversationScope: hints.conversationScope ?? null,
     chatKind: hints.chatKind ?? null,
@@ -162,9 +172,11 @@ export const admitPersonalMemoryAccess = Effect.fn("admitPersonalMemoryAccess")(
     readonly chatKind?: "private" | "group" | null;
   }) {
     const kind = classifySessionMemoryKind(input);
+
     if (kind === "shared-group") {
       return yield* new PersonalMemoryError({ reason: "cross_scope" });
     }
+
     return {
       kind: "personal" as const,
       parsed: parseConversationMemoryScope(input.conversationScope ?? null),
@@ -190,6 +202,7 @@ export const admitPersonalWipeTarget = Effect.fn("admitPersonalWipeTarget")(
     readonly chatKind?: "private" | "group" | null;
   }) {
     yield* admitPersonalMemoryAccess(input);
+
     // personalWipeAffectsSharedGroup is false by model contract; coverage documents isolation.
     return personalWipeCoverage;
   }
@@ -202,12 +215,15 @@ export const admitPersonalWipeTarget = Effect.fn("admitPersonalWipeTarget")(
 export const readSharedGroupMemoryStub = Effect.fn("readSharedGroupMemoryStub")(
   function* (conversationScope: string) {
     const parsed = parseConversationMemoryScope(conversationScope);
+
     if (parsed.kind !== "shared-group" || !("channel" in parsed)) {
       return yield* new PersonalMemoryError({ reason: "invalid_binding" });
     }
+
     const key = sharedGroupMemoryModel.keyFromConversationScope(
       parsed.conversationScope
     );
+
     return {
       scope: key,
       namespace: sharedGroupMemoryModel.namespace,
@@ -229,6 +245,7 @@ export const admitSharedGroupMemoryRead = Effect.fn(
 }) {
   const requested = parseConversationMemoryScope(input.requestedScope);
   const session = parseConversationMemoryScope(input.sessionScope);
+
   if (
     requested.kind !== "shared-group" ||
     session.kind !== "shared-group" ||
@@ -236,5 +253,6 @@ export const admitSharedGroupMemoryRead = Effect.fn(
   ) {
     return yield* new PersonalMemoryError({ reason: "cross_scope" });
   }
+
   return yield* readSharedGroupMemoryStub(requested.conversationScope);
 });

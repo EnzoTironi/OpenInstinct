@@ -2,12 +2,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const handler = vi.fn<(request: Request) => Promise<Response>>();
+
 const mocks = vi.hoisted(() => ({
   getAuth: vi.fn(),
   toNextJsHandler: vi.fn(),
 }));
 
 vi.mock("@db/services/auth", () => ({ getAuth: mocks.getAuth }));
+
 vi.mock("better-auth/next-js", () => ({
   toNextJsHandler: mocks.toNextJsHandler,
 }));
@@ -30,6 +32,7 @@ describe("auth route initialization", () => {
       .mockRejectedValueOnce(new Error("Blob temporarily unavailable"))
       .mockResolvedValueOnce({});
     const { GET } = await import("@app/api/auth/[...all]/route");
+
     const request = new Request(
       "https://openinstinct.example/api/auth/session"
     );

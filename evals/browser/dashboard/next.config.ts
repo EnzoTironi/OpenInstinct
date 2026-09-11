@@ -1,5 +1,6 @@
-import type { NextConfig } from "next";
 import { resolve } from "node:path";
+
+import type { NextConfig } from "next";
 
 export default {
   agentRules: false,

@@ -5,6 +5,7 @@ export function getLatestTurnFailure(
 ): string | undefined {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
+
     if (!event) continue;
 
     if (isTurnFailureEvent(event) && event.type === "turn.failed") {
@@ -12,6 +13,7 @@ export function getLatestTurnFailure(
         ? "The model is temporarily unavailable. Please try again."
         : event.data.message;
     }
+
     if (
       event.type === "turn.completed" ||
       event.type === "turn.cancelled" ||
@@ -20,5 +22,6 @@ export function getLatestTurnFailure(
       return undefined;
     }
   }
+
   return undefined;
 }

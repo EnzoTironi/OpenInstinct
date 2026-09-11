@@ -1,7 +1,8 @@
+import { getAuthSession } from "@db/services/auth/session";
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAuthSession } from "@db/services/auth/session";
+
 import { config, proxy } from "../../../proxy";
 
 const mocks = vi.hoisted(() => ({
@@ -62,9 +63,11 @@ describe("auth proxy matcher", () => {
         proxy(new NextRequest(`https://example.com${path}`))
       )
     );
+
     for (const response of responses) {
       expect(response.headers.get("x-middleware-next")).toBe("1");
     }
+
     expect(getAuthSession).not.toHaveBeenCalled();
   });
 

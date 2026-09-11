@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -9,6 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
+import { Match } from "effect";
+import Link from "next/link";
+
 import type { BrowserBenchmarkLiveStatus } from "../../../live-status-schema";
 import { averageBenchmarkImprovement } from "../../lib/benchmark-comparison";
 import { useRuns } from "../../lib/use-runs";
@@ -17,9 +19,11 @@ type Variant = BrowserBenchmarkLiveStatus["variants"]["baseline"];
 
 export default function RunsPage() {
   const { error, runs } = useRuns();
+
   const active = runs.some(
     (run) => run.status === "preparing" || run.status === "running"
   );
+
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
       <header className="flex items-end justify-between gap-4">
@@ -75,10 +79,12 @@ export default function RunsPage() {
 function RunRow({ run }: { run: BrowserBenchmarkLiveStatus }) {
   const baseline = summarize(run.variants.baseline);
   const candidate = summarize(run.variants.candidate);
+
   const improvement = averageBenchmarkImprovement(
     run.variants.baseline.tasks,
     run.variants.candidate.tasks
   );
+
   return (
     <TableRow>
       <TableCell>
@@ -130,6 +136,7 @@ function RunRow({ run }: { run: BrowserBenchmarkLiveStatus }) {
 
 function Improvement({ value }: { value: number | null }) {
   if (value === null) return <span className="text-muted-foreground">—</span>;
+
   return (
     <span className={value < 0 ? "text-success" : "text-destructive"}>
       {value > 0 ? "+" : ""}
@@ -143,22 +150,24 @@ function RunStatus({
 }: {
   status: BrowserBenchmarkLiveStatus["status"];
 }) {
-  const className =
-    status === "failed"
-      ? "text-destructive"
-      : status === "completed"
-        ? "text-success"
-        : "text-information";
+  const className = Match.value(status).pipe(
+    Match.when("failed", () => "text-destructive"),
+    Match.when("completed", () => "text-success"),
+    Match.orElse(() => "text-information")
+  );
+
   return <span className={className}>{status}</span>;
 }
 
 function summarize(variant: Variant) {
   let passed = 0;
   let cost = 0;
+
   for (const task of variant.tasks) {
     if (task.success === true) passed += 1;
     cost += task.costUsd ?? 0;
   }
+
   return {
     cost,
     costComplete:
@@ -177,6 +186,7 @@ function formatPassed(summary: ReturnType<typeof summarize>) {
 
 function elapsed(startedAt: string, completedAt: string | null) {
   if (!completedAt) return null;
+
   return Math.max(
     0,
     new Date(completedAt).getTime() - new Date(startedAt).getTime()
@@ -186,7 +196,9 @@ function elapsed(startedAt: string, completedAt: string | null) {
 function formatDuration(milliseconds: number | null) {
   if (milliseconds === null) return "Running";
   const seconds = milliseconds / 1_000;
+
   if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+
   return `${String(Math.floor(seconds / 60))}m ${String(Math.floor(seconds % 60))}s`;
 }
 

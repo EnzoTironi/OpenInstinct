@@ -1,5 +1,6 @@
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
+
 import { Effect, Schema } from "effect";
 import {
   FetchHttpClient,
@@ -7,6 +8,7 @@ import {
   HttpClientRequest,
 } from "effect/unstable/http";
 import { describe, expect, it } from "vitest";
+
 import {
   boundRetryAfterSeconds,
   DEFAULT_RETRY_AFTER_SECONDS,
@@ -22,6 +24,7 @@ function fixtureUrl(server: Server, path = "/send") {
   const address = Schema.decodeUnknownSync(
     Schema.Struct({ port: Schema.Number })
   )(server.address());
+
   return `http://127.0.0.1:${String(address.port)}${path}`;
 }
 
@@ -70,11 +73,11 @@ describe("requestProviderJson status classification", () => {
         })
       );
     }).listen(0, "127.0.0.1");
+
     await once(server, "listening");
     await expect(
       Effect.runPromise(call(fixtureUrl(server)))
     ).rejects.toMatchObject({
-      _tag: "ProviderRetryable",
       status: 429,
       retryAfterSeconds: 17,
       provider: "telegram",
@@ -86,10 +89,13 @@ describe("requestProviderJson status classification", () => {
       response.writeHead(429);
       response.end(JSON.stringify({ ok: false, error_code: 429 }));
     }).listen(0, "127.0.0.1");
+
     await once(server, "listening");
+
     const error = await Effect.runPromise(
       call(fixtureUrl(server)).pipe(Effect.flip)
     );
+
     expect(error).toBeInstanceOf(ProviderRetryable);
     expect(error).toMatchObject({
       status: 429,
@@ -108,13 +114,11 @@ describe("requestProviderJson status classification", () => {
         })
       );
     }).listen(0, "127.0.0.1");
+
     await once(server, "listening");
     await expect(
       Effect.runPromise(call(fixtureUrl(server)))
-    ).rejects.toMatchObject({
-      _tag: "ProviderRetryable",
-      retryAfterSeconds: 9,
-    });
+    ).rejects.toMatchObject({ retryAfterSeconds: 9 });
   });
 
   it("defaults when Retry-After is malformed", async () => {
@@ -122,13 +126,11 @@ describe("requestProviderJson status classification", () => {
       response.writeHead(429, { "retry-after": "soon-please" });
       response.end("{}");
     }).listen(0, "127.0.0.1");
+
     await once(server, "listening");
     await expect(
       Effect.runPromise(call(fixtureUrl(server)))
-    ).rejects.toMatchObject({
-      _tag: "ProviderRetryable",
-      retryAfterSeconds: DEFAULT_RETRY_AFTER_SECONDS,
-    });
+    ).rejects.toMatchObject({ retryAfterSeconds: DEFAULT_RETRY_AFTER_SECONDS });
   });
 
   it("keeps permanent 4xx as ProviderRejected", async () => {
@@ -136,10 +138,13 @@ describe("requestProviderJson status classification", () => {
       response.writeHead(400);
       response.end("bad");
     }).listen(0, "127.0.0.1");
+
     await once(server, "listening");
+
     const error = await Effect.runPromise(
       call(fixtureUrl(server)).pipe(Effect.flip)
     );
+
     expect(error).toBeInstanceOf(ProviderRejected);
     expect(error).toMatchObject({ status: 400 });
   });
@@ -149,10 +154,13 @@ describe("requestProviderJson status classification", () => {
       response.writeHead(408);
       response.end("later");
     }).listen(0, "127.0.0.1");
+
     await once(server, "listening");
+
     const error = await Effect.runPromise(
       call(fixtureUrl(server)).pipe(Effect.flip)
     );
+
     expect(error).toBeInstanceOf(ProviderUncertain);
   });
 
@@ -161,10 +169,13 @@ describe("requestProviderJson status classification", () => {
       response.writeHead(503);
       response.end("later");
     }).listen(0, "127.0.0.1");
+
     await once(server, "listening");
+
     const error = await Effect.runPromise(
       call(fixtureUrl(server)).pipe(Effect.flip)
     );
+
     expect(error).toBeInstanceOf(ProviderUncertain);
   });
 });

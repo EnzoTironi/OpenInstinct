@@ -1,5 +1,6 @@
 import { Effect, type Schema } from "effect";
 import { describe, expect, it, test } from "vitest";
+
 import {
   DEFAULT_RETRY_AFTER_SECONDS,
   ProviderInputError,
@@ -10,14 +11,18 @@ import {
 import { parseTelegramUpdate, telegramSendFailure } from "./telegram";
 
 const now = 1_800_000_000_000;
+
 const installation = { botId: "123456", botUsername: "CompanionBot" };
+
 const token = "a".repeat(43);
+
 const baseMessage = {
   message_id: 51,
   date: now / 1000,
   from: { id: 789012, is_bot: false },
   chat: { id: 789012, type: "private" },
 };
+
 const parse = (value: Schema.Json) =>
   Effect.runPromise(parseTelegramUpdate(value, installation, now));
 
@@ -41,6 +46,7 @@ test("preserves update and sender IDs and separates login tokens from messages",
     update_id: 99,
     message: { ...baseMessage, text: `/start ${token}` },
   });
+
   expect(events).toEqual([
     {
       channel: "telegram",
@@ -57,10 +63,12 @@ test("preserves update and sender IDs and separates login tokens from messages",
     },
   ]);
   expect(events[0]).not.toHaveProperty("payload");
+
   const confirm = await parse({
     update_id: 100,
     message: { ...baseMessage, text: `/confirm@CompanionBot ${token}` },
   });
+
   expect(confirm[0]).toMatchObject({
     kind: "command",
     command: "confirm",
@@ -83,6 +91,7 @@ test("normalizes text and opaque media without downloading or retaining URLs", a
       reply_to_message: { message_id: 42 },
     },
   });
+
   expect(events[0]).toMatchObject({
     kind: "message",
     payload: {
@@ -136,6 +145,7 @@ test("ignores bots, unmentioned groups, edited updates, mismatched private sende
       message: { ...baseMessage, text: `/start@AnotherBot ${token}` },
     },
   ];
+
   expect(await Promise.all(ignored.map(parse))).toEqual(ignored.map(() => []));
 });
 
@@ -146,6 +156,7 @@ test("only accepts private confirmation callbacks on this bot's own message", as
     message: { ...baseMessage, from: { id: 123456, is_bot: true } },
     data: `confirm:${token}`,
   };
+
   const events = await parse({ update_id: 17, callback_query: query });
   expect(events[0]).toMatchObject({
     kind: "command",
@@ -203,6 +214,7 @@ describe("telegram private send failure classification", () => {
       error_code: 429,
       parameters: { retry_after: 14 },
     });
+
     expect(error).toBeInstanceOf(ProviderRetryable);
     expect(error).toMatchObject({
       provider: "telegram",
@@ -237,6 +249,7 @@ describe("telegram private send failure classification", () => {
 
 test("group mention foundation accepts @mention and reply-to-bot; private still works", async () => {
   const groupChat = { id: -100123, type: "supergroup" as const };
+
   const mentioned = await parse({
     update_id: 200,
     message: {
@@ -246,6 +259,7 @@ test("group mention foundation accepts @mention and reply-to-bot; private still 
       entities: [{ type: "mention", offset: 4, length: 14 }],
     },
   });
+
   expect(mentioned).toHaveLength(1);
   expect(mentioned[0]).toMatchObject({
     kind: "message",
@@ -267,6 +281,7 @@ test("group mention foundation accepts @mention and reply-to-bot; private still 
       },
     },
   });
+
   expect(replied[0]).toMatchObject({
     kind: "message",
     chatKind: "group",
@@ -291,6 +306,7 @@ test("group mention foundation accepts @mention and reply-to-bot; private still 
     update_id: 203,
     message: { ...baseMessage, text: "still private" },
   });
+
   expect(privateMessage[0]).toMatchObject({
     kind: "message",
     chatKind: "private",

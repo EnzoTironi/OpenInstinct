@@ -1,8 +1,9 @@
 import { PgClient } from "@effect/sql-pg";
 import { Context, Effect, Layer, Schema } from "effect";
 import type { SessionAuthContext } from "eve/context";
-import { channelProviderSchema } from "../../shared/identity/channel-auth";
+
 import { accessScopeForUser } from "../../shared/identity/access-scope";
+import { channelProviderSchema } from "../../shared/identity/channel-auth";
 import { scopeFromPrincipal } from "../../shared/identity/principal-scope";
 import {
   BrowserWorkerAccessError,
@@ -21,11 +22,14 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       return yield* new BrowserWorkerAccessError({
         reason: "unauthenticated",
       });
+
     const scope = yield* Effect.try({
       try: () => scopeFromPrincipal(principal),
       catch: () => new BrowserWorkerAccessError({ reason: "unauthenticated" }),
     });
+
     const canonical = accessScopeForUser(scope.userId);
+
     if (canonical.workspaceId !== scope.workspaceId)
       return yield* new BrowserWorkerAccessError({
         reason: "unauthenticated",
@@ -39,6 +43,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
           () => new BrowserWorkerAccessError({ reason: "lease_inactive" })
         )
       );
+
       const leaseToken = yield* Schema.decodeUnknownEffect(identifier)(
         principal.attributes.scheduledRunLeaseToken
       ).pipe(
@@ -46,8 +51,10 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
           () => new BrowserWorkerAccessError({ reason: "lease_inactive" })
         )
       );
+
       yield* requireBrowserWorkerLease(scope, runId, leaseToken);
       const scheduleId = principal.attributes.scheduleId;
+
       if (scheduleId !== undefined) {
         const id = yield* Schema.decodeUnknownEffect(identifier)(
           scheduleId
@@ -56,6 +63,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
             () => new BrowserWorkerAccessError({ reason: "paused" })
           )
         );
+
         yield* requireBrowserWorkerScheduleActive(scope, id);
       }
     }
@@ -71,6 +79,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
           () => new BrowserWorkerAccessError({ reason: "revoked" })
         )
       );
+
       yield* requireBrowserWorkerChannelIdentity(scope, identityId);
     } else if (principal.authenticator === "authjs") {
       const sessionId = yield* Schema.decodeUnknownEffect(identifier)(
@@ -80,6 +89,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
           () => new BrowserWorkerAccessError({ reason: "unauthenticated" })
         )
       );
+
       yield* requireBrowserWorkerWebSession(scope, sessionId);
     } else if (principal.authenticator !== "scheduled-worker") {
       yield* requireBrowserWorkerMembership(scope);
@@ -95,6 +105,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
 
 const makeBrowserWorkerAccess = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
+
   return {
     authorize: (principal: SessionAuthContext) =>
       authorize(principal).pipe(Effect.provideService(PgClient.PgClient, sql)),

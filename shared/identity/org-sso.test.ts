@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+
 import {
   assertCanAcceptOrgInvite,
   assertEmailDomainAllowed,
@@ -35,6 +36,7 @@ describe("C02 org Google SSO invite gates", () => {
         Effect.flip
       )
     );
+
     expect(denied).toEqual(
       new OrgSsoDenied({
         reason: "domain_not_allowed",
@@ -73,6 +75,7 @@ describe("C02 org Google SSO invite gates", () => {
         },
       }).pipe(Effect.flip)
     );
+
     expect(mismatch.reason).toBe("email_mismatch");
 
     const unverified = await Effect.runPromise(
@@ -86,6 +89,7 @@ describe("C02 org Google SSO invite gates", () => {
         },
       }).pipe(Effect.flip)
     );
+
     expect(unverified.reason).toBe("email_unverified");
 
     const noGoogle = await Effect.runPromise(
@@ -99,6 +103,7 @@ describe("C02 org Google SSO invite gates", () => {
         },
       }).pipe(Effect.flip)
     );
+
     expect(noGoogle.reason).toBe("google_account_missing");
     expect(orgSsoFailureMessage(noGoogle)).toContain("Google");
 
@@ -117,6 +122,7 @@ describe("C02 org Google SSO invite gates", () => {
         now: new Date("2026-09-10T00:00:00.000Z"),
       }).pipe(Effect.flip)
     );
+
     expect(expired.reason).toBe("invite_expired");
   });
 });

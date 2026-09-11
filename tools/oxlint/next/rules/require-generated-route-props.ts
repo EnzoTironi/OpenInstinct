@@ -1,7 +1,6 @@
 import path from "node:path";
 
 import { defineRule } from "@oxlint/plugins";
-
 import type { ESTree } from "@oxlint/plugins";
 
 import { isStringLiteral } from "../../shared/literals.ts";
@@ -54,12 +53,14 @@ const getFunction = (
   node: ESTree.Node | null | undefined
 ): FunctionNode | undefined => {
   const expression = unwrapExpression(node);
+
   switch (expression?.type) {
     case "ArrowFunctionExpression":
     case "FunctionDeclaration":
     case "FunctionExpression":
       return expression;
   }
+
   return undefined;
 };
 
@@ -68,6 +69,7 @@ const getIdentifierName = (node: ESTree.Node | null | undefined) =>
 
 const getRouteLiteral = (node: ESTree.TSType | undefined) => {
   if (node?.type !== "TSLiteralType") return undefined;
+
   return isStringLiteral(node.literal) ? node.literal.value : undefined;
 };
 
@@ -81,10 +83,13 @@ const hasGeneratedType = (
 
   if (!("typeAnnotation" in parameter)) return false;
   const annotation = parameter.typeAnnotation?.typeAnnotation;
+
   if (annotation?.type !== "TSTypeReference") return false;
+
   if (getIdentifierName(annotation.typeName) !== helper) return false;
 
   const typeArguments = annotation.typeArguments?.params ?? [];
+
   return (
     typeArguments.length === 1 && getRouteLiteral(typeArguments[0]) === route
   );
@@ -98,6 +103,7 @@ const getLocalBindings = (body: ProgramStatement[]) => {
       for (const specifier of statement.specifiers) {
         bindings.add(specifier.local.name);
       }
+
       continue;
     }
 
@@ -109,8 +115,10 @@ const getLocalBindings = (body: ProgramStatement[]) => {
     if (declaration?.type === "VariableDeclaration") {
       for (const declarator of declaration.declarations) {
         const name = getIdentifierName(declarator.id);
+
         if (name) bindings.add(name);
       }
+
       continue;
     }
 
@@ -118,6 +126,7 @@ const getLocalBindings = (body: ProgramStatement[]) => {
       declaration && "id" in declaration
         ? getIdentifierName(declaration.id)
         : undefined;
+
     if (name) bindings.add(name);
   }
 
@@ -139,10 +148,12 @@ const getDeclaredFunctions = (body: ProgramStatement[]) => {
     }
 
     if (declaration?.type !== "VariableDeclaration") continue;
+
     for (const declarator of declaration.declarations) {
       if (declarator.id.type !== "Identifier") continue;
 
       const fn = getFunction(declarator.init);
+
       if (fn) functions.set(declarator.id.name, fn);
     }
   }
@@ -155,9 +166,11 @@ const resolveFunction = (
   functions: Map<string, FunctionNode>
 ) => {
   const fn = getFunction(node);
+
   if (fn) return fn;
 
   const name = getIdentifierName(unwrapExpression(node));
+
   return name ? functions.get(name) : undefined;
 };
 
@@ -204,17 +217,21 @@ export const requireGeneratedRoutePropsRule = defineRule({
     return {
       before() {
         const filename = normalizePath(context.filename);
+
         const match = /^(layout|page|route)\.tsx?$/.exec(
           path.basename(filename)
         );
+
         if (!match) return false;
 
         const appDirectory = findAppDirectory(filename);
+
         if (!appDirectory || !isWithin(filename, appDirectory)) return false;
 
         kind = match[1] ?? "";
         route = getAppRoute(filename, appDirectory);
         reportedParameters = new Set();
+
         return undefined;
       },
       Program(program) {
@@ -225,9 +242,11 @@ export const requireGeneratedRoutePropsRule = defineRule({
           const defaultExport = program.body.find(
             (statement) => statement.type === "ExportDefaultDeclaration"
           );
+
           if (!defaultExport) return;
 
           const fn = resolveFunction(defaultExport.declaration, functions);
+
           if (!fn) return;
 
           reportParameter(
@@ -236,6 +255,7 @@ export const requireGeneratedRoutePropsRule = defineRule({
             `${kind} props`,
             localBindings
           );
+
           return;
         }
 
@@ -244,6 +264,7 @@ export const requireGeneratedRoutePropsRule = defineRule({
 
           if (statement.declaration?.type === "FunctionDeclaration") {
             const name = getIdentifierName(statement.declaration.id);
+
             if (name && HTTP_METHODS.has(name)) {
               reportParameter(
                 statement.declaration.params[1],
@@ -257,9 +278,11 @@ export const requireGeneratedRoutePropsRule = defineRule({
           if (statement.declaration?.type === "VariableDeclaration") {
             for (const declarator of statement.declaration.declarations) {
               const name = getIdentifierName(declarator.id);
+
               if (!name || !HTTP_METHODS.has(name)) continue;
 
               const fn = getFunction(declarator.init);
+
               if (fn) {
                 reportParameter(
                   fn.params[1],
@@ -273,10 +296,12 @@ export const requireGeneratedRoutePropsRule = defineRule({
 
           for (const specifier of statement.specifiers) {
             const exportedName = getIdentifierName(specifier.exported);
+
             if (!exportedName || !HTTP_METHODS.has(exportedName)) continue;
 
             const localName = getIdentifierName(specifier.local);
             const fn = localName ? functions.get(localName) : undefined;
+
             if (fn) {
               reportParameter(
                 fn.params[1],

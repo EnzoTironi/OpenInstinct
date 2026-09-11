@@ -1,10 +1,10 @@
-import type { MessageStreamEvent } from "eve/client";
-import { z } from "zod";
 import {
   browserActivityKindForTool,
   type BrowserActivityKind,
   sumBrowserActivityDurations,
 } from "@web/browser/activity";
+import type { MessageStreamEvent } from "eve/client";
+import { z } from "zod";
 
 const toolActivity = new Map<string, string>([
   ["browser_act", "Acting in the browser"],
@@ -42,31 +42,43 @@ export function browserBenchmarkActivity(
           )
           .join("")
       );
+
       if (message) return message;
     }
+
     if (event.type === "message.completed") {
       const message = activityLine(event.data.message ?? "");
+
       if (message) return message;
     }
+
     if (event.type === "actions.requested") {
       const activities = event.data.actions.map((action) => {
         if (action.kind === "load-skill")
           return "Loading the browser procedure";
+
         if (action.kind === "tool-call")
           return activityForTool(action.toolName);
+
         return "Coordinating browser work";
       });
+
       return [...new Set(activities)].join(" and ");
     }
+
     if (event.type === "action.result") {
       const result = event.data.result;
+
       if (result.kind === "tool-result") {
         return `Reviewing ${activityForTool(result.toolName).toLowerCase()} result`;
       }
     }
+
     if (event.type === "input.requested") return "Waiting for required input";
+
     if (event.type === "step.started") return "Planning the next step";
   }
+
   return null;
 }
 
@@ -77,6 +89,7 @@ export function browserBenchmarkActivityDurations(
   return sumBrowserActivityDurations(
     events.flatMap((event) => {
       const kind = activityKindForEvent(event);
+
       return kind ? [{ at: Date.parse(event.meta.at), kind }] : [];
     }),
     now
@@ -89,16 +102,21 @@ export function browserBenchmarkLiveViewUrl(
   for (const event of events.toReversed()) {
     if (event.type !== "action.result") continue;
     const result = event.data.result;
+
     if (
       result.kind !== "tool-result" ||
       result.toolName !== "manage_browsers"
     ) {
       continue;
     }
+
     const parsed = managedBrowserOutputSchema.safeParse(result.output);
+
     if (!parsed.success) continue;
+
     try {
       const url = new URL(parsed.data.browser.browser_live_view_url);
+
       if (url.protocol === "https:" || url.protocol === "http:") {
         return url.toString();
       }
@@ -106,6 +124,7 @@ export function browserBenchmarkLiveViewUrl(
       continue;
     }
   }
+
   return null;
 }
 
@@ -120,19 +139,25 @@ function activityKindForEvent(
   ) {
     return "model";
   }
+
   if (event.type === "input.requested") return "waiting";
+
   if (event.type !== "actions.requested") return null;
 
   const kinds = new Set(
     event.data.actions.map((action) => {
       if (action.kind === "load-skill") return "setup";
+
       if (action.kind === "tool-call") {
         return browserActivityKindForTool(action.toolName);
       }
+
       return "other";
     })
   );
+
   if (kinds.size !== 1) return "other";
+
   return kinds.values().next().value ?? "other";
 }
 
@@ -142,6 +167,8 @@ function activityForTool(name: string) {
 
 function activityLine(value: string) {
   const line = value.replaceAll(/\s+/gu, " ").trim();
+
   if (!line) return null;
+
   return line.length > 180 ? `${line.slice(0, 179).trimEnd()}…` : line;
 }

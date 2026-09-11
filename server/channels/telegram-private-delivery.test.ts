@@ -1,10 +1,13 @@
 import { Effect, Redacted } from "effect";
 import { describe, expect, it } from "vitest";
+
 import { parseTelegramUpdate } from "./telegram";
 import { readVerifiedWebhook } from "./webhook";
 
 const testSecret = Redacted.make("unit-test-webhook-secret");
+
 const now = 1_800_000_000_000;
+
 const installation = { botId: "123456", botUsername: "CompanionBot" };
 
 describe("Telegram private delivery qualification (fixture)", () => {
@@ -19,6 +22,7 @@ describe("Telegram private delivery qualification (fixture)", () => {
         text: "qual private hello",
       },
     });
+
     const request = new Request("https://test.invalid/channels/telegram", {
       method: "POST",
       body,
@@ -26,12 +30,15 @@ describe("Telegram private delivery qualification (fixture)", () => {
         "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
       },
     });
+
     const verified = await Effect.runPromise(
       readVerifiedWebhook(request, "telegram", testSecret)
     );
+
     const events = await Effect.runPromise(
       parseTelegramUpdate(verified, installation, now)
     );
+
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       channel: "telegram",
@@ -55,6 +62,7 @@ describe("Telegram private delivery qualification (fixture)", () => {
         text: "group noise",
       },
     });
+
     const verified = await Effect.runPromise(
       readVerifiedWebhook(
         new Request("https://test.invalid/channels/telegram", {
@@ -68,6 +76,7 @@ describe("Telegram private delivery qualification (fixture)", () => {
         testSecret
       )
     );
+
     expect(
       await Effect.runPromise(parseTelegramUpdate(verified, installation, now))
     ).toEqual([]);

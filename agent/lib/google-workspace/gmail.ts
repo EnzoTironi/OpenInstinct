@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
+
 import { gmail, type gmail_v1 } from "@googleapis/gmail";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
+
 import { googleApiErrorStatus, withGoogleAuth } from "./client";
 
 type GmailMessage = gmail_v1.Schema$Message;
+
 type GmailPart = gmail_v1.Schema$MessagePart;
 
 export const GMAIL_UPDATE_ACTIONS = [
@@ -38,6 +41,7 @@ export async function searchGmail(
       { maxResults, q: query, userId: "me" },
       { signal: ctx.abortSignal }
     );
+
     const messages = await Promise.all(
       (listed.data.messages ?? []).flatMap(({ id }) =>
         id
@@ -61,6 +65,7 @@ export async function searchGmail(
           : []
       )
     );
+
     return messages.map(({ data }) => minimizeMessage(data));
   });
 }
@@ -71,6 +76,7 @@ export async function readGmailThread(ctx: ToolContext, threadId: string) {
       { format: "full", id: threadId, userId: "me" },
       { signal: ctx.abortSignal }
     );
+
     return {
       id: thread.id ?? threadId,
       messages: (thread.messages ?? []).slice(-20).map((message) =>
@@ -98,6 +104,7 @@ export async function updateGmail(
       { signal: ctx.abortSignal }
     )
   );
+
   return { action, updatedCount: ids.length };
 }
 
@@ -114,6 +121,7 @@ export function gmailSendIdempotencyKey(ctx: {
     .update(`${ctx.session.id}:${ctx.callId}`)
     .digest("hex")
     .slice(0, 40);
+
   return `openinstinct-send-${stableId}`;
 }
 
@@ -133,6 +141,7 @@ export function gmailSendMessageId(ctx: {
 /** rfc822msgid query helper (insufficient alone on live Gmail send). */
 export function gmailSendMessageIdQuery(messageId: string) {
   const bare = messageId.replace(/^<|>$/gu, "");
+
   return `rfc822msgid:${bare}`;
 }
 
@@ -147,6 +156,7 @@ export async function sendGmail(
 ) {
   const idempotencyKey = gmailSendIdempotencyKey(ctx);
   const messageId = gmailSendMessageId(ctx);
+
   const headers = [
     `To: ${payload.to.map(safeHeader).join(", ")}`,
     ...(payload.cc.length
@@ -168,21 +178,25 @@ export async function sendGmail(
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: 8bit",
   ];
+
   const raw = Buffer.from(
     `${headers.join("\r\n")}\r\n\r\n${payload.body}`,
     "utf8"
   ).toString("base64url");
+
   return withGmail(ctx, async (client) => {
     const existing = await findSentGmailByIdempotencyKey(
       client,
       idempotencyKey,
       ctx.abortSignal
     );
+
     if (existing) return existing;
 
     const requestBody = payload.threadId
       ? { raw, threadId: payload.threadId }
       : { raw };
+
     try {
       const { data } = await client.users.messages.send(
         {
@@ -191,6 +205,7 @@ export async function sendGmail(
         },
         { signal: ctx.abortSignal }
       );
+
       return data;
     } catch (error) {
       // Uncertain outcomes (timeout / transport / 5xx) must not blind-resend.
@@ -198,12 +213,15 @@ export async function sendGmail(
       // idempotency key already landed (provider accepted before the error surfaced).
       const status = googleApiErrorStatus(error);
       const uncertain = status === undefined || status >= 500 || status === 429;
+
       if (!uncertain) throw error;
+
       const recovered = await findSentGmailByIdempotencyKey(
         client,
         idempotencyKey,
         ctx.abortSignal
       );
+
       if (recovered) return recovered;
       throw error;
     }
@@ -223,8 +241,11 @@ async function findSentGmailByIdempotencyKey(
     },
     { signal }
   );
+
   const id = listed.data.messages?.[0]?.id;
+
   if (!id) return null;
+
   const { data } = await client.users.messages.get(
     {
       format: "minimal",
@@ -233,6 +254,7 @@ async function findSentGmailByIdempotencyKey(
     },
     { signal }
   );
+
   return data;
 }
 
@@ -251,6 +273,7 @@ export function gmailUpdateLabels(action: GmailUpdateAction) {
     case "unstar":
       return { addLabelIds: [], removeLabelIds: ["STARRED"] };
   }
+
   throw new Error("Unsupported Gmail update action.");
 }
 
@@ -264,18 +287,23 @@ function header(part: GmailPart | undefined, name: string) {
 
 function plainText(part: GmailPart | undefined): string {
   if (!part) return "";
+
   if (part.mimeType === "text/plain" && part.body?.data) {
     return decodeBase64Url(part.body.data);
   }
+
   for (const child of part.parts ?? []) {
     const text = plainText(child);
+
     if (text) return text;
   }
+
   if (part.mimeType === "text/html" && part.body?.data) {
     return decodeBase64Url(part.body.data)
       .replace(/<[^>]+>/gu, " ")
       .replace(/\s+/gu, " ");
   }
+
   return "";
 }
 
@@ -299,6 +327,7 @@ function collectAttachments(part: GmailPart | undefined): {
   size: number;
 }[] {
   if (!part) return [];
+
   const own =
     part.filename && part.body?.attachmentId
       ? [
@@ -309,9 +338,11 @@ function collectAttachments(part: GmailPart | undefined): {
           },
         ]
       : [];
+
   const nested = (part.parts ?? []).flatMap((child) => {
     return collectAttachments(child);
   });
+
   return [...own, ...nested];
 }
 
@@ -346,8 +377,10 @@ const secretPatterns: readonly (readonly [RegExp, string])[] = [
 
 function redactGoogleText(value: string, maxLength = 12_000) {
   let redacted = value.slice(0, maxLength);
+
   for (const [pattern, replacement] of secretPatterns) {
     redacted = redacted.replace(pattern, replacement);
   }
+
   return redacted;
 }

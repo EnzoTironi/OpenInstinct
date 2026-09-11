@@ -1,8 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { z } from "zod";
+
+import { ActivityDurationBreakdown } from "@web/components/browser/activity-duration-breakdown";
 import {
   Table,
   TableBody,
@@ -11,11 +10,15 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
-import { ActivityDurationBreakdown } from "@web/components/browser/activity-duration-breakdown";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { z } from "zod";
+
 import { browserBenchmarkLiveStatusSchema } from "../../../../../../live-status-schema";
 import { dashboardEnv } from "../../../../../env";
 
 const identifier = /^[A-Za-z0-9._:-]+$/u;
+
 const traceArtifactSchema = z.object({
   events: z.array(
     z.object({
@@ -31,19 +34,23 @@ const traceArtifactSchema = z.object({
   updatedAt: z.string(),
   version: z.literal(1),
 });
+
 const nodeErrorSchema = z.object({ code: z.string() });
+
 const routeParametersSchema = z.object({
   runId: z.string(),
   sessionId: z.string(),
 });
 
 export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 
 export default async function BenchmarkTracePage({
   params,
 }: PageProps<"/runs/[runId]/traces/[sessionId]">) {
   const { runId, sessionId } = routeParametersSchema.parse(await params);
+
   if (!identifier.test(runId) || !identifier.test(sessionId)) notFound();
 
   const browserAbRoot = join(
@@ -51,9 +58,12 @@ export default async function BenchmarkTracePage({
     ".eve",
     "browser-ab"
   );
+
   const status = await readRunStatus(browserAbRoot, runId);
+
   if (!status) notFound();
   const match = findTask(status, sessionId);
+
   if (!match) notFound();
   const trace = await readTrace(browserAbRoot, runId, sessionId);
 
@@ -145,12 +155,16 @@ async function readRunStatus(root: string, runId: string) {
     join(root, runId, "status.json"),
     browserBenchmarkLiveStatusSchema
   );
+
   if (archived) return archived;
+
   const live = await readParsedFile(
     join(root, "live.json"),
     browserBenchmarkLiveStatusSchema
   );
+
   if (!live) return null;
+
   return live.runId === runId ? live : null;
 }
 
@@ -171,6 +185,7 @@ async function readParsedFile<TSchema extends z.ZodType>(
     );
   } catch (error) {
     const parsed = nodeErrorSchema.safeParse(error);
+
     if (parsed.success && parsed.data.code === "ENOENT") return null;
     throw error;
   }
@@ -184,7 +199,9 @@ function findTask(
     const task = variant.tasks.find((candidate) =>
       candidate.sessions.some((session) => session.id === sessionId)
     );
+
     if (task) return { task, variant: variant.kind };
   }
+
   return null;
 }

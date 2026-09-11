@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import type { Effect } from "effect";
-import type { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 import { authClient } from "@web/auth/client";
-import { api } from "@web/trpc/client";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
+import { api } from "@web/trpc/client";
+import type { Effect } from "effect";
+import { useState } from "react";
+
+import type { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 
 export function LinkedChannels({
   identities,
@@ -18,21 +19,26 @@ export function LinkedChannels({
   const [selected, setSelected] = useState<string>();
   const [lastAccess, setLastAccess] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
   const selectedIdentity = identities.find(
     (identity) => identity.id === selected
   );
+
   const revoke = api.accountChannels.revoke.useMutation({
     onSuccess(result) {
       if (result.status === "last_access") {
         setLastAccess(true);
+
         return;
       }
+
       setSigningOut(true);
       void authClient.signOut().finally(() => {
         window.location.assign("/sign-in?reason=channel-unlinked");
       });
     },
   });
+
   return (
     <div className="space-y-3">
       {signingOut ? (

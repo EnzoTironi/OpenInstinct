@@ -1,5 +1,3 @@
-import { Effect, Option, Schema } from "effect";
-import type { Stripe } from "stripe";
 import {
   findEntitlementByStripeSubscription,
   upsertEntitlement,
@@ -7,6 +5,9 @@ import {
   type BillingSubjectType,
 } from "@db/services/billing";
 import type { BillingPlanId } from "@shared/billing/plans";
+import { Effect, Option, Schema } from "effect";
+import type { Stripe } from "stripe";
+
 import {
   requireStripe,
   stripeWebhookSecret,
@@ -45,11 +46,13 @@ function mapSubscriptionStatus(
 
 function parsePlan(raw: string | undefined): BillingPlanId | null {
   if (raw === "pro" || raw === "org" || raw === "free") return raw;
+
   return null;
 }
 
 function parseSubjectType(raw: string | undefined): BillingSubjectType | null {
   if (raw === "user" || raw === "organization") return raw;
+
   return null;
 }
 
@@ -60,6 +63,7 @@ const stripeIdRefSchema = Schema.Union([
 
 function stripeIdFromRef(value: typeof stripeIdRefSchema.Type): string {
   if (Schema.is(Schema.String)(value)) return value;
+
   return value.id;
 }
 
@@ -67,7 +71,9 @@ function stripeIdFromRef(value: typeof stripeIdRefSchema.Type): string {
 function readStripeId(field: unknown): string | null {
   // Stripe expands customer/subscription into objects or leaves string ids.
   const decoded = Schema.decodeUnknownOption(stripeIdRefSchema)(field);
+
   if (Option.isNone(decoded)) return null;
+
   return stripeIdFromRef(decoded.value);
 }
 
@@ -78,6 +84,7 @@ async function applySubscription(subscription: Stripe.Subscription) {
   const subjectId = metadata.instinctSubjectId;
   const quantity = subscription.items.data[0]?.quantity ?? 1;
   const seatFromMeta = Number(metadata.instinctSeatCount ?? quantity);
+
   const seatCount = Math.max(
     1,
     Number.isFinite(seatFromMeta) ? seatFromMeta : 1
@@ -85,13 +92,16 @@ async function applySubscription(subscription: Stripe.Subscription) {
 
   let resolvedType = subjectType;
   let resolvedId = subjectId;
+
   if (!resolvedType || !resolvedId) {
     const existing = await findEntitlementByStripeSubscription(subscription.id);
+
     if (existing) {
       resolvedType = existing.subjectType;
       resolvedId = existing.subjectId;
     }
   }
+
   if (!resolvedType || !resolvedId) return;
 
   const effectivePlan: BillingPlanId =
@@ -122,7 +132,9 @@ async function applyCheckoutSession(session: Stripe.Checkout.Session) {
   const plan = parsePlan(metadata.instinctPlan);
   const subjectType = parseSubjectType(metadata.instinctSubjectType);
   const subjectId = metadata.instinctSubjectId;
+
   if (!plan || !subjectType || !subjectId) return;
+
   if (plan === "free") return;
 
   const customerId = readStripeId(session.customer);
@@ -152,6 +164,7 @@ export const handleStripeWebhook = Effect.fn("handleStripeWebhook")(function* (
 ) {
   let stripe;
   let secret: string;
+
   try {
     stripe = requireStripe();
     secret = stripeWebhookSecret();
@@ -162,10 +175,12 @@ export const handleStripeWebhook = Effect.fn("handleStripeWebhook")(function* (
         message: error.message,
       });
     }
+
     throw error;
   }
 
   const signature = request.headers.get("stripe-signature");
+
   if (!signature) {
     return yield* new BillingWebhookError({
       reason: "invalid_signature",
@@ -200,6 +215,7 @@ export const handleStripeWebhook = Effect.fn("handleStripeWebhook")(function* (
           await applyCheckoutSession(session);
           break;
         }
+
         case "customer.subscription.created":
         case "customer.subscription.updated":
         case "customer.subscription.deleted": {
@@ -208,6 +224,7 @@ export const handleStripeWebhook = Effect.fn("handleStripeWebhook")(function* (
           await applySubscription(subscription);
           break;
         }
+
         default:
           break;
       }

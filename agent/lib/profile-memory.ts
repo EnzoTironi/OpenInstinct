@@ -1,3 +1,4 @@
+import { resolveModeValue } from "@agent/lib/mode";
 import {
   defineMemoryProvider,
   type MemoryOperationContext,
@@ -6,15 +7,16 @@ import {
   type MemoryScopeContext,
 } from "eve/memory";
 import { z } from "zod";
-import { resolveModeValue } from "@agent/lib/mode";
 
 export function resolveProfileMemoryScope(context: MemoryScopeContext) {
   const caller = context.session.auth.current;
   const workspaceId = z.string().safeParse(caller?.attributes.workspaceId);
+
   const scope =
     caller?.principalType === "user" && workspaceId.success
       ? workspaceId.data
       : null;
+
   return resolveModeValue(context, {
     interactive: scope,
     "scheduled-worker": scope,
@@ -23,6 +25,7 @@ export function resolveProfileMemoryScope(context: MemoryScopeContext) {
 
 export function preserveProfileMemoryCancellation(provider: MemoryProvider) {
   const compactionRecall = provider.recall["compaction.completed"];
+
   return defineMemoryProvider({
     ...provider,
     recall: {
@@ -45,6 +48,7 @@ async function recallWithCancellationReason<
     if (context.abortSignal.aborted) {
       context.abortSignal.throwIfAborted();
     }
+
     throw error;
   }
 }

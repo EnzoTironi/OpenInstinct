@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
 import {
   browserBenchmarkFixtureContext,
   browserBenchmarkTasks,
 } from "@evals/browser/tasks";
+import { describe, expect, it } from "vitest";
 
 describe("browser benchmark tasks", () => {
   it("includes the focused Peek next-month calendar regression", () => {
@@ -57,6 +57,7 @@ describe("browser benchmark tasks", () => {
   it("stops unauthenticated commerce tasks before login is required", () => {
     const tasks = browserBenchmarkTasks("all");
     const yankeesTask = tasks.find((task) => task.prompt.includes("Yankees"));
+
     const targetTask = tasks.find((task) =>
       task.prompt.includes("Target's website")
     );
@@ -78,9 +79,11 @@ describe("browser benchmark tasks", () => {
 
   it("ends vertical-search tasks before unrelated checkout prerequisites", () => {
     const tasks = browserBenchmarkTasks("all");
+
     const flightTask = tasks.find((task) =>
       task.prompt.includes("Google Flights")
     );
+
     const elsewhereTask = tasks.find((task) =>
       task.prompt.includes("Elsewhere's official website")
     );
@@ -106,9 +109,11 @@ describe("browser benchmark tasks", () => {
     const appleTask = tasks.find((task) => task.prompt.includes("Apple's"));
 
     expect(appleTask).toHaveProperty("judgeContext");
+
     if (!appleTask || !("judgeContext" in appleTask)) {
       throw new Error("Apple benchmark task has no judge context.");
     }
+
     expect(appleTask.judgeContext).toContain("11222");
     expect(
       tasks.filter((task) => "judgeContext" in task && task.judgeContext)

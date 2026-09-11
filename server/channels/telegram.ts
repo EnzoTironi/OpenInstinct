@@ -12,6 +12,12 @@ import {
   HttpClient,
   HttpClientRequest,
 } from "effect/unstable/http";
+
+import {
+  detectTelegramChatKind,
+  evaluateGroupMentionPolicy,
+  telegramTextMentionsBot,
+} from "./group-policy";
 import {
   LoginTokenSchema,
   normalizeInbound,
@@ -20,11 +26,8 @@ import {
   type InboundCoordinates,
   type InboundEvent,
 } from "./inbound";
-import {
-  detectTelegramChatKind,
-  evaluateGroupMentionPolicy,
-  telegramTextMentionsBot,
-} from "./group-policy";
+import { downloadMediaBytes } from "./media/download";
+import { ChannelMediaError } from "./media/policy";
 import {
   boundRetryAfterSeconds,
   ProviderInputError,
@@ -33,33 +36,39 @@ import {
   ProviderUncertain,
   requestProviderJson,
 } from "./provider-errors";
-import { downloadMediaBytes } from "./media/download";
-import { ChannelMediaError } from "./media/policy";
 
 const positiveId = Schema.Int.check(
   Schema.isBetween({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
 );
+
 const stringId = Schema.String.check(Schema.isPattern(/^[1-9][0-9]{0,15}$/));
+
 const username = Schema.String.check(
   Schema.isPattern(/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/)
 );
+
 export const TelegramInstallationSchema = Schema.Struct({
   botId: stringId,
   botUsername: username,
 });
+
 export type TelegramInstallation = typeof TelegramInstallationSchema.Type;
+
 const user = Schema.Struct({ id: positiveId, is_bot: Schema.Boolean });
+
 const file = Schema.Struct({
   file_id: ProviderReferenceSchema,
   mime_type: Schema.optionalKey(ProviderReferenceSchema),
   file_name: Schema.optionalKey(ProviderReferenceSchema),
 });
+
 const messageEntity = Schema.Struct({
   type: Schema.String,
   offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   length: Schema.Int.check(Schema.isGreaterThan(0)),
   user: Schema.optionalKey(user),
 });
+
 const message = Schema.Struct({
   message_id: positiveId,
   date: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -86,12 +95,14 @@ const message = Schema.Struct({
     })
   ),
 });
+
 const callback = Schema.Struct({
   id: ProviderReferenceSchema,
   from: user,
   message: Schema.optionalKey(message),
   data: Schema.optionalKey(Schema.String),
 });
+
 const update = Schema.Struct({
   update_id: Schema.Int.check(
     Schema.isBetween({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
@@ -99,6 +110,7 @@ const update = Schema.Struct({
   message: Schema.optionalKey(message),
   callback_query: Schema.optionalKey(callback),
 });
+
 const malformed = () =>
   new ProviderInputError({ provider: "telegram", reason: "malformed" });
 
@@ -111,37 +123,50 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
   const installation = yield* Schema.decodeUnknownEffect(
     TelegramInstallationSchema
   )(configuration).pipe(Effect.mapError(malformed));
+
   const incoming = yield* Schema.decodeUnknownEffect(update)(value).pipe(
     Effect.mapError(malformed)
   );
+
   if (incoming.message && incoming.callback_query) return yield* malformed();
   const source = incoming.callback_query?.message ?? incoming.message;
   const sender = incoming.callback_query?.from ?? incoming.message?.from;
+
   if (!source || !sender || sender.is_bot) return [];
+
   if (String(sender.id) === installation.botId) return [];
   const chatKind = detectTelegramChatKind(source.chat.type);
+
   if (chatKind === "unsupported") return [];
+
   // Callbacks / login confirmations remain private-only.
   if (incoming.callback_query && chatKind !== "private") return [];
+
   if (chatKind === "private") {
     if (source.chat.id !== sender.id) return [];
   } else {
     const botUsername = installation.botUsername.replace(/^@/, "");
     const bodyText = source.text ?? source.caption;
     const entities = source.entities ?? source.caption_entities;
+
     const mentionedBot = telegramTextMentionsBot(
       bodyText,
       botUsername,
       entities,
       installation.botId
     );
+
     const replyFrom = source.reply_to_message?.from;
+
     const replyToBot = Boolean(
       replyFrom?.is_bot && String(replyFrom.id) === installation.botId
     );
+
     if (!evaluateGroupMentionPolicy({ mentionedBot, replyToBot })) return [];
   }
+
   const occurredAt = yield* validateEventAge("telegram", source.date, nowMs);
+
   const coordinates: InboundCoordinates = {
     channel: "telegram",
     installationId: installation.botId,
@@ -152,12 +177,17 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
     chatKind,
     chatId: String(source.chat.id),
   };
+
   const query = incoming.callback_query;
+
   if (query) {
     if (!source.from?.is_bot || String(source.from.id) !== installation.botId)
       return [];
+
     if (!query.data?.startsWith("confirm:")) return [];
+
     if (Buffer.byteLength(query.data, "utf8") > 64) return yield* malformed();
+
     const token = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
       query.data.slice(8)
     ).pipe(
@@ -169,6 +199,7 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
           })
       )
     );
+
     return [
       {
         ...coordinates,
@@ -179,6 +210,7 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
       },
     ];
   }
+
   const media =
     source.document ??
     source.audio ??
@@ -186,6 +218,7 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
     source.video ??
     source.sticker ??
     source.photo?.at(-1);
+
   const payload = {
     text: source.text ?? source.caption,
     attachments: media
@@ -201,11 +234,13 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
       ? String(source.reply_to_message.message_id)
       : undefined,
   };
+
   const event = yield* normalizeInbound(
     coordinates,
     payload,
     installation.botUsername.replace(/^@/, "")
   );
+
   return event ? [event] : [];
 });
 
@@ -219,15 +254,18 @@ const readInstallation = Config.all({
       new ProviderInputError({ provider: "telegram", reason: "configuration" })
   )
 );
+
 /** Private peers are positive; Telegram groups/supergroups use negative chat ids. */
 const chatTargetId = Schema.String.check(
   Schema.isPattern(/^-?[1-9][0-9]{0,15}$/)
 );
+
 const sendInput = Schema.Struct({
   targetId: chatTargetId,
   text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
   reply: Schema.optional(stringId),
 });
+
 const response = Schema.Union([
   Schema.Struct({
     ok: Schema.Literal(true),
@@ -264,6 +302,7 @@ export const telegramSendFailure = (failure: {
       ),
     });
   }
+
   if (
     failure.error_code >= 400 &&
     failure.error_code < 500 &&
@@ -274,6 +313,7 @@ export const telegramSendFailure = (failure: {
       status: failure.error_code,
     });
   }
+
   return new ProviderUncertain({
     provider: "telegram",
     reason: "server_error",
@@ -296,11 +336,13 @@ const downloadableFile = Schema.Struct({
 
 const makeTelegram = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
+
   const request = Effect.fn("Telegram.request")(function* (
     method: "sendMessage" | "answerCallbackQuery" | "getFile",
     body: Schema.Json
   ) {
     const installation = yield* readInstallation;
+
     const secret = yield* Config.redacted("TELEGRAM_BOT_TOKEN").pipe(
       Effect.mapError(
         () =>
@@ -310,6 +352,7 @@ const makeTelegram = Effect.gen(function* () {
           })
       )
     );
+
     const token = Redacted.value(secret);
     yield* Schema.decodeUnknownEffect(
       Schema.String.check(Schema.isPattern(/^[1-9][0-9]*:[A-Za-z0-9_-]+$/))
@@ -322,12 +365,14 @@ const makeTelegram = Effect.gen(function* () {
           })
       )
     );
+
     if (token.split(":")[0] !== installation.botId) {
       return yield* new ProviderInputError({
         provider: "telegram",
         reason: "configuration",
       });
     }
+
     return yield* requestProviderJson(
       http,
       "telegram",
@@ -336,6 +381,7 @@ const makeTelegram = Effect.gen(function* () {
       ).pipe(HttpClientRequest.bodyJsonUnsafe(body))
     );
   });
+
   const send = Effect.fn("Telegram.send")(function* (
     targetId: string,
     text: string,
@@ -355,22 +401,26 @@ const makeTelegram = Effect.gen(function* () {
           })
       )
     );
+
     const body: Schema.MutableJsonObject = {
       chat_id: input.targetId,
       text: input.text,
       link_preview_options: { is_disabled: true },
     };
+
     if (input.reply)
       body.reply_parameters = {
         message_id: Number(input.reply),
         allow_sending_without_reply: false,
       };
+
     if (confirmation)
       body.reply_markup = {
         inline_keyboard: [
           [{ text: "Confirm sign-in", callback_data: confirmation }],
         ],
       };
+
     const result = yield* request("sendMessage", body).pipe(
       Effect.flatMap(Schema.decodeUnknownEffect(response)),
       Effect.catchTag(
@@ -382,17 +432,21 @@ const makeTelegram = Effect.gen(function* () {
           })
       )
     );
+
     if (!result.ok) {
       return yield* telegramSendFailure(result);
     }
+
     if (String(result.result.chat.id) !== input.targetId) {
       return yield* new ProviderUncertain({
         provider: "telegram",
         reason: "malformed_receipt",
       });
     }
+
     return { providerMessageId: String(result.result.message_id) };
   });
+
   return {
     downloadMedia: Effect.fn("Telegram.downloadMedia")(function* (
       installationId: string,
@@ -400,8 +454,10 @@ const makeTelegram = Effect.gen(function* () {
       maxBytes: number
     ) {
       const installation = yield* readInstallation;
+
       if (installation.botId !== installationId)
         return yield* new ChannelMediaError({ reason: "wrong_installation" });
+
       const id = yield* Schema.decodeUnknownEffect(ProviderReferenceSchema)(
         fileId
       ).pipe(
@@ -409,24 +465,29 @@ const makeTelegram = Effect.gen(function* () {
           () => new ChannelMediaError({ reason: "invalid_media" })
         )
       );
+
       const metadata = yield* request("getFile", { file_id: id }).pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(downloadableFile)),
         Effect.mapError(
           () => new ChannelMediaError({ reason: "download_failed" })
         )
       );
+
       if (metadata.result.file_id !== id)
         return yield* new ChannelMediaError({ reason: "invalid_media" });
+
       if (
         metadata.result.file_size !== undefined &&
         metadata.result.file_size > maxBytes
       )
         return yield* new ChannelMediaError({ reason: "too_large" });
+
       const secret = yield* Config.redacted("TELEGRAM_BOT_TOKEN").pipe(
         Effect.mapError(
           () => new ChannelMediaError({ reason: "download_failed" })
         )
       );
+
       const bytes = yield* downloadMediaBytes(
         http,
         HttpClientRequest.get(
@@ -434,11 +495,13 @@ const makeTelegram = Effect.gen(function* () {
         ),
         maxBytes
       );
+
       if (
         metadata.result.file_size !== undefined &&
         bytes.length !== metadata.result.file_size
       )
         return yield* new ChannelMediaError({ reason: "invalid_media" });
+
       return bytes;
     }),
     parse: Effect.fn("Telegram.parse")(function* (value: Schema.Json) {
@@ -460,8 +523,11 @@ const makeTelegram = Effect.gen(function* () {
         const valid = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
           token
         ).pipe(Effect.mapError(malformed));
+
         const data = `confirm:${valid}`;
+
         if (Buffer.byteLength(data, "utf8") > 64) return yield* malformed();
+
         return yield* send(
           targetId,
           "Confirm this sign-in only if you requested it in your browser.",
@@ -476,9 +542,11 @@ const makeTelegram = Effect.gen(function* () {
       const id = yield* Schema.decodeUnknownEffect(ProviderReferenceSchema)(
         callbackQueryId
       ).pipe(Effect.mapError(malformed));
+
       const body = yield* request("answerCallbackQuery", {
         callback_query_id: id,
       });
+
       yield* Schema.decodeUnknownEffect(
         Schema.Struct({
           ok: Schema.Literal(true),

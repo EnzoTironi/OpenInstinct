@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+
 import type { CompanyRole } from "./org-rbac";
 
 /**
@@ -51,7 +52,9 @@ function normalizeEmail(email: string): string {
 export function emailDomain(email: string): string | undefined {
   const normalized = normalizeEmail(email);
   const at = normalized.lastIndexOf("@");
+
   if (at <= 0 || at === normalized.length - 1) return undefined;
+
   return normalized.slice(at + 1);
 }
 
@@ -63,10 +66,13 @@ export function assertEmailDomainAllowed(
   if (allowedDomains === undefined || allowedDomains.length === 0) {
     return Effect.void;
   }
+
   const domain = emailDomain(email);
+
   const allowed = new Set(
     allowedDomains.map((value) => value.trim().toLowerCase()).filter(Boolean)
   );
+
   if (domain === undefined || !allowed.has(domain)) {
     return Effect.fail(
       new OrgSsoDenied({
@@ -76,6 +82,7 @@ export function assertEmailDomainAllowed(
       })
     );
   }
+
   return Effect.void;
 }
 
@@ -100,6 +107,7 @@ export function assertCanAcceptOrgInvite(input: {
     }
 
     const now = input.now ?? new Date();
+
     if (input.invite.expiresAt.getTime() <= now.getTime()) {
       yield* Effect.fail(
         new OrgSsoDenied({

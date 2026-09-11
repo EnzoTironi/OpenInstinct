@@ -1,6 +1,3 @@
-import type { Session } from "eve/channels";
-import type { ScheduleHandlerArgs, ScheduleToFn } from "eve/schedules";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   claimReadyScheduledAgentRuns,
   claimScheduledReport,
@@ -11,6 +8,9 @@ import type {
   releaseScheduledReport,
   setScheduledRunSession,
 } from "@db/services/scheduled-agent-jobs";
+import type { Session } from "eve/channels";
+import type { ScheduleHandlerArgs, ScheduleToFn } from "eve/schedules";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const services = vi.hoisted(() => ({
   claimReports: vi.fn<typeof claimScheduledReport>(),
@@ -22,6 +22,7 @@ const services = vi.hoisted(() => ({
   releaseRun: vi.fn<typeof releaseScheduledAgentRun>(),
   setSession: vi.fn<typeof setScheduledRunSession>(),
 }));
+
 const requests = vi.hoisted(() => ({
   report: vi.fn<(runId: string) => Promise<void>>(),
 }));
@@ -36,16 +37,19 @@ vi.mock("@db/services/scheduled-agent-jobs", () => ({
   releaseScheduledReport: services.releaseReport,
   setScheduledRunSession: services.setSession,
 }));
+
 vi.mock("@agent/channels/linq", () => ({ default: { channel: "linq" } }));
+
 vi.mock("@agent/lib/schedules/request", () => ({
   postScheduledReport: requests.report,
 }));
+
 vi.mock("@agent/channels/scheduled-run", () => ({
   default: { channel: "scheduled-run" },
 }));
 
-import dynamicSchedule from "@agent/schedules/dynamic";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
+import dynamicSchedule from "@agent/schedules/dynamic";
 
 describe("dynamic schedule dispatch", () => {
   beforeEach(() => {
@@ -61,9 +65,11 @@ describe("dynamic schedule dispatch", () => {
   it("hands due work directly to the scheduled-run channel", async () => {
     const claim = scheduledClaim();
     services.claimRuns.mockResolvedValue([claim]);
+
     const send = vi
       .fn<ReturnType<ScheduleToFn>["send"]>()
       .mockResolvedValue(workerSession());
+
     const to = vi.fn<ScheduleToFn>(() => ({ send }));
 
     await runSchedule(to);
@@ -90,9 +96,11 @@ describe("dynamic schedule dispatch", () => {
     const claim = scheduledClaim();
     claim.run.workerSessionId = "interrupted-worker-session";
     services.claimRuns.mockResolvedValue([claim]);
+
     const send = vi
       .fn<ReturnType<ScheduleToFn>["send"]>()
       .mockResolvedValue(workerSession());
+
     const to = vi.fn<ScheduleToFn>(() => ({ send }));
 
     await runSchedule(to);
@@ -109,9 +117,11 @@ describe("dynamic schedule dispatch", () => {
       { conversationChannel: "linq", runId: report.run.id },
     ]);
     services.claimReports.mockResolvedValue(report);
+
     const send = vi
       .fn<ReturnType<ScheduleToFn>["send"]>()
       .mockResolvedValue(workerSession("main-session"));
+
     const to = vi.fn<ScheduleToFn>(() => ({ send }));
 
     await runSchedule(to);
@@ -148,9 +158,11 @@ describe("dynamic schedule dispatch", () => {
         id: claim.run.id,
       },
     });
+
     const send = vi
       .fn<ReturnType<ScheduleToFn>["send"]>()
       .mockRejectedValue(new Error("Workflow did not accept the candidate."));
+
     const to = vi.fn<ScheduleToFn>(() => ({ send }));
 
     await runSchedule(to);
@@ -175,9 +187,11 @@ describe("scheduled report delivery", () => {
     const report = scheduledReport();
     report.job.replyAnchorMessageId = "original-message";
     services.claimReports.mockResolvedValue(report);
+
     const send = vi
       .fn<ReturnType<ScheduleToFn>["send"]>()
       .mockResolvedValue(workerSession("main-session"));
+
     const to = vi.fn<ScheduleToFn>(() => ({ send }));
     const attachSession = vi.fn<(sessionId: string) => Session>();
 
@@ -218,9 +232,11 @@ describe("scheduled report delivery", () => {
     const send = vi.fn<Session["send"]>();
     const attached = workerSession("web-session", send);
     send.mockResolvedValue({ sessionId: "web-session", status: "accepted" });
+
     const attachSession = vi
       .fn<(sessionId: string) => Session>()
       .mockReturnValue(attached);
+
     const to = vi.fn<ScheduleToFn>();
 
     await dispatchScheduledReport(
@@ -245,9 +261,11 @@ describe("scheduled report delivery", () => {
     report.job.conversationChannel = "eve";
     report.job.conversationId = "retired-session";
     services.claimReports.mockResolvedValue(report);
+
     const send = vi
       .fn<Session["send"]>()
       .mockResolvedValue({ status: "session_not_active" });
+
     const attachSession = vi
       .fn<(sessionId: string) => Session>()
       .mockReturnValue(workerSession("retired-session", send));
@@ -268,6 +286,7 @@ describe("scheduled report delivery", () => {
 
 async function runSchedule(to: ScheduleToFn) {
   let task: Promise<unknown> | undefined;
+
   const args: ScheduleHandlerArgs = {
     appAuth: {
       attributes: {},
@@ -280,6 +299,7 @@ async function runSchedule(to: ScheduleToFn) {
       task = backgroundTask;
     },
   };
+
   dynamicSchedule.run(args);
   await task;
 }
@@ -374,6 +394,7 @@ function scheduledReport(): NonNullable<
   Awaited<ReturnType<typeof claimScheduledReport>>
 > {
   const claim = scheduledClaim();
+
   return {
     job: claim.job,
     run: {

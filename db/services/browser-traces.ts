@@ -1,12 +1,12 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
-import { z } from "zod";
-import type { AccessScope } from "@shared/identity/access-scope";
 import {
   browserTraceDomains,
   browserTraceEvents,
   browserTraces,
   db,
 } from "@db";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
 type CompletedBrowserTraceStatus = Exclude<
   typeof browserTraces.$inferSelect.status,
@@ -36,6 +36,7 @@ function encodeTraceCursor(boundary: z.infer<typeof traceCursorSchema>) {
 
 export async function listBrowserTraces(scope: AccessScope, cursor?: string) {
   const boundary = cursor === undefined ? undefined : decodeTraceCursor(cursor);
+
   const rows = await db.query.browserTraces.findMany({
     columns: { createdByUserId: false, workspaceId: false },
     limit: traceHistoryPageSize + 1,
@@ -85,7 +86,9 @@ export async function readBrowserTrace(scope: AccessScope, sessionId: string) {
       },
     },
   });
+
   if (!trace) return undefined;
+
   return serializeBrowserTrace(trace);
 }
 
@@ -146,6 +149,7 @@ export async function recordBrowserTraceEvents(
   }[]
 ) {
   if (events.length === 0) return;
+
   const owned = await db
     .select({ sessionId: browserTraces.sessionId })
     .from(browserTraces)
@@ -156,6 +160,7 @@ export async function recordBrowserTraceEvents(
       )
     )
     .limit(1);
+
   if (owned.length === 0) return;
 
   await db
@@ -197,6 +202,7 @@ export async function listBrowserTraceEvents(
     )
     .orderBy(asc(browserTraceEvents.id))
     .limit(traceEventReadLimit);
+
   return events.map((event) =>
     Object.assign({}, event, { at: event.at.toISOString() })
   );
@@ -208,6 +214,7 @@ export async function recordBrowserTraceDomains(
   domains: readonly string[]
 ) {
   if (domains.length === 0) return;
+
   const owned = await db
     .select({ sessionId: browserTraces.sessionId })
     .from(browserTraces)
@@ -218,6 +225,7 @@ export async function recordBrowserTraceDomains(
       )
     )
     .limit(1);
+
   if (owned.length === 0) return;
 
   const firstSeenAt = new Date();

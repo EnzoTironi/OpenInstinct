@@ -1,5 +1,6 @@
 import { ConfigProvider, Effect } from "effect";
 import { expect, it } from "vitest";
+
 import { transcribeChannelAudio } from "./transcription";
 
 it("fails the unavailable transcription profile without a provider call", async () => {

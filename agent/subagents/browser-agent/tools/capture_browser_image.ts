@@ -1,8 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { del, put } from "@vercel/blob";
-import { defineTool, toolOutput } from "eve/tools";
-import { z } from "zod";
+
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
 import { withVaultScreenshotMask } from "@agent/subagents/browser-agent/lib/vault-screenshot-mask";
 import {
@@ -16,7 +15,9 @@ import {
   sniffBrowserImageMediaType,
 } from "@shared/browser/artifact";
 import { env } from "@shared/environment";
-import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { del, put } from "@vercel/blob";
+import { defineTool, toolOutput } from "eve/tools";
+import { z } from "zod";
 
 const regionSchema = z.object({
   height: z.number().int().positive(),
@@ -24,10 +25,12 @@ const regionSchema = z.object({
   x: z.number().int().nonnegative(),
   y: z.number().int().nonnegative(),
 });
+
 const commonFields = {
   label: z.string().trim().min(1).max(200),
   session_id: z.string().min(1),
 };
+
 const inputSchema = z.discriminatedUnion("source", [
   z.object({
     ...commonFields,
@@ -49,6 +52,7 @@ const inputSchema = z.discriminatedUnion("source", [
     source: z.literal("image_resource"),
   }),
 ]);
+
 const outputSchema = z.object({ image: browserImageArtifactReferenceSchema });
 
 type CaptureInput = z.infer<typeof inputSchema>;
@@ -62,6 +66,7 @@ export default defineTool({
     const scope = await requireWorkerScope(context);
     await requireOwnedBrowserSession(scope, input.session_id);
     const parent = context.session.parent;
+
     if (!parent)
       throw new Error("Browser image capture requires a delegated worker.");
 
@@ -73,15 +78,18 @@ export default defineTool({
       sourceKind: input.source,
       workerSessionId: context.session.id,
     });
+
     if (reserved.status === "ready") return { image: reserved.image };
 
     const captured = await captureBrowserImage(input, context.abortSignal);
     const mediaType = sniffBrowserImageMediaType(captured.bytes);
+
     if (!mediaType) {
       throw new Error(
         "The captured resource is not a supported browser image."
       );
     }
+
     const image = await persistCapturedImage(
       scope,
       reserved.reservation,
@@ -92,6 +100,7 @@ export default defineTool({
       },
       context.abortSignal
     );
+
     return outputSchema.parse({ image });
   },
   toModelOutput(output) {
@@ -115,11 +124,13 @@ async function captureBrowserImage(
             { signal }
           )
       );
+
       return {
         bytes: await readBoundedResponse(response),
         sourceKind: input.source,
       };
     }
+
     case "full_page":
       return {
         bytes: await capturePlaywrightScreenshot(
@@ -150,6 +161,7 @@ async function captureBrowserImage(
         };
       } catch (error) {
         if (signal?.aborted) throw error;
+
         return {
           bytes: await capturePlaywrightScreenshot(
             input.session_id,
@@ -160,6 +172,7 @@ async function captureBrowserImage(
         };
       }
   }
+
   throw new Error("Unsupported browser image source.");
 }
 
@@ -184,20 +197,25 @@ return await image.evaluate((element) => {
     },
     { signal }
   );
+
   const resolved = z
     .object({ url: z.url() })
     .safeParse(result.success ? result.result : undefined);
+
   if (!resolved.success) {
     throw new Error(
       result.error ?? "The selected image resource was unavailable."
     );
   }
+
   const url = new URL(resolved.data.url);
+
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("The selected image does not use an HTTP URL.");
   }
 
   await getKernel().browsers.retrieve(sessionId, {}, { signal });
+
   const response = await getKernel().browsers.fetch(sessionId, url, {
     headers: {
       accept: "image/webp,image/png,image/jpeg,image/gif,*/*;q=0.1",
@@ -206,15 +224,19 @@ return await image.evaluate((element) => {
     signal,
     timeout_ms: 20_000,
   });
+
   if (!response.ok) {
     throw new Error(
       `The selected image resource returned HTTP ${String(response.status)}.`
     );
   }
+
   const bytes = await readBoundedResponse(response);
+
   if (!sniffBrowserImageMediaType(bytes)) {
     throw new Error("The selected resource is not a supported image.");
   }
+
   return bytes;
 }
 
@@ -237,21 +259,25 @@ async function capturePlaywrightScreenshot(
 const target = page.locator(${JSON.stringify(target.selector)}).first();
 await target.waitFor({ state: "visible", timeout: 5_000 });
 await target.screenshot({ animations: "disabled", caret: "hide", path: ${JSON.stringify(remotePath)}, type: "png" });`;
+
       const result = await getKernel().browsers.playwright.execute(
         sessionId,
         { code: `${screenshotCode}\nreturn true;`, timeout_sec: 25 },
         { signal }
       );
+
       if (!result.success) {
         throw new Error(
           result.error ?? "Kernel could not capture the screenshot."
         );
       }
+
       const response = await getKernel().browsers.fs.readFile(
         sessionId,
         { path: remotePath },
         { signal }
       );
+
       return await readBoundedResponse(response);
     } finally {
       await getKernel()
@@ -271,6 +297,7 @@ function safeBrowserImageFilename(
     "image/png": "png",
     "image/webp": "webp",
   }[mediaType];
+
   const stem = label
     .normalize("NFKD")
     .replace(/(?:\.\.[/\\])+/gu, "")
@@ -280,6 +307,7 @@ function safeBrowserImageFilename(
     .trim()
     .replace(/^\.+|\.+$/gu, "")
     .slice(0, 160);
+
   return `${stem || "browser-image"}.${extension}`;
 }
 
@@ -294,10 +322,12 @@ async function persistCapturedImage(
   signal?: AbortSignal
 ) {
   const mediaType = sniffBrowserImageMediaType(input.bytes);
+
   if (!mediaType)
     throw new Error("The captured resource is not a supported browser image.");
   const contentHash = createHash("sha256").update(input.bytes).digest("hex");
   const storagePathname = `${reservation.storagePathname}/${contentHash}`;
+
   if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) {
     throw new Error("Browser image storage is not configured.");
   }
@@ -311,6 +341,7 @@ async function persistCapturedImage(
     contentType: mediaType,
     maximumSizeInBytes: maximumBrowserImageBytes,
   });
+
   try {
     const finalized = await finalizeBrowserImageArtifact(scope, reservation, {
       byteSize: input.bytes.byteLength,
@@ -320,9 +351,11 @@ async function persistCapturedImage(
       sourceKind: input.sourceKind,
       storagePathname,
     });
+
     if (finalized.storagePathname !== storagePathname) {
       await del(storagePathname).catch(() => undefined);
     }
+
     return finalized.image;
   } catch (error) {
     await del(storagePathname).catch(() => undefined);
@@ -332,37 +365,46 @@ async function persistCapturedImage(
 
 async function readBoundedResponse(response: Response) {
   const contentLength = Number(response.headers.get("content-length"));
+
   if (
     Number.isFinite(contentLength) &&
     contentLength > maximumBrowserImageBytes
   ) {
     throw new Error("The browser image exceeds the maximum size.");
   }
+
   if (!response.body) throw new Error("The browser image response is empty.");
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+
   try {
     /* oxlint-disable eslint/no-await-in-loop -- A response body is an ordered stream and must be read and cancelled sequentially. */
     for (;;) {
       const { done, value } = await reader.read();
+
       if (done) break;
       total += value.byteLength;
+
       if (total > maximumBrowserImageBytes) {
         await reader.cancel();
         throw new Error("The browser image exceeds the maximum size.");
       }
+
       chunks.push(value);
     }
     /* oxlint-enable eslint/no-await-in-loop */
   } finally {
     reader.releaseLock();
   }
+
   const bytes = new Uint8Array(total);
   let offset = 0;
+
   for (const chunk of chunks) {
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
+
   return bytes;
 }

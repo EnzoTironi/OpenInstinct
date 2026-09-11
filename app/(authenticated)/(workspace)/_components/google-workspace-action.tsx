@@ -1,9 +1,9 @@
 "use client";
 
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import { api } from "@web/trpc/client";
-import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 
 export function GoogleWorkspaceAction({
   state,
@@ -13,12 +13,14 @@ export function GoogleWorkspaceAction({
   readonly returnTo?: string;
 }) {
   const returnPath = googleWorkspaceReturnTo(returnTo);
+
   const update = api.googleWorkspace.update.useMutation({
     onError: () => {
       const query = new URLSearchParams({
         google: "unavailable",
         returnTo: returnPath,
       });
+
       window.location.assign(`/?${query}`);
     },
     onSuccess: ({ redirectTo }) => {
@@ -29,11 +31,13 @@ export function GoogleWorkspaceAction({
   if (!state) {
     return <Badge variant="secondary">Loading…</Badge>;
   }
+
   if (state === "unavailable") {
     return <Badge variant="secondary">Setup required</Badge>;
   }
 
   const action = state === "connected" ? "disconnect" : "connect";
+
   return (
     <Button
       disabled={update.isPending}

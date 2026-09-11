@@ -1,8 +1,5 @@
-import { defineDynamic, defineTool } from "eve/tools";
-import { authorizeApprovalResponse } from "@agent/lib/approval-response";
-import { always } from "eve/tools/approval";
 import { approvalMessageSchema } from "@agent/lib/approval-message";
-import { z } from "zod";
+import { authorizeApprovalResponse } from "@agent/lib/approval-response";
 import {
   GMAIL_UPDATE_ACTIONS,
   gmailSendSchema,
@@ -12,6 +9,9 @@ import {
   updateGmail,
 } from "@agent/lib/google-workspace/gmail";
 import { resolveModeValue } from "@agent/lib/mode";
+import { defineDynamic, defineTool } from "eve/tools";
+import { always } from "eve/tools/approval";
+import { z } from "zod";
 
 export const gmailSearch = defineTool({
   description:
@@ -45,6 +45,7 @@ export const gmailUpdate = defineTool({
   }),
   async execute(input, ctx) {
     const updated = await updateGmail(ctx, input.messageIds, input.update);
+
     return {
       update: updated.action,
       updatedCount: updated.updatedCount,
@@ -61,6 +62,7 @@ export const gmailSend = defineTool({
   }),
   async execute(input, ctx) {
     const sent = await sendGmail(ctx, input);
+
     return {
       messageId: sent.id,
       sent: true,

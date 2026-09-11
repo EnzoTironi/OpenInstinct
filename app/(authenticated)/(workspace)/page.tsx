@@ -1,32 +1,36 @@
-import { BotIcon, MailIcon } from "lucide-react";
-import Link from "next/link";
-import type { ReactNode } from "react";
-import { Effect, Result } from "effect";
-import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
-import { Button } from "@web/components/ui/button";
 import { getGatewayModel } from "@db/services/settings";
 import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
-import { serverRuntime } from "../../../server/runtime";
-import { readGoogleWorkspaceConnection } from "../../../server/google-workspace";
 import { requireRequestScope } from "@web/auth/request-scope";
+import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
+import { Button } from "@web/components/ui/button";
+import { Effect, Result, Match } from "effect";
+import { BotIcon, MailIcon } from "lucide-react";
+import { headers } from "next/headers";
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
+import { readGoogleWorkspaceConnection } from "../../../server/google-workspace";
+import { serverRuntime } from "../../../server/runtime";
+import { FirstRunStatus } from "./_components/first-run-status";
 import { GoogleWorkspaceAction } from "./_components/google-workspace-action";
 import { HomeOverview } from "./_components/home-overview";
-import { FirstRunStatus } from "./_components/first-run-status";
 import { ModelSelector } from "./_components/model-selector";
-import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
-import { headers } from "next/headers";
 
 export default async function Page({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
   const google = params.google;
   const welcomeParam = params.welcome;
+
   const welcomeValue = Array.isArray(welcomeParam)
     ? welcomeParam[0]
     : welcomeParam;
+
   const welcome = welcomeValue === "1" || welcomeValue === "true";
   const returnTo = googleWorkspaceReturnTo(params.returnTo);
   const scope = await requireRequestScope();
   const requestHeaders = await headers();
+
   const [googleWorkspace, gatewayModel, linkedChannels] = await Promise.all([
     serverRuntime.runPromise(
       readGoogleWorkspaceConnection(scope).pipe(Effect.result)
@@ -36,6 +40,7 @@ export default async function Page({ searchParams }: PageProps<"/">) {
       readLinkedChannelIdentities(requestHeaders).pipe(Effect.result)
     ),
   ]);
+
   const identities = Result.isSuccess(linkedChannels)
     ? linkedChannels.success
     : [];
@@ -106,12 +111,17 @@ function GoogleWorkspaceSection({
   readonly returnTo: string;
 }) {
   const state = connection.state;
-  const description =
-    state === "connected"
-      ? "Gmail, Calendar, and Contacts connected."
-      : state === "unavailable"
-        ? "Google connections aren’t enabled on this installation yet."
-        : "Gmail, Calendar, and Contacts through your Google account.";
+
+  const description = Match.value(state).pipe(
+    Match.when("connected", () => "Gmail, Calendar, and Contacts connected."),
+    Match.when(
+      "unavailable",
+      () => "Google connections aren’t enabled on this installation yet."
+    ),
+    Match.orElse(
+      () => "Gmail, Calendar, and Contacts through your Google account."
+    )
+  );
 
   return (
     <WorkspaceSection headingId="connections-heading" title="Connections">

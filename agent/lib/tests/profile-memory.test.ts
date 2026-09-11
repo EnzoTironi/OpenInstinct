@@ -1,16 +1,16 @@
 import {
+  preserveProfileMemoryCancellation,
+  resolveProfileMemoryScope,
+} from "@agent/lib/profile-memory";
+import personalInfoMemory from "@agent/memory/personal_info";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import {
   defineMemoryProvider,
   type MemoryScopeContext,
   type MemoryTurnStartedContext,
   type MemoryToolsContext,
 } from "eve/memory";
 import { describe, expect, it } from "vitest";
-import personalInfoMemory from "@agent/memory/personal_info";
-import {
-  preserveProfileMemoryCancellation,
-  resolveProfileMemoryScope,
-} from "@agent/lib/profile-memory";
-import { accessScopeForUser } from "@shared/identity/access-scope";
 
 const derivedWorkspaceId = accessScopeForUser("better-auth:user").workspaceId;
 
@@ -73,11 +73,13 @@ describe("profile memory", () => {
     const interactiveTools = await personalInfoMemory.provider.tools(
       memoryToolsContext(userPrincipal("authjs", derivedWorkspaceId))
     );
+
     expect(Object.keys(interactiveTools ?? {})).toEqual(["update"]);
 
     const scheduledTools = await personalInfoMemory.provider.tools(
       memoryToolsContext(userPrincipal("scheduled-worker", derivedWorkspaceId))
     );
+
     expect(scheduledTools).toBeNull();
   });
 
@@ -86,11 +88,14 @@ describe("profile memory", () => {
       "This operation was aborted",
       "AbortError"
     );
+
     const cancellation = Object.assign(new Error("The turn was cancelled."), {
       name: "TurnCancelledError",
     });
+
     const controller = new AbortController();
     controller.abort(cancellation);
+
     const provider = preserveProfileMemoryCancellation(
       defineMemoryProvider({
         recall: {
@@ -111,6 +116,7 @@ describe("profile memory", () => {
       "This operation was aborted",
       "AbortError"
     );
+
     const provider = preserveProfileMemoryCancellation(
       defineMemoryProvider({
         recall: {

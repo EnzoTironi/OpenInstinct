@@ -1,10 +1,11 @@
-import type { DynamicResolveContext } from "eve/instructions";
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+
 import executionSafety from "@agent/instructions/10-execution-safety";
 import roleInstructions from "@agent/instructions/20-role";
 import workerCoordination from "@agent/instructions/25-worker-coordination";
 import messageStyle from "@agent/instructions/30-message-style";
+import type { DynamicResolveContext } from "eve/instructions";
+import { describe, expect, it } from "vitest";
 
 describe("agent instructions", () => {
   it.each([
@@ -14,6 +15,7 @@ describe("agent instructions", () => {
   ])("selects %s instructions for the current turn", async (role, phrase) => {
     const resolve = roleInstructions.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     const selected = await resolve({}, dynamicContext(role));
@@ -23,6 +25,7 @@ describe("agent instructions", () => {
   it("limits scheduled-result turns to reporting", async () => {
     const resolve = roleInstructions.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     const selected = await resolve({}, dynamicContext("scheduled-result"));
@@ -40,6 +43,7 @@ describe("agent instructions", () => {
   it("omits execution safety from scheduled reports", async () => {
     const resolve = executionSafety.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     expect(await resolve({}, dynamicContext("scheduled-result"))).toBeNull();
@@ -50,6 +54,7 @@ describe("agent instructions", () => {
   it("uses an authored proposal and a source-bound native response without repeating approval", async () => {
     const resolve = executionSafety.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     const selected = await resolve({}, dynamicContext("linq-message"));
@@ -67,6 +72,7 @@ describe("agent instructions", () => {
   it("treats personal information as recalled context instead of a read tool", async () => {
     const resolve = roleInstructions.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     const selected = await resolve({}, dynamicContext("linq-message"));
@@ -84,6 +90,7 @@ describe("agent instructions", () => {
   it("omits message style from scheduled workers", async () => {
     const resolve = messageStyle.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     expect(await resolve({}, dynamicContext("scheduled-worker"))).toBeNull();
@@ -96,6 +103,7 @@ describe("agent instructions", () => {
   it("shares the exact browser contract with scheduled workers", async () => {
     const resolve = workerCoordination.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     const selections = await Promise.all(
@@ -103,6 +111,7 @@ describe("agent instructions", () => {
         Promise.resolve(resolve({}, dynamicContext(authenticator)))
       )
     );
+
     for (const selected of selections) {
       expect(selected?.content).toContain(
         "Every initial or resumed `browser-agent` call must set `outputSchema`"
@@ -121,12 +130,14 @@ describe("agent instructions", () => {
   it("keeps resumed scheduled turns in worker mode", async () => {
     const resolve = roleInstructions.events["turn.started"];
     expect(resolve).toBeDefined();
+
     if (!resolve) return;
 
     const selected = await resolve(
       {},
       dynamicContext("linq-message", "scheduled-worker")
     );
+
     expect(selected?.content).toContain("isolated background session");
   });
 });

@@ -1,18 +1,15 @@
 "use client";
 
 import type {
-  ChannelAuthorizationError,
-  ChannelAuthorizationStatus,
-} from "@web/auth/channel/client";
-import { Effect, Result } from "effect";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import type {
   channelChallengeSchema,
   deviceBoundSchema,
   channelChallengeRequestSchema,
   channelProviderSchema,
 } from "@shared/identity/channel-auth";
+import type {
+  ChannelAuthorizationError,
+  ChannelAuthorizationStatus,
+} from "@web/auth/channel/client";
 import {
   checkChannelAuthorization,
   channelFailureMessage,
@@ -23,10 +20,14 @@ import {
   reauthenticationDestination,
   startChannelAuthorization,
 } from "@web/auth/channel/client";
+import { authClient } from "@web/auth/client";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
+import { Effect, Result } from "effect";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
 import { ChannelStatus } from "./status";
-import { authClient } from "@web/auth/client";
 
 export function ChannelAuthForm({
   callbackUrl,
@@ -37,7 +38,9 @@ export function ChannelAuthForm({
 }) {
   const [challenge, setChallenge] =
     useState<typeof channelChallengeSchema.Type>();
+
   const action = useAuthorizationRequest();
+
   function start(channel: typeof channelProviderSchema.Type) {
     action.run(startChannelAuthorization(channel, purpose), (result) => {
       if ("conversationUrl" in result)
@@ -58,6 +61,7 @@ export function ChannelAuthForm({
         }}
       />
     );
+
   return (
     <div className="space-y-3">
       <Button
@@ -130,6 +134,7 @@ export function PendingAuthorization({
     if (status !== "pending" && status !== "confirmed") return undefined;
     const controller = new AbortController();
     const remaining = Math.max(0, Date.parse(challenge.expiresAt) - Date.now());
+
     const timer = setTimeout(
       () => {
         controller.abort();
@@ -137,19 +142,25 @@ export function PendingAuthorization({
       },
       Math.min(remaining, 2_147_483_647)
     );
+
     if (status === "pending") {
       const poll = Effect.gen(function* pollConfirmation() {
         let failures = 0;
+
         while (Date.now() < Date.parse(challenge.expiresAt)) {
           const result = yield* checkChannelAuthorization(challenge.id).pipe(
             Effect.result
           );
+
           let delay = 2000;
+
           if (Result.isSuccess(result)) {
             failures = 0;
             setError(undefined);
+
             if (result.success.status !== "pending") {
               setStatus(result.success.status);
+
               return;
             }
           } else {
@@ -159,26 +170,34 @@ export function PendingAuthorization({
               Date.now(),
               Date.parse(challenge.expiresAt)
             );
+
             setError(
               next.status === "invalid"
                 ? `${channelFailureMessage(result.failure, purpose)} Start a new request to continue.`
                 : channelFailureMessage(result.failure, purpose)
             );
+
             if (next.status !== "pending") {
               setStatus(next.status);
+
               return;
             }
+
             failures = next.failures;
             delay = next.delay;
           }
+
           yield* Effect.sleep(delay);
         }
+
         setStatus("expired");
       });
+
       void Effect.runPromise(poll, { signal: controller.signal }).catch(() => {
         if (!controller.signal.aborted) setError(channelHttpError(0).message);
       });
     }
+
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -187,10 +206,13 @@ export function PendingAuthorization({
 
   function complete() {
     if (status !== "confirmed") return;
+
     if (Date.now() >= Date.parse(challenge.expiresAt)) {
       setStatus("expired");
+
       return;
     }
+
     action.run(completeChannelAuthorization(challenge.id), () => {
       if (purpose === "link") onRestart();
       router.replace(safeCallbackUrl(callbackUrl));
@@ -254,12 +276,14 @@ export function useAuthorizationRequest() {
         }
       });
   }
+
   return { busy, error, run };
 }
 
 export function SignInAgain({ callbackUrl }: { readonly callbackUrl: string }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+
   return (
     <div className="space-y-3">
       <Button
@@ -274,12 +298,16 @@ export function SignInAgain({ callbackUrl }: { readonly callbackUrl: string }) {
               outcome,
               callbackUrl
             );
+
             if (destination) {
               window.location.assign(destination);
+
               return undefined;
             }
+
             setFailed(true);
             setBusy(false);
+
             return undefined;
           });
         }}

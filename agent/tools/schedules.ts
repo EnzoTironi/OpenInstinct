@@ -1,17 +1,12 @@
-import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
-import { z } from "zod";
-import { requireChannelPrincipal } from "../../server/channels/principal";
-import { serverRuntime } from "../../server/runtime";
+import { postInternalRequest } from "@agent/lib/internal-request";
 import { resolveModeValue } from "@agent/lib/mode";
 import { scheduledReportIdentity } from "@agent/lib/schedules/identity";
-import { postInternalRequest } from "@agent/lib/internal-request";
 import {
   scheduleListSummary,
   scheduleOwner,
   scheduleReplyAnchor,
   scheduleSummary,
 } from "@agent/lib/schedules/tools";
-import { scheduleTimingSchema } from "@shared/schedules/timing";
 import {
   createScheduledAgentJob,
   getScheduledAgentRunInput,
@@ -19,6 +14,12 @@ import {
   listScheduledAgentJobs,
   updateScheduledAgentJob,
 } from "@db/services/scheduled-agent-jobs";
+import { scheduleTimingSchema } from "@shared/schedules/timing";
+import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
+import { z } from "zod";
+
+import { requireChannelPrincipal } from "../../server/channels/principal";
+import { serverRuntime } from "../../server/runtime";
 
 export const createSchedule = defineTool({
   description:
@@ -30,6 +31,7 @@ export const createSchedule = defineTool({
   }),
   async execute(input, context) {
     const owner = await authorizedScheduleOwner(context);
+
     return scheduleSummary(
       await createScheduledAgentJob(owner.scope, {
         ...owner.conversation,
@@ -48,6 +50,7 @@ export const listSchedules = defineTool({
   inputSchema: z.object({}),
   async execute(_input, context) {
     const owner = await authorizedScheduleOwner(context);
+
     return (await listScheduledAgentJobs(owner.scope, owner.conversation)).map(
       scheduleListSummary
     );
@@ -73,13 +76,16 @@ export const updateSchedule = defineTool({
   inputSchema: updateScheduleInputSchema,
   async execute({ id, ...patch }, context) {
     const owner = await authorizedScheduleOwner(context);
+
     const job = await updateScheduledAgentJob(
       owner.scope,
       owner.conversation,
       id,
       patch
     );
+
     if (!job) throw new Error("Schedule not found.");
+
     return scheduleSummary(job);
   },
 });
@@ -93,9 +99,11 @@ export const answerSchedule = defineTool({
   }),
   async execute({ answer, runId }, context) {
     const pending = await pendingScheduledRun(context, runId);
+
     if (!pending) {
       throw new Error("That scheduled task is not waiting for input.");
     }
+
     const response = await postInternalRequest(
       "/internal/scheduled-run/respond",
       {
@@ -104,6 +112,7 @@ export const answerSchedule = defineTool({
         runId: pending.runId,
       }
     );
+
     if (!response.ok) {
       throw new Error(
         response.status === 422
@@ -111,6 +120,7 @@ export const answerSchedule = defineTool({
           : "The scheduled task could not be resumed."
       );
     }
+
     return { resumed: true, runId };
   },
 });
@@ -134,29 +144,35 @@ async function pendingScheduledRun(context: ToolContext, runId: string) {
   const resolvePending = resolveModeValue(context, {
     interactive: async () => {
       const owner = await authorizedScheduleOwner(context);
+
       return getScheduledAgentRunInput(owner.scope, owner.conversation, runId);
     },
     "scheduled-report": () => {
       const report = scheduledReportIdentity(context.session.auth);
+
       if (!report || report.runId !== runId) {
         throw new Error("This reporting turn cannot resume that run.");
       }
+
       return getScheduledAgentRunInputForReport(
         report.runId,
         report.leaseToken
       );
     },
   });
+
   return resolvePending?.();
 }
 
 async function authorizedScheduleOwner(context: ToolContext) {
   const owner = scheduleOwner(context);
   const channel = owner.conversation.conversationChannel;
+
   if (channel === "telegram" || channel === "kapso") {
     await serverRuntime.runPromise(
       requireChannelPrincipal(channel, context.session.auth.current)
     );
   }
+
   return owner;
 }

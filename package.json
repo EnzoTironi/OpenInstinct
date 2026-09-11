@@ -56,7 +56,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@linqapp/chat-sdk-adapter": "0.5.1",
     "@next/env": "16.3.3",
-    "@oxlint/plugins": "1.80.0",
+    "@oxlint/plugins": "1.82.0",
     "@types/node": "24.13.3",
     "@types/pg": "^8.23.1",
     "@types/react": "19.2.18",
@@ -66,8 +66,8 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-turbo": "2.10.12",
     "knip": "6.32.3",
-    "oxfmt": "0.65.0",
-    "oxlint": "1.80.0",
+    "oxfmt": "0.67.0",
+    "oxlint": "1.82.0",
     "oxlint-tailwindcss": "1.10.0",
     "oxlint-tsgolint": "7.0.2001",
     "portless": "0.15.1",
@@ -76,6 +76,7 @@
     "tsx": "4.21.0",
     "turbo": "2.10.12",
     "typescript": "7.0.2",
+    "ultracite": "7.11.1",
     "vercel": "^59.6.2",
     "vitest": "4.1.11"
   },
@@ -114,8 +115,8 @@
     "format:check": "oxfmt --check .",
     "knip": "knip --config knip.config.ts",
     "lint": "turbo run lint:app",
-    "lint:app": "oxlint . --deny-warnings",
-    "lint:fix": "oxlint . --fix",
+    "lint:app": "ultracite check",
+    "lint:fix": "ultracite fix",
     "start": "node --env-file-if-exists=.env.local scripts/start.ts",
     "start:app": "node --env-file-if-exists=.env.local scripts/start.ts",
     "test": "turbo run test:app",
@@ -136,7 +137,8 @@
     "infra:fly-pg": "bash ./scripts/fly-alchemy-pg.sh",
     "infra:fly-pg:plan:prod": "bash ./scripts/fly-alchemy-pg.sh plan --stage prod",
     "infra:fly-pg:deploy:prod": "bash ./scripts/fly-alchemy-pg.sh deploy --stage prod",
-    "ingress:set-webhooks": "bash ./scripts/set-channel-webhooks.sh"
+    "ingress:set-webhooks": "bash ./scripts/set-channel-webhooks.sh",
+    "ultracite": "ultracite"
   },
   "version": "0.0.0",
   "type": "module"

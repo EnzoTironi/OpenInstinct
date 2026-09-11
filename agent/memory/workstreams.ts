@@ -1,12 +1,3 @@
-import {
-  defineMemory,
-  defineMemoryProvider,
-  type MemoryOperationContext,
-  type MemoryScopeContext,
-} from "eve/memory";
-import { defineTool } from "eve/tools";
-import { z } from "zod";
-import { scopeFromPrincipal } from "@shared/identity/principal-scope";
 import { resolveModeValue } from "@agent/lib/mode";
 import {
   findWorkstreams,
@@ -15,32 +6,45 @@ import {
   recallWorkstreams,
   saveWorkstream,
 } from "@db/services/workstreams";
+import { scopeFromPrincipal } from "@shared/identity/principal-scope";
 import {
   findWorkstreamsSchema,
   forgetWorkstreamSchema,
   saveWorkstreamSchema,
   workstreamIdSchema,
 } from "@shared/workstreams/schema";
+import {
+  defineMemory,
+  defineMemoryProvider,
+  type MemoryOperationContext,
+  type MemoryScopeContext,
+} from "eve/memory";
+import { defineTool } from "eve/tools";
+import { z } from "zod";
 
 function interactiveWorkstreamScope(
   context: Pick<MemoryScopeContext, "session">
 ) {
   const caller = context.session.auth.current;
+
   if (
     caller?.principalType !== "user" ||
     !z.string().min(1).safeParse(caller.attributes.workspaceId).success
   )
     return null;
   const scope = scopeFromPrincipal(caller);
+
   return resolveModeValue(context, { interactive: scope });
 }
 
 async function recall(context: MemoryOperationContext) {
   const scope = interactiveWorkstreamScope(context);
+
   if (!scope) return null;
   context.abortSignal.throwIfAborted();
   const index = await recallWorkstreams(scope, context.memory.scope.key);
   context.abortSignal.throwIfAborted();
+
   // Always supersede the index, including when every workstream was closed or forgotten.
   return {
     messages: [
@@ -66,8 +70,10 @@ export default defineMemory({
     recall: { "turn.started": recall, "compaction.completed": recall },
     async tools(context) {
       const scope = interactiveWorkstreamScope(context);
+
       if (!scope) return null;
       const key = context.memory.scope.key;
+
       return {
         find: defineTool({
           description:

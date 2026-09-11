@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { ActivityDurationBreakdown } from "@web/components/browser/activity-duration-breakdown";
 import {
   Table,
   TableBody,
@@ -10,7 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
-import { ActivityDurationBreakdown } from "@web/components/browser/activity-duration-breakdown";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
 import type { BrowserBenchmarkLiveStatus } from "../../live-status-schema";
 import {
   averageBenchmarkImprovement,
@@ -19,6 +20,7 @@ import {
 import { useRuns } from "../lib/use-runs";
 
 type Variant = BrowserBenchmarkLiveStatus["variants"]["baseline"];
+
 type Task = Variant["tasks"][number];
 
 export function RunDetail({ runId }: { runId: string }) {
@@ -29,9 +31,11 @@ export function RunDetail({ runId }: { runId: string }) {
 
   useEffect(() => {
     if (!active) return undefined;
+
     const timer = setInterval(() => {
       setNow(Date.now());
     }, 1_000);
+
     return () => {
       clearInterval(timer);
     };
@@ -87,6 +91,7 @@ function RunTables({
   const baseline = run.variants.baseline.tasks;
   const candidate = run.variants.candidate.tasks;
   const averageImprovement = averageBenchmarkImprovement(baseline, candidate);
+
   const tasks = [
     ...baseline.map((task) => task.id),
     ...candidate
@@ -95,6 +100,7 @@ function RunTables({
       )
       .map((task) => task.id),
   ];
+
   return (
     <>
       <div className="flex flex-wrap gap-x-5 gap-y-1 type-caption text-muted-foreground">
@@ -163,6 +169,7 @@ function RunTables({
                 tasks.map((taskId) => {
                   const left = baseline.find((task) => task.id === taskId);
                   const right = candidate.find((task) => task.id === taskId);
+
                   return (
                     <TableRow className="border-b border-border" key={taskId}>
                       <TableCell className="align-top font-medium wrap-break-word whitespace-normal">
@@ -197,6 +204,7 @@ function RunTables({
 
 function VariantRow({ variant }: { variant: Variant }) {
   const summary = summarize(variant);
+
   return (
     <TableRow>
       <TableCell className="font-medium capitalize">{variant.kind}</TableCell>
@@ -219,11 +227,13 @@ function VariantRow({ variant }: { variant: Variant }) {
 function TaskResultCell({ now, task }: { now: number; task?: Task }) {
   if (!task)
     return <TableCell className="text-muted-foreground">Waiting</TableCell>;
+
   const message =
     task.terminalMessage ??
     task.error ??
     task.activity ??
     (task.status === "running" ? "Starting task" : "Waiting to start");
+
   return (
     <TableCell className="min-w-0 overflow-hidden border-l border-border align-top whitespace-normal">
       <div className="flex items-center gap-2">
@@ -258,6 +268,7 @@ function TaskTraceCell({
       </TableCell>
     );
   }
+
   return (
     <TableCell className="border-l border-border align-top whitespace-normal">
       <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -297,6 +308,7 @@ function TaskImprovement({
   candidate: Task | undefined;
 }) {
   const improvement = compareBenchmarkTasks(baseline, candidate);
+
   return (
     <TableCell className="border-l border-border align-top whitespace-normal">
       <div className="grid gap-1">
@@ -319,7 +331,9 @@ function Improvement({
       <span className="type-caption text-muted-foreground">{label} —</span>
     );
   }
+
   const improved = value < 0;
+
   return (
     <span
       className={`type-caption ${improved ? "text-success" : "text-destructive"}`}
@@ -335,6 +349,7 @@ function traceHref(runId: string, task: Task | undefined) {
   const workerSession = task?.sessions.find(
     (session) => session.role === "worker"
   );
+
   return workerSession
     ? `/runs/${encodeURIComponent(runId)}/traces/${encodeURIComponent(workerSession.id)}`
     : null;
@@ -351,6 +366,7 @@ function StatusDot({ status }: { status: Task["status"] }) {
           : status === "running"
             ? "bg-information"
             : "bg-muted-foreground";
+
   return (
     <span
       aria-label={status}
@@ -362,11 +378,16 @@ function StatusDot({ status }: { status: Task["status"] }) {
 
 function StatusText({ status }: { status: string }) {
   let className = "text-muted-foreground";
+
   if (status === "passed" || status === "completed") className = "text-success";
+
   if (status === "failed") className = "text-destructive";
+
   if (status === "scored" || status === "skipped") className = "text-warning";
+
   if (status === "running" || status === "preparing")
     className = "text-information";
+
   return <span className={className}>{status}</span>;
 }
 
@@ -375,12 +396,16 @@ function summarize(variant: Variant) {
   let running = 0;
   let failed = 0;
   let cost = 0;
+
   for (const task of variant.tasks) {
     if (task.success === true) passed += 1;
+
     if (task.status === "running") running += 1;
+
     if (task.success === false) failed += 1;
     cost += task.costUsd ?? 0;
   }
+
   return {
     cost,
     costComplete:
@@ -398,6 +423,7 @@ function elapsed(
   now: number
 ) {
   if (!startedAt) return null;
+
   return Math.max(
     0,
     (completedAt ? new Date(completedAt).getTime() : now) -
@@ -407,13 +433,17 @@ function elapsed(
 
 function formatDuration(milliseconds: number | null) {
   if (milliseconds === null) return "—";
+
   if (milliseconds < 1_000) return `${String(Math.round(milliseconds))}ms`;
   const seconds = milliseconds / 1_000;
+
   if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+
   return `${String(Math.floor(seconds / 60))}m ${String(Math.floor(seconds % 60))}s`;
 }
 
 function formatCost(cost: number | null, complete: boolean) {
   if (cost === null) return "—";
+
   return `${complete ? "" : "~"}$${cost.toFixed(4)}`;
 }

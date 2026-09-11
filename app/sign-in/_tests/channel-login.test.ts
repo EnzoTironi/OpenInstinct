@@ -1,15 +1,15 @@
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { Schema } from "effect";
-import { describe, expect, it } from "vitest";
-import { ChannelStatus } from "@web/auth/channel/status";
+import { channelChallengeSchema } from "@shared/identity/channel-auth";
 import {
   channelHttpError,
   channelPollFailure,
   invalidChannelChallenge,
   safeCallbackUrl,
 } from "@web/auth/channel/client";
-import { channelChallengeSchema } from "@shared/identity/channel-auth";
+import { ChannelStatus } from "@web/auth/channel/status";
+import { Schema } from "effect";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
 
 const challenge = Schema.decodeUnknownSync(channelChallengeSchema)({
   id: "5dd20c8c-9d99-49ea-8e04-936d238dac03",
@@ -139,12 +139,14 @@ describe("poll failure transitions", () => {
   it("bounds exponential transient retries and then invalidates the request", () => {
     const failure = channelHttpError(503);
     let failures = 0;
+
     for (const delay of [4000, 8000, 16_000, 30_000]) {
       const next = channelPollFailure(failure, failures, now, expiry);
       expect(next.status).toBe("pending");
       expect(next.delay).toBe(delay);
       failures = next.failures;
     }
+
     expect(channelPollFailure(failure, failures, now, expiry)).toEqual({
       status: "invalid",
       failures: 5,

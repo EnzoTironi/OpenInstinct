@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Config, Effect, FileSystem, Schedule, Schema } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
@@ -34,7 +35,9 @@ const start = Command.make(
           "Web and Eve ports must differ. Use --port 3000 --eve-port 4274.",
       });
     }
+
     const fs = yield* FileSystem.FileSystem;
+
     const routes = yield* fs.readFileString(".next/routes-manifest.json").pipe(
       Effect.flatMap(
         Schema.decodeUnknownEffect(
@@ -53,12 +56,15 @@ const start = Command.make(
         )
       )
     );
+
     const origin = `http://127.0.0.1:${String(evePort)}`;
+
     const requiredRoutes = [
       ["/eve/v1/:path+", "/eve/v1/:path+"],
       ["/api/channels/telegram", "/channels/telegram"],
       ["/api/channels/kapso", "/channels/kapso"],
     ] as const;
+
     if (
       !requiredRoutes.every(([source, path]) =>
         routes.rewrites.beforeFiles.some(
@@ -72,16 +78,20 @@ const start = Command.make(
           "Eve port does not match the built web routes. Rebuild with EVE_NEXT_PRODUCTION_PORT set to the desired port.",
       });
     }
+
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const capacity = Schema.Int.check(Schema.isGreaterThan(0));
+
     const concurrency = yield* Config.schema(
       capacity,
       "WORKFLOW_POSTGRES_WORKER_CONCURRENCY"
     ).pipe(Config.withDefault(4));
+
     const poolSize = yield* Config.schema(
       capacity,
       "WORKFLOW_POSTGRES_MAX_POOL_SIZE"
     ).pipe(Config.withDefault(10));
+
     const eve = yield* spawner.spawn(
       ChildProcess.make(process.execPath, [".output/server/index.mjs"], {
         env: {
@@ -100,6 +110,7 @@ const start = Command.make(
         forceKillAfter: "15 seconds",
       })
     );
+
     const http = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
     yield* Effect.raceFirst(
       http
@@ -117,6 +128,7 @@ const start = Command.make(
         )
       )
     );
+
     const web = yield* spawner.spawn(
       ChildProcess.make(
         process.execPath,
@@ -140,7 +152,9 @@ const start = Command.make(
         }
       )
     );
+
     const code = yield* Effect.raceFirst(eve.exitCode, web.exitCode);
+
     return yield* new ServerStopped({
       message: `A server exited with code ${String(code)}; stopping the companion.`,
     });

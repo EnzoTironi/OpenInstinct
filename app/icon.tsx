@@ -1,5 +1,6 @@
-import { OpenGraphMark } from "./_components/og-mark";
 import { ImageResponse } from "next/og";
+
+import { OpenGraphMark } from "./_components/og-mark";
 
 export const size = {
   height: 32,

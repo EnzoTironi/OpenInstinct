@@ -1,11 +1,12 @@
-import { accessScopeForUser } from "../../shared/identity/access-scope";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
-import { PgClient } from "@effect/sql-pg";
+
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
+import { PgClient } from "@effect/sql-pg";
 import { Effect, Layer } from "effect";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import { test } from "vitest";
+
 import {
   ChannelAccountError,
   ChannelAccounts,
@@ -14,7 +15,7 @@ import {
   ChannelAuthPromptError,
   ChannelAuthPrompts,
 } from "../../server/channel-auth/prompts.ts";
-
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
 
 const rejected = <A>(
@@ -38,34 +39,42 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
   const accountsLayer = ChannelAccounts.layer.pipe(
     Layer.provideMerge(runtimeDatabase)
   );
+
   const testKey = randomBytes(32).toString("base64url");
+
   const secrets = ResolvedInstallationSecrets.layerFromResolved({
     betterAuthSecret: testKey,
     secretEncryptionKey: randomBytes(32).toString("base64"),
   });
+
   const live = ChannelAuthPrompts.layer.pipe(
     Layer.provideMerge(secrets),
     Layer.provideMerge(accountsLayer)
   );
+
   await Effect.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
       const prompts = yield* ChannelAuthPrompts;
       const sql = yield* PgClient.PgClient;
       const installationId = `prompts-${randomUUID()}`;
+
       const sender = {
         channel: "telegram" as const,
         installationId,
         senderId: "private-sender",
       };
+
       const issue = accounts.issueChallenge({
         purpose: "login" as const,
         channel: "telegram",
         installationId,
         browserSecret: randomBytes(32).toString("base64url"),
       });
+
       try {
         const unavailableKey = yield* issue;
+
         const unavailableLive = ChannelAuthPrompts.layer.pipe(
           Layer.provideMerge(
             ResolvedInstallationSecrets.layerFromResolved({
@@ -75,6 +84,7 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           ),
           Layer.provideMerge(accountsLayer)
         );
+
         yield* Effect.gen(function* () {
           const shortPrompts = yield* ChannelAuthPrompts;
           yield* shortPrompts.prepare({
@@ -94,39 +104,51 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
               }),
           })
         );
+
         const unqueued =
           yield* sql`SELECT challenge_id FROM public.channel_auth_prompt WHERE challenge_id = ${unavailableKey.challengeId}`;
+
         assert.equal(unqueued.length, 0);
         const challenge = yield* issue;
+
         const request = {
           token: challenge.token,
           sender,
           eventId: randomUUID(),
         };
+
         const beforeUsers = yield* sql<{
           count: number;
         }>`SELECT count(*)::int AS count FROM public."user"`;
+
         const receipts = yield* Effect.all(
           Array.from({ length: 8 }, () => prompts.prepare(request)),
           { concurrency: "unbounded" }
         );
+
         for (const receipt of receipts)
           assert.deepEqual(receipt, {
             challengeId: challenge.challengeId,
             status: "queued",
           });
+
         const afterUsers = yield* sql<{
           count: number;
         }>`SELECT count(*)::int AS count FROM public."user"`;
+
         assert.equal(afterUsers[0]?.count, beforeUsers[0]?.count);
+
         const identities =
           yield* sql`SELECT id FROM public.channel_identity WHERE installation_id = ${installationId}`;
+
         assert.equal(identities.length, 0);
+
         const encrypted = yield* sql<{
           tokenCiphertext: string;
           count: number;
         }>`SELECT token_ciphertext AS "tokenCiphertext", count(*) OVER ()::int AS count
         FROM public.channel_auth_prompt WHERE challenge_id = ${challenge.challengeId}`;
+
         const ciphertext = encrypted[0]?.tokenCiphertext;
         assert.ok(ciphertext);
         assert.equal(encrypted[0]?.count, 1);
@@ -153,10 +175,12 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         assert.ok(
           (yield* prompts.pending(100)).includes(challenge.challengeId)
         );
+
         const claims = yield* Effect.all(
           Array.from({ length: 8 }, () => prompts.claim(challenge.challengeId)),
           { concurrency: "unbounded" }
         );
+
         assert.equal(claims.filter(Boolean).length, 1);
         const claimed = claims.find((value) => value !== null);
         assert.ok(claimed);
@@ -181,21 +205,25 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           status: "sent",
         });
         assert.equal(yield* prompts.claim(challenge.challengeId), null);
+
         const sent = yield* sql<{
           tokenCiphertext: string | null;
           attempts: number;
           providerMessageId: string;
         }>`SELECT token_ciphertext AS "tokenCiphertext", attempts,
         provider_message_id AS "providerMessageId" FROM public.channel_auth_prompt WHERE challenge_id = ${challenge.challengeId}`;
+
         assert.equal(sent[0]?.tokenCiphertext, null);
         assert.equal(sent[0].attempts, 1);
         assert.equal(sent[0].providerMessageId, "synthetic-message-id");
         const expiredLease = yield* issue;
+
         const leaseRequest = {
           token: expiredLease.token,
           sender,
           eventId: randomUUID(),
         };
+
         yield* prompts.prepare(leaseRequest);
         const leased = yield* prompts.claim(expiredLease.challengeId);
         assert.ok(leased);
@@ -218,10 +246,12 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         });
         yield* sql`UPDATE public.channel_auth_challenge SET created_at = clock_timestamp() - interval '6 minutes', expires_at = clock_timestamp() - interval '1 second' WHERE id = ${expiredChallenge.challengeId}`;
         assert.equal(yield* prompts.claim(expiredChallenge.challengeId), null);
+
         const cancelled = yield* sql<{
           status: string;
           tokenCiphertext: string | null;
         }>`SELECT status, token_ciphertext AS "tokenCiphertext" FROM public.channel_auth_prompt WHERE challenge_id = ${expiredChallenge.challengeId}`;
+
         assert.equal(cancelled[0]?.status, "cancelled");
         assert.equal(cancelled[0].tokenCiphertext, null);
         const confirmedChallenge = yield* issue;
@@ -230,9 +260,11 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           sender,
           eventId: randomUUID(),
         });
+
         const confirmedLease = yield* prompts.claim(
           confirmedChallenge.challengeId
         );
+
         assert.ok(confirmedLease);
         yield* accounts.confirmChallenge({
           token: confirmedChallenge.token,
@@ -241,28 +273,34 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         yield* rejected(prompts.checkLease(confirmedLease.lease), "lease_lost");
         yield* sql`UPDATE public.channel_auth_prompt SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE challenge_id = ${confirmedChallenge.challengeId}`;
         yield* prompts.pending(100);
+
         const unresolved = yield* sql<{
           status: string;
           tokenCiphertext: string | null;
         }>`SELECT status, token_ciphertext AS "tokenCiphertext"
           FROM public.channel_auth_prompt WHERE challenge_id = ${confirmedChallenge.challengeId}`;
+
         assert.equal(unresolved[0]?.status, "uncertain");
         assert.equal(unresolved[0].tokenCiphertext, null);
         assert.equal(
           yield* prompts.claim(confirmedChallenge.challengeId),
           null
         );
+
         for (const invalidation of ["confirm", "expire"] as const) {
           const inFlight = yield* issue;
+
           const inFlightRequest = {
             token: inFlight.token,
             sender,
             eventId: randomUUID(),
           };
+
           yield* prompts.prepare(inFlightRequest);
           const dispatch = yield* prompts.claim(inFlight.challengeId);
           assert.ok(dispatch);
           yield* prompts.checkLease(dispatch.lease);
+
           // Provider I/O may already be running when the challenge becomes inactive.
           if (invalidation === "confirm")
             yield* accounts.confirmChallenge({ token: inFlight.token, sender });
@@ -275,12 +313,14 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           });
           yield* rejected(prompts.checkLease(dispatch.lease), "lease_lost");
           yield* prompts.markSent(dispatch.lease, "synthetic-inflight-receipt");
+
           const settled = yield* sql<{
             status: string;
             providerMessageId: string | null;
             tokenCiphertext: string | null;
           }>`SELECT status,
             provider_message_id AS "providerMessageId", token_ciphertext AS "tokenCiphertext" FROM public.channel_auth_prompt WHERE challenge_id = ${inFlight.challengeId}`;
+
           assert.equal(settled[0]?.status, "sent");
           assert.equal(
             settled[0].providerMessageId,
@@ -289,16 +329,20 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           assert.equal(settled[0].tokenCiphertext, null);
           assert.equal(yield* prompts.claim(inFlight.challengeId), null);
         }
+
         for (const terminal of ["uncertain", "failed"] as const) {
           const item = yield* issue;
+
           const itemRequest = {
             token: item.token,
             sender,
             eventId: randomUUID(),
           };
+
           yield* prompts.prepare(itemRequest);
           const lease = yield* prompts.claim(item.challengeId);
           assert.ok(lease);
+
           if (terminal === "uncertain")
             yield* prompts.markUncertain(lease.lease);
           else yield* prompts.markRejected(lease.lease);
@@ -308,6 +352,7 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           });
           assert.equal(yield* prompts.claim(item.challengeId), null);
         }
+
         const swapped = yield* issue;
         yield* prompts.prepare({
           token: swapped.token,
@@ -316,15 +361,19 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         });
         yield* sql`UPDATE public.channel_auth_prompt SET token_ciphertext = ${ciphertext} WHERE challenge_id = ${swapped.challengeId}`;
         assert.equal(yield* prompts.claim(swapped.challengeId), null);
+
         const tampered = yield* sql<{
           status: string;
           tokenCiphertext: string | null;
         }>`SELECT status, token_ciphertext AS "tokenCiphertext" FROM public.channel_auth_prompt WHERE challenge_id = ${swapped.challengeId}`;
+
         assert.equal(tampered[0]?.status, "failed");
         assert.equal(tampered[0].tokenCiphertext, null);
+
         const retained =
           yield* sql`SELECT challenge_id FROM public.channel_auth_prompt WHERE installation_id = ${installationId}
         AND status IN ('sent', 'uncertain', 'failed', 'cancelled') AND token_ciphertext IS NOT NULL`;
+
         assert.equal(retained.length, 0);
       } finally {
         yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;
@@ -346,18 +395,22 @@ test("prompt preparation delegates revoked link rejection to account preview", a
       ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase))
     )
   );
+
   await Effect.runPromise(
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
       const accounts = yield* ChannelAccounts;
       const prompts = yield* ChannelAuthPrompts;
       const installationId = `revoked-prompt-${randomUUID()}`;
+
       const sender = {
         channel: "telegram" as const,
         installationId,
         senderId: "revoked-sender",
       };
+
       const owner = yield* accounts.resolveVerifiedSender(sender);
+
       try {
         yield* sql`INSERT INTO public.channel_identity (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)
         VALUES (${randomUUID()}, 'telegram', ${installationId}, 'backup', ${owner.userId}, clock_timestamp(), clock_timestamp(), clock_timestamp())`;
@@ -368,6 +421,7 @@ test("prompt preparation delegates revoked link rejection to account preview", a
         const sessionId = randomUUID();
         yield* sql`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
         VALUES (${sessionId}, ${randomBytes(32).toString("base64url")}, ${owner.userId}, clock_timestamp() + interval '1 hour', clock_timestamp(), clock_timestamp())`;
+
         const challenge = yield* accounts.issueChallenge({
           purpose: "link" as const,
           channel: "telegram",
@@ -376,6 +430,7 @@ test("prompt preparation delegates revoked link rejection to account preview", a
           userId: owner.userId,
           sessionId,
         });
+
         yield* prompts
           .prepare({ token: challenge.token, sender, eventId: randomUUID() })
           .pipe(
@@ -388,8 +443,10 @@ test("prompt preparation delegates revoked link rejection to account preview", a
               },
             })
           );
+
         const rows =
           yield* sql`SELECT challenge_id FROM public.channel_auth_prompt WHERE challenge_id = ${challenge.challengeId}`;
+
         assert.equal(rows.length, 0);
       } finally {
         yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;

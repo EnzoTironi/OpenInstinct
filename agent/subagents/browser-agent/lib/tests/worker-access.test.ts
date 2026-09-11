@@ -1,11 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
+import * as LiveAuthority from "@agent/subagents/browser-agent/lib/live-authority";
 import * as SessionService from "@db/services/sessions";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import type { SessionAuthContext } from "eve/context";
-import * as LiveAuthority from "@agent/subagents/browser-agent/lib/live-authority";
-import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const isSessionOwnedMock = vi.spyOn(SessionService, "isSessionOwned");
+
 const assertLiveWorkerAuthorityMock = vi.spyOn(
   LiveAuthority,
   "assertLiveWorkerAuthority"
@@ -67,6 +68,7 @@ describe("worker access", () => {
         workspaceId: accessScopeForUser("better-auth:alice").workspaceId,
       },
     });
+
     assertLiveWorkerAuthorityMock.mockRejectedValueOnce(
       new Error("The caller's channel authority has been revoked.")
     );
@@ -95,6 +97,7 @@ describe("worker access", () => {
         workspaceId: accessScopeForUser("better-auth:alice").workspaceId,
       },
     });
+
     assertLiveWorkerAuthorityMock.mockRejectedValueOnce(
       new Error("The scheduled job is no longer active.")
     );

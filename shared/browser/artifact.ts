@@ -42,7 +42,9 @@ export function browserImageArtifactUrl(id: string) {
 
 export function isBrowserImageArtifactUrl(value: string) {
   const parsed = /^\/artifacts\/([^/]+)$/u.exec(value);
+
   if (!parsed?.[1]) return false;
+
   return z.uuid().safeParse(decodeURIComponent(parsed[1])).success;
 }
 
@@ -60,6 +62,7 @@ export function sniffBrowserImageMediaType(bytes: Uint8Array) {
   ) {
     return "image/png" as const;
   }
+
   if (
     bytes.length >= 3 &&
     bytes[0] === 0xff &&
@@ -68,12 +71,15 @@ export function sniffBrowserImageMediaType(bytes: Uint8Array) {
   ) {
     return "image/jpeg" as const;
   }
+
   if (bytes.length >= 6) {
     const signature = new TextDecoder("ascii").decode(bytes.subarray(0, 6));
+
     if (signature === "GIF87a" || signature === "GIF89a") {
       return "image/gif" as const;
     }
   }
+
   if (
     bytes.length >= 12 &&
     new TextDecoder("ascii").decode(bytes.subarray(0, 4)) === "RIFF" &&
@@ -81,5 +87,6 @@ export function sniffBrowserImageMediaType(bytes: Uint8Array) {
   ) {
     return "image/webp" as const;
   }
+
   return undefined;
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@web/components/ui/button";
 import { cn } from "@web/components/class-names";
+import { Button } from "@web/components/ui/button";
 import type { UIMessage } from "ai";
 import { ArrowDownIcon, DownloadIcon } from "lucide-react";
 import type { ComponentProps } from "react";
@@ -17,6 +17,7 @@ import { z } from "zod";
 export type ConversationProps = ComponentProps<typeof StickToBottom> & {
   scrollRestorationKey?: string;
 };
+
 type ConversationRenderChild = Extract<
   NonNullable<ConversationProps["children"]>,
   (...args: never[]) => React.ReactNode
@@ -39,7 +40,9 @@ export const Conversation = ({
       (value) => z.function().safeParse(value).success
     )
     .safeParse(children);
+
   const renderChild = parsedRenderer.success ? parsedRenderer.data : undefined;
+
   return (
     <StickToBottom
       className={cn("relative flex-1 overflow-y-hidden", className)}
@@ -83,10 +86,12 @@ function ConversationScrollRestoration({
 
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;
+
     if (scrollElement === null) return undefined;
 
     if (restoredKeyRef.current !== storageKey) {
       const saved = readScrollPosition(sessionStorage.getItem(storageKey));
+
       if (saved?.atBottom === false) {
         scrollElement.scrollTop = saved.scrollTop;
         requestAnimationFrame(() => {
@@ -96,6 +101,7 @@ function ConversationScrollRestoration({
         scrollElement.scrollTop = scrollElement.scrollHeight;
         void scrollToBottom({ animation: "instant", ignoreEscapes: true });
       }
+
       restoredKeyRef.current = storageKey;
     }
 
@@ -108,7 +114,9 @@ function ConversationScrollRestoration({
         })
       );
     };
+
     let frame: number | undefined;
+
     const scheduleSave = () => {
       if (frame !== undefined) return;
       frame = requestAnimationFrame(() => {
@@ -116,11 +124,14 @@ function ConversationScrollRestoration({
         saveNow();
       });
     };
+
     scrollElement.addEventListener("scroll", scheduleSave, { passive: true });
     window.addEventListener("pagehide", saveNow);
+
     return () => {
       scrollElement.removeEventListener("scroll", scheduleSave);
       window.removeEventListener("pagehide", saveNow);
+
       if (frame !== undefined) cancelAnimationFrame(frame);
       saveNow();
     };
@@ -136,8 +147,10 @@ function readScrollPosition(value: string | null):
     }
   | undefined {
   if (value === null) return undefined;
+
   try {
     const parsed = scrollPositionSchema.safeParse(JSON.parse(value));
+
     return parsed.success ? parsed.data : undefined;
   } catch {
     return undefined;
@@ -196,6 +209,7 @@ export const ConversationEmptyState = ({
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
 
 const unsubscribeFromHydration = () => undefined;
+
 const subscribeToHydration = () => unsubscribeFromHydration;
 
 export const ConversationScrollButton = ({
@@ -203,6 +217,7 @@ export const ConversationScrollButton = ({
   ...props
 }: ConversationScrollButtonProps) => {
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
+
   const isReady = useSyncExternalStore(
     subscribeToHydration,
     () => true,
@@ -252,6 +267,7 @@ export type ConversationDownloadProps = Omit<
 const defaultFormatMessage = (message: UIMessage): string => {
   const roleLabel =
     message.role.charAt(0).toUpperCase() + message.role.slice(1);
+
   return `**${roleLabel}:** ${getMessageText(message)}`;
 };
 

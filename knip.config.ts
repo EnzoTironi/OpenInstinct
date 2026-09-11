@@ -9,9 +9,6 @@ export default {
   },
   workspaces: {
     ".": {
-      vitest: {
-        config: ["vitest.config.ts", "vitest.runtime.config.ts"],
-      },
       entry: [
         "agent/channels/**/*.ts",
         "agent/hooks/**/*.ts",
@@ -40,7 +37,7 @@ export default {
         // Imported through the owning Tailwind stylesheet rather than TypeScript.
         "shadcn",
         "tailwindcss",
-        // Loaded as jsPlugins from .oxlintrc.jsonc rather than TypeScript.
+        // Loaded as jsPlugins from oxlint.config.ts rather than TypeScript.
         "eslint-plugin-react-hooks",
         "eslint-plugin-turbo",
         "oxlint-tailwindcss",
@@ -48,6 +45,9 @@ export default {
         "vercel",
       ],
       project: ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "!infrastructure/**"],
+      vitest: {
+        config: ["vitest.config.ts", "vitest.runtime.config.ts"],
+      },
     },
     infrastructure: {
       entry: ["alchemy.run.ts", "alchemy.fly-postgres.run.ts"],

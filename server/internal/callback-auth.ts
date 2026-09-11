@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import {
   Clock,
@@ -33,6 +34,7 @@ export const internalCallbackBodies = {
     runId: Schema.String.check(Schema.isUUID()),
   }),
 };
+
 export type InternalCallbackRoute = keyof typeof internalCallbackBodies;
 
 export class InternalCallbackRejected extends Schema.TaggedError<InternalCallbackRejected>()(
@@ -42,10 +44,12 @@ export class InternalCallbackRejected extends Schema.TaggedError<InternalCallbac
 
 const reject = (status: InternalCallbackRejected["status"]) =>
   new InternalCallbackRejected({ status });
+
 const originSchema = Schema.String.check(
   Schema.makeFilter((value) => {
     if (!URL.canParse(value)) return false;
     const url = new URL(value);
+
     return (
       !url.username &&
       !url.password &&
@@ -61,14 +65,17 @@ export const internalCallbackOrigin = Config.string("BETTER_AUTH_URL").pipe(
   Effect.map((value) => new URL(value).origin),
   Effect.mapError(() => reject(503))
 );
+
 const callbackKey = Effect.gen(function* () {
   const installation = yield* ResolvedInstallationSecrets;
+
   const secret = yield* Schema.decodeUnknownEffect(
     Schema.String.check(
       Schema.isBase64(),
       Schema.makeFilter((value) => Buffer.from(value, "base64").length === 32)
     )
   )(Redacted.value(installation.secretEncryptionKey));
+
   return Redacted.make(
     createHmac("sha256", Buffer.from(secret, "base64"))
       .update("companion/internal-callback/v1")
@@ -101,9 +108,11 @@ export const internalCallbackHeaders = Effect.fn("internalCallbackHeaders")(
   function* (route: InternalCallbackRoute, body: string) {
     const origin = yield* internalCallbackOrigin;
     const key = yield* callbackKey;
+
     const timestamp = String(
       Math.floor((yield* Clock.currentTimeMillis) / 1000)
     );
+
     return new Headers({
       "content-type": "application/json",
       "x-internal-callback-time": timestamp,
@@ -122,10 +131,12 @@ const readInternalCallbackBody = Effect.fn("readInternalCallbackBody")(
   function* (request: Request) {
     if (!request.body) return yield* reject(400);
     const source = request.body;
+
     const cancel = Effect.tryPromise({
       try: () => source.cancel(),
       catch: () => reject(400),
     }).pipe(Effect.interruptible, Effect.timeout("100 millis"), Effect.ignore);
+
     return yield* Stream.fromReadableStream({
       evaluate: () => source,
       onError: () => reject(400),
@@ -136,9 +147,11 @@ const readInternalCallbackBody = Effect.fn("readInternalCallbackBody")(
         (acc, chunk) => {
           if (acc.size + chunk.length > 64 * 1024)
             return Effect.fail(reject(413));
+
           return Effect.sync(() => {
             acc.size += chunk.length;
             acc.chunks.push(chunk);
+
             return acc;
           });
         }
@@ -157,25 +170,33 @@ export const readVerifiedInternalCallback = Effect.fn(
   const origin = yield* internalCallbackOrigin;
   const key = yield* callbackKey;
   const url = new URL(request.url);
+
   if (request.method !== "POST" || url.pathname !== route || url.search)
     return yield* reject(401);
+
   const timestamp = yield* Schema.decodeUnknownEffect(
     Schema.String.check(Schema.isPattern(/^\d{10}$/u))
   )(request.headers.get("x-internal-callback-time")).pipe(
     Effect.mapError(() => reject(401))
   );
+
   const age =
     Math.floor((yield* Clock.currentTimeMillis) / 1000) - Number(timestamp);
+
   if (age < -5 || age > 60) return yield* reject(401);
+
   const encoded = yield* Schema.decodeUnknownEffect(
     Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
   )(request.headers.get("x-internal-callback-signature")).pipe(
     Effect.mapError(() => reject(401))
   );
+
   const body = yield* readInternalCallbackBody(request);
   const expected = signature(key, origin, route, timestamp, body);
+
   if (!timingSafeEqual(Buffer.from(encoded, "hex"), expected))
     return yield* reject(401);
+
   // Authentication is time-bounded, not single-use. The existing run/report claim fences dispatch.
   return body;
 });
@@ -185,14 +206,18 @@ export const readAuthenticatedInternalCallback = Effect.fn(
 )(
   function* (request: Request, route: InternalCallbackRoute) {
     const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
+
     if (Option.isSome(vercel)) {
       const auth = yield* Effect.tryPromise({
         try: () => routeAuth(request, [vercelOidc()]),
         catch: () => new InternalCallbackRejected({ status: 503 }),
       });
+
       if (auth instanceof Response) return auth;
+
       return yield* readInternalCallbackBody(request);
     }
+
     return yield* readVerifiedInternalCallback(request, route);
   },
   Effect.catchTag("ConfigError", () =>

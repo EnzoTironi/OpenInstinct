@@ -1,12 +1,13 @@
-import { and, desc, eq } from "drizzle-orm";
-import { z } from "zod";
-import type { AccessScope } from "@shared/identity/access-scope";
+import { chats, db } from "@db";
 import {
   chatListSchema,
   type ChatSummary,
   type SaveChat,
 } from "@shared/chat/schema";
-import { chats, db } from "@db";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { and, desc, eq } from "drizzle-orm";
+import { z } from "zod";
+
 import { ensureScope } from "./scope";
 import { waitForSessionOwnership } from "./sessions";
 
@@ -24,6 +25,7 @@ const chatRowSchema = z.object({
 function toChatSummary(row: z.infer<typeof chatRowSchema>): ChatSummary {
   const { costUsd, createdAt, inputTokens, outputTokens, updatedAt, ...chat } =
     row;
+
   return {
     ...chat,
     createdAt: createdAt.toISOString(),
@@ -42,6 +44,7 @@ export async function listChats(scope: AccessScope) {
         .where(eq(chats.workspaceId, scope.workspaceId))
         .orderBy(desc(chats.updatedAt))
     );
+
   return chatListSchema.parse(rows.map(toChatSummary));
 }
 
@@ -56,7 +59,9 @@ export async function readChat(scope: AccessScope, sessionId: string) {
       )
     )
     .limit(1);
+
   const row = chatRowSchema.optional().parse(rows[0]);
+
   return row ? toChatSummary(row) : undefined;
 }
 
@@ -68,6 +73,7 @@ export async function saveChat(
   if (!(await waitForSessionOwnership(scope, chat.sessionId))) return;
   await ensureScope(scope);
   const now = new Date();
+
   const existing = await db
     .select({ sessionId: chats.sessionId })
     .from(chats)
@@ -77,6 +83,7 @@ export async function saveChat(
         eq(chats.sessionId, chat.sessionId)
       )
     );
+
   if (existing.length === 0) {
     await db.insert(chats).values({
       channel: chat.channel ?? null,
@@ -89,16 +96,22 @@ export async function saveChat(
       updatedAt: now,
       workspaceId: scope.workspaceId,
     });
+
     return;
   }
+
   const updates: Partial<typeof chats.$inferInsert> = { updatedAt: now };
+
   if (chat.channel !== undefined) updates.channel = chat.channel;
+
   if (chat.title !== undefined) updates.title = chat.title;
+
   if (chat.usage !== undefined) {
     updates.costUsd = chat.usage.costUsd;
     updates.inputTokens = chat.usage.inputTokens;
     updates.outputTokens = chat.usage.outputTokens;
   }
+
   await db
     .update(chats)
     .set(updates)

@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { Effect, Redacted, Schema, Stream } from "effect";
+
 import type { channelProviderSchema } from "@shared/identity/channel-auth";
+import { Effect, Redacted, Schema, Stream } from "effect";
 
 const maximumBodyBytes = 256 * 1024;
 
@@ -12,6 +13,7 @@ class WebhookRejected extends Schema.TaggedError<WebhookRejected>()(
 const matchesSecret = (received: string, expected: string) => {
   const left = Buffer.from(received);
   const right = Buffer.from(expected);
+
   return (
     right.length > 0 &&
     left.length === right.length &&
@@ -27,6 +29,7 @@ export const readVerifiedWebhook = Effect.fn("readVerifiedWebhook")(function* (
   if (Redacted.value(secret).length === 0) {
     return yield* new WebhookRejected({ status: 401 });
   }
+
   if (
     channel === "telegram" &&
     !matchesSecret(
@@ -38,11 +41,14 @@ export const readVerifiedWebhook = Effect.fn("readVerifiedWebhook")(function* (
   }
 
   const source = request.body;
+
   if (!source) return yield* new WebhookRejected({ status: 400 });
+
   const cancelBody = Effect.tryPromise({
     try: () => source.cancel(),
     catch: () => new WebhookRejected({ status: 400 }),
   }).pipe(Effect.interruptible, Effect.timeout("100 millis"), Effect.ignore);
+
   const received = yield* Stream.fromReadableStream({
     evaluate: () => source,
     onError: () => new WebhookRejected({ status: 400 }),
@@ -56,6 +62,7 @@ export const readVerifiedWebhook = Effect.fn("readVerifiedWebhook")(function* (
           : Effect.sync(() => {
               acc.size += chunk.length;
               acc.chunks.push(chunk);
+
               return acc;
             })
     ),
@@ -65,6 +72,7 @@ export const readVerifiedWebhook = Effect.fn("readVerifiedWebhook")(function* (
     ),
     Effect.ensuring(cancelBody)
   );
+
   const body = Buffer.concat(received.chunks, received.size);
 
   if (

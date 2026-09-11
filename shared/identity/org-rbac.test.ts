@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+
 import {
   assertCanAssignRole,
   assertCanManageMembers,
@@ -26,6 +27,7 @@ describe("C01 org/workspace RBAC", () => {
     const denied = await Effect.runPromise(
       assertCanAssignRole("member", "admin").pipe(Effect.flip)
     );
+
     expect(denied).toEqual(
       new RbacDenied({
         reason: "not_admin",
@@ -39,6 +41,7 @@ describe("C01 org/workspace RBAC", () => {
     const denied = await Effect.runPromise(
       assertCanManageMembers("member").pipe(Effect.flip)
     );
+
     expect(denied.reason).toBe("not_admin");
   });
 

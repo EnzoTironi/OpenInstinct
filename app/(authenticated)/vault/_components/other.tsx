@@ -1,6 +1,7 @@
 "use client";
 
 import type { VaultItem } from "@shared/vault/schema";
+
 import { VaultItemList } from "./section";
 
 export function VaultOtherItems({

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type {
   deviceBoundSchema,
   deviceRequestSchema,
 } from "@shared/identity/channel-auth";
+import { Button } from "@web/components/ui/button";
 import { Effect } from "effect";
+import { useEffect, useState } from "react";
+
 import {
   bindNativeBrowser,
   resumeNativeBrowser,
@@ -18,7 +20,6 @@ import {
   useAuthorizationRequest,
   SignInAgain,
 } from "./form";
-import { Button } from "@web/components/ui/button";
 
 export function NativeDeviceForm({
   id,
@@ -47,11 +48,14 @@ export function NativeDeviceForm({
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
+
     return () => {
       controller.abort();
     };
   }, [id, purpose]);
+
   if (loading) return <output>Checking this browser…</output>;
+
   if (resumeError)
     return (
       <div className="space-y-4">
@@ -61,6 +65,7 @@ export function NativeDeviceForm({
         ) : null}
       </div>
     );
+
   if (bound)
     return (
       <PendingAuthorization
@@ -72,6 +77,7 @@ export function NativeDeviceForm({
         }}
       />
     );
+
   return (
     <div className="space-y-4">
       <p>

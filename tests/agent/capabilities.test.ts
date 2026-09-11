@@ -1,7 +1,3 @@
-import { Predicate } from "effect";
-import { accessScopeForUser } from "@shared/identity/access-scope";
-import type { DynamicResolveContext } from "eve/tools";
-import { describe, expect, it } from "vitest";
 import personalInfoMemory from "@agent/memory/personal_info";
 import workstreamMemory from "@agent/memory/workstreams";
 import browserAgent from "@agent/subagents/browser-agent/agent";
@@ -11,6 +7,10 @@ import gmail from "@agent/tools/gmail";
 import messaging from "@agent/tools/messaging";
 import schedules from "@agent/tools/schedules";
 import vault from "@agent/tools/vault";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import { Predicate } from "effect";
+import type { DynamicResolveContext } from "eve/tools";
+import { describe, expect, it } from "vitest";
 
 const groupedTools = [calendar, contacts, gmail, messaging, schedules, vault];
 
@@ -70,11 +70,13 @@ async function authoredCapabilities(authenticator: string) {
     groupedTools.map(async (definition) => {
       const resolve = definition.events["turn.started"];
       const resolved = resolve ? await resolve({}, context) : null;
+
       return Predicate.isObject(resolved) && !("execute" in resolved)
         ? Object.keys(resolved)
         : [];
     })
   );
+
   capabilities.push(...resolvedGroups.flat());
 
   const personalInfoTools = await personalInfoMemory.provider.tools({
@@ -89,6 +91,7 @@ async function authoredCapabilities(authenticator: string) {
     },
     turn: { id: "turn-1", input: [], sequence: 1 },
   });
+
   if (personalInfoTools) {
     capabilities.push(
       ...Object.keys(personalInfoTools).map((name) => `personal_info__${name}`)
@@ -107,12 +110,14 @@ async function authoredCapabilities(authenticator: string) {
     },
     turn: { id: "turn-1", input: [], sequence: 1 },
   });
+
   if (workstreamTools)
     capabilities.push(
       ...Object.keys(workstreamTools).map((name) => `workstreams__${name}`)
     );
 
   const resolveBrowserAgent = browserAgent.events["turn.started"];
+
   if (resolveBrowserAgent && (await resolveBrowserAgent({}, context))) {
     capabilities.push("browser-agent");
   }

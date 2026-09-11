@@ -1,11 +1,11 @@
-import { Result, Schema } from "effect";
-import type { MessageStreamEvent } from "eve/client";
-import type { EveMessagePart } from "eve/react";
+import { sendMessageToolResultSchema } from "@shared/chat/message-delivery";
 import {
   reactionTextFor,
   reactToMessageToolResultSchema,
 } from "@shared/chat/reaction";
-import { sendMessageToolResultSchema } from "@shared/chat/message-delivery";
+import { Result, Schema } from "effect";
+import type { MessageStreamEvent } from "eve/client";
+import type { EveMessagePart } from "eve/react";
 
 export function messageTimestamps(events: readonly MessageStreamEvent[]) {
   const timestamps = new Map<string, string>();
@@ -40,6 +40,7 @@ export function imessageTimestamps(events: readonly MessageStreamEvent[]) {
 
 export function sentMessages(events: readonly MessageStreamEvent[]) {
   const delivered = new Set<string>();
+
   const messagesByTurn = new Map<
     string,
     { id: string; parts: EveMessagePart[]; timestamp: string }[]
@@ -50,8 +51,10 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
     const delivery = completedSendMessageOutput(event);
     const reaction = completedReactionOutput(event);
     const completed = delivery ?? reaction;
+
     if (!completed) continue;
     const deliveryId = delivery?.output.deliveryId ?? completed.callId;
+
     if (delivery?.output.deliveryId) {
       if (delivered.has(delivery.output.deliveryId)) continue;
       delivered.add(delivery.output.deliveryId);
@@ -59,6 +62,7 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
 
     const turnMessageId = `${event.data.turnId}:assistant`;
     const parts: EveMessagePart[] = [];
+
     if (reaction) {
       parts.push({
         state: "done",
@@ -68,12 +72,14 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
       });
     } else if (delivery) {
       const { output } = delivery;
+
       // Delivered text is plain and reaches the user verbatim. The chat view
       // renders text parts as Markdown, so keep every line break as a hard break.
       const text =
         output.kind === "link"
           ? output.url
           : output.text?.replaceAll("\n", "  \n");
+
       if (text) {
         parts.push({
           state: "done",
@@ -82,7 +88,9 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
           type: "text",
         });
       }
+
       const attachments = output.kind === "message" ? output.attachments : [];
+
       for (const attachment of attachments ?? []) {
         parts.push({
           filename: attachment.name,
@@ -93,6 +101,7 @@ export function sentMessages(events: readonly MessageStreamEvent[]) {
         });
       }
     }
+
     const messages = messagesByTurn.get(turnMessageId) ?? [];
     messages.push({
       id: `${turnMessageId}:${deliveryId}`,
@@ -113,6 +122,7 @@ function completedReactionOutput(event: MessageStreamEvent) {
   const result = Schema.decodeUnknownResult(reactToMessageToolResultSchema)(
     event.data.result
   );
+
   return Result.isSuccess(result) && result.success.output.operation === "add"
     ? { callId: event.data.result.callId, output: result.success.output }
     : undefined;
@@ -126,6 +136,7 @@ function completedSendMessageOutput(event: MessageStreamEvent) {
   const result = Schema.decodeUnknownResult(sendMessageToolResultSchema)(
     event.data.result
   );
+
   return Result.isSuccess(result)
     ? { callId: event.data.result.callId, output: result.success.output }
     : undefined;

@@ -1,9 +1,10 @@
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import { Result, Schema } from "effect";
 import type { ConnectionPrincipal } from "eve/connections";
 import type { SessionAuthContext } from "eve/context";
-import { Result, Schema } from "effect";
-import { accessScopeForUser } from "@shared/identity/access-scope";
 
 const identifier = Schema.NonEmptyString.check(Schema.isTrimmed());
+
 const decodePrincipal = Schema.decodeUnknownResult(
   Schema.Struct({
     attributes: Schema.Struct({ workspaceId: identifier }),
@@ -27,7 +28,9 @@ export function scopeFromPrincipal(
         message: "An authenticated workspace user is required.",
       })
   );
+
   const userId = principal.id ?? principal.principalId;
+
   if (
     !userId ||
     (principal.id &&
@@ -38,11 +41,14 @@ export function scopeFromPrincipal(
       message: "An unambiguous authenticated workspace user is required.",
     });
   }
+
   const scope = accessScopeForUser(userId);
+
   if (scope.workspaceId !== principal.attributes.workspaceId) {
     throw new PrincipalScopeError({
       message: "The workspace does not belong to the authenticated user.",
     });
   }
+
   return scope;
 }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { requireRequestScope } from "@web/auth/request-scope";
 import { Logo } from "@web/components/ui/logo";
 import {
   Sidebar,
@@ -11,8 +11,9 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@web/components/ui/sidebar";
-import { requireRequestScope } from "@web/auth/request-scope";
 import { TRPCProvider } from "@web/trpc/client";
+import Link from "next/link";
+
 import { AuthenticatedAccountControl } from "./_components/account-control";
 import {
   AuthenticatedMobileHeader,

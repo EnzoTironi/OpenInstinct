@@ -1,16 +1,22 @@
-export default {
-  ignorePatterns: ["tools/oxlint/anti-slop/**"],
-  printWidth: 80,
-  semi: true,
-  singleQuote: false,
+import { defineConfig } from "oxfmt";
+import ultracite from "ultracite/oxfmt";
+
+export default defineConfig({
+  ...ultracite,
+  ignorePatterns: [
+    ...(ultracite.ignorePatterns ?? []),
+    "tools/oxlint/anti-slop/**",
+  ],
+  // Keep lockfile/scripts churn low; Ultracite defaults to true.
   sortPackageJson: false,
-  sortTailwindcss: { stylesheet: "./app/globals.css" },
-  tabWidth: 2,
-  trailingComma: "es5",
+  sortTailwindcss: {
+    functions: ["clsx", "cva", "tw", "twMerge", "cn", "twJoin", "tv"],
+    stylesheet: "./app/globals.css",
+  },
   overrides: [
     {
       files: ["*.jsonc"],
       options: { trailingComma: "none" },
     },
   ],
-};
+});

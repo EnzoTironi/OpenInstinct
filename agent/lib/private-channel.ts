@@ -1,16 +1,17 @@
 import { Config, DateTime, Effect } from "effect";
 import { defineChannel, POST, type ChannelDefinition } from "eve/channels";
+
 import { ChannelAccounts, type Identity } from "../../server/accounts";
-import { Messaging, type Lease } from "../../server/messaging";
 import { ChannelAuthPrompts } from "../../server/channel-auth/prompts";
-import { ChannelTransport } from "../../server/channels/transport";
 import {
   dispatchAuthPrompt,
   dispatchItem,
 } from "../../server/channels/dispatch";
-import { Telegram } from "../../server/channels/telegram";
 import { Kapso } from "../../server/channels/kapso";
+import { Telegram } from "../../server/channels/telegram";
+import { ChannelTransport } from "../../server/channels/transport";
 import { readVerifiedWebhook } from "../../server/channels/webhook";
+import { Messaging, type Lease } from "../../server/messaging";
 import { serverRuntime } from "../../server/runtime";
 import { drainChannelInbox, handoffChannelMessage } from "./channel-session";
 import { privateChannelEvents } from "./private-channel-events";
@@ -27,28 +28,35 @@ export function privateChannel(channel: Identity["channel"]) {
                 ? "TELEGRAM_WEBHOOK_SECRET"
                 : "KAPSO_WEBHOOK_SECRET"
             );
+
             const body = yield* readVerifiedWebhook(request, channel, secret);
+
             const provider =
               channel === "telegram" ? yield* Telegram : yield* Kapso;
+
             const events = yield* provider.parse(body);
             const accounts = yield* ChannelAccounts;
             const messaging = yield* Messaging;
             const identities = new Map<string, Identity>();
             const prompts: string[] = [];
+
             for (const event of events) {
               const sender = {
                 channel: event.channel,
                 installationId: event.installationId,
                 senderId: event.senderId,
               };
+
               if (event.kind === "command") {
                 if (event.command === "start") {
                   const authPrompts = yield* ChannelAuthPrompts;
+
                   const prompt = yield* authPrompts.prepare({
                     token: event.token,
                     sender,
                     eventId: event.eventId,
                   });
+
                   prompts.push(prompt.challengeId);
                 } else {
                   yield* accounts.confirmChallenge({
@@ -72,6 +80,7 @@ export function privateChannel(channel: Identity["channel"]) {
                 identities.set(identity.id, identity);
               }
             }
+
             // Both ordinary inputs and login prompts are durable before ACK.
             context.waitUntil(
               serverRuntime.runPromise(
@@ -103,6 +112,7 @@ export function privateChannel(channel: Identity["channel"]) {
                 })
               )
             );
+
             return new Response("ok");
           }).pipe(
             Effect.catchTags({
@@ -136,5 +146,6 @@ export function privateChannel(channel: Identity["channel"]) {
       ),
     events: privateChannelEvents(channel),
   };
+
   return defineChannel(definition);
 }

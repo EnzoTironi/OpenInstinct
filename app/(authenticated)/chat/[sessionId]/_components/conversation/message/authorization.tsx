@@ -1,3 +1,6 @@
+import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
+import { Badge } from "@web/components/ui/badge";
+import { Button } from "@web/components/ui/button";
 import type { EveAuthorizationPart } from "eve/react";
 import {
   CheckCircleIcon,
@@ -5,9 +8,6 @@ import {
   KeyRoundIcon,
   XCircleIcon,
 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
-import { Badge } from "@web/components/ui/badge";
-import { Button } from "@web/components/ui/button";
 
 export function AuthorizationPrompt({
   part,
@@ -16,15 +16,20 @@ export function AuthorizationPrompt({
 }) {
   const isAuthorized =
     part.state === "completed" && part.outcome === "authorized";
+
   const isCompleted = part.state === "completed";
+
   const Icon = isAuthorized
     ? CheckCircleIcon
     : isCompleted
       ? XCircleIcon
       : KeyRoundIcon;
+
   const instructions = part.authorization?.instructions;
+
   const shouldShowInstructions =
     instructions !== undefined && instructions !== part.description;
+
   const alertVariant = isAuthorized
     ? "success"
     : isCompleted
@@ -71,14 +76,18 @@ export function AuthorizationPrompt({
 
 function authorizationTitle(part: EveAuthorizationPart): string {
   if (part.state === "required") return `Connect ${part.displayName}`;
+
   if (part.outcome === "authorized") return `${part.displayName} connected`;
+
   return `${part.displayName} authorization ${formatAuthorizationOutcome(part.outcome)}`;
 }
 
 function authorizationDescription(part: EveAuthorizationPart): string {
   if (part.state === "required") return part.description;
+
   if (part.outcome === "authorized") return `${part.displayName} connected.`;
   const tail = part.reason !== undefined ? ` (${part.reason})` : "";
+
   return `${part.displayName} authorization ${formatAuthorizationOutcome(part.outcome)}${tail}.`;
 }
 
@@ -95,5 +104,6 @@ function formatAuthorizationOutcome(
     case "timed-out":
       return "timed out";
   }
+
   throw new Error("Unsupported authorization outcome.");
 }

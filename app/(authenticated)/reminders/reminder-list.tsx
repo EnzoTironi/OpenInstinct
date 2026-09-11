@@ -1,13 +1,15 @@
+import { Badge } from "@web/components/ui/badge";
 import type { Effect } from "effect";
 import Link from "next/link";
+
 import type { listReminders } from "../../../server/schedules/queries";
-import { Badge } from "@web/components/ui/badge";
 
 const jobLabels = {
   active: "Active",
   paused: "Paused",
   completed: "No future occurrences",
 };
+
 const runLabels = {
   queued: "Waiting to run",
   running: "In progress",
@@ -15,6 +17,7 @@ const runLabels = {
   completed: "Run finished",
   dead_letter: "Run failed",
 };
+
 const reportLabels = {
   not_ready: "Report not ready",
   not_needed: "No report needed",
@@ -26,12 +29,14 @@ const reportLabels = {
   cancelled: "Delivery stopped; some parts may have been sent",
   uncertain: "Delivery uncertain; automatic retry blocked",
 };
+
 const channelLabels = {
   eve: "Companion",
   linq: "Linq",
   telegram: "Telegram",
   kapso: "WhatsApp",
 };
+
 const dateFormatter = new Intl.DateTimeFormat("en", {
   dateStyle: "medium",
   timeStyle: "short",

@@ -1,13 +1,14 @@
 "use client";
 
-import { type SubmitEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { z } from "zod";
+import { serializeContactVaultPayload } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
 import { DialogFooter } from "@web/components/ui/dialog";
 import { FieldGroup } from "@web/components/ui/field";
-import { serializeContactVaultPayload } from "@shared/vault/schema";
 import { api } from "@web/trpc/client";
+import { useRouter } from "next/navigation";
+import { type SubmitEvent, useState } from "react";
+import { z } from "zod";
+
 import { FormField } from "../field";
 
 const contactFormSchema = z
@@ -43,20 +44,25 @@ export function ContactForm({
   readonly onSaved: () => void;
 }) {
   const router = useRouter();
+
   const create = api.vault.create.useMutation({
     onSuccess: () => {
       router.refresh();
       onSaved();
     },
   });
+
   const [attempted, setAttempted] = useState(false);
+
   const [form, setForm] = useState({
     email: "",
     fullName: "",
     nickname: initialLabel,
     phone: "",
   });
+
   const result = contactFormSchema.safeParse(form);
+
   const errors =
     attempted && !result.success
       ? z.flattenError(result.error).fieldErrors
@@ -65,6 +71,7 @@ export function ContactForm({
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAttempted(true);
+
     if (!result.success) return;
     create.mutate({
       account: "",

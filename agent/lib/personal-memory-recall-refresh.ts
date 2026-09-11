@@ -52,6 +52,7 @@ const MUTATING_MEMORY_TOOLS = new Set(["save_memory", "remove_memory"]);
 
 export function isMutatingMemoryTool(name: string): boolean {
   const bare = name.includes("__") ? (name.split("__").at(-1) ?? name) : name;
+
   return MUTATING_MEMORY_TOOLS.has(bare);
 }
 
@@ -59,6 +60,7 @@ export function recalledProjectionFrom(
   result: MemoryRecallResult
 ): RecalledProjection {
   if (result == null) return { messages: [] };
+
   return { messages: result.messages };
 }
 
@@ -78,11 +80,13 @@ export function projectNotesForNextModelStep(
       message.id === undefined ? [] : [message.id]
     )
   );
+
   const byId = new Map<string, MemoryRecallMessage>();
   const unkeyed: MemoryRecallMessage[] = [];
 
   for (const message of prior.messages) {
     if (message.id === undefined) continue;
+
     if (!refreshedIds.has(message.id)) continue;
     byId.set(message.id, message);
   }
@@ -92,6 +96,7 @@ export function projectNotesForNextModelStep(
       unkeyed.push(message);
       continue;
     }
+
     byId.set(message.id, message);
   }
 
@@ -120,6 +125,7 @@ const refreshRecalledProjection = Effect.fn("refreshRecalledProjection")(
           cause instanceof Error ? cause.message : String(cause)
         ),
     });
+
     return recalledProjectionFrom(result);
   }
 );
@@ -155,6 +161,7 @@ export const executeMemoryMutationWithRecallRefresh = Effect.fn(
     input.priorProjection ?? { messages: [] },
     refreshed
   );
+
   const phase: RecallRefreshPhase = { kind: "clean", projection };
 
   return { mutationResult, projection, phase };
@@ -171,6 +178,7 @@ export const requireCleanProjectionForNextModelStep = Effect.fn(
       )
     );
   }
+
   if (phase.kind === "absent") {
     return yield* Effect.fail(
       new RecallRefreshError(
@@ -179,6 +187,7 @@ export const requireCleanProjectionForNextModelStep = Effect.fn(
       )
     );
   }
+
   return phase.projection;
 });
 

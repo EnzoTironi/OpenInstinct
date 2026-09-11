@@ -1,7 +1,8 @@
 import { Effect, Schema } from "effect";
+
+import { sniffBrowserImageMediaType } from "../../../shared/browser/artifact";
 import { artifactLimits } from "../../artifacts/model";
 import type { MessagePayload } from "../../messaging/model";
-import { sniffBrowserImageMediaType } from "../../../shared/browser/artifact";
 
 export type MediaReference = NonNullable<MessagePayload["attachments"]>[number];
 
@@ -60,13 +61,16 @@ export const identifyMedia = Effect.fn("identifyMedia")(function* (
 ) {
   if (bytes.length === 0)
     return yield* new ChannelMediaError({ reason: "invalid_media" });
+
   const head = Buffer.from(
     bytes.buffer,
     bytes.byteOffset,
     Math.min(bytes.length, 64)
   );
+
   const claimed = reference.mediaType.split(";")[0]?.trim().toLowerCase();
   const imageType = sniffBrowserImageMediaType(bytes);
+
   const mediaType =
     imageType === "image/png" || imageType === "image/jpeg"
       ? imageType
@@ -80,15 +84,19 @@ export const identifyMedia = Effect.fn("identifyMedia")(function* (
             : Schema.is(textType)(claimed)
               ? claimed
               : undefined;
+
   if (!mediaType)
     return yield* new ChannelMediaError({ reason: "unsupported_type" });
+
   const allowedClaim =
     claimed === "application/octet-stream" ||
     claimed === mediaType ||
     (mediaType === "audio/ogg" && claimed === "application/ogg") ||
     (mediaType === "audio/wav" && claimed === "audio/x-wav");
+
   if (!allowedClaim)
     return yield* new ChannelMediaError({ reason: "invalid_media" });
+
   const limit = mediaType.startsWith("image/")
     ? mediaLimits.imageBytes
     : mediaType.startsWith("audio/")
@@ -96,8 +104,10 @@ export const identifyMedia = Effect.fn("identifyMedia")(function* (
       : Schema.is(textType)(mediaType)
         ? mediaLimits.textBytes
         : mediaLimits.totalBytes;
+
   if (bytes.length > limit)
     return yield* new ChannelMediaError({ reason: "too_large" });
+
   return mediaType;
 });
 
@@ -108,12 +118,14 @@ export const decodeMediaText = Effect.fn("decodeMediaText")(function* (
     try: () => new TextDecoder("utf-8", { fatal: true }).decode(bytes),
     catch: () => new ChannelMediaError({ reason: "invalid_media" }),
   });
+
   return yield* Schema.decodeUnknownEffect(
     Schema.String.check(
       Schema.isMinLength(1),
       Schema.makeFilter((value) =>
         value.split("").every((character) => {
           const code = character.charCodeAt(0);
+
           return code >= 32 || code === 9 || code === 10 || code === 13;
         })
       )

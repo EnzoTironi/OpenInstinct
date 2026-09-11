@@ -12,41 +12,48 @@ import {
   HttpClient,
   HttpClientRequest,
 } from "effect/unstable/http";
-import {
-  normalizeInbound,
-  ProviderReferenceSchema,
-  validateEventAge,
-  type InboundEvent,
-} from "./inbound";
+
 import {
   detectKapsoChatKind,
   evaluateGroupMentionPolicy,
   extractKapsoGroupMentionSignals,
 } from "./group-policy";
 import {
+  normalizeInbound,
+  ProviderReferenceSchema,
+  validateEventAge,
+  type InboundEvent,
+} from "./inbound";
+import { downloadMediaBytes } from "./media/download";
+import { ChannelMediaError } from "./media/policy";
+import {
   ProviderInputError,
   ProviderUncertain,
   requestProviderJson,
 } from "./provider-errors";
-import { downloadMediaBytes } from "./media/download";
-import { ChannelMediaError } from "./media/policy";
 
 const phone = Schema.String.check(Schema.isPattern(/^\+?[1-9][0-9]{5,14}$/));
+
 const phoneId = Schema.String.check(Schema.isPattern(/^[1-9][0-9]{0,31}$/));
+
 const messageId = Schema.String.check(
   Schema.isPattern(/^wamid\.[A-Za-z0-9_+/=.-]{1,240}$/)
 );
+
 export const KapsoInstallationSchema = Schema.Struct({
   phoneNumberId: phoneId,
   phoneNumber: phone,
 });
+
 export type KapsoInstallation = typeof KapsoInstallationSchema.Type;
+
 const media = Schema.Struct({
   id: ProviderReferenceSchema,
   mime_type: Schema.optionalKey(ProviderReferenceSchema),
   filename: Schema.optionalKey(ProviderReferenceSchema),
   caption: Schema.optionalKey(Schema.String),
 });
+
 const message = Schema.Struct({
   id: messageId,
   timestamp: Schema.String.check(Schema.isPattern(/^[0-9]{1,12}$/)),
@@ -89,6 +96,7 @@ const message = Schema.Struct({
     ),
   }),
 });
+
 const envelope = Schema.Struct({
   phone_number_id: phoneId,
   message: Schema.optionalKey(message),
@@ -100,6 +108,7 @@ const envelope = Schema.Struct({
     is_group: Schema.optionalKey(Schema.Boolean),
   }),
 });
+
 const batch = Schema.Struct({
   batch: Schema.Literal(true),
   type: Schema.String,
@@ -108,8 +117,10 @@ const batch = Schema.Struct({
     Schema.isMaxLength(100)
   ),
 });
+
 const malformed = () =>
   new ProviderInputError({ provider: "kapso", reason: "malformed" });
+
 const digits = (value: string) => value.replace(/^\+/, "");
 
 const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
@@ -126,13 +137,16 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       reason: "wrong_installation",
     });
   }
+
   const incoming = item.message;
+
   if (
     incoming?.kapso.direction !== "inbound" ||
     (incoming.kapso.status !== "received" &&
       incoming.kapso.status !== "delivered")
   )
     return null;
+
   // Documented live origins; direction/status still exclude Business App sends.
   // https://docs.kapso.ai/docs/platform/webhooks/advanced#message-origin
   // History imports, missing and future origins must never become login commands.
@@ -143,7 +157,9 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
     return null;
   // Groups stay closed unless provider mention / reply-to-business signals exist.
   const chatKind = detectKapsoChatKind(item.conversation);
+
   if (incoming.type === "system") return null;
+
   const sender = yield* Schema.decodeUnknownEffect(phone)(incoming.from).pipe(
     Effect.mapError(
       () =>
@@ -153,8 +169,11 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
         })
     )
   );
+
   const senderId = digits(sender);
+
   if (senderId === digits(installation.phoneNumber)) return null;
+
   if (
     incoming.to !== undefined &&
     digits(incoming.to) !== digits(installation.phoneNumber)
@@ -164,6 +183,7 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       reason: "wrong_installation",
     });
   }
+
   if (chatKind === "group") {
     const mentionSignals = extractKapsoGroupMentionSignals({
       installationPhoneDigits: digits(installation.phoneNumber),
@@ -172,6 +192,7 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       kapso: incoming.kapso,
       contextFromMe: incoming.context?.from_me === true,
     });
+
     if (!evaluateGroupMentionPolicy(mentionSignals)) return null;
   } else if (
     item.conversation.phone_number !== undefined &&
@@ -182,12 +203,15 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       reason: "wrong_installation",
     });
   }
+
   const occurredAt = yield* validateEventAge(
     "kapso",
     Number(incoming.timestamp),
     nowMs
   );
+
   let attachment: typeof media.Type | undefined;
+
   switch (incoming.type) {
     case "text":
       break;
@@ -209,8 +233,10 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
     default:
       return null;
   }
+
   if (incoming.type !== "text" && attachment === undefined)
     return yield* malformed();
+
   const payload = {
     text: incoming.type === "text" ? incoming.text?.body : attachment?.caption,
     attachments: attachment
@@ -227,6 +253,7 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       : [],
     replyToMessageId: incoming.context?.id,
   };
+
   return yield* normalizeInbound(
     {
       channel: "kapso",
@@ -257,9 +284,11 @@ export const parseKapsoWebhook = Effect.fn("parseKapsoWebhook")(function* (
   const installation = yield* Schema.decodeUnknownEffect(
     KapsoInstallationSchema
   )(configuration).pipe(Effect.mapError(malformed));
+
   const marker = yield* Schema.decodeUnknownEffect(
     Schema.Struct({ batch: Schema.optionalKey(Schema.Boolean) })
   )(value).pipe(Effect.mapError(malformed));
+
   const items = marker.batch
     ? (yield* Schema.decodeUnknownEffect(batch)(value).pipe(
         Effect.mapError(malformed)
@@ -269,9 +298,11 @@ export const parseKapsoWebhook = Effect.fn("parseKapsoWebhook")(function* (
           Effect.mapError(malformed)
         ),
       ];
+
   const events = yield* Effect.forEach(items, (item) =>
     normalizeEnvelope(item, installation, nowMs)
   );
+
   return events.filter((event) => event !== null);
 });
 
@@ -284,11 +315,13 @@ const readInstallation = Config.all({
     () => new ProviderInputError({ provider: "kapso", reason: "configuration" })
   )
 );
+
 const sendInput = Schema.Struct({
   targetId: phone,
   text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
   reply: Schema.optional(messageId),
 });
+
 const receipt = Schema.Struct({
   messaging_product: Schema.Literal("whatsapp"),
   contacts: Schema.Array(Schema.Struct({ input: phone, wa_id: phone })).check(
@@ -306,6 +339,7 @@ const downloadableMedia = Schema.Struct({
     Schema.makeFilter((value) => {
       try {
         const url = new URL(value);
+
         return (
           url.origin === "https://api.kapso.ai" &&
           url.pathname === "/meta/whatsapp/media_download" &&
@@ -323,6 +357,7 @@ const downloadableMedia = Schema.Struct({
 
 const makeKapso = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
+
   const sendText = Effect.fn("Kapso.sendText")(function* (
     targetId: string,
     text: string,
@@ -341,13 +376,16 @@ const makeKapso = Effect.gen(function* () {
           })
       )
     );
+
     const installation = yield* readInstallation;
+
     const key = yield* Config.redacted("KAPSO_API_KEY").pipe(
       Effect.mapError(
         () =>
           new ProviderInputError({ provider: "kapso", reason: "configuration" })
       )
     );
+
     const body: Schema.MutableJsonObject = {
       messaging_product: "whatsapp",
       recipient_type: "individual",
@@ -355,7 +393,9 @@ const makeKapso = Effect.gen(function* () {
       type: "text",
       text: { body: input.text, preview_url: false },
     };
+
     if (input.reply) body.context = { message_id: input.reply };
+
     const result = yield* requestProviderJson(
       http,
       "kapso",
@@ -376,8 +416,10 @@ const makeKapso = Effect.gen(function* () {
           })
       )
     );
+
     const contact = result.contacts[0];
     const sentMessage = result.messages[0];
+
     if (
       !contact ||
       !sentMessage ||
@@ -389,8 +431,10 @@ const makeKapso = Effect.gen(function* () {
         reason: "malformed_receipt",
       });
     }
+
     return { providerMessageId: sentMessage.id };
   });
+
   return {
     downloadMedia: Effect.fn("Kapso.downloadMedia")(function* (
       installationId: string,
@@ -398,18 +442,22 @@ const makeKapso = Effect.gen(function* () {
       maxBytes: number
     ) {
       const installation = yield* readInstallation;
+
       if (installation.phoneNumberId !== installationId)
         return yield* new ChannelMediaError({ reason: "wrong_installation" });
+
       const id = yield* Schema.decodeUnknownEffect(phoneId)(mediaId).pipe(
         Effect.mapError(
           () => new ChannelMediaError({ reason: "invalid_media" })
         )
       );
+
       const key = yield* Config.redacted("KAPSO_API_KEY").pipe(
         Effect.mapError(
           () => new ChannelMediaError({ reason: "download_failed" })
         )
       );
+
       const metadata = yield* requestProviderJson(
         http,
         "kapso",
@@ -425,18 +473,23 @@ const makeKapso = Effect.gen(function* () {
           () => new ChannelMediaError({ reason: "download_failed" })
         )
       );
+
       if (metadata.id !== id)
         return yield* new ChannelMediaError({ reason: "invalid_media" });
+
       if (Number(metadata.file_size) > maxBytes)
         return yield* new ChannelMediaError({ reason: "too_large" });
+
       // The provider-issued URL embeds its authorization. Never forward the API key.
       const bytes = yield* downloadMediaBytes(
         http,
         HttpClientRequest.get(metadata.download_url),
         maxBytes
       );
+
       if (bytes.length !== Number(metadata.file_size))
         return yield* new ChannelMediaError({ reason: "invalid_media" });
+
       return bytes;
     }),
     parse: Effect.fn("Kapso.parse")(function* (value: Schema.Json) {

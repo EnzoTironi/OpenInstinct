@@ -1,31 +1,36 @@
-import { Effect, Result } from "effect";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { getAuthSession } from "@db/services/auth/session";
 import { readEntitlement } from "@db/services/billing";
 import { ChannelAuthForm } from "@web/auth/channel/form";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
-import { serverRuntime } from "../../../server/runtime";
+import { Effect, Result } from "effect";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
 import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
-import { LinkedChannels } from "./linked-channels";
-import { PersonalMemorySection } from "./personal-memory";
 import {
   isStripeBillingConfigured,
   isStripePortalConfigured,
 } from "../../../server/billing/stripe";
+import { serverRuntime } from "../../../server/runtime";
 import { AccountBillingSection } from "./_components/billing-section";
 import { AccountPrivacyWipeSection } from "./_components/privacy-wipe-section";
+import { LinkedChannels } from "./linked-channels";
+import { PersonalMemorySection } from "./personal-memory";
 
 export default async function AccountPage() {
   const requestHeaders = await headers();
   const session = await getAuthSession(requestHeaders);
+
   if (!session) redirect("/sign-in?callbackUrl=%2Faccount");
+
   const result = await serverRuntime.runPromise(
     readLinkedChannelIdentities(requestHeaders).pipe(Effect.result)
   );
+
   if (Result.isFailure(result) && result.failure.reason === "unauthenticated")
     redirect("/sign-in?callbackUrl=%2Faccount");
   const entitlement = await readEntitlement("user", session.user.id);
+
   return (
     <main className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-8 px-4 py-6 sm:p-8">
       <header className="space-y-2">

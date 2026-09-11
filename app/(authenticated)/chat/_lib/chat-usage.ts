@@ -1,5 +1,5 @@
-import type { MessageStreamEvent } from "eve/client";
 import type { ChatUsage } from "@shared/chat/schema";
+import type { MessageStreamEvent } from "eve/client";
 
 export function summarizeChatUsage(
   events: readonly MessageStreamEvent[]
@@ -16,6 +16,7 @@ export function summarizeChatUsage(
 
     inputTokens += event.data.usage?.inputTokens ?? 0;
     outputTokens += event.data.usage?.outputTokens ?? 0;
+
     if (event.data.usage?.costUsd !== undefined) {
       costUsd += event.data.usage.costUsd;
       measuredCosts += 1;
@@ -58,6 +59,7 @@ export function combineChatUsage(usages: readonly ChatUsage[]): ChatUsage {
 
 export function formatChatUsage(usage: ChatUsage) {
   const tokens = usage.inputTokens + usage.outputTokens;
+
   const tokenLabel = `${new Intl.NumberFormat("en", {
     notation: tokens >= 10_000 ? "compact" : "standard",
     maximumFractionDigits: 1,

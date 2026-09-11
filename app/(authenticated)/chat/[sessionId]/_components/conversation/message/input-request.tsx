@@ -1,4 +1,3 @@
-import type { EveDynamicToolPart, EveMessageInputRequest } from "eve/react";
 import {
   Question,
   QuestionActions,
@@ -13,6 +12,8 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import type { InputResponse } from "eve/client";
+import type { EveDynamicToolPart, EveMessageInputRequest } from "eve/react";
+
 import type { RespondToAgentInput } from "./types";
 
 export function QuestionRequest({
@@ -29,6 +30,7 @@ export function QuestionRequest({
   const selectedOption = inputRequest.options?.find(
     (option) => option.id === inputResponse?.optionId
   );
+
   const hasOptions = (inputRequest.options?.length ?? 0) > 0;
   const acceptsFreeform = inputRequest.allowFreeform === true || !hasOptions;
 
@@ -103,9 +105,11 @@ export function InputRequestActions({
   readonly part: EveDynamicToolPart;
 }) {
   const inputRequest = part.toolMetadata?.eve?.inputRequest;
+
   if (!inputRequest) return null;
 
   const inputResponse = part.toolMetadata.eve.inputResponse;
+
   const selectedOption = inputRequest.options?.find(
     (option) => option.id === inputResponse?.optionId
   );

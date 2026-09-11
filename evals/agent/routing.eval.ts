@@ -1,10 +1,10 @@
-import { defineEval } from "eve/evals";
-import { includes } from "eve/evals/expect";
 import {
   agentEvalTags,
   assertPlainTextDelivery,
   requireDeliveredText,
 } from "@evals/agent/shared";
+import { defineEval } from "eve/evals";
+import { includes } from "eve/evals/expect";
 
 export default [
   defineEval({
@@ -14,6 +14,7 @@ export default [
       const turn = await t.send(
         "Read https://example.com and tell me the page heading. Use the page itself rather than prior knowledge."
       );
+
       turn.expectOk();
       turn.succeeded();
       turn.calledTool("web_fetch", { count: 1 });
@@ -31,6 +32,7 @@ export default [
       const turn = await t.send(
         "Find the official website for Brooklyn Botanic Garden. Give me its name and URL. This is public research; do not interact with the site."
       );
+
       turn.expectOk();
       turn.succeeded();
       turn.calledTool("web_search");
@@ -53,6 +55,7 @@ export default [
       const turn = await t.send(
         "Draft a two-sentence email to a neighbor asking whether they can water my plants this weekend. Do not send it."
       );
+
       turn.expectOk();
       turn.succeeded();
       turn.notCalledTool("gmail-send");

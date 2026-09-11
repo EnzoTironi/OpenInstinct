@@ -2,6 +2,7 @@ import type { ChildProcess } from "node:child_process";
 import { readFile } from "node:fs/promises";
 
 const LOG_POLL_INTERVAL_MS = 20;
+
 const LOG_WAIT_TIMEOUT_MS = 5_000;
 
 export const SUPERVISOR_TEST_TIMEOUT_MS = LOG_WAIT_TIMEOUT_MS + 5_000;
@@ -42,6 +43,7 @@ export async function waitForSupervisorLogEntry(
       : `Last log read failed: ${
           readError instanceof Error ? readError.message : "Unknown read error"
         }`;
+
   throw new Error(
     `Timed out after ${String(LOG_WAIT_TIMEOUT_MS)}ms waiting for ${JSON.stringify(expected)} in ${path}. ${lastObservation}`
   );

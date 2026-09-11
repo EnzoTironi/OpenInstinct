@@ -1,17 +1,18 @@
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { PgClient } from "@effect/sql-pg";
 import { Config, Layer, ManagedRuntime } from "effect";
+
 import { ChannelAccounts } from "./accounts";
 import { NativeDeviceAuth } from "./accounts/device";
 import { Artifacts } from "./artifacts";
-import { Messaging } from "./messaging";
-import { Telegram } from "./channels/telegram";
-import { Kapso } from "./channels/kapso";
-import { ChannelTransport } from "./channels/transport";
-import { ChannelAuthPrompts } from "./channel-auth/prompts";
-import { MemoryDocuments } from "./memory/documents";
-import { PersonalMemory } from "./personal-memory";
 import { BrowserWorkerAccess } from "./browser-worker";
+import { ChannelAuthPrompts } from "./channel-auth/prompts";
+import { Kapso } from "./channels/kapso";
+import { Telegram } from "./channels/telegram";
+import { ChannelTransport } from "./channels/transport";
+import { MemoryDocuments } from "./memory/documents";
+import { Messaging } from "./messaging";
+import { PersonalMemory } from "./personal-memory";
 
 const database = PgClient.layerConfig({
   url: Config.redacted("DATABASE_URL"),

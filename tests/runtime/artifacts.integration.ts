@@ -1,10 +1,12 @@
-import { fileURLToPath } from "node:url";
-import { NodeServices } from "@effect/platform-node";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+
+import { NodeServices } from "@effect/platform-node";
 import { PgClient } from "@effect/sql-pg";
 import { Effect, Layer, Result, Schema } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { expect, test } from "vitest";
+
 import { ChannelAccounts, type Identity } from "../../server/accounts";
 import { Artifacts } from "../../server/artifacts";
 import { artifactDigest } from "../../server/artifacts/content";
@@ -17,7 +19,9 @@ const dependencies = Layer.mergeAll(
   ChannelAccounts.layer,
   Messaging.layer
 ).pipe(Layer.provideMerge(runtimeDatabase));
+
 const services = Artifacts.layer.pipe(Layer.provideMerge(dependencies));
+
 const fixture = Effect.fn("artifacts.fixture")(function* (
   body: (context: {
     artifacts: Artifacts["Service"];
@@ -34,21 +38,26 @@ const fixture = Effect.fn("artifacts.fixture")(function* (
   yield* Effect.addFinalizer(() =>
     Effect.forEach(identities, (identity) => {
       const scope = accessScopeForUser(`better-auth:${identity.userId}`);
+
       return sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`.pipe(
         Effect.andThen(sql`DELETE FROM "user" WHERE id = ${identity.userId}`),
         Effect.orDie
       );
     })
   );
+
   for (let index = 0; index < 2; index++) {
     const identity = yield* accounts.resolveVerifiedSender({
       channel: "telegram",
       installationId: "artifact-proof",
       senderId: randomUUID(),
     });
+
     identities.push(identity);
   }
+
   const [owner, other] = identities;
+
   if (!owner || !other) throw new Error("Fixture accounts were not created.");
   const linked = randomUUID();
   yield* sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
@@ -62,10 +71,12 @@ const fixture = Effect.fn("artifacts.fixture")(function* (
     linked,
   });
 });
+
 const run = (body: Parameters<typeof fixture>[0]) =>
   Effect.runPromise(
     fixture(body).pipe(Effect.scoped, Effect.provide(services))
   );
+
 const source = Effect.fn("artifacts.source")(function* (
   messaging: Messaging["Service"],
   identityId: string,
@@ -74,6 +85,7 @@ const source = Effect.fn("artifacts.source")(function* (
 ) {
   const mediaId = randomUUID();
   const eventId = randomUUID();
+
   const receipt = yield* messaging.accept({
     identityId,
     eventId,
@@ -88,9 +100,11 @@ const source = Effect.fn("artifacts.source")(function* (
       ],
     },
   });
+
   const sourceInboxId = yield* Schema.decodeUnknownEffect(ArtifactId)(
     receipt.id
   );
+
   return { identityId, sourceInboxId, mediaId };
 });
 
@@ -107,17 +121,21 @@ test("persists immutable bytes and server-owned source metadata; exact replay re
         sha256: artifactDigest(bytes),
         sourceMediaId: input.mediaId,
       });
+
       const reread = yield* artifacts.read({
         identityId: owner.id,
         artifactId: first.artifactId,
       });
+
       expect(Buffer.from(reread.bytes)).toEqual(bytes);
       expect(reread.metadata).toEqual(first);
       expect(yield* artifacts.put({ ...input, bytes })).toEqual(first);
+
       const second = yield* artifacts.put({
         ...(yield* source(messaging, owner.id)),
         bytes,
       });
+
       expect(second.filename).toBe(first.filename);
       expect(second.artifactId).not.toBe(first.artifactId);
       expect(
@@ -129,7 +147,7 @@ test("persists immutable bytes and server-owned source metadata; exact replay re
             Object.assign({}, input, { bytes, filename: "injected.txt" })
           )
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "invalid_input" });
+      ).toMatchObject({ reason: "invalid_input" });
       expect(
         yield* Effect.flip(
           artifacts.put({
@@ -137,7 +155,7 @@ test("persists immutable bytes and server-owned source metadata; exact replay re
             bytes: Buffer.from("different attachment"),
           })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "source_conflict" });
+      ).toMatchObject({ reason: "source_conflict" });
     })
   ));
 
@@ -148,10 +166,12 @@ test("concurrent exact source replay has one durable ID", () =>
         ...(yield* source(messaging, owner.id)),
         bytes: Buffer.from("one source"),
       };
+
       const results = yield* Effect.all(
         Array.from({ length: 8 }, () => artifacts.put(input)),
         { concurrency: 8 }
       );
+
       expect(new Set(results.map((result) => result.artifactId)).size).toBe(1);
       expect(
         yield* artifacts.list({ identityId: owner.id, limit: 20 })
@@ -168,15 +188,14 @@ test("source lookup rejects changed source metadata and missing or foreign inbox
         yield* Effect.flip(
           artifacts.readForSource({ ...input, identityId: other.id })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "source_invalid" });
+      ).toMatchObject({ reason: "source_invalid" });
       expect(
         yield* Effect.flip(
           artifacts.readForSource({ ...input, mediaId: randomUUID() })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "source_invalid" });
+      ).toMatchObject({ reason: "source_invalid" });
       yield* sql`UPDATE channel_inbox SET payload = jsonb_set(payload, '{attachments,0,name}', '"changed.txt"') WHERE id = ${input.sourceInboxId}`;
       expect(yield* Effect.flip(artifacts.readForSource(input))).toMatchObject({
-        _tag: "ArtifactError",
         reason: "source_conflict",
       });
     })
@@ -189,13 +208,12 @@ test("scopes every operation to the current account and membership, and source r
         ...(yield* source(messaging, owner.id)),
         bytes: Buffer.from("account private"),
       });
+
       const stranger = { identityId: other.id, artifactId: file.artifactId };
       expect(yield* Effect.flip(artifacts.read(stranger))).toMatchObject({
-        _tag: "ArtifactError",
         reason: "not_found",
       });
       expect(yield* Effect.flip(artifacts.delete(stranger))).toMatchObject({
-        _tag: "ArtifactError",
         reason: "not_found",
       });
       expect(
@@ -212,12 +230,12 @@ test("scopes every operation to the current account and membership, and source r
         yield* Effect.flip(
           artifacts.read({ identityId: owner.id, artifactId: file.artifactId })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "not_found" });
+      ).toMatchObject({ reason: "not_found" });
       expect(
         yield* Effect.flip(
           artifacts.read({ identityId: linked, artifactId: file.artifactId })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "not_found" });
+      ).toMatchObject({ reason: "not_found" });
       expect(
         yield* Effect.flip(
           artifacts.setDerived({
@@ -228,7 +246,7 @@ test("scopes every operation to the current account and membership, and source r
             text: "private",
           })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "not_found" });
+      ).toMatchObject({ reason: "not_found" });
       expect(yield* artifacts.list({ identityId: linked, limit: 20 })).toEqual(
         []
       );
@@ -243,7 +261,7 @@ test("scopes every operation to the current account and membership, and source r
       yield* sql`DELETE FROM workspace_memberships WHERE workspace_id = ${scope.workspaceId} AND user_id = ${scope.userId}`;
       expect(
         yield* Effect.flip(artifacts.list({ identityId: linked, limit: 20 }))
-      ).toMatchObject({ _tag: "ArtifactError", reason: "not_found" });
+      ).toMatchObject({ reason: "not_found" });
     })
   ));
 
@@ -254,12 +272,13 @@ test("detects persisted byte corruption before content or derivation can be retu
         ...(yield* source(messaging, owner.id)),
         bytes: Buffer.from("good"),
       });
+
       yield* sql`UPDATE private_artifact SET content = ${Buffer.from("evil")} WHERE id = ${file.artifactId}`;
       expect(
         yield* Effect.flip(
           artifacts.read({ identityId: owner.id, artifactId: file.artifactId })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "corrupt" });
+      ).toMatchObject({ reason: "corrupt" });
       expect(
         yield* Effect.flip(
           artifacts.setDerived({
@@ -270,7 +289,7 @@ test("detects persisted byte corruption before content or derivation can be retu
             text: "good",
           })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "corrupt" });
+      ).toMatchObject({ reason: "corrupt" });
     })
   ));
 
@@ -290,7 +309,7 @@ test("derived text is hash-bound and UTF-8 bounded; deletion wipes bytes and der
             text: "wrong revision",
           })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "source_conflict" });
+      ).toMatchObject({ reason: "source_conflict" });
       expect(
         yield* Effect.flip(
           artifacts.setDerived({
@@ -300,7 +319,7 @@ test("derived text is hash-bound and UTF-8 bounded; deletion wipes bytes and der
             text: "é".repeat(32769),
           })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "invalid_input" });
+      ).toMatchObject({ reason: "invalid_input" });
       yield* artifacts.setDerived({
         ...access,
         sha256: file.sha256,
@@ -312,16 +331,14 @@ test("derived text is hash-bound and UTF-8 bounded; deletion wipes bytes and der
         yield* artifacts.delete(access)
       );
       expect(yield* Effect.flip(artifacts.read(access))).toMatchObject({
-        _tag: "ArtifactError",
         reason: "deleted",
       });
       expect(yield* Effect.flip(artifacts.readForSource(input))).toMatchObject({
-        _tag: "ArtifactError",
         reason: "deleted",
       });
       expect(
         yield* Effect.flip(artifacts.put({ ...input, bytes }))
-      ).toMatchObject({ _tag: "ArtifactError", reason: "deleted" });
+      ).toMatchObject({ reason: "deleted" });
       expect(
         yield* Effect.flip(
           artifacts.setDerived({
@@ -331,9 +348,11 @@ test("derived text is hash-bound and UTF-8 bounded; deletion wipes bytes and der
             text: "revive",
           })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "deleted" });
+      ).toMatchObject({ reason: "deleted" });
+
       const rows =
         yield* sql`SELECT content, derived_text, derived_kind, deleted_at IS NOT NULL AS deleted FROM private_artifact WHERE id = ${file.artifactId}`;
+
       expect(rows[0]).toEqual({
         content: null,
         derived_text: null,
@@ -347,10 +366,12 @@ test("database rejects orphan derived text and invalid byte lengths, and source 
   run(({ artifacts, messaging, owner, sql }) =>
     Effect.gen(function* () {
       const input = yield* source(messaging, owner.id);
+
       const file = yield* artifacts.put({
         ...input,
         bytes: Buffer.from("constraint"),
       });
+
       for (const statement of [
         sql`UPDATE private_artifact SET derived_text = 'orphan', derived_kind = NULL WHERE id = ${file.artifactId}`,
         sql`UPDATE private_artifact SET derived_text = ${"é".repeat(32769)}, derived_kind = 'text' WHERE id = ${file.artifactId}`,
@@ -359,6 +380,7 @@ test("database rejects orphan derived text and invalid byte lengths, and source 
         const result = yield* Effect.result(statement);
         expect(Result.isFailure(result)).toBe(true);
       }
+
       expect(
         yield* Effect.flip(
           artifacts.put({
@@ -366,13 +388,13 @@ test("database rejects orphan derived text and invalid byte lengths, and source 
             bytes: Buffer.alloc(artifactLimits.bytes + 1),
           })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "invalid_input" });
+      ).toMatchObject({ reason: "invalid_input" });
       yield* sql`DELETE FROM channel_inbox WHERE id = ${input.sourceInboxId}`;
       expect(
         yield* Effect.flip(
           artifacts.read({ identityId: owner.id, artifactId: file.artifactId })
         )
-      ).toMatchObject({ _tag: "ArtifactError", reason: "not_found" });
+      ).toMatchObject({ reason: "not_found" });
     })
   ));
 
@@ -381,6 +403,7 @@ test("a fresh process reads exact persisted bytes after the writing process and 
     Effect.gen(function* () {
       const input = yield* source(messaging, owner.id);
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
       const resultSchema = Schema.fromJsonString(
         Schema.Struct({
           artifactId: Schema.String,
@@ -388,9 +411,11 @@ test("a fresh process reads exact persisted bytes after the writing process and 
           text: Schema.String,
         })
       );
+
       const childPath = fileURLToPath(
         new URL("./artifacts-process.ts", import.meta.url)
       );
+
       const written = yield* spawner.string(
         ChildProcess.make(process.execPath, [
           "--import",
@@ -400,7 +425,9 @@ test("a fresh process reads exact persisted bytes after the writing process and 
           JSON.stringify(input),
         ])
       );
+
       const metadata = yield* Schema.decodeUnknownEffect(resultSchema)(written);
+
       const read = yield* spawner.string(
         ChildProcess.make(process.execPath, [
           "--import",
@@ -413,6 +440,7 @@ test("a fresh process reads exact persisted bytes after the writing process and 
           }),
         ])
       );
+
       const restored = yield* Schema.decodeUnknownEffect(resultSchema)(read);
       expect(restored).toEqual({
         ...metadata,

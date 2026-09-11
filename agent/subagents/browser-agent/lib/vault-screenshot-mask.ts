@@ -6,6 +6,7 @@ export async function withVaultScreenshotMask<T>(
   capture: () => Promise<T>
 ) {
   await setVaultScreenshotMask(sessionId, "add", signal);
+
   try {
     return await capture();
   } finally {
@@ -22,6 +23,7 @@ async function setVaultScreenshotMask(
 ) {
   const styleId = "vault-screenshot-mask";
   const selector = '[data-vault-secret="true"]';
+
   const operation =
     action === "add"
       ? `
@@ -46,6 +48,7 @@ async function setVaultScreenshotMask(
         } else {
           style.remove();
         }`;
+
   const code = `
 for (const currentContext of browser.contexts()) {
   for (const currentPage of currentContext.pages()) {
@@ -57,11 +60,13 @@ for (const currentContext of browser.contexts()) {
   }
 }
 return true;`;
+
   const result = await getKernel().browsers.playwright.execute(
     sessionId,
     { code, timeout_sec: 10 },
     { signal }
   );
+
   if (!result.success) {
     throw new Error(
       action === "add"

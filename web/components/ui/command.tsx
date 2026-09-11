@@ -1,9 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { Command as CommandPrimitive } from "cmdk";
-import { CheckIcon, SearchIcon } from "lucide-react";
-
+import { cn } from "@web/components/class-names";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +9,9 @@ import {
   DialogTitle,
 } from "@web/components/ui/dialog";
 import { InputGroup, InputGroupAddon } from "@web/components/ui/input-group";
-import { cn } from "@web/components/class-names";
+import { Command as CommandPrimitive } from "cmdk";
+import { CheckIcon, SearchIcon } from "lucide-react";
+import * as React from "react";
 
 function Command({
   className,

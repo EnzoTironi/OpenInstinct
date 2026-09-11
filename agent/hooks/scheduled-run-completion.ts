@@ -1,9 +1,4 @@
-import { defineHook } from "eve/hooks";
-import { serverRuntime } from "../../server/runtime";
-import { dispatchItem } from "../../server/channels/dispatch";
-import { deliverNativeScheduledReport } from "../../server/schedules/native-report";
 import { scheduledRunIdentity } from "@agent/lib/schedules/identity";
-import { scheduledRunOutcomeSchema } from "@shared/schedules/outcome";
 import {
   completeScheduledAgentRun,
   deferScheduledAgentRunCompletion,
@@ -11,6 +6,12 @@ import {
   releaseScheduledAgentRun,
   waitForScheduledAgentRunInput,
 } from "@db/services/scheduled-agent-jobs";
+import { scheduledRunOutcomeSchema } from "@shared/schedules/outcome";
+import { defineHook } from "eve/hooks";
+
+import { dispatchItem } from "../../server/channels/dispatch";
+import { serverRuntime } from "../../server/runtime";
+import { deliverNativeScheduledReport } from "../../server/schedules/native-report";
 
 const workerRuntimeLimitMs = 6 * 60 * 60_000;
 
@@ -18,7 +19,9 @@ export default defineHook({
   events: {
     async "turn.started"(event, ctx) {
       const identity = scheduledRunIdentity(ctx.session.auth);
+
       if (!identity) return;
+
       const started = await markScheduledAgentRunStarted(
         identity.runId,
         identity.leaseToken,
@@ -26,13 +29,16 @@ export default defineHook({
         workerRuntimeLimitMs,
         new Date(event.meta.at)
       );
+
       if (!started) {
         console.warn("[scheduled-run] worker started with a stale lease", {
           runId: identity.runId,
           sessionId: ctx.session.id,
         });
+
         return;
       }
+
       console.info("[scheduled-run] worker turn started", {
         runId: identity.runId,
         sessionId: ctx.session.id,
@@ -40,20 +46,25 @@ export default defineHook({
     },
     async "input.requested"(event, ctx) {
       const identity = scheduledRunIdentity(ctx.session.auth);
+
       if (!identity) return;
+
       const waiting = await waitForScheduledAgentRunInput(
         identity.runId,
         identity.leaseToken,
         event.data.requests,
         new Date(event.meta.at)
       );
+
       if (waiting?.reportStatus !== "pending") {
         console.warn("[scheduled-run] input request missed its active lease", {
           runId: identity.runId,
           sessionId: ctx.session.id,
         });
+
         return;
       }
+
       console.info("[scheduled-run] worker waiting for input", {
         requestCount: event.data.requests.length,
         runId: waiting.id,
@@ -67,13 +78,16 @@ export default defineHook({
     async "subagent.completed"(event, ctx) {
       if (!event.data.backgroundTask) return;
       const identity = scheduledRunIdentity(ctx.session.auth);
+
       if (!identity) return;
+
       const deferred = await deferScheduledAgentRunCompletion(
         identity.runId,
         identity.leaseToken,
         ctx.session.turn.id,
         new Date(event.meta.at)
       );
+
       console.info("[scheduled-run] worker delegated background work", {
         deferred,
         runId: identity.runId,
@@ -84,8 +98,11 @@ export default defineHook({
     },
     async "message.completed"(event, ctx) {
       const identity = scheduledRunIdentity(ctx.session.auth);
+
       if (!identity) return;
+
       if (event.data.finishReason === "tool-calls") return;
+
       if (event.data.finishReason !== "stop") {
         const status = await releaseScheduledAgentRun(
           identity.runId,
@@ -93,6 +110,7 @@ export default defineHook({
           `Scheduled worker stopped with finish reason: ${event.data.finishReason}.`,
           new Date(event.meta.at)
         );
+
         console.warn("[scheduled-run] worker stopped without a final result", {
           finishReason: event.data.finishReason,
           nextStatus: status,
@@ -100,9 +118,12 @@ export default defineHook({
           sessionId: ctx.session.id,
         });
         logDeadLetterReportQueued(status, identity.runId, ctx.session.id);
+
         return;
       }
+
       const message = event.data.message?.trim().slice(0, 4_000);
+
       const outcome = scheduledRunOutcomeSchema.parse(
         message
           ? {
@@ -115,6 +136,7 @@ export default defineHook({
               reason: "The scheduled task produced no useful update.",
             }
       );
+
       const completed = await completeScheduledAgentRun(
         identity.runId,
         identity.leaseToken,
@@ -122,6 +144,7 @@ export default defineHook({
         outcome,
         new Date(event.meta.at)
       );
+
       if (completed?.status === "deferred") {
         console.info(
           "[scheduled-run] worker completion deferred for background work",
@@ -131,28 +154,35 @@ export default defineHook({
             turnId: event.data.turnId,
           }
         );
+
         return;
       }
+
       if (!completed) {
         console.warn("[scheduled-run] worker completion missed its lease", {
           runId: identity.runId,
           sessionId: ctx.session.id,
         });
+
         return;
       }
+
       console.info("[scheduled-run] worker completed", {
         outcomeKind: outcome.kind,
         reportStatus: completed.run.reportStatus,
         runId: completed.run.id,
         sessionId: ctx.session.id,
       });
+
       if (completed.run.reportStatus === "pending") {
         console.info("[scheduled-run] completion report pending", {
           runId: completed.run.id,
           sessionId: ctx.session.id,
         });
+
         const channel =
           ctx.session.auth.initiator?.attributes.conversationChannel;
+
         if (channel === "telegram" || channel === "kapso") {
           await serverRuntime.runPromise(
             dispatchItem(
@@ -165,13 +195,16 @@ export default defineHook({
     },
     async "turn.failed"(event, ctx) {
       const identity = scheduledRunIdentity(ctx.session.auth);
+
       if (!identity) return;
+
       const status = await releaseScheduledAgentRun(
         identity.runId,
         identity.leaseToken,
         event.data.message,
         new Date(event.meta.at)
       );
+
       console.warn("[scheduled-run] worker turn failed", {
         nextStatus: status,
         runId: identity.runId,
@@ -181,13 +214,16 @@ export default defineHook({
     },
     async "turn.cancelled"(event, ctx) {
       const identity = scheduledRunIdentity(ctx.session.auth);
+
       if (!identity) return;
+
       const status = await releaseScheduledAgentRun(
         identity.runId,
         identity.leaseToken,
         "Scheduled worker was cancelled.",
         new Date(event.meta.at)
       );
+
       console.warn("[scheduled-run] worker turn cancelled", {
         nextStatus: status,
         runId: identity.runId,
@@ -197,13 +233,16 @@ export default defineHook({
     },
     async "session.failed"(event, ctx) {
       const identity = scheduledRunIdentity(ctx.session.auth);
+
       if (!identity) return;
+
       const status = await releaseScheduledAgentRun(
         identity.runId,
         identity.leaseToken,
         event.data.message,
         new Date(event.meta.at)
       );
+
       console.warn("[scheduled-run] worker session failed", {
         nextStatus: status,
         runId: identity.runId,

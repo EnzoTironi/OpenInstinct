@@ -1,4 +1,19 @@
 import { createHash } from "node:crypto";
+
+import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
+import { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
+import {
+  domainFromUrl,
+  harvestBrowserTraceDomains,
+} from "@agent/subagents/browser-agent/lib/trace/domains";
+import { recordBrowserTraceDomains } from "@db/services/browser-traces";
+import {
+  createBrowserSession,
+  deleteBrowserSession,
+  listBrowserSessions,
+  withBrowserProfileWriteLock,
+} from "@db/services/browsers";
 import { ConflictError, NotFoundError } from "@onkernel/sdk";
 import type {
   BrowserCreateResponse,
@@ -7,21 +22,8 @@ import type {
 } from "@onkernel/sdk/resources/browsers";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import {
-  createBrowserSession,
-  deleteBrowserSession,
-  listBrowserSessions,
-  withBrowserProfileWriteLock,
-} from "@db/services/browsers";
-import { recordBrowserTraceDomains } from "@db/services/browser-traces";
-import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
-import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
+
 import { disposeBrowserLoopSession } from "../lib/semantic-loop";
-import { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
-import {
-  domainFromUrl,
-  harvestBrowserTraceDomains,
-} from "@agent/subagents/browser-agent/lib/trace/domains";
 
 const browserTimeoutFloorSeconds = 15 * 60;
 
@@ -58,17 +60,20 @@ const manageBrowsers = defineTool({
             scope.workspaceId,
             signal
           );
+
           if (input.save_changes) {
             const activeWriter = await findActiveProfileWriter(
               profile.id,
               signal
             );
+
             if (activeWriter) {
               throw new Error(
                 `Browser session ${activeWriter.session_id} is already saving login state for this workspace. Retry after it finishes.`
               );
             }
           }
+
           const browser = await getKernel().browsers.create(
             {
               profile: {
@@ -87,6 +92,7 @@ const manageBrowsers = defineTool({
             },
             { maxRetries: 8, signal }
           );
+
           try {
             await createBrowserSession(scope, {
               createdAt: browser.created_at,
@@ -99,23 +105,29 @@ const manageBrowsers = defineTool({
               .catch(() => undefined);
             throw error;
           }
+
           const startDomain = input.start_url
             ? domainFromUrl(input.start_url)
             : undefined;
+
           if (startDomain) {
             await recordBrowserTraceDomains(scope, context.session.id, [
               startDomain,
             ]).catch(() => undefined);
           }
+
           return lifecycleResult(browser);
         };
+
         return input.save_changes
           ? withBrowserProfileWriteLock(scope, create)
           : create();
       }
+
       case "list": {
         const records = await listBrowserSessions(scope);
         const includeDeleted = input.status !== "active";
+
         const browsers = await Promise.all(
           records.map(async ({ sessionId }) => {
             try {
@@ -124,24 +136,31 @@ const manageBrowsers = defineTool({
                 { include_deleted: includeDeleted },
                 { signal }
               );
+
               const value = browserDescriptor(browser);
+
               if (input.status === "deleted" && value.status !== "deleted") {
                 return null;
               }
+
               if (input.status === "active" && value.status !== "active") {
                 return null;
               }
+
               return value;
             } catch (error) {
               if (isNotFoundError(error)) {
                 await deleteBrowserSession(scope, sessionId);
               }
+
               return null;
             }
           })
         );
+
         const offset = input.offset ?? 0;
         const limit = input.limit ?? 100;
+
         return {
           has_more: false,
           items: browsers
@@ -150,17 +169,21 @@ const manageBrowsers = defineTool({
           next_offset: null,
         };
       }
+
       case "get": {
         const sessionId = requireSessionId(input.session_id);
         await requireOwnedBrowserSession(scope, sessionId);
+
         return browserDescriptor(
           await retrieveBrowser(scope, sessionId, signal)
         );
       }
+
       case "update": {
         const sessionId = requireSessionId(input.session_id);
         await requireOwnedBrowserSession(scope, sessionId);
         const viewport = browserViewport(input);
+
         const browser = viewport
           ? await getKernel().browsers.update(
               sessionId,
@@ -168,8 +191,10 @@ const manageBrowsers = defineTool({
               { signal }
             )
           : await retrieveBrowser(scope, sessionId, signal);
+
         return lifecycleResult(browser);
       }
+
       case "delete": {
         const sessionId = requireSessionId(input.session_id);
         const record = await requireOwnedBrowserSession(scope, sessionId);
@@ -186,9 +211,11 @@ const manageBrowsers = defineTool({
             if (!isNotFoundError(cause)) throw cause;
           });
         await deleteBrowserSession(scope, sessionId);
+
         return "Browser session deleted successfully";
       }
     }
+
     throw new Error("Unsupported browser management action.");
   },
 });
@@ -197,6 +224,7 @@ export default manageBrowsers;
 
 function requireSessionId(sessionId: string | undefined) {
   if (!sessionId) throw new Error("A browser session ID is required.");
+
   return sessionId;
 }
 
@@ -225,10 +253,13 @@ function isNotFoundError(cause: unknown) {
 function browserViewport(input: z.infer<typeof inputSchema>) {
   const height = input.viewport_height;
   const width = input.viewport_width;
+
   if (height === undefined && width === undefined) return undefined;
+
   if (height === undefined || width === undefined) {
     throw new Error("Viewport width and height must be provided together.");
   }
+
   return { height, width };
 }
 
@@ -248,6 +279,7 @@ function browserDescriptor(browser: KernelBrowser) {
 
 function lifecycleResult(browser: KernelBrowser) {
   const value = browserDescriptor(browser);
+
   return {
     browser: value,
     next_actions: [
@@ -272,6 +304,7 @@ async function ensureWorkspaceProfile(
   signal?: AbortSignal
 ) {
   const name = kernelProfileNameForWorkspace(workspaceId);
+
   try {
     return await getKernel().profiles.retrieve(name, { signal });
   } catch (error) {
@@ -282,6 +315,7 @@ async function ensureWorkspaceProfile(
     return await getKernel().profiles.create({ name }, { signal });
   } catch (error) {
     if (!(error instanceof ConflictError)) throw error;
+
     return getKernel().profiles.retrieve(name, { signal });
   }
 }
@@ -291,6 +325,7 @@ async function findActiveProfileWriter(
   signal: AbortSignal | undefined
 ) {
   if (!profileId) return undefined;
+
   for await (const browser of getKernel().browsers.list(
     { query: profileId, status: "active" },
     { signal }
@@ -299,5 +334,6 @@ async function findActiveProfileWriter(
       return browser;
     }
   }
+
   return undefined;
 }

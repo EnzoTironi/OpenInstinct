@@ -1,13 +1,15 @@
-import { requirePersonalMemoryMembership } from "../server/personal-memory/access";
-import { replaceUserProfile } from "../db/services/user-profile";
 import { ensureScope } from "../db/services/scope";
+import { replaceUserProfile } from "../db/services/user-profile";
 import { saveVaultItem } from "../db/services/vault";
+import { requirePersonalMemoryMembership } from "../server/personal-memory/access";
+import { serverRuntime } from "../server/runtime";
 import { accessScopeForUser } from "../shared/identity/access-scope";
 import { serializePaymentCard } from "../shared/vault/schema";
-import { serverRuntime } from "../server/runtime";
 
 const scope = accessScopeForUser("better-auth:browser-benchmark");
+
 await ensureScope(scope);
+
 await serverRuntime.runPromise(
   replaceUserProfile(requirePersonalMemoryMembership(scope), {
     addressLine1: "123 Test Street",

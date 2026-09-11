@@ -1,8 +1,5 @@
-import { defineDynamic, defineTool } from "eve/tools";
-import { authorizeApprovalResponse } from "@agent/lib/approval-response";
-import { always } from "eve/tools/approval";
 import { approvalMessageSchema } from "@agent/lib/approval-message";
-import { z } from "zod";
+import { authorizeApprovalResponse } from "@agent/lib/approval-response";
 import {
   calendarEventSchema,
   checkCalendarAvailability,
@@ -10,6 +7,9 @@ import {
   listCalendarEvents,
 } from "@agent/lib/google-workspace/calendar";
 import { resolveModeValue } from "@agent/lib/mode";
+import { defineDynamic, defineTool } from "eve/tools";
+import { always } from "eve/tools/approval";
+import { z } from "zod";
 
 export const calendarListEvents = defineTool({
   description:

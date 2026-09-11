@@ -1,14 +1,14 @@
-import { MessageSquareIcon, PlusIcon } from "lucide-react";
-import Link from "next/link";
 import {
   combineChatUsage,
   formatChatUsage,
 } from "@app/(authenticated)/chat/_lib/chat-usage";
+import { listChats } from "@db/services/chats";
+import { requireRequestScope } from "@web/auth/request-scope";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
-import { listChats } from "@db/services/chats";
-import { requireRequestScope } from "@web/auth/request-scope";
+import { MessageSquareIcon, PlusIcon } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,7 @@ export default async function AllChatsPage() {
   const scope = await requireRequestScope();
   const chats = await listChats(scope);
   const totalUsage = combineChatUsage(chats.map((chat) => chat.usage));
+
   const imessageSessionId = chats.find(
     (chat) => chat.channel === "channel:linq"
   )?.sessionId;

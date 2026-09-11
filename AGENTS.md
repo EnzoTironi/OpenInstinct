@@ -22,11 +22,7 @@ Follow links or inspect public types only when the routed page leaves the task u
 
 ## Prefer an existing integration
 
-For recipe, routine, or integration discovery work, first read
-[`docs/recipe-integrations/README.md`](docs/recipe-integrations/README.md). It records
-the agreed conversational recipe experience, public source catalogs and reuse
-constraints. Catalog entries are research evidence, not implemented capabilities
-or permission to install, activate, or redistribute vendor code.
+For recipe, routine, or integration discovery work, first read [`docs/recipe-integrations/README.md`](docs/recipe-integrations/README.md). It records the agreed conversational recipe experience, public source catalogs and reuse constraints. Catalog entries are research evidence, not implemented capabilities or permission to install, activate, or redistribute vendor code.
 
 When a task names an external product or service, search the registry before implementing its integration. For a generic capability, author a tool instead.
 
@@ -82,22 +78,16 @@ Run the validation the task requests. When it does not establish the behavior yo
 
 Before planning or changing product UI:
 
-- Build from the primitives in `web/components/ui` and the semantic `type-*`
-  typography utilities defined in `app/styles/brand/typography.css`.
-- Preserve the current `components.json` primitive base and local extensions;
-  add new primitives with the official shadcn CLI.
+- Build from the primitives in `web/components/ui` and the semantic `type-*` typography utilities defined in `app/styles/brand/typography.css`.
+- Preserve the current `components.json` primitive base and local extensions; add new primitives with the official shadcn CLI.
 
 ## Type ownership
 
 - Keep each TypeScript concept anchored to one source of truth.
-- Before adding a `type` or `interface`, search for an existing owning export,
-  schema-derived type, model inference, or function/value type that can be
-  reused or derived.
+- Before adding a `type` or `interface`, search for an existing owning export, schema-derived type, model inference, or function/value type that can be reused or derived.
 - Prefer inference for implementation details and contextual callbacks.
-- Add a named type only for a real domain concept, public boundary, validation
-  source, or meaningfully reused composition.
-- Do not mirror schemas, database rows, router inputs or outputs, SDK payloads,
-  library exports, or function results with parallel interfaces.
+- Add a named type only for a real domain concept, public boundary, validation source, or meaningfully reused composition.
+- Do not mirror schemas, database rows, router inputs or outputs, SDK payloads, library exports, or function results with parallel interfaces.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
@@ -113,19 +103,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 This repository uses the Effect Typescript library EVERYWHERE.
 
-Use Effect 4 (`effect@rc`, exact resolution in the lockfile) for application
-logic: services, I/O, configuration, validation, typed errors,
-resource lifetimes, concurrency, retries and observability. Migrate existing
-features as complete slices, including callers and tests. Do not keep duplicate
-Promise and Effect implementations of the same application behavior.
+Use Effect 4 (`effect@rc`, exact resolution in the lockfile) for application logic: services, I/O, configuration, validation, typed errors, resource lifetimes, concurrency, retries and observability. Migrate existing features as complete slices, including callers and tests. Do not keep duplicate Promise and Effect implementations of the same application behavior.
 
-Eve remains the owner of agent turns, sessions and durable workflow execution.
-Bridge Effect into Eve/Next/Better Auth/SDK callbacks at their public boundaries;
-keep runtime execution out of inner services. Propagate cancellation and map typed
-errors deliberately. Do not introduce a second scheduler or agent loop. React
-components remain idiomatic React; shared application logic follows Effect.
-Use framework-required schemas at integration edges only; avoid maintaining two
-independent domain schemas. Retain third-party libraries through narrow adapters
-where needed rather than rewriting their internals.
+Eve remains the owner of agent turns, sessions and durable workflow execution. Bridge Effect into Eve/Next/Better Auth/SDK callbacks at their public boundaries; keep runtime execution out of inner services. Propagate cancellation and map typed errors deliberately. Do not introduce a second scheduler or agent loop. React components remain idiomatic React; shared application logic follows Effect. Use framework-required schemas at integration edges only; avoid maintaining two independent domain schemas. Retain third-party libraries through narrow adapters where needed rather than rewriting their internals.
 
 Before writing any Effect code, first read `node_modules/effect/AGENTS.md` completely, and follow its links when required. Search `node_modules/effect/src` for APIs the guide does not cover.

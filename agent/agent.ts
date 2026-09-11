@@ -1,11 +1,12 @@
-import { defineAgent, defineDynamic } from "eve";
-import { Effect } from "effect";
 import { scheduledRunIdentity } from "@agent/lib/schedules/identity";
 import { isScheduledAgentRunLeaseActive } from "@db/services/scheduled-agent-run-leases";
 import { getGatewayModel } from "@db/services/settings";
-import { scopeFromPrincipal } from "../shared/identity/principal-scope";
+import { Effect } from "effect";
+import { defineAgent, defineDynamic } from "eve";
+
 import { requireChannelPrincipal } from "../server/channels/principal";
 import { serverRuntime } from "../server/runtime";
+import { scopeFromPrincipal } from "../shared/identity/principal-scope";
 import { installationModel } from "./lib/installation-model";
 
 export default defineAgent({
@@ -21,6 +22,7 @@ export default defineAgent({
     events: {
       "step.started": async (_event, ctx) => {
         const scheduledRun = scheduledRunIdentity(ctx.session.auth);
+
         if (
           scheduledRun &&
           !(await isScheduledAgentRunLeaseActive(
@@ -30,15 +32,20 @@ export default defineAgent({
         ) {
           throw new Error("The scheduled run lease is no longer active.");
         }
+
         const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
+
         if (!caller) throw new Error("An authenticated user is required.");
         const channel = caller.attributes.conversationChannel;
+
         if (channel === "telegram" || channel === "kapso") {
           await serverRuntime.runPromise(
             requireChannelPrincipal(channel, caller)
           );
         }
+
         const scope = scopeFromPrincipal(caller);
+
         return (
           (await Effect.runPromise(installationModel)) ??
           (await getGatewayModel(scope))

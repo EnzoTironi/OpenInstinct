@@ -1,11 +1,14 @@
 "use client";
 
-import { type SubmitEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { z } from "zod";
+import {
+  loginIdentifierSchema,
+  loginIdentifierTypeSchema,
+  loginOriginSchema,
+  serializeLoginVaultPayload,
+} from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@web/components/ui/field";
 import { DialogFooter } from "@web/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@web/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -13,13 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@web/components/ui/select";
-import {
-  loginIdentifierSchema,
-  loginIdentifierTypeSchema,
-  loginOriginSchema,
-  serializeLoginVaultPayload,
-} from "@shared/vault/schema";
 import { api } from "@web/trpc/client";
+import { useRouter } from "next/navigation";
+import { type SubmitEvent, useState } from "react";
+import { z } from "zod";
+
 import { FormField } from "../field";
 
 const loginFormSchema = z
@@ -39,6 +40,7 @@ const loginFormSchema = z
       type: form.identifierType,
       value: form.identifier,
     });
+
     if (!identifier.success) {
       for (const issue of identifier.error.issues) {
         context.addIssue({
@@ -48,6 +50,7 @@ const loginFormSchema = z
         });
       }
     }
+
     if (form.identifierType === "username" && !form.password) {
       context.addIssue({
         code: "custom",
@@ -69,13 +72,16 @@ export function LoginForm({
   readonly onSaved: () => void;
 }) {
   const router = useRouter();
+
   const create = api.vault.create.useMutation({
     onSuccess: () => {
       router.refresh();
       onSaved();
     },
   });
+
   const [attempted, setAttempted] = useState(false);
+
   const [form, setForm] = useState<z.input<typeof loginFormSchema>>({
     identifier: "",
     identifierType: initialIdentifierType ?? "email",
@@ -83,7 +89,9 @@ export function LoginForm({
     origin: initialOrigin,
     password: "",
   });
+
   const result = loginFormSchema.safeParse(form);
+
   const errors =
     attempted && !result.success
       ? z.flattenError(result.error).fieldErrors
@@ -92,6 +100,7 @@ export function LoginForm({
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAttempted(true);
+
     if (!result.success) return;
 
     const authentication = loginAuthentication(result.data);
@@ -220,13 +229,17 @@ function identifierPlaceholder(
   type: z.infer<typeof loginIdentifierTypeSchema>
 ) {
   if (type === "email") return "name@example.com";
+
   if (type === "phone") return "+1 555 555 5555";
+
   return "username";
 }
 
 function identifierLabel(type: z.infer<typeof loginIdentifierTypeSchema>) {
   if (type === "email") return "Email";
+
   if (type === "phone") return "Phone number";
+
   return "Username";
 }
 
@@ -234,13 +247,16 @@ function loginAuthentication(form: z.output<typeof loginFormSchema>) {
   if (form.password) {
     return { password: form.password, type: "password" as const };
   }
+
   if (form.identifierType === "email") return { type: "email_otp" as const };
+
   if (form.identifierType === "phone") return { type: "sms_otp" as const };
   throw new Error("Username logins require a password.");
 }
 
 function normalizeLoginOrigin(value: string) {
   const candidate = value.includes("://") ? value : `https://${value}`;
+
   try {
     return new URL(candidate).origin;
   } catch {

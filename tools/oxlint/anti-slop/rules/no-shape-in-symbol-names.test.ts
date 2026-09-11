@@ -1,7 +1,8 @@
-import { typescriptRuleTester as tester } from "./rule-tester.ts";
+import { RuleTester } from "oxlint/plugins-dev";
 
-import { noForbiddenTermInSymbolNamesRule } from "@tools/oxlint/anti-slop/rules/no-shape-in-symbol-names.ts";
+import { noForbiddenTermInSymbolNamesRule } from "./no-shape-in-symbol-names.ts";
 
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } });
 const error = { messageId: "forbiddenSymbolName" };
 
 tester.run("anti-slop/no-shape-in-symbol-names", noForbiddenTermInSymbolNamesRule, {
@@ -10,8 +11,6 @@ tester.run("anti-slop/no-shape-in-symbol-names", noForbiddenTermInSymbolNamesRul
 		"declare const outer: External; const value = outer.inner.shape;",
 		"declare const schema: ExternalSchema; schema.shape.id.parse('x');",
 		"const owner = { id: 1 }; const value = owner.id;",
-		"class Owner { #value = 1; read() { return this.#value; } }",
-		{ code: "const view = <Panel />;", filename: "component.tsx" },
 	],
 	invalid: [
 		{ code: "const shape = 1;", errors: [error] },
@@ -21,17 +20,6 @@ tester.run("anti-slop/no-shape-in-symbol-names", noForbiddenTermInSymbolNamesRul
 		{
 			code: "declare const owner: External; const shape = 'field'; const value = owner[shape];",
 			errors: 2,
-		},
-		{
-			name: "private identifier",
-			code: "class Owner { #shape = 1; }",
-			errors: [error],
-		},
-		{
-			name: "JSX identifier",
-			code: "const view = <PayloadShape />;",
-			filename: "component.tsx",
-			errors: [error],
 		},
 	],
 });

@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   addressVaultPayloadStringSchema,
   contactVaultPayloadStringSchema,
@@ -13,6 +12,7 @@ import {
   serializeContactVaultPayload,
   serializeLoginVaultPayload,
 } from "@shared/vault/schema";
+import { describe, expect, it } from "vitest";
 
 describe("versioned vault payloads", () => {
   it("stores password and passwordless login methods", () => {
@@ -23,6 +23,7 @@ describe("versioned vault payloads", () => {
       origin: "https://www.ubereats.com",
       version: 2,
     });
+
     const otpLogin = serializeLoginVaultPayload({
       authentication: { type: "sms_otp" },
       identifier: { type: "phone", value: "+15555550100" },
@@ -88,6 +89,7 @@ describe("versioned vault payloads", () => {
       region: "London",
       version: 1,
     });
+
     const contact = serializeContactVaultPayload({
       dateOfBirth: "1815-12-10",
       email: "ada@example.com",

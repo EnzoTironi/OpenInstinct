@@ -1,16 +1,18 @@
 import { randomBytes } from "node:crypto";
+
+import scheduledRunChannel from "@agent/channels/scheduled-run";
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { ConfigProvider, Effect } from "effect";
-import { routeAuth, vercelOidc } from "eve/channels/auth";
-import { internalCallbackHeaders } from "../../../server/internal/callback-auth";
 import type {
   ChannelResolveSession,
   ChannelSource,
   RouteHandlerArgs,
   Session,
 } from "eve/channels";
+import { routeAuth, vercelOidc } from "eve/channels/auth";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import scheduledRunChannel from "@agent/channels/scheduled-run";
+
+import { internalCallbackHeaders } from "../../../server/internal/callback-auth";
 
 const scheduledRunPaths = [
   "/internal/scheduled-run/report",
@@ -29,6 +31,7 @@ describe("scheduled run channel authentication", () => {
     "rejects unsigned self-hosted requests to %s even in Eve dev mode",
     async (path) => {
       vi.stubEnv("EVE_DEV", "1");
+
       const response = await scheduledRoute(path).handler(
         new Request(`https://assistant.example${path}`, {
           body: "not valid JSON",
@@ -36,6 +39,7 @@ describe("scheduled run channel authentication", () => {
         }),
         unexpectedRouteContext()
       );
+
       expect(response.status).toBe(401);
       expect(response.headers.get("www-authenticate")).toBeNull();
     }
@@ -45,17 +49,22 @@ describe("scheduled run channel authentication", () => {
     "preserves the complete native Vercel challenge for %s",
     async (path) => {
       vi.stubEnv("VERCEL_ENV", "production");
+
       const request = new Request(`https://assistant.example${path}`, {
         body: "not valid JSON",
         method: "POST",
       });
+
       const expected = await routeAuth(request.clone(), [vercelOidc()]);
+
       if (!(expected instanceof Response))
         throw new Error("Expected the native authentication challenge");
+
       const response = await scheduledRoute(path).handler(
         request,
         unexpectedRouteContext()
       );
+
       expect(response.status).toBe(expected.status);
       expect([...response.headers]).toEqual([...expected.headers]);
       expect(response.headers.get("www-authenticate")).toBe("Bearer");
@@ -67,6 +76,7 @@ describe("scheduled run channel authentication", () => {
     "authenticates a signed request before rejecting invalid JSON on %s",
     async (path) => {
       const body = "not valid JSON";
+
       const headers = await Effect.runPromise(
         internalCallbackHeaders(path, body).pipe(
           Effect.provide(ResolvedInstallationSecrets.layer),
@@ -76,6 +86,7 @@ describe("scheduled run channel authentication", () => {
           )
         )
       );
+
       const response = await scheduledRoute(path).handler(
         new Request(`https://assistant.example${path}`, {
           body,
@@ -84,6 +95,7 @@ describe("scheduled run channel authentication", () => {
         }),
         unexpectedRouteContext()
       );
+
       expect(response.status).toBe(400);
     }
   );
@@ -96,8 +108,10 @@ function scheduledRoute(path: (typeof scheduledRunPaths)[number]) {
       candidate.method === "POST" &&
       candidate.path === path
   );
+
   if (!route || route.transport === "websocket")
     throw new Error(`The scheduled run route ${path} is unavailable.`);
+
   return route;
 }
 
@@ -106,7 +120,9 @@ describe("scheduled run channel handoff", () => {
     const send = vi
       .fn<ChannelSource["send"]>()
       .mockResolvedValue(workerSession());
+
     const reset = vi.fn<ChannelSource["reset"]>();
+
     const source: ChannelSource = {
       getInputAcceptance: unexpectedRouteRequest,
       recoverInputAcceptance: unexpectedRouteRequest,
@@ -117,9 +133,12 @@ describe("scheduled run channel handoff", () => {
       respond: vi.fn<ChannelSource["respond"]>(),
       send,
     };
+
     const from = vi.fn<(address: string) => ChannelSource>(() => source);
     const receive = scheduledRunChannel.receive;
+
     if (!receive) throw new Error("The scheduled-run channel cannot receive.");
+
     const auth = {
       attributes: { scheduledRunId: "00000000-0000-4000-8000-000000000001" },
       authenticator: "scheduled-worker",

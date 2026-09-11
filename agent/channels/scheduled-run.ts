@@ -1,21 +1,22 @@
-import { serverRuntime } from "../../server/runtime";
-import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
-import { defineChannel, POST } from "eve/channels";
-import { parseInputResponses, resolveTextToResponses } from "eve/client";
-import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
-import { ConfigProvider, Effect, Result, Schema } from "effect";
-import {
-  InternalCallbackRejected,
-  readAuthenticatedInternalCallback,
-  internalCallbackBodies,
-} from "../../server/internal/callback-auth";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import {
   claimScheduledAgentRunInput,
   getScheduledReportChannel,
   finishScheduledAgentRunInput,
   restoreScheduledAgentRunInput,
 } from "@db/services/scheduled-agent-jobs";
+import { ConfigProvider, Effect, Result, Schema } from "effect";
+import { defineChannel, POST } from "eve/channels";
+import { parseInputResponses, resolveTextToResponses } from "eve/client";
+
+import {
+  InternalCallbackRejected,
+  readAuthenticatedInternalCallback,
+  internalCallbackBodies,
+} from "../../server/internal/callback-auth";
+import { serverRuntime } from "../../server/runtime";
+import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
 
 const scheduledRunTargetSchema = Schema.Struct({
   restart: Schema.optionalKey(Schema.Boolean),
@@ -29,12 +30,15 @@ export default defineChannel({
         onExcessProperty: "error",
       })(input.target)
     );
+
     const source = from(`scheduled-run:${target.runId}`);
+
     if (target.restart) {
       await source.reset({
         reason: "Scheduled worker exceeded its runtime.",
       });
     }
+
     return source.send(input.message, {
       auth: input.auth,
       title: `Scheduled run ${target.runId}`,
@@ -50,7 +54,9 @@ export default defineChannel({
               request,
               "/internal/scheduled-run/report"
             );
+
             if (raw instanceof Response) return raw;
+
             const input = yield* Schema.decodeUnknownEffect(
               Schema.fromJsonString(
                 internalCallbackBodies["/internal/scheduled-run/report"]
@@ -61,9 +67,11 @@ export default defineChannel({
                 () => new InternalCallbackRejected({ status: 400 })
               )
             );
+
             const channel = yield* Effect.tryPromise(() =>
               getScheduledReportChannel(input.runId)
             );
+
             if (channel)
               waitUntil(
                 dispatchScheduledReport(
@@ -72,6 +80,7 @@ export default defineChannel({
                   channel
                 )
               );
+
             return new Response(null, { status: 202 });
           }).pipe(
             Effect.provide(ResolvedInstallationSecrets.layer),
@@ -100,7 +109,9 @@ export default defineChannel({
               request,
               "/internal/scheduled-run/respond"
             );
+
             if (raw instanceof Response) return raw;
+
             return yield* Schema.decodeUnknownEffect(
               Schema.fromJsonString(
                 internalCallbackBodies["/internal/scheduled-run/respond"]
@@ -121,37 +132,48 @@ export default defineChannel({
           ),
           { signal: request.signal }
         );
+
         if (Result.isFailure(decoded)) {
           const failure = decoded.failure;
+
           const status =
             failure instanceof InternalCallbackRejected ? failure.status : 503;
+
           return new Response("Scheduled callback rejected", { status });
         }
+
         if (decoded.success instanceof Response) return decoded.success;
         const input = decoded.success;
+
         const claimed = await claimScheduledAgentRunInput(
           input.runId,
           input.leaseToken
         );
+
         if (
           !claimed?.run.pendingInputRequests ||
           !claimed.run.workerSessionId
         ) {
           return new Response(null, { status: 409 });
         }
+
         const responses = parseInputResponses(
           resolveTextToResponses(input.answer, claimed.run.pendingInputRequests)
         );
+
         if (responses.length === 0) {
           await restoreScheduledAgentRunInput(
             input.runId,
             input.leaseToken,
             "The answer did not match the pending request."
           );
+
           return new Response(null, { status: 422 });
         }
+
         try {
           const channel = claimed.job.conversationChannel;
+
           if (channel === "telegram" || channel === "kapso") {
             await serverRuntime.runPromise(
               requireScheduledChannelOwner({
@@ -160,6 +182,7 @@ export default defineChannel({
               })
             );
           }
+
           const attributes = {
             conversationChannel: claimed.job.conversationChannel,
             conversationId: claimed.job.conversationId,
@@ -167,6 +190,7 @@ export default defineChannel({
             scheduledRunId: claimed.run.id,
             workspaceId: claimed.job.workspaceId,
           };
+
           const result = await attachSession(
             claimed.run.workerSessionId
           ).respond(responses, {
@@ -184,15 +208,19 @@ export default defineChannel({
               principalType: "user",
             },
           });
+
           if (result.status !== "accepted") {
             await restoreScheduledAgentRunInput(
               input.runId,
               input.leaseToken,
               "The scheduled session is no longer active."
             );
+
             return new Response(null, { status: 409 });
           }
+
           await finishScheduledAgentRunInput(input.runId, input.leaseToken);
+
           return new Response(null, { status: 202 });
         } catch (error) {
           await restoreScheduledAgentRunInput(
@@ -200,6 +228,7 @@ export default defineChannel({
             input.leaseToken,
             error instanceof Error ? error.message : String(error)
           );
+
           return new Response(null, { status: 502 });
         }
       }

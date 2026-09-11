@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useRef } from "react";
 import {
   PromptInput,
   PromptInputBody,
@@ -8,9 +7,11 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@web/components/ai-elements/prompt-input";
+import { api } from "@web/trpc/client";
+import { useEffect, useMemo, useRef } from "react";
+
 import { messageContent } from "../../../_lib/message-input";
 import { hasPendingBackgroundWorker } from "../../_lib/trace-view";
-import { api } from "@web/trpc/client";
 import type { ChatAgent } from "../chat-agent";
 
 export function ChatInput({
@@ -26,8 +27,10 @@ export function ChatInput({
   const { mutate: saveChat } = api.chats.save.useMutation();
   const backgroundCatchUp = useRef<Promise<void> | undefined>(undefined);
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
+
   const isRestoring =
     agent.status === "resuming" && agent.data.messages.length === 0;
+
   const hasPendingWorker = useMemo(
     () => hasPendingBackgroundWorker(agent.events),
     [agent.events]
@@ -57,6 +60,7 @@ export function ChatInput({
 
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text.trim();
+
     if (
       (text.length === 0 && message.files.length === 0) ||
       agent.status === "submitted" ||
@@ -66,6 +70,7 @@ export function ChatInput({
     }
 
     const catchUp = backgroundCatchUp.current;
+
     if (catchUp !== undefined) {
       await Promise.all([agent.cancel().catch(() => undefined), catchUp]);
     }

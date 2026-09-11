@@ -1,6 +1,3 @@
-import { serverRuntime } from "../../server/runtime";
-import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
-import { defineSchedule, type ScheduleToFn } from "eve/schedules";
 import scheduledRunChannel from "@agent/channels/scheduled-run";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
 import { postScheduledReport } from "@agent/lib/schedules/request";
@@ -11,6 +8,10 @@ import {
   releaseScheduledAgentRun,
   setScheduledRunSession,
 } from "@db/services/scheduled-agent-jobs";
+import { defineSchedule, type ScheduleToFn } from "eve/schedules";
+
+import { serverRuntime } from "../../server/runtime";
+import { requireScheduledChannelOwner } from "../../server/schedules/channel-owner";
 
 const workerStartupLimitMs = 5 * 60_000;
 
@@ -23,16 +24,20 @@ export default defineSchedule({
 
 async function dispatchDueWork(to: ScheduleToFn) {
   const now = new Date();
+
   const materializedRunIds = await materializeDueScheduledAgentRuns({
     limit: 25,
     now,
   });
+
   const runs = await claimReadyScheduledAgentRuns({
     leaseForMs: workerStartupLimitMs,
     limit: 25,
     now,
   });
+
   const reports = await listRecoverableScheduledReports(now, 25);
+
   if (materializedRunIds.length > 0 || runs.length > 0 || reports.length > 0) {
     console.info("[scheduled-run] schedule tick found work", {
       claimedRunCount: runs.length,
@@ -40,6 +45,7 @@ async function dispatchDueWork(to: ScheduleToFn) {
       recoverableReportCount: reports.length,
     });
   }
+
   await Promise.all([
     ...runs.map((claim) => executeScheduledRun(to, claim)),
     ...reports.map((report) => dispatchRecoverableReport(to, report)),
@@ -51,6 +57,7 @@ async function executeScheduledRun(
   claim: Awaited<ReturnType<typeof claimReadyScheduledAgentRuns>>[number]
 ) {
   const leaseToken = claim.run.leaseToken;
+
   if (!leaseToken) throw new Error("A scheduled run claim requires a lease.");
   console.info("[scheduled-run] dispatching worker", {
     attempt: claim.run.attempts,
@@ -58,8 +65,10 @@ async function executeScheduledRun(
     runId: claim.run.id,
     scheduledFor: claim.run.scheduledFor.toISOString(),
   });
+
   try {
     const channel = claim.job.conversationChannel;
+
     if (channel === "telegram" || channel === "kapso") {
       await serverRuntime.runPromise(
         requireScheduledChannelOwner({
@@ -68,20 +77,24 @@ async function executeScheduledRun(
         })
       );
     }
+
     const session = await to(scheduledRunChannel, {
       restart: claim.run.workerSessionId !== null,
       runId: claim.run.id,
     }).send(scheduledRunPrompt(claim), {
       auth: scheduledWorkerAuth(claim),
     });
+
     const persisted = await setScheduledRunSession(
       claim.run.id,
       leaseToken,
       session.id
     );
+
     if (!persisted) {
       throw new Error("The scheduled run lease expired during dispatch.");
     }
+
     console.info("[scheduled-run] worker session accepted", {
       jobId: claim.job.id,
       runId: claim.run.id,
@@ -93,11 +106,13 @@ async function executeScheduledRun(
       jobId: claim.job.id,
       runId: claim.run.id,
     });
+
     const status = await releaseScheduledAgentRun(
       claim.run.id,
       leaseToken,
       error instanceof Error ? error.message : String(error)
     );
+
     if (status === "dead_letter") {
       await dispatchRecoverableReport(to, {
         conversationChannel: claim.job.conversationChannel,
@@ -130,7 +145,9 @@ function scheduledWorkerAuth(
   claim: Awaited<ReturnType<typeof claimReadyScheduledAgentRuns>>[number]
 ) {
   const leaseToken = claim.run.leaseToken;
+
   if (!leaseToken) throw new Error("A scheduled run claim requires a lease.");
+
   const attributes = {
     conversationChannel: claim.job.conversationChannel,
     conversationId: claim.job.conversationId,
@@ -139,6 +156,7 @@ function scheduledWorkerAuth(
     scheduledRunId: claim.run.id,
     workspaceId: claim.job.workspaceId,
   };
+
   return {
     attributes:
       claim.job.conversationChannel === "telegram" ||

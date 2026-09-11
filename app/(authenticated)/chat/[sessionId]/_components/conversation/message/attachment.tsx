@@ -1,17 +1,20 @@
-import type { EveMessagePart } from "eve/react";
-import { ExternalLinkIcon, FileIcon, ImageIcon } from "lucide-react";
 import { Button } from "@web/components/ui/button";
 import { Card, CardContent } from "@web/components/ui/card";
+import type { EveMessagePart } from "eve/react";
+import { ExternalLinkIcon, FileIcon, ImageIcon } from "lucide-react";
 
 type EveFilePart = Extract<EveMessagePart, { type: "file" }>;
 
 export function AttachmentPart({ part }: { readonly part: EveFilePart }) {
   const label = part.filename ?? "Attachment";
+
   const detail = [part.mediaType, formatBytes(part.size)]
     .filter(Boolean)
     .join(" · ");
+
   const isImage = part.mediaType.startsWith("image/") && part.url !== undefined;
   const Icon = isImage ? ImageIcon : FileIcon;
+
   const content = (
     <>
       {isImage ? (
@@ -64,7 +67,10 @@ export function AttachmentPart({ part }: { readonly part: EveFilePart }) {
 
 function formatBytes(size: number | undefined): string | undefined {
   if (size === undefined) return undefined;
+
   if (size < 1024) return `${String(size)} B`;
+
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }

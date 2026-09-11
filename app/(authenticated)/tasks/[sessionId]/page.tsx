@@ -1,9 +1,12 @@
-import { ArrowLeftIcon } from "lucide-react";
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import {
+  listBrowserTraceEvents,
+  readBrowserTrace,
+} from "@db/services/browser-traces";
+import { requireRequestScope } from "@web/auth/request-scope";
+import { browserTraceActivityDurations } from "@web/browser/activity";
+import { ActivityDurationBreakdown } from "@web/components/browser/activity-duration-breakdown";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
-import { ActivityDurationBreakdown } from "@web/components/browser/activity-duration-breakdown";
 import {
   Table,
   TableBody,
@@ -12,14 +15,12 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
-import {
-  listBrowserTraceEvents,
-  readBrowserTrace,
-} from "@db/services/browser-traces";
-import { requireRequestScope } from "@web/auth/request-scope";
-import { browserTraceActivityDurations } from "@web/browser/activity";
-import { RefreshButton } from "./_components/refresh-button";
+import { ArrowLeftIcon } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { z } from "zod";
+
+import { RefreshButton } from "./_components/refresh-button";
 
 const statusText = {
   cancelled: { label: "Cancelled", variant: "secondary" },
@@ -28,6 +29,7 @@ const statusText = {
   running: { label: "Running", variant: "information" },
   success: { label: "Succeeded", variant: "success" },
 } as const;
+
 const traceStatusSchema = z.enum([
   "cancelled",
   "error",
@@ -42,13 +44,17 @@ export default async function TraceDetailPage({
   const scope = await requireRequestScope();
   const { sessionId } = await params;
   const trace = await readBrowserTrace(scope, sessionId);
+
   if (!trace) notFound();
   const traceStatus = traceStatusSchema.safeParse(trace.status);
+
   const status = traceStatus.success
     ? statusText[traceStatus.data]
     : { label: trace.status, variant: "secondary" as const };
+
   const events = await listBrowserTraceEvents(scope, trace.sessionId);
   const activityEnd = trace.completedAt ?? events.at(-1)?.at ?? trace.startedAt;
+
   const activityDurations = browserTraceActivityDurations(
     events,
     new Date(activityEnd).getTime()

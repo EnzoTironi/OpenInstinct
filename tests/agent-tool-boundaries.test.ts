@@ -1,16 +1,22 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 const rootTools = "agent/tools";
+
 const rootMemory = "agent/memory/profile.ts";
+
 const workerRoot = "agent/subagents/browser-agent";
+
 const workerTools = `${workerRoot}/tools`;
 
 function toolFiles(directory: string, root = directory): string[] {
   return readdirSync(directory, { withFileTypes: true })
     .flatMap((entry) => {
       const path = `${directory}/${entry.name}`;
+
       if (entry.isDirectory()) return toolFiles(path, root);
+
       return entry.name.endsWith(".ts") ? path.slice(root.length + 1) : [];
     })
     .toSorted();
@@ -40,10 +46,12 @@ describe("root and worker capability boundaries", () => {
     );
     expect(existsSync("agent/skills/browser-execution/SKILL.md")).toBe(false);
     expect(existsSync(`${rootTools}/agent.ts`)).toBe(false);
+
     const rootInstructions = readFileSync(
       "agent/instructions/content/role/interactive.md",
       "utf8"
     );
+
     expect(rootInstructions).toContain(
       "Perform public research, source discovery, comparisons, and current-information lookups directly with `web_search`"
     );
@@ -87,6 +95,7 @@ describe("root and worker capability boundaries", () => {
     expect(readFileSync(`${workerTools}/personal_info.ts`, "utf8")).toContain(
       "disableTool()"
     );
+
     for (const tool of [
       "bash",
       "load_skill",
@@ -100,12 +109,14 @@ describe("root and worker capability boundaries", () => {
         "disableTool()"
       );
     }
+
     expect(existsSync(`${workerRoot}/extensions/kernel/extension.ts`)).toBe(
       false
     );
     expect(readFileSync("package.json", "utf8")).not.toContain(
       "@onkernel/eve-extension"
     );
+
     for (const tool of [
       "capture_browser_image",
       "computer_action",
@@ -116,21 +127,26 @@ describe("root and worker capability boundaries", () => {
       expect(source).not.toContain("defineDynamic(");
       expect(source).toContain("requireWorkerScope(context)");
     }
+
     expect(existsSync(`${workerRoot}/hooks/session-owner.ts`)).toBe(true);
     expect(existsSync(`${workerRoot}/skills/browser-execution/SKILL.md`)).toBe(
       false
     );
+
     const semanticBrowser = readFileSync(
       `${workerTools}/semantic_browser.ts`,
       "utf8"
     );
+
     expect(semanticBrowser).toContain("defineDynamic(");
     expect(semanticBrowser).toContain("requireWorkerScope(context)");
     expect(semanticBrowser).toContain('from "@onkernel/browser-loop"');
+
     const workerInstructions = readFileSync(
       `${workerRoot}/instructions.md`,
       "utf8"
     );
+
     expect(workerInstructions).not.toContain("`inspect_autofill`");
     expect(workerInstructions).toContain(
       "native `final_output` tool exactly once"
@@ -154,6 +170,7 @@ describe("root and worker capability boundaries", () => {
     expect(readFileSync(`${workerRoot}/lib/kernel.ts`, "utf8")).toContain(
       "new Kernel("
     );
+
     for (const tool of [
       "capture_browser_image",
       "computer_action",
@@ -165,6 +182,7 @@ describe("root and worker capability boundaries", () => {
       );
       expect(source).not.toContain("new Kernel(");
     }
+
     expect(readFileSync(`${workerTools}/fill_from_vault.ts`, "utf8")).toContain(
       'from "../lib/autofill/native"'
     );
@@ -175,6 +193,7 @@ describe("root and worker capability boundaries", () => {
       "agent/instructions/content/worker-coordination.md",
       "utf8"
     );
+
     const workerConfig = readFileSync(`${workerRoot}/agent.ts`, "utf8");
 
     expect(workerCoordination).toContain(

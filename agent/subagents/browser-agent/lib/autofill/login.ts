@@ -29,6 +29,7 @@ export function classifyNativeLoginControl(
     .toLowerCase()
     .split(/\s+/u)
     .filter(Boolean);
+
   if (
     autocompleteTokens.some((token) =>
       ["new-password", "one-time-code"].includes(token)
@@ -46,24 +47,31 @@ export function classifyNativeLoginControl(
   const searchable = normalizeText(
     [descriptor.name, descriptor.label].filter(Boolean).join(" ")
   );
+
   if (/\b(?:new|confirm|create|repeat)\s*password\b/u.test(searchable)) {
     return null;
   }
+
   if (descriptor.type === "password") {
     return { ...descriptor, score: 90, token: "current-password" };
   }
+
   if (descriptor.type === "email") {
     return { ...descriptor, score: 85, token: "email" };
   }
+
   if (descriptor.type === "tel") {
     return { ...descriptor, score: 85, token: "tel" };
   }
+
   if (/\b(?:e-?mail|email address)\b/u.test(searchable)) {
     return { ...descriptor, score: 75, token: "email" };
   }
+
   if (/\b(?:phone|telephone|mobile)\b/u.test(searchable)) {
     return { ...descriptor, score: 75, token: "tel" };
   }
+
   if (
     /\b(?:user\s*name|username|login|account|member|membership|mileageplus)\b/u.test(
       searchable
@@ -71,6 +79,7 @@ export function classifyNativeLoginControl(
   ) {
     return { ...descriptor, score: 70, token: "username" };
   }
+
   return null;
 }
 
@@ -79,11 +88,13 @@ export function selectNativeLoginFills<T extends ClassifiedNativeLoginControl>(
   claims: readonly Pick<AutofillClaim, "token" | "value">[]
 ) {
   const focused = controls.find((control) => control.focused);
+
   if (!focused) return [];
 
   const sameSurface = controls
     .filter((control) => control.formIndex === focused.formIndex)
     .toSorted(compareLoginControls);
+
   const values = new Map(claims.map(({ token, value }) => [token, value]));
   const selected: { readonly control: T; readonly value: string }[] = [];
 
@@ -92,8 +103,10 @@ export function selectNativeLoginFills<T extends ClassifiedNativeLoginControl>(
       control.token !== "current-password" &&
       (values.has(control.token) || values.has("username"))
   );
+
   if (identifier) {
     const value = values.get(identifier.token) ?? values.get("username");
+
     if (value !== undefined) selected.push({ control: identifier, value });
   }
 
@@ -101,10 +114,13 @@ export function selectNativeLoginFills<T extends ClassifiedNativeLoginControl>(
     (control) =>
       control.token === "current-password" && values.has(control.token)
   );
+
   if (password) {
     const value = values.get(password.token);
+
     if (value !== undefined) selected.push({ control: password, value });
   }
+
   return selected;
 }
 
@@ -164,7 +180,9 @@ function compareLoginControls(
   right: ClassifiedNativeLoginControl
 ) {
   if (left.focused !== right.focused) return left.focused ? -1 : 1;
+
   if (left.score !== right.score) return right.score - left.score;
+
   return left.index - right.index;
 }
 

@@ -1,7 +1,8 @@
-import { typescriptRuleTester as tester } from "./rule-tester.ts";
+import { RuleTester } from "oxlint/plugins-dev";
 
-import { noUnknownReturnsRule } from "@tools/oxlint/anti-slop/rules/no-unknown-returns.ts";
+import { noUnknownReturnsRule } from "./no-unknown-returns.ts";
 
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } });
 const error = { messageId: "unknownReturn" };
 
 tester.run("anti-slop/no-unknown-returns", noUnknownReturnsRule, {

@@ -2,6 +2,7 @@ import type { MessageStreamEvent } from "eve/client";
 import type { EveMessage } from "eve/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
 import { ChatConversation } from ".";
 import type { ChatAgent } from "../chat-agent";
 
@@ -82,6 +83,7 @@ describe("chat conversation", () => {
         },
       },
     } satisfies EveMessage["parts"][number];
+
     const agent = {
       data: {
         messages: [
@@ -102,12 +104,15 @@ describe("chat conversation", () => {
       ChatAgent,
       "data" | "error" | "events" | "respond" | "status"
     >;
+
     const render = () =>
       renderToStaticMarkup(
         <ChatConversation agent={agent} traceView="imessage" />
       );
+
     const markup = render();
     expect(markup.match(/Create this calendar event\?/g)).toHaveLength(1);
+
     for (const detail of [
       "First delivery",
       "Second delivery",
@@ -121,11 +126,13 @@ describe("chat conversation", () => {
       "Cancel",
     ])
       expect(markup).toContain(detail);
+
     const answered = {
       ...approval,
       state: "approval-responded",
       approval: { id: "calendar-request", approved: true },
     } satisfies EveMessage["parts"][number];
+
     const settled = {
       ...agent,
       data: {
@@ -137,6 +144,7 @@ describe("chat conversation", () => {
       ChatAgent,
       "data" | "error" | "events" | "respond" | "status"
     >;
+
     expect(
       renderToStaticMarkup(
         <ChatConversation agent={settled} traceView="imessage" />
@@ -147,19 +155,23 @@ describe("chat conversation", () => {
   it("keeps the previous visible message while a filtered assistant shell is pending", () => {
     const cancellationText =
       "Background task task_worker (browser-agent) is cancelled.";
+
     const visibleMessage = message("visible-turn:user", "Keep this visible");
     const hiddenDelivery = message("task-delivery:user", cancellationText);
+
     const hiddenShell = {
       id: "task-delivery:assistant",
       metadata: { status: "streaming", turnId: "task-delivery" },
       parts: [{ type: "step-start" }],
       role: "assistant",
     } satisfies EveMessage;
+
     const events = [
       workerReceipt("task_worker"),
       workerCancellation("task_worker"),
       delivery("task-delivery", cancellationText),
     ];
+
     const agent = {
       data: { messages: [visibleMessage, hiddenDelivery, hiddenShell] },
       error: undefined,

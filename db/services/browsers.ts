@@ -1,6 +1,6 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import type { AccessScope } from "@shared/identity/access-scope";
 import { browserSessions, db } from "@db";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 interface BrowserSessionRecord {
   readonly createdAt: string;
@@ -38,6 +38,7 @@ export async function listWorkerBrowserSessions(
       )
     )
     .orderBy(desc(browserSessions.createdAt));
+
   return rows.map(serializeBrowserSession);
 }
 
@@ -50,6 +51,7 @@ export async function listBrowserSessions(scope: AccessScope) {
     .from(browserSessions)
     .where(eq(browserSessions.workspaceId, scope.workspaceId))
     .orderBy(desc(browserSessions.createdAt));
+
   return rows.map(serializeBrowserSession);
 }
 
@@ -71,11 +73,13 @@ export async function readBrowserSession(
       )
     )
     .limit(1);
+
   return rows[0] ? serializeBrowserSession(rows[0]) : undefined;
 }
 
 function serializeBrowserSession<T extends { createdAt: Date }>(record: T) {
   const { createdAt, ...session } = record;
+
   return { ...session, createdAt: createdAt.toISOString() };
 }
 
@@ -92,6 +96,7 @@ export async function deleteBrowserSession(
       )
     )
     .returning({ sessionId: browserSessions.sessionId });
+
   return rows.length > 0;
 }
 
@@ -103,11 +108,13 @@ export async function withBrowserProfileWriteLock<T>(
     const result = await transaction.execute<{ acquired: boolean }>(
       sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${scope.workspaceId}, 0)) AS "acquired"`
     );
+
     if (result.rows[0]?.acquired !== true) {
       throw new Error(
         "Another browser profile update is starting for this workspace. Retry after it finishes."
       );
     }
+
     return operation();
   });
 }

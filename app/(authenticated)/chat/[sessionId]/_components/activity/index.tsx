@@ -1,8 +1,11 @@
 "use client";
 
-import type { MessageStreamEvent } from "eve/client";
-import { ListTreeIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  collectSubagentSessions,
+  getSubagentStatus,
+} from "@app/_lib/subagent-sessions";
+import type { ChatUsage } from "@shared/chat/schema";
+import { cn } from "@web/components/class-names";
 import { Button } from "@web/components/ui/button";
 import {
   Sheet,
@@ -11,12 +14,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@web/components/ui/sheet";
-import {
-  collectSubagentSessions,
-  getSubagentStatus,
-} from "@app/_lib/subagent-sessions";
-import type { ChatUsage } from "@shared/chat/schema";
-import { cn } from "@web/components/class-names";
+import type { MessageStreamEvent } from "eve/client";
+import { ListTreeIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import type { TraceView } from "../../_lib/trace-view";
 import { ActivityCard } from "./card";
 import { TracePreview } from "./preview";
@@ -44,6 +45,7 @@ export function SubagentPanel({
   const traceCloseButton = useRef<HTMLButtonElement>(null);
   const restoreFocusId = useRef<string | undefined>(undefined);
   const sessions = useMemo(() => collectSubagentSessions(events), [events]);
+
   const usage = useChatUsage({
     events,
     historyComplete,
@@ -53,9 +55,12 @@ export function SubagentPanel({
 
   useEffect(() => {
     if (!window.matchMedia("(min-width: 48rem)").matches) return undefined;
+
     if (!selectedId) {
       const taskId = restoreFocusId.current;
+
       if (!taskId) return undefined;
+
       const frame = requestAnimationFrame(() => {
         document
           .querySelector<HTMLButtonElement>(
@@ -64,6 +69,7 @@ export function SubagentPanel({
           ?.focus();
         restoreFocusId.current = undefined;
       });
+
       return () => {
         cancelAnimationFrame(frame);
       };
@@ -72,10 +78,13 @@ export function SubagentPanel({
     const frame = requestAnimationFrame(() =>
       traceCloseButton.current?.focus()
     );
+
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSelectedId(undefined);
     };
+
     window.addEventListener("keydown", closeOnEscape);
+
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("keydown", closeOnEscape);
@@ -85,6 +94,7 @@ export function SubagentPanel({
   const selected = sessions.find(
     (session) => session.childSessionId === selectedId
   );
+
   const statuses = useMemo(
     () =>
       new Map(
@@ -95,17 +105,22 @@ export function SubagentPanel({
       ),
     [sessions]
   );
+
   const workingCount = [...statuses.values()].filter((status) =>
     ["starting", "working"].includes(status)
   ).length;
+
   const doneCount = sessions.length - workingCount;
+
   const openTask = (childSessionId: string) => {
     restoreFocusId.current = childSessionId;
     setSelectedId(childSessionId);
   };
+
   const closeTask = () => {
     setSelectedId(undefined);
   };
+
   const activity = (
     <ActivityCard
       doneCount={doneCount}
@@ -183,6 +198,7 @@ export function SubagentPanel({
       <Sheet
         onOpenChange={(open) => {
           setMobileOpen(open);
+
           if (!open) closeTask();
         }}
         open={mobileOpen}

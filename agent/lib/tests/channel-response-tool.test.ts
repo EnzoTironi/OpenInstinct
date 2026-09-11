@@ -1,5 +1,6 @@
-import { describe, expect, test } from "vitest";
 import { Schema } from "effect";
+import { describe, expect, test } from "vitest";
+
 import { inputSchema } from "../../tools/respond-to-approval";
 
 describe("natural approval tool input boundary", () => {

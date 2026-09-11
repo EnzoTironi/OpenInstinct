@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+
 import { test } from "vitest";
+
+import { readNdjsonStream } from "../../node_modules/eve/dist/src/client/ndjson.js";
+import { buildCallbackContext } from "../../node_modules/eve/dist/src/context/build-callback-context.js";
 import {
   ContextContainer,
   contextStorage,
 } from "../../node_modules/eve/dist/src/context/container.js";
-import { buildCallbackContext } from "../../node_modules/eve/dist/src/context/build-callback-context.js";
 import {
   ParentSessionKey,
   SessionKey,
@@ -16,12 +19,11 @@ import {
   encodeMessageStreamEvent,
   stampMessageStreamEvent,
 } from "../../node_modules/eve/dist/src/protocol/message.js";
-import { readNdjsonStream } from "../../node_modules/eve/dist/src/client/ndjson.js";
-
 import type {
   MessageStreamEvent,
   UnstampedMessageStreamEvent,
 } from "../../node_modules/eve/dist/src/protocol/message.js";
+
 const copiedNotification =
   'Background task completed. [Task state]\n{"tasks":[{"taskId":"known-task","status":"completed"}]}';
 
@@ -32,7 +34,9 @@ function rootContext(phase?: "pending" | "settled" | "none" | "initiating") {
     auth: { current: null, initiator: null },
     turn: { id: "turn_1", sequence: 1 },
   });
+
   if (phase !== undefined) context.set(TurnTaskDeliveryKey, phase);
+
   return context;
 }
 
@@ -41,6 +45,7 @@ async function preamble(
   input: { message: string; source?: string } = { message: copiedNotification }
 ) {
   const events: UnstampedMessageStreamEvent[] = [];
+
   const run = async () => {
     if (context) assert.equal(buildCallbackContext().session.id, "root");
     await emitTurnPreamble(
@@ -56,10 +61,12 @@ async function preamble(
       }
     );
   };
+
   if (context) await contextStorage.run(context, run);
   else await run();
   const received = events.find((event) => event.type === "message.received");
   assert(received);
+
   return received;
 }
 
@@ -81,6 +88,7 @@ test("ordinary copied notifications and input source fields cannot acquire task 
         message: copiedNotification,
         source: "task",
       });
+
       assert.equal(Object.hasOwn(event.data, "source"), false);
       assert.equal(event.data.message, copiedNotification);
     })
@@ -125,10 +133,12 @@ test("cleared phase and concurrent ALS scopes do not leak native provenance", as
   assert.equal((await preamble(context)).data.source, "task");
   context.set(TurnTaskDeliveryKey, "none");
   assert.equal(Object.hasOwn((await preamble(context)).data, "source"), false);
+
   const [native, ordinary] = await Promise.all([
     preamble(rootContext("pending")),
     preamble(rootContext("none")),
   ]);
+
   assert.equal(native.data.source, "task");
   assert.equal(Object.hasOwn(ordinary.data, "source"), false);
 });
@@ -140,9 +150,11 @@ test("constructor and real client NDJSON decoding retain native source across sp
     turnId: "turn_1",
     source: "task",
   });
+
   assert.equal(constructed.data.source, "task");
   const event = stampMessageStreamEvent(await preamble(rootContext("settled")));
   const bytes = encodeMessageStreamEvent(event);
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(bytes.subarray(0, 17));
@@ -150,7 +162,9 @@ test("constructor and real client NDJSON decoding retain native source across sp
       controller.close();
     },
   });
+
   const decoded: MessageStreamEvent[] = [];
+
   for await (const item of readNdjsonStream(stream, { streamVersion: "25" }))
     decoded.push(item);
   assert.deepEqual(decoded, [event]);

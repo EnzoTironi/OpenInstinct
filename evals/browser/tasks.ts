@@ -78,5 +78,6 @@ export function browserBenchmarkTasks(suite: "all" | "live" | "smoke") {
   ] as const;
 
   if (suite === "smoke") return [live[0], live[4]];
+
   return live;
 }

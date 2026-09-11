@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 import { accessScopeForUser } from "@shared/identity/access-scope";
+import { describe, expect, it } from "vitest";
+
+import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 
 describe("principal scope", () => {
   it("accepts the workspace derived from the authenticated user", () => {
@@ -53,6 +54,7 @@ describe("principal scope", () => {
 
   it("rejects ambiguous principal aliases", () => {
     const scope = accessScopeForUser("better-auth:alice");
+
     const principal = {
       attributes: { workspaceId: scope.workspaceId },
       authenticator: "authjs",
@@ -60,6 +62,7 @@ describe("principal scope", () => {
       principalId: "better-auth:bob",
       id: scope.userId,
     };
+
     expect(() => scopeFromPrincipal(principal)).toThrow("unambiguous");
   });
 

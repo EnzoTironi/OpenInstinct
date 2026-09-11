@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+
 import { Predicate, Result, Schema } from "effect";
 import { parseInputResponse, type InputRequest } from "eve/client";
 
@@ -6,8 +7,11 @@ const identifier = Schema.NonEmptyString.check(
   Schema.isTrimmed(),
   Schema.isMaxLength(256)
 );
+
 const revision = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u));
+
 const reference = Schema.Struct({ requestId: identifier, revision });
+
 const candidateSchema = Schema.Struct({
   intent: Schema.Literals([
     "approve",
@@ -18,6 +22,7 @@ const candidateSchema = Schema.Struct({
   ]),
   references: Schema.Array(reference).check(Schema.isMaxLength(16)),
 });
+
 const decodeCandidate = Schema.decodeUnknownResult(candidateSchema, {
   onExcessProperty: "error",
 });
@@ -33,6 +38,7 @@ const sourceSchema = Schema.Struct({
   text: Schema.NonEmptyString.check(Schema.isMaxLength(16_384)),
   sourceOccurredAtMs: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
 });
+
 const decodeSource = Schema.decodeUnknownResult(sourceSchema, {
   onExcessProperty: "error",
 });
@@ -52,6 +58,7 @@ const deliverySchema = Schema.Struct({
     Schema.isMaxLength(16)
   ),
 });
+
 const decodeDelivery = Schema.decodeUnknownResult(deliverySchema);
 
 /** Confirmed delivery of ALL proposal chunks; deliveredAtMs is their latest send receipt. */
@@ -119,6 +126,7 @@ export function channelConsentRevision(request: InputRequest): string {
           )
         : value
   );
+
   return createHash("sha256").update(serialized).digest("hex");
 }
 
@@ -137,45 +145,60 @@ export function validateChannelConsent(
     interpretation,
     snapshot
   );
+
   if (sourceRejection) return { status: "rejected", reason: sourceRejection };
   const decoded = decodeCandidate(interpretation.candidate);
+
   if (Result.isFailure(decoded))
     return { status: "rejected", reason: "invalid_candidate" };
   const candidate = decoded.success;
+
   if (candidate.intent === "clarify" || candidate.intent === "conversation") {
     return candidate.references.length === 0
       ? { status: "non_action", intent: candidate.intent }
       : { status: "rejected", reason: "invalid_candidate" };
   }
+
   const [target] = candidate.references;
+
   if (candidate.references.length !== 1 || !target) {
     return { status: "rejected", reason: "ambiguous_reference" };
   }
+
   const matches = snapshot.pending.filter(
     (request) => request.requestId === target.requestId
   );
+
   const [request] = matches;
+
   if (!request) return { status: "rejected", reason: "stale_request" };
+
   if (matches.length !== 1)
     return { status: "rejected", reason: "ambiguous_reference" };
+
   if (channelConsentRevision(request) !== target.revision) {
     return { status: "rejected", reason: "stale_revision" };
   }
+
   const optionId = candidate.intent === "approve" ? "approve" : "cancel";
+
   if (
     request.kind !== "tool-approval" ||
     request.options?.filter((option) => option.id === optionId).length !== 1
   ) {
     return { status: "rejected", reason: "unsupported_request" };
   }
+
   const deliveryResult = resolveConsentDelivery(
     source,
     target,
     snapshot.deliveries
   );
+
   if (Result.isFailure(deliveryResult))
     return { status: "rejected", reason: deliveryResult.failure };
   const delivery = deliveryResult.success;
+
   return {
     status: "validated",
     intent: candidate.intent,
@@ -198,21 +221,25 @@ function validateConsentSource(
   if (Result.isFailure(decodeSource(source)) || !source.text.trim()) {
     return "invalid_source";
   }
+
   if (
     source.sourceMessageId !== interpretation.sourceMessageId ||
     source.text !== interpretation.sourceText
   ) {
     return "source_mismatch";
   }
+
   if (
     source.identityId !== snapshot.identityId ||
     source.sessionId !== snapshot.sessionId
   ) {
     return "scope_mismatch";
   }
+
   if (snapshot.consumedSourceMessageIds.includes(source.sourceMessageId)) {
     return "replayed_source";
   }
+
   return undefined;
 }
 
@@ -228,15 +255,20 @@ function resolveConsentDelivery(
       delivery.identityId === source.identityId &&
       delivery.sessionId === source.sessionId
   );
+
   const [delivery] = deliveries;
+
   if (!delivery) return Result.fail("missing_delivery");
+
   if (deliveries.length !== 1) return Result.fail("ambiguous_delivery");
+
   if (
     !Number.isFinite(delivery.deliveredAtMs) ||
     delivery.deliveredAtMs >= source.sourceOccurredAtMs
   ) {
     return Result.fail("delivery_not_before_source");
   }
+
   if (
     Result.isFailure(decodeDelivery(delivery)) ||
     !delivery.text.trim() ||
@@ -246,5 +278,6 @@ function resolveConsentDelivery(
   ) {
     return Result.fail("missing_delivery");
   }
+
   return Result.succeed(delivery);
 }

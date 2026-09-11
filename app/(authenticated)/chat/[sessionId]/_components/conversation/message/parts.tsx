@@ -1,4 +1,3 @@
-import type { EveMessagePart } from "eve/react";
 import { MessageResponse } from "@web/components/ai-elements/message";
 import {
   Reasoning,
@@ -12,6 +11,8 @@ import {
   ToolInput,
   ToolOutput,
 } from "@web/components/ai-elements/tool";
+import type { EveMessagePart } from "eve/react";
+
 import { AttachmentPart } from "./attachment";
 import { AuthorizationPrompt } from "./authorization";
 import { InputRequestActions, QuestionRequest } from "./input-request";
@@ -52,6 +53,7 @@ export function AgentMessagePart({
       return <AuthorizationPrompt part={part} />;
     case "dynamic-tool": {
       const inputRequest = part.toolMetadata?.eve?.inputRequest;
+
       if (inputRequest?.kind === "question") {
         return (
           <QuestionRequest
@@ -99,6 +101,7 @@ export function AgentMessagePart({
       );
     }
   }
+
   throw new Error("Unsupported agent message part.");
 }
 

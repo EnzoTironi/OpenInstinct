@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
+import { describe, expect, it } from "vitest";
+
 import { handleStripeWebhook, BillingWebhookError } from "./webhook";
 
 describe("Stripe billing webhook", () => {
@@ -8,9 +9,11 @@ describe("Stripe billing webhook", () => {
       method: "POST",
       body: "{}",
     });
+
     const error = await Effect.runPromise(
       handleStripeWebhook(request).pipe(Effect.flip)
     );
+
     expect(error).toBeInstanceOf(BillingWebhookError);
     expect(error.reason).toBe("stripe_not_configured");
   });

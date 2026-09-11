@@ -1,3 +1,5 @@
+import { Badge } from "@web/components/ui/badge";
+import { Button } from "@web/components/ui/button";
 import {
   ArrowUpRightIcon,
   ClockIcon,
@@ -8,8 +10,7 @@ import {
   UserRoundIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { Badge } from "@web/components/ui/badge";
-import { Button } from "@web/components/ui/button";
+
 import {
   describeLinkedChannels,
   type LinkedChannelSummary,
@@ -44,10 +45,13 @@ const destinations = [
 
 function linkedLabels(identities: readonly LinkedChannelSummary[]) {
   const labels: string[] = [];
+
   for (const identity of identities) {
     const label = identity.channel === "telegram" ? "Telegram" : "WhatsApp";
+
     if (!labels.includes(label)) labels.push(label);
   }
+
   return labels;
 }
 

@@ -1,11 +1,11 @@
 "use client";
 
+import { cn } from "@web/components/class-names";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@web/components/ui/collapsible";
-import { cn } from "@web/components/class-names";
 import type { DynamicToolUIPart } from "ai";
 import {
   CheckCircleIcon,
@@ -131,7 +131,7 @@ function ToolContent({ className, ...props }: ToolContentProps) {
   return (
     <CollapsibleContent
       className={cn(
-        "space-y-4 py-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2",
+        "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2 space-y-4 py-2 text-popover-foreground outline-none",
         className
       )}
       data-slot="chat-tool-content"
@@ -169,6 +169,7 @@ function ToolOutput({
   if (output === undefined && !errorText) return null;
 
   const text = z.string().safeParse(output);
+
   const content = isValidElement(output)
     ? output
     : text.success
@@ -182,7 +183,7 @@ function ToolOutput({
       </p>
       <div
         className={cn(
-          "overflow-x-auto rounded-md bg-muted/50 p-3 type-supporting-body whitespace-pre-wrap",
+          "type-supporting-body overflow-x-auto rounded-md bg-muted/50 p-3 whitespace-pre-wrap",
           errorText && "bg-destructive/10 text-destructive"
         )}
       >
@@ -193,6 +194,7 @@ function ToolOutput({
 }
 
 export { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput };
+
 export type {
   ToolContentProps,
   ToolHeaderProps,

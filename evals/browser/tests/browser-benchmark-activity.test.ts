@@ -1,5 +1,6 @@
 import type { MessageStreamEvent } from "eve/client";
 import { describe, expect, it } from "vitest";
+
 import {
   browserBenchmarkActivity,
   browserBenchmarkActivityDurations,

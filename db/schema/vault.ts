@@ -1,3 +1,4 @@
+import { vaultItemKinds } from "@shared/vault/schema";
 import { relations, sql } from "drizzle-orm";
 import {
   check,
@@ -8,7 +9,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { vaultItemKinds } from "@shared/vault/schema";
+
 import { workspaces } from "./workspaces";
 
 export const vaultItems = pgTable(

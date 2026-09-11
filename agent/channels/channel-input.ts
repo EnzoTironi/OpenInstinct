@@ -1,5 +1,6 @@
 import { ConfigProvider, Effect, Schema } from "effect";
 import { defineChannel, POST } from "eve/channels";
+
 import {
   internalCallbackBodies,
   readAuthenticatedInternalCallback,
@@ -15,12 +16,16 @@ export default defineChannel({
       serverRuntime.runPromise(
         Effect.gen(function* () {
           const raw = yield* readAuthenticatedInternalCallback(request, route);
+
           if (raw instanceof Response) return raw;
+
           const input = yield* Schema.decodeUnknownEffect(
             Schema.fromJsonString(internalCallbackBodies[route]),
             { onExcessProperty: "error" }
           )(raw.toString("utf8"));
+
           yield* submitChannelResponse(input, attachSession(input.sessionId));
+
           return Response.json(
             { status: "accepted", requestId: input.requestId },
             { status: 202 }

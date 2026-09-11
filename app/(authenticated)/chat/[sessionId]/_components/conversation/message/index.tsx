@@ -1,9 +1,10 @@
 "use client";
 
-import type { EveMessage } from "eve/react";
-import { useState } from "react";
 import { Message, MessageContent } from "@web/components/ai-elements/message";
 import { cn } from "@web/components/class-names";
+import type { EveMessage } from "eve/react";
+import { useState } from "react";
+
 import { AgentMessagePart, partKey } from "./parts";
 import type { RespondToAgentInput } from "./types";
 
@@ -25,15 +26,19 @@ export function AgentMessage({
   readonly userVisibleOnly?: boolean;
 }) {
   const [optimisticTimestamp] = useState(() => new Date().toISOString());
+
   const displayedTimestamp =
     timestamp ?? (message.role === "user" ? optimisticTimestamp : undefined);
+
   const visibleParts = userVisibleOnly
     ? userVisibleParts(message, sentMessageParts)
     : message.parts;
+
   const lastTextIndex = visibleParts.reduce(
     (last, part, index) => (part.type === "text" ? index : last),
     -1
   );
+
   const hasAssistantText =
     message.role === "assistant" &&
     visibleParts.some((part) => part.type === "text" && part.text.length > 0);
@@ -100,6 +105,7 @@ function userVisibleParts(
         (part.state === "input-available" ||
           part.state === "approval-requested")
   );
+
   return [...(sentMessageParts ?? []), ...controls];
 }
 

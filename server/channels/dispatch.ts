@@ -1,7 +1,8 @@
 import { Config, Effect } from "effect";
+
 import { ChannelAuthPrompts } from "../channel-auth/prompts";
-import { Telegram } from "./telegram";
 import { ProviderInputError } from "./provider-errors";
+import { Telegram } from "./telegram";
 
 export const dispatchItem = Effect.fn("dispatchItem")(function* <
   A,
@@ -23,7 +24,9 @@ export const dispatchAuthPrompt = Effect.fn("dispatchAuthPrompt")(function* (
 ) {
   const prompts = yield* ChannelAuthPrompts;
   const claim = yield* prompts.claim(challengeId);
+
   if (!claim) return;
+
   const send = Effect.gen(function* () {
     if (claim.channel !== "telegram")
       return yield* new ProviderInputError({
@@ -31,6 +34,7 @@ export const dispatchAuthPrompt = Effect.fn("dispatchAuthPrompt")(function* (
         reason: "invalid_command",
       });
     const installation = yield* Config.string("TELEGRAM_BOT_ID");
+
     if (installation !== claim.installationId)
       return yield* new ProviderInputError({
         provider: claim.channel,
@@ -38,8 +42,10 @@ export const dispatchAuthPrompt = Effect.fn("dispatchAuthPrompt")(function* (
       });
     const provider = yield* Telegram;
     yield* prompts.checkLease(claim.lease);
+
     return yield* provider.sendLoginConfirmation(claim.senderId, claim.token);
   });
+
   yield* send.pipe(
     Effect.flatMap((result) =>
       prompts.markSent(claim.lease, result.providerMessageId)

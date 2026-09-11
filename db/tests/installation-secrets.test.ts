@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { InstallationSecrets } from "@db/services/installation-secrets";
 import type { get, put } from "@vercel/blob";
 import { Effect, Redacted } from "effect";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { InstallationSecrets } from "@db/services/installation-secrets";
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn<typeof get>(),
@@ -44,6 +44,7 @@ describe("installation secrets", () => {
     });
 
     const getInstallationSecrets = await loadInstallationSecrets();
+
     const [first, second] = await Promise.all([
       getInstallationSecrets(),
       getInstallationSecrets(),
@@ -56,6 +57,7 @@ describe("installation secrets", () => {
     expect(mocks.get).toHaveBeenCalledOnce();
     expect(mocks.put).toHaveBeenCalledOnce();
     const call = mocks.put.mock.calls[0];
+
     if (!call) throw new Error("Expected an installation secrets upload.");
     const [pathname, body, options] = call;
     expect(pathname).toMatch(
@@ -78,6 +80,7 @@ describe("installation secrets", () => {
       secretEncryptionKey: Buffer.alloc(32, 3).toString("base64"),
       version: 1 as const,
     };
+
     mocks.get
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(blobResult(winner));
@@ -95,6 +98,7 @@ describe("installation secrets", () => {
       secretEncryptionKey: Buffer.alloc(32, 5).toString("base64"),
       version: 1 as const,
     };
+
     vi.stubEnv("BETTER_AUTH_SECRET", configured.betterAuthSecret);
     vi.stubEnv("SECRET_ENCRYPTION_KEY", configured.secretEncryptionKey);
 
@@ -147,14 +151,17 @@ describe("installation secrets", () => {
       secretEncryptionKey: Buffer.alloc(32, 8).toString("base64"),
       version: 1 as const,
     };
+
     vi.stubEnv("BETTER_AUTH_SECRET", configured.betterAuthSecret);
     vi.stubEnv("SECRET_ENCRYPTION_KEY", configured.secretEncryptionKey);
 
     const { ResolvedInstallationSecrets } =
       await import("@db/services/installation-secrets");
+
     const resolved = await Effect.runPromise(
       Effect.gen(function* () {
         const secrets = yield* ResolvedInstallationSecrets;
+
         return {
           betterAuthSecret: Redacted.value(secrets.betterAuthSecret),
           secretEncryptionKey: Redacted.value(secrets.secretEncryptionKey),
@@ -181,6 +188,7 @@ describe("installation secrets", () => {
 
 async function loadInstallationSecrets() {
   const secretsModule = await import("@db/services/installation-secrets");
+
   return secretsModule.getInstallationSecrets;
 }
 
@@ -190,7 +198,9 @@ type InstallationSecretsFixture = Partial<InstallationSecrets> &
 function blobResult(value: InstallationSecretsFixture) {
   const body = JSON.stringify(value);
   const stream = new Response(body).body;
+
   if (!stream) throw new Error("Expected a response body.");
+
   return {
     blob: {
       cacheControl: "public, max-age=31536000",

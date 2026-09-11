@@ -8,6 +8,7 @@ export function applicationOrigin() {
       env.VERCEL_PROJECT_PRODUCTION_URL ??
       env.VERCEL_URL ??
       env.VERCEL_BRANCH_URL;
+
     if (hostname) return new URL(`https://${hostname}`).origin;
   }
 
@@ -18,6 +19,7 @@ export function applicationOrigin() {
 
 export function betterAuthBaseURL() {
   const fallback = applicationOrigin();
+
   if (!env.VERCEL_ENV) return fallback;
 
   const allowedHosts = new Set(

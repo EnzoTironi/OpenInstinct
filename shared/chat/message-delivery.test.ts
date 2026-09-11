@@ -1,5 +1,6 @@
 import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
+
 import {
   sendMessageOutputSchema,
   sendMessageToolResultSchema,
@@ -74,12 +75,14 @@ describe("message delivery contract", () => {
 
   it("enforces message, attachment, metadata and native-link bounds", () => {
     const url = `https://example.com/${"a".repeat(2028)}`;
+
     const attachment = {
       kind: "audio",
       url,
       name: "n".repeat(180),
       mimeType: "m".repeat(200),
     };
+
     expect(
       Schema.decodeUnknownSync(sendMessageOutputSchema)({
         kind: "message",
@@ -94,6 +97,7 @@ describe("message delivery contract", () => {
         url: link,
       })
     ).toMatchObject({ url: link });
+
     for (const input of [
       { kind: "message", text: "x".repeat(20_001) },
       { kind: "message", attachments: [] },
@@ -162,7 +166,9 @@ describe("message delivery contract", () => {
       kind: "link",
       url: "https://bad host",
     });
+
     expect(Result.isFailure(result)).toBe(true);
+
     if (Result.isSuccess(result))
       throw new Error("Malformed URL was accepted.");
     expect(result.failure).toBeInstanceOf(Schema.SchemaError);
@@ -182,6 +188,7 @@ describe("message delivery contract", () => {
       toolName: "send_message",
       output: { kind: "message", text: "ok" },
     });
+
     for (const input of [
       {
         kind: "tool-result",

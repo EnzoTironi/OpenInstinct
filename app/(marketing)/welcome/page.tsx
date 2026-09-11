@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+
 import { MarketingLanding } from "./_components/marketing-landing";
 
 export const metadata: Metadata = {

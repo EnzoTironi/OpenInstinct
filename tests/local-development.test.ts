@@ -2,8 +2,10 @@ import { spawn } from "node:child_process";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import {
   SUPERVISOR_TEST_TIMEOUT_MS,
   waitForSupervisorClose,
@@ -11,6 +13,7 @@ import {
 } from "./helpers/supervisor-process";
 
 const temporaryDirectories: string[] = [];
+
 const supervisorTestOptions = { timeout: SUPERVISOR_TEST_TIMEOUT_MS };
 
 afterEach(async () => {
@@ -29,6 +32,7 @@ describe("local development", supervisorTestOptions, () => {
         readFile(new URL("../scripts/dev.ts", import.meta.url), "utf8"),
         readFile(new URL("../package.json", import.meta.url), "utf8"),
       ]);
+
     const packageManifest = z
       .object({ scripts: z.object({ dev: z.string() }) })
       .parse(JSON.parse(packageManifestSource));
@@ -44,9 +48,11 @@ describe("local development", supervisorTestOptions, () => {
     const start = developmentScript.indexOf(
       'composeArguments("up", "--detach", "--wait")'
     );
+
     const port = developmentScript.indexOf(
       'composeArguments("port", "postgres", "5432")'
     );
+
     const migrate = developmentScript.indexOf('["db:migrate"]');
     const application = developmentScript.indexOf('["dev:app"]');
     const stop = developmentScript.indexOf('composeArguments("down")');
@@ -126,9 +132,11 @@ function projectFromComposeCommand(command: string | undefined) {
   const project = command?.match(
     /^compose --project-name (open-instinct-[a-f0-9]{12}) /
   )?.[1];
+
   if (!project) {
     throw new Error(`Missing Compose project in: ${String(command)}`);
   }
+
   return project;
 }
 
@@ -232,6 +240,7 @@ printf 'pnpm %s %s\n' "$*" "$DATABASE_URL" >> "$DEV_SUPERVISOR_LOG"
       stdio: "ignore",
     }
   );
+
   const exitCode = waitForSupervisorClose(supervisor);
 
   return {

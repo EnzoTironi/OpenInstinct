@@ -1,25 +1,31 @@
 import assert from "node:assert/strict";
-import { PgClient } from "@effect/sql-pg";
-import { Config, Effect, Layer, ManagedRuntime, Schema } from "effect";
+
 import { getAuth } from "@db/services/auth";
-import { accessScopeForUser } from "@shared/identity/access-scope";
+import { PgClient } from "@effect/sql-pg";
 import { applicationOrigin } from "@shared/environment/origin";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import { channelChallengeSchema } from "@shared/identity/channel-auth";
+import { Config, Effect, Layer, ManagedRuntime, Schema } from "effect";
+
 import { runtimeDatabase } from "../../tests/runtime/database";
-import { ChannelAccounts } from "./index";
 import {
   readLinkedChannelIdentities,
   revokeLinkedChannelIdentity,
 } from "./controls";
+import { ChannelAccounts } from "./index";
 
 const runtime = ManagedRuntime.make(
   ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase))
 );
+
 const installationId = await Effect.runPromise(
   Config.string("TELEGRAM_BOT_ID")
 );
+
 assert.ok(installationId.startsWith("account-controls-"));
+
 const userIds: string[] = [];
+
 const cookieHeader = (response: Response) =>
   response.headers
     .getSetCookie()
@@ -30,6 +36,7 @@ try {
   const accounts = await runtime.runPromise(ChannelAccounts);
   const auth = await getAuth();
   const origin = applicationOrigin();
+
   const authorize = async (
     senderId: string,
     purpose: "login" | "link",
@@ -47,29 +54,37 @@ try {
           body: JSON.stringify(body),
         })
       );
+
     const started = await request(
       "start",
       { channel: "telegram", purpose },
       existingCookie
     );
+
     assert.equal(started.status, 200);
+
     const challenge = Schema.decodeUnknownSync(channelChallengeSchema)(
       await started.json()
     );
+
     const token = new URL(challenge.deepLink).searchParams.get("start");
     assert.ok(token);
     const sender = { channel: "telegram" as const, installationId, senderId };
     await runtime.runPromise(accounts.confirmChallenge({ token, sender }));
+
     const completed = await request(
       "complete",
       { id: challenge.id },
       [existingCookie, cookieHeader(started)].filter(Boolean).join("; ")
     );
+
     assert.equal(completed.status, 200);
     assert.deepEqual(await completed.json(), { ok: true });
+
     const identity = await runtime.runPromise(
       accounts.getActiveIdentity(sender)
     );
+
     if (purpose === "login") userIds.push(identity.userId);
 
     return {
@@ -79,6 +94,7 @@ try {
         .join("; "),
     };
   };
+
   const owner = await authorize("account-owner", "login");
   const foreign = await authorize("other-owner", "login");
   const headers = new Headers({ cookie: owner.cookie });
@@ -87,8 +103,10 @@ try {
   await runtime.runPromise(
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
+
       const rows =
         yield* sql`SELECT workspace_id FROM workspace_memberships WHERE user_id = ${scope.userId} AND workspace_id = ${scope.workspaceId}`;
+
       assert.equal(rows.length, 1);
     })
   );
@@ -147,11 +165,15 @@ try {
   await runtime.runPromise(
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
+
       const rows =
         yield* sql`SELECT id FROM public.channel_identity WHERE id = ${linked.id} AND revoked_at IS NULL`;
+
       assert.equal(rows.length, 1);
+
       const sessions =
         yield* sql`SELECT id FROM public.session WHERE "userId" = ${owner.userId}`;
+
       assert.equal(sessions.length, 0);
     })
   );
@@ -164,6 +186,7 @@ try {
       const sql = yield* PgClient.PgClient;
       yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
       yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
+
       for (const userId of userIds) {
         yield* sql`DELETE FROM public."user" WHERE id = ${userId}`;
         const scope = accessScopeForUser(`better-auth:${userId}`);

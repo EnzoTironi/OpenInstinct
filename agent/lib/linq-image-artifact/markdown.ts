@@ -10,11 +10,14 @@ export function extractImageArtifactMarkdownReferences(message: string) {
     readonly markdown: string;
     readonly url: string;
   }[] = [];
+
   const seen = new Set<string>();
 
   for (const match of message.matchAll(imageArtifactMarkdownPattern)) {
     const [markdown, label, url, id] = match;
+
     if (!markdown || !url || !id || seen.has(id)) continue;
+
     if (!isBrowserImageArtifactUrl(url)) continue;
     seen.add(id);
     references.push({ id, label: label ?? "", markdown, url });

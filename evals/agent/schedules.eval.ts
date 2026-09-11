@@ -1,10 +1,11 @@
-import { defineEval } from "eve/evals";
 import { isDeepStrictEqual } from "node:util";
+
 import {
   agentEvalTags,
   assertPlainTextDelivery,
   requireDeliveredText,
 } from "@evals/agent/shared";
+import { defineEval } from "eve/evals";
 
 const cases = [
   {

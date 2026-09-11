@@ -53,9 +53,11 @@ describe.each(["telegram", "kapso"] as const)(
 
     it("preserves plain text and current-message replies through the codec", async () => {
       const original = privateMessageTool(channel).inputSchema;
+
       const restored = toInputSchema(
         decodeJsonObject(JSON.stringify(serializeInputSchema(original)))
       );
+
       await Promise.all(
         [toInputSchema(original), restored].flatMap((schema) =>
           [
@@ -76,9 +78,11 @@ describe.each(["telegram", "kapso"] as const)(
 
     it("rejects malformed and excess input before and after serialization", async () => {
       const original = privateMessageTool(channel).inputSchema;
+
       const restored = toInputSchema(
         decodeJsonObject(JSON.stringify(serializeInputSchema(original)))
       );
+
       await Promise.all(
         [toInputSchema(original), restored].flatMap((schema) =>
           [

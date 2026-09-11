@@ -1,7 +1,5 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import type { VaultItem } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
 import {
@@ -9,8 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@web/components/ui/dialog";
-import { LoginForm } from "./form";
-import { ChromeImportPanel } from "./import";
+import { PlusIcon } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+
 import {
   useVaultSection,
   VaultItemBrowser,
@@ -20,6 +19,8 @@ import {
   VaultSectionTrigger,
 } from "../section";
 import { useVaultSetup } from "../setup";
+import { LoginForm } from "./form";
+import { ChromeImportPanel } from "./import";
 
 export function VaultLogins({
   items,
@@ -30,6 +31,7 @@ export function VaultLogins({
   const setup = useVaultSetup();
   const initialSetup = setup?.kind === "login" ? setup : undefined;
   const initialChromeImport = searchParams.get("import") === "chrome";
+
   const section = useVaultSection(
     initialChromeImport ? "import" : initialSetup ? "add" : "list"
   );

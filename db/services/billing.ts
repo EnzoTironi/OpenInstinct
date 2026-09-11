@@ -1,13 +1,15 @@
-import { and, eq, isNotNull } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+
 import { billingEntitlements, db } from "@db";
 import {
   type BillingPlanId,
   quotaLimitsForPlan,
   type PlanQuotaLimits,
 } from "@shared/billing/plans";
+import { and, eq, isNotNull } from "drizzle-orm";
 
 export type BillingSubjectType = "user" | "organization";
+
 export type BillingEntitlementStatus =
   | "active"
   | "trialing"
@@ -41,12 +43,15 @@ function toResolved(
   row: typeof billingEntitlements.$inferSelect
 ): ResolvedEntitlement {
   const plan: BillingPlanId = isBillingPlanId(row.plan) ? row.plan : "free";
+
   const paidActive =
     plan === "free" ||
     row.status === "active" ||
     row.status === "trialing" ||
     row.status === "past_due";
+
   const effectivePlan: BillingPlanId = paidActive ? plan : "free";
+
   return {
     plan: effectivePlan,
     status: row.status,
@@ -71,7 +76,9 @@ export async function readEntitlement(
       )
     )
     .limit(1);
+
   const row = rows[0];
+
   return row ? toResolved(row) : freeEntitlement();
 }
 
@@ -87,6 +94,7 @@ export async function upsertEntitlement(input: {
   currentPeriodEnd?: Date | null;
 }) {
   const now = new Date();
+
   const existing = await db
     .select({ id: billingEntitlements.id })
     .from(billingEntitlements)
@@ -99,6 +107,7 @@ export async function upsertEntitlement(input: {
     .limit(1);
 
   const seatCount = Math.max(1, input.seatCount ?? 1);
+
   if (existing[0]) {
     await db
       .update(billingEntitlements)
@@ -123,6 +132,7 @@ export async function upsertEntitlement(input: {
         updatedAt: now,
       })
       .where(eq(billingEntitlements.id, existing[0].id));
+
     return existing[0].id;
   }
 
@@ -141,6 +151,7 @@ export async function upsertEntitlement(input: {
     createdAt: now,
     updatedAt: now,
   });
+
   return id;
 }
 
@@ -155,6 +166,7 @@ export async function findEntitlementByStripeCustomer(customerId: string) {
       )
     )
     .limit(1);
+
   return rows[0] ?? null;
 }
 
@@ -171,5 +183,6 @@ export async function findEntitlementByStripeSubscription(
       )
     )
     .limit(1);
+
   return rows[0] ?? null;
 }

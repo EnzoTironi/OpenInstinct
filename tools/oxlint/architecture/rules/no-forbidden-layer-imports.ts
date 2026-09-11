@@ -1,12 +1,12 @@
 import path from "node:path";
 
 import { defineRule } from "@oxlint/plugins";
-
 import type { ESTree } from "@oxlint/plugins";
 
 import { isStringLiteral } from "../../shared/literals.ts";
 
 const productionLayers = ["agent", "app", "db", "shared", "web"] as const;
+
 type ProductionLayer = (typeof productionLayers)[number];
 
 const moduleMockMethods = new Set(["doMock", "mock", "unstable_mockModule"]);
@@ -24,14 +24,17 @@ function productionLayerForPath(
   repositoryRoot: string
 ): ProductionLayer | undefined {
   const normalizedPath = path.resolve(filePath);
+
   if (normalizedPath === path.join(repositoryRoot, "proxy.ts")) return "web";
 
   const relativePath = path.relative(repositoryRoot, normalizedPath);
+
   if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     return undefined;
   }
 
   const [root] = relativePath.split(path.sep);
+
   return productionLayers.find((candidate) => candidate === root);
 }
 
@@ -49,6 +52,7 @@ function importedProductionLayer(
 
   const match = /^@(agent|app|db|shared|web)(?:\/(.*))?$/u.exec(source);
   const aliasRoot = match?.[1];
+
   if (!aliasRoot) return undefined;
 
   return productionLayerForPath(
@@ -61,6 +65,7 @@ function moduleMockSource(
   node: ESTree.CallExpression
 ): ESTree.Node | undefined {
   const callee = node.callee;
+
   if (
     !("object" in callee) ||
     !("property" in callee) ||
@@ -78,9 +83,11 @@ function moduleMockSource(
     : callee.property.type === "Identifier"
       ? callee.property.name
       : undefined;
+
   if (!method || !moduleMockMethods.has(method)) return undefined;
 
   const [source] = node.arguments;
+
   return source && isStringLiteral(source) ? source : undefined;
 }
 
@@ -104,11 +111,13 @@ export const noForbiddenLayerImportsRule = defineRule({
 
     const checkImport = (node: ESTree.Node, source: string) => {
       if (!owner) return;
+
       const dependency = importedProductionLayer(
         importer,
         source,
         repositoryRoot
       );
+
       if (!dependency || !forbiddenDependencies[owner].has(dependency)) return;
 
       context.report({
@@ -140,6 +149,7 @@ export const noForbiddenLayerImportsRule = defineRule({
       },
       CallExpression(node) {
         const source = moduleMockSource(node);
+
         if (source && isStringLiteral(source)) {
           checkImport(source, source.value);
         }

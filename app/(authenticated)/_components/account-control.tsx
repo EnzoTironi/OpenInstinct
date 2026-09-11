@@ -1,8 +1,5 @@
 "use client";
 
-import { LogOutIcon, UserIcon } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
 import { reauthenticationDestination } from "@web/auth/channel/client";
 import { authClient } from "@web/auth/client";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
@@ -12,11 +9,15 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@web/components/ui/sidebar";
+import { LogOutIcon, UserIcon } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 export function AuthenticatedAccountControl() {
   const { data: session } = authClient.useSession();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+
   if (!session?.user) return null;
 
   const accountLabel = session.user.name || "Signed in";
@@ -40,12 +41,16 @@ export function AuthenticatedAccountControl() {
             void Promise.allSettled([authClient.signOut()]).then(
               ([outcome]) => {
                 const destination = reauthenticationDestination(outcome, "/");
+
                 if (destination) {
                   window.location.assign(destination);
+
                   return undefined;
                 }
+
                 setFailed(true);
                 setBusy(false);
+
                 return undefined;
               }
             );

@@ -1,15 +1,16 @@
+import { applicationOrigin } from "@shared/environment/origin";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import { channelProviderSchema } from "@shared/identity/channel-auth";
 import { Effect, Schema } from "effect";
 import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
-import { PersonalMemory } from "../../server/personal-memory";
-import { serverRuntime } from "../../server/runtime";
-import { accessScopeForUser } from "@shared/identity/access-scope";
-import { applicationOrigin } from "@shared/environment/origin";
-import { channelProviderSchema } from "@shared/identity/channel-auth";
+
 import { requireChannelPrincipal } from "../../server/channels/principal";
-import { resolveModeValue } from "../lib/mode";
+import { PersonalMemory } from "../../server/personal-memory";
 import { PersonalMemoryError } from "../../server/personal-memory/access";
 import { admitPersonalMemoryFromSession } from "../../server/personal-memory/group-memory-policy";
+import { serverRuntime } from "../../server/runtime";
+import { resolveModeValue } from "../lib/mode";
 
 export const inspectStoredPersonalMemory = defineTool({
   description:
@@ -26,18 +27,24 @@ export const inspectStoredPersonalMemory = defineTool({
           return yield* new PersonalMemoryError({ reason: "unauthenticated" });
         // G02: group conversationScope must not inspect personal memory.
         yield* admitPersonalMemoryFromSession(context.session.auth.current);
+
         const channel = yield* Schema.decodeUnknownEffect(
           channelProviderSchema
         )(context.session.auth.current.attributes.conversationChannel);
+
         const identity = yield* requireChannelPrincipal(
           channel,
           context.session.auth.current
         );
+
         const memory = yield* PersonalMemory;
+
         const snapshot = yield* memory.inspect(
           accessScopeForUser(`better-auth:${identity.userId}`)
         );
+
         yield* requireChannelPrincipal(channel, context.session.auth.current);
+
         return {
           ...snapshot,
           downloadUrl: new URL(
@@ -61,6 +68,7 @@ export default defineDynamic({
         )
       )
         return null;
+
       return resolveModeValue(context, {
         interactive: { "personal-memory-inspect": inspectStoredPersonalMemory },
       });

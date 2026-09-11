@@ -24,9 +24,11 @@ function companionStageTier(stage: string): CompanionStageTier {
   if (stage === "prod") {
     return "production";
   }
+
   if (stage === "staging") {
     return "shared-preprod";
   }
+
   return "ephemeral";
 }
 
@@ -75,6 +77,7 @@ export class CompanionStagePolicy extends Context.Service<
     Effect.gen(function* () {
       const stack = yield* Stack;
       const stage = stack.stage;
+
       return CompanionStagePolicy.of({
         stage,
         documented: isDocumentedCompanionStage(stage),

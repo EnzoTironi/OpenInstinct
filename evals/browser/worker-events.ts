@@ -1,9 +1,10 @@
+import { taskCompletionOutputSchema } from "@agent/subagents/browser-agent/lib/completion";
 import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
-import { taskCompletionOutputSchema } from "@agent/subagents/browser-agent/lib/completion";
 
 const workerTaskNotificationPrefix =
   /^Background task (\S+) \(browser-agent\) /u;
+
 const terminalTaskControlSchema = z.object({
   tasks: z.array(
     z.object({
@@ -26,10 +27,13 @@ export function measureWorkerTask(
 ) {
   const start = events.find((event) => event.type === "message.received")?.meta
     .at;
+
   const backgroundTasks = readBackgroundWorkerTasks(events);
+
   const pendingWorker = backgroundTasks.some(
     (task) => task.status === undefined
   );
+
   const terminal =
     readTaskCompletion(events)?.completedAt ??
     (pendingWorker
@@ -41,6 +45,7 @@ export function measureWorkerTask(
         (!pendingWorker &&
           (event.type === "turn.failed" || event.type === "turn.cancelled"))
     )?.meta.at;
+
   let completedSteps = 0;
   let measuredSteps = 0;
   let costUsd = 0;
@@ -54,16 +59,21 @@ export function measureWorkerTask(
     completedSteps += 1;
 
     const cost = event.data.usage?.costUsd;
+
     if (cost !== undefined) {
       measuredSteps += 1;
       costUsd += cost;
     }
+
     const input = event.data.usage?.inputTokens;
+
     if (input !== undefined) {
       measuredInputTokenSteps += 1;
       inputTokens += input;
     }
+
     const output = event.data.usage?.outputTokens;
+
     if (output !== undefined) {
       measuredOutputTokenSteps += 1;
       outputTokens += output;
@@ -89,9 +99,11 @@ export function didCompleteWorker(events: readonly MessageStreamEvent[]) {
 
 export function didFinishWorker(events: readonly MessageStreamEvent[]) {
   const backgroundTasks = readBackgroundWorkerTasks(events);
+
   if (backgroundTasks.length > 0) {
     return backgroundTasks.every((task) => task.status !== undefined);
   }
+
   return readTaskCompletion(events) !== undefined;
 }
 
@@ -100,6 +112,7 @@ export function terminalWorkerMessage(
   events: readonly MessageStreamEvent[]
 ) {
   const completion = readTaskCompletion(events);
+
   if (completion) return normalizeMessage(completion.message);
 
   if (message?.trim()) return normalizeMessage(message);
@@ -115,18 +128,22 @@ export function terminalWorkerMessage(
 
 export function readTaskCompletion(events: readonly MessageStreamEvent[]) {
   const backgroundTasks = readBackgroundWorkerTasks(events);
+
   if (backgroundTasks.length > 0) {
     if (backgroundTasks.some((task) => task.status === undefined)) {
       return undefined;
     }
 
     const latest = backgroundTasks.at(-1);
+
     if (latest?.status === "completed" && latest.output && latest.terminalAt) {
       const completion = taskCompletionOutputSchema.safeParse(latest.output);
+
       if (completion.success) {
         return { ...completion.data, completedAt: latest.terminalAt };
       }
     }
+
     return undefined;
   }
 
@@ -135,9 +152,11 @@ export function readTaskCompletion(events: readonly MessageStreamEvent[]) {
       const completion = taskCompletionOutputSchema.safeParse(
         event.data.result
       );
+
       if (completion.success) {
         return { ...completion.data, completedAt: event.meta.at };
       }
+
       continue;
     }
 
@@ -149,10 +168,12 @@ export function readTaskCompletion(events: readonly MessageStreamEvent[]) {
         const completion = taskCompletionOutputSchema.safeParse(
           event.data.output
         );
+
         if (completion.success) {
           return { ...completion.data, completedAt: event.meta.at };
         }
       }
+
       continue;
     }
 
@@ -161,16 +182,19 @@ export function readTaskCompletion(events: readonly MessageStreamEvent[]) {
     }
 
     const result = event.data.result;
+
     if (result.kind === "subagent-result") {
       if (
         result.subagentName === "browser-agent" &&
         (result.origin !== "child" || result.backgroundTask === undefined)
       ) {
         const completion = taskCompletionOutputSchema.safeParse(result.output);
+
         if (completion.success) {
           return { ...completion.data, completedAt: event.meta.at };
         }
       }
+
       continue;
     }
   }
@@ -181,8 +205,10 @@ export function readTaskCompletion(events: readonly MessageStreamEvent[]) {
 function readWorkerTaskNotification(event: MessageStreamEvent) {
   if (event.type !== "message.received") return undefined;
   const match = workerTaskNotificationPrefix.exec(event.data.message);
+
   if (!match) return undefined;
   const [, taskId] = match;
+
   if (!taskId) return undefined;
   const message = event.data.message.slice(match[0].length);
 
@@ -190,6 +216,7 @@ function readWorkerTaskNotification(event: MessageStreamEvent) {
     return { status: "cancelled" as const, taskId };
 
   const completedPrefix = "is completed.\n\nResult:\n";
+
   if (message.startsWith(completedPrefix)) {
     return {
       output: message.slice(completedPrefix.length),
@@ -199,6 +226,7 @@ function readWorkerTaskNotification(event: MessageStreamEvent) {
   }
 
   const failedPrefix = "failed.\n\nError:\n";
+
   if (message.startsWith(failedPrefix)) {
     return {
       output: message.slice(failedPrefix.length),
@@ -215,6 +243,7 @@ function readBackgroundWorkerTasks(events: readonly MessageStreamEvent[]) {
 
   for (const event of events) {
     const receiptTaskId = readBackgroundWorkerReceiptTaskId(event);
+
     if (receiptTaskId) {
       tasks.set(receiptTaskId, {
         taskId: receiptTaskId,
@@ -223,8 +252,10 @@ function readBackgroundWorkerTasks(events: readonly MessageStreamEvent[]) {
     }
 
     const notification = readWorkerTaskNotification(event);
+
     if (notification) {
       const task = tasks.get(notification.taskId);
+
       if (task) {
         tasks.set(notification.taskId, {
           ...task,
@@ -233,6 +264,7 @@ function readBackgroundWorkerTasks(events: readonly MessageStreamEvent[]) {
           terminalAt: event.meta.at,
         });
       }
+
       continue;
     }
 
@@ -248,9 +280,12 @@ function readBackgroundWorkerTasks(events: readonly MessageStreamEvent[]) {
     const parsed = terminalTaskControlSchema.safeParse(
       event.data.result.output
     );
+
     if (!parsed.success) continue;
+
     for (const result of parsed.data.tasks) {
       const task = tasks.get(result.taskId);
+
       if (!task) continue;
       tasks.set(result.taskId, {
         ...task,

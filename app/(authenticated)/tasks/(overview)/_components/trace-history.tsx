@@ -1,9 +1,6 @@
 "use client";
 
-import { RefreshCwIcon } from "lucide-react";
-import Link from "next/link";
-import { useMemo } from "react";
-import { z } from "zod";
+import type { BrowserTracePage } from "@db/services/browser-traces";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
@@ -15,8 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
-import type { BrowserTracePage } from "@db/services/browser-traces";
 import { api } from "@web/trpc/client";
+import { RefreshCwIcon } from "lucide-react";
+import Link from "next/link";
+import { useMemo } from "react";
+import { z } from "zod";
 
 const statusLabels = {
   cancelled: { label: "Cancelled", variant: "secondary" },
@@ -25,6 +25,7 @@ const statusLabels = {
   running: { label: "Running", variant: "information" },
   success: { label: "Succeeded", variant: "success" },
 } as const;
+
 const traceStatusSchema = z.enum([
   "cancelled",
   "error",
@@ -35,6 +36,7 @@ const traceStatusSchema = z.enum([
 
 function statusLabel(status: string) {
   const parsed = traceStatusSchema.safeParse(status);
+
   return parsed.success
     ? statusLabels[parsed.data]
     : { label: status, variant: "secondary" as const };
@@ -42,11 +44,15 @@ function statusLabel(status: string) {
 
 function formatDuration(durationMs: number | null) {
   if (durationMs === null) return "—";
+
   if (durationMs < 1000) return "<1s";
   const seconds = Math.round(durationMs / 1000);
+
   if (seconds < 60) return `${String(seconds)}s`;
   const minutes = Math.floor(seconds / 60);
+
   if (minutes < 60) return `${String(minutes)}m ${String(seconds % 60)}s`;
+
   return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60)}m`;
 }
 
@@ -62,13 +68,16 @@ export function TraceHistory({
     initialCursor: null,
     staleTime: 30 * 1000,
   };
+
   if (initialPage) {
     Object.assign(queryOptions, {
       initialData: { pageParams: [null], pages: [initialPage] },
     });
   }
+
   const history = api.traces.list.useInfiniteQuery({}, queryOptions);
   const pages = history.data?.pages;
+
   const traces = useMemo(
     () => [
       ...new Map(
@@ -79,6 +88,7 @@ export function TraceHistory({
     ],
     [pages]
   );
+
   const historyError = history.error
     ? history.error instanceof Error
       ? history.error.message
@@ -86,6 +96,7 @@ export function TraceHistory({
     : history.data
       ? undefined
       : initialError;
+
   const succeeded = traces.filter((trace) => trace.status === "success").length;
 
   return (
@@ -140,6 +151,7 @@ export function TraceHistory({
           ) : (
             traces.map((trace) => {
               const status = statusLabel(trace.status);
+
               return (
                 <TableRow key={trace.sessionId}>
                   <TableCell className="truncate" title={trace.task}>

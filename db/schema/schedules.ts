@@ -1,5 +1,6 @@
+import { scheduledConversationChannelSchema } from "@shared/schedules/conversation";
+import { scheduledReportStatusSchema } from "@shared/schedules/report-status";
 import { relations, sql } from "drizzle-orm";
-import type { InputRequest } from "eve/client";
 import {
   check,
   foreignKey,
@@ -13,10 +14,10 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { workspaceMemberships } from "./workspaces";
+import type { InputRequest } from "eve/client";
+
 import { channelOutbox } from "./messaging";
-import { scheduledConversationChannelSchema } from "@shared/schedules/conversation";
-import { scheduledReportStatusSchema } from "@shared/schedules/report-status";
+import { workspaceMemberships } from "./workspaces";
 
 export const scheduledAgentJobs = pgTable(
   "scheduled_agent_jobs",

@@ -55,12 +55,14 @@ const attachmentsSchema = Schema.Array(attachmentSchema).check(
   Schema.isMinLength(1),
   Schema.isMaxLength(4)
 );
+
 const messageFields = {
   attachments: Schema.optionalKey(attachmentsSchema),
   kind: Schema.Literal("message"),
   text: Schema.optionalKey(textSchema),
   replyTo: Schema.optionalKey(replyReferenceSchema),
 };
+
 const messageOutputSchema = Schema.Union([
   Schema.Struct({ ...messageFields, text: textSchema }),
   Schema.Struct({ ...messageFields, attachments: attachmentsSchema }),

@@ -1,10 +1,10 @@
-import { defineEval } from "eve/evals";
-import { includes } from "eve/evals/expect";
 import {
   agentEvalTags,
   assertPlainTextDelivery,
   requireDeliveredText,
 } from "@evals/agent/shared";
+import { defineEval } from "eve/evals";
+import { includes } from "eve/evals/expect";
 
 const preferenceCanary = "quiet-car preference on train trips";
 
@@ -14,19 +14,23 @@ export default [
     tags: [...agentEvalTags, "memory"],
     async test(t) {
       let evaluationError: Error | undefined;
+
       try {
         const first = await t.send(
           `Remember this exact preference for future trips: ${preferenceCanary}.`
         );
+
         first.expectOk();
         first.succeeded();
         first.calledTool("profile__save_memory", { count: 1 });
         await requireDeliveredText(t, first);
 
         const laterSession = t.newSession();
+
         const later = await laterSession.send(
           "What seating preference have I told you to use for train trips?"
         );
+
         later.expectOk();
         later.succeeded();
         const text = await requireDeliveredText(t, later);
@@ -42,11 +46,14 @@ export default [
       }
 
       let cleanupError: Error | undefined;
+
       try {
         const cleanupSession = t.newSession();
+
         const cleanup = await cleanupSession.send(
           `Use profile__remove_memory to forget this exact preference: ${preferenceCanary}.`
         );
+
         cleanup.expectOk();
         cleanup.succeeded();
         cleanup.calledTool("profile__remove_memory", { count: 1 });
@@ -66,7 +73,9 @@ export default [
           "Memory evaluation and canary cleanup both failed."
         );
       }
+
       if (evaluationError) throw evaluationError;
+
       if (cleanupError) throw cleanupError;
     },
   }),
@@ -77,6 +86,7 @@ export default [
       const turn = await t.send(
         "For today only, I want sparkling water with lunch. Do not save that as a preference."
       );
+
       turn.expectOk();
       turn.succeeded();
       turn.notCalledTool("profile__save_memory");

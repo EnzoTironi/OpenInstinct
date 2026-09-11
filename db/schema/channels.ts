@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
 import { session, user } from "./auth";
 
 export const channelIdentities = pgTable(

@@ -24,6 +24,7 @@ export function authSessionFor<
     Partial<AuthSessionFixture["user"]>,
 >(user: User) {
   const now = new Date("2026-08-31T00:00:00.000Z");
+
   return {
     session: {
       createdAt: now,

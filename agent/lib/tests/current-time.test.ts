@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { currentTimeInstructions } from "../current-time";
 
 describe("fresh turn clock instructions", () => {
@@ -17,9 +18,11 @@ describe("fresh turn clock instructions", () => {
     const before = Date.now();
     const instructions = currentTimeInstructions();
     const after = Date.now();
+
     const timestamp = /\d{4}-\d{2}-\d{2}T[\d:.]+Z/u.exec(
       instructions.content
     )?.[0];
+
     expect(timestamp).toBeDefined();
     const observed = Date.parse(timestamp ?? "");
     expect(observed).toBeGreaterThanOrEqual(before);

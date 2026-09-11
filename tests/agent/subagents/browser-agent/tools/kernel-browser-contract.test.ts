@@ -1,22 +1,22 @@
-/* oxlint-disable typescript/no-unsafe-type-assertion -- Kernel's page type has private members beyond the AsyncIterable contract consumed by the browser tool. */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
+import type { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
+import type { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
+import type * as TraceDomainsModule from "@agent/subagents/browser-agent/lib/trace/domains";
+import type { harvestBrowserTraceDomains } from "@agent/subagents/browser-agent/lib/trace/domains";
+import manageBrowsers, {
+  kernelProfileNameForWorkspace,
+} from "@agent/subagents/browser-agent/tools/manage_browsers";
+import type { recordBrowserTraceDomains } from "@db/services/browser-traces";
 import type {
   createBrowserSession,
   deleteBrowserSession,
   listBrowserSessions,
   withBrowserProfileWriteLock,
 } from "@db/services/browsers";
-import type { recordBrowserTraceDomains } from "@db/services/browser-traces";
-import type { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
-import type { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
-import type * as TraceDomainsModule from "@agent/subagents/browser-agent/lib/trace/domains";
-import type { harvestBrowserTraceDomains } from "@agent/subagents/browser-agent/lib/trace/domains";
-import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { toolContextFor } from "@tests/helpers/tool-context";
-import manageBrowsers, {
-  kernelProfileNameForWorkspace,
-} from "@agent/subagents/browser-agent/tools/manage_browsers";
+/* oxlint-disable typescript/no-unsafe-type-assertion -- Kernel's page type has private members beyond the AsyncIterable contract consumed by the browser tool. */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const serviceMocks = vi.hoisted(() => ({
   createBrowserSession: vi.fn<typeof createBrowserSession>(),
@@ -35,15 +35,19 @@ vi.mock("@db/services/browsers", () => ({
   listBrowserSessions: serviceMocks.listBrowserSessions,
   withBrowserProfileWriteLock: serviceMocks.withBrowserProfileWriteLock,
 }));
+
 vi.mock("@db/services/browser-traces", () => ({
   recordBrowserTraceDomains: serviceMocks.recordBrowserTraceDomains,
 }));
+
 vi.mock("@agent/subagents/browser-agent/lib/access", () => ({
   requireWorkerScope: serviceMocks.requireWorkerScope,
 }));
+
 vi.mock("@agent/subagents/browser-agent/lib/owned-browser", () => ({
   requireOwnedBrowserSession: serviceMocks.requireOwnedBrowserSession,
 }));
+
 vi.mock(
   "@agent/subagents/browser-agent/lib/trace/domains",
   async (importOriginal) => ({
@@ -55,6 +59,7 @@ vi.mock(
 vi.mock("eve/context", () => ({
   defineState: <T>(_name: string, initial: () => T) => {
     let value = initial();
+
     return {
       get: () => value,
       update: (update: (current: T) => T) => {
@@ -130,6 +135,7 @@ const workerContext = toolContextFor({ sessionId: "worker-session-1" });
 describe("Kernel browser contract", () => {
   it("keeps agent-created browsers alive for at least 15 minutes", () => {
     const inputSchema = manageBrowsers.inputSchema;
+
     if (!(inputSchema instanceof z.ZodType)) {
       throw new Error("manage_browsers must use a Zod input schema.");
     }
@@ -159,9 +165,11 @@ describe("Kernel browser contract", () => {
         browser_live_view_url: "https://live.kernel.test/browser-1",
       },
     });
+
     const lifecycle = z
       .object({ next_actions: z.array(z.string()) })
       .parse(result);
+
     expect(lifecycle.next_actions.join(" ")).toContain("browser_snapshot");
     expect(lifecycle.next_actions.join(" ")).toContain("browser_act");
     expect(lifecycle.next_actions.join(" ")).toContain("playwright_execute");

@@ -1,19 +1,22 @@
-import { Effect, Result } from "effect";
-import Link from "next/link";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { inspectPersonalMemory } from "../../../server/personal-memory/export";
-import { serverRuntime } from "../../../server/runtime";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { buttonVariants } from "@web/components/ui/button";
+import { Effect, Result } from "effect";
+import { headers } from "next/headers";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { inspectPersonalMemory } from "../../../server/personal-memory/export";
+import { serverRuntime } from "../../../server/runtime";
 
 export async function PersonalMemorySection() {
   const result = await serverRuntime.runPromise(
     inspectPersonalMemory(await headers()).pipe(Effect.result)
   );
+
   if (Result.isFailure(result)) {
     if (result.failure.reason === "unauthenticated")
       redirect("/sign-in?callbackUrl=%2Faccount");
+
     return (
       <Alert variant="destructive">
         <AlertTitle>Couldn&apos;t load personal memory</AlertTitle>
@@ -21,10 +24,13 @@ export async function PersonalMemorySection() {
       </Alert>
     );
   }
+
   const snapshot = result.success;
+
   const profile = Object.entries(snapshot.profile).filter(
     ([, value]) => value !== null
   );
+
   return (
     <section
       aria-labelledby="personal-memory-heading"

@@ -12,6 +12,7 @@ export function compareBenchmarkTasks(
   if (baseline?.success !== true || candidate?.success !== true) {
     return { cost: null, time: null };
   }
+
   return {
     cost: improvementRatio(baseline.costUsd, candidate.costUsd),
     time: improvementRatio(baseline.durationMs, candidate.durationMs),
@@ -24,10 +25,12 @@ export function averageBenchmarkImprovement(
 ) {
   const comparisons = baseline.flatMap((baselineTask) => {
     const candidateTask = candidate.find((task) => task.id === baselineTask.id);
+
     return candidateTask
       ? [compareBenchmarkTasks(baselineTask, candidateTask)]
       : [];
   });
+
   return {
     cost: mean(comparisons.flatMap((value) => finite(value.cost))),
     time: mean(comparisons.flatMap((value) => finite(value.time))),
@@ -47,6 +50,7 @@ function improvementRatio(
   ) {
     return null;
   }
+
   return (candidate - baseline) / baseline;
 }
 
@@ -56,5 +60,6 @@ function finite(value: number | null) {
 
 function mean(values: readonly number[]) {
   if (values.length === 0) return null;
+
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }

@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { browserImageArtifactReferenceSchema } from "@shared/browser/artifact";
+import { z } from "zod";
 
 export const maximumWorkerCompletionImages = 4;
 
@@ -18,9 +18,12 @@ const historicalTaskCompletionSchema = taskCompletionSchema.omit({
 export const taskCompletionOutputSchema = z.preprocess(
   (input) => {
     const text = z.string().safeParse(input);
+
     if (!text.success) return input;
+
     try {
       const parsed = z.json().safeParse(JSON.parse(text.data));
+
       return parsed.success ? parsed.data : input;
     } catch {
       return input;

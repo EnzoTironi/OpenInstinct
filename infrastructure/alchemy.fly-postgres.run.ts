@@ -2,6 +2,7 @@ import * as Alchemy from "alchemy";
 import * as Fly from "alchemy/Fly";
 import * as RemovalPolicy from "alchemy/RemovalPolicy";
 import { Config, Effect, Option } from "effect";
+
 import { CompanionStagePolicy } from "./companion-stage.ts";
 
 /**
@@ -28,18 +29,22 @@ export default Alchemy.Stack(
   Effect.gen(function* () {
     const policy = yield* CompanionStagePolicy;
     const password = yield* Config.redacted("COMPANION_POSTGRES_PASSWORD");
+
     const region = yield* Config.string("COMPANION_FLY_PG_REGION").pipe(
       Config.withDefault("gru")
     );
+
     const volumeSizeGb = yield* Config.number(
       "COMPANION_FLY_PG_VOLUME_GB"
     ).pipe(
       Config.withDefault(10),
       Config.map((n) => Math.max(1, Math.floor(n)))
     );
+
     const configuredAppName = yield* Config.string(
       "COMPANION_FLY_PG_APP_NAME"
     ).pipe(Config.option);
+
     const appName = Option.getOrElse(
       configuredAppName,
       () => `companion-pg-${policy.stage.replaceAll("_", "-")}`

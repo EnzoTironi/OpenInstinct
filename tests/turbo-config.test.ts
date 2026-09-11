@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -13,6 +14,7 @@ const applicationEnvironment = [
   "SECRET_ENCRYPTION_KEY",
   "VERCEL_*",
 ];
+
 const runtimeEnvironment = [
   "AI_GATEWAY_API_KEY",
   ...applicationEnvironment,

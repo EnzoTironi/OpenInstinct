@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
 import { readEntitlement } from "@db/services/billing";
 import { applicationOrigin } from "@shared/environment/origin";
+import { Effect, Schema } from "effect";
+
 import { requireStripe, StripeNotConfiguredError } from "./stripe";
 
 export class BillingPortalError extends Schema.TaggedError<BillingPortalError>()(
@@ -20,6 +21,7 @@ export const createCustomerPortalSession = Effect.fn(
   "createCustomerPortalSession"
 )(function* (input: { userId: string; organizationId?: string }) {
   let stripe;
+
   try {
     stripe = requireStripe();
   } catch (error) {
@@ -29,11 +31,13 @@ export const createCustomerPortalSession = Effect.fn(
         message: error.message,
       });
     }
+
     throw error;
   }
 
   const subjectType = input.organizationId ? "organization" : "user";
   const subjectId = input.organizationId ?? input.userId;
+
   const entitlement = yield* Effect.tryPromise({
     try: () => readEntitlement(subjectType, subjectId),
     catch: () =>
@@ -44,6 +48,7 @@ export const createCustomerPortalSession = Effect.fn(
   });
 
   let customerId = entitlement.stripeCustomerId;
+
   if (!customerId && input.organizationId) {
     const userEntitlement = yield* Effect.tryPromise({
       try: () => readEntitlement("user", input.userId),
@@ -53,6 +58,7 @@ export const createCustomerPortalSession = Effect.fn(
           message: "Unable to load user entitlement.",
         }),
     });
+
     customerId = userEntitlement.stripeCustomerId;
   }
 
@@ -64,6 +70,7 @@ export const createCustomerPortalSession = Effect.fn(
   }
 
   const origin = applicationOrigin();
+
   const session = yield* Effect.tryPromise({
     try: () =>
       stripe.billingPortal.sessions.create({

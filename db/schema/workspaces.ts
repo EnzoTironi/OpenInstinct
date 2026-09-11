@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+
 import { organizations } from "./organizations";
 
 export const workspaces = pgTable(

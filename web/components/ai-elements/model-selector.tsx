@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import { cn } from "@web/components/class-names";
 import {
   Command,
   CommandEmpty,
@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@web/components/ui/dialog";
-import { cn } from "@web/components/class-names";
+import type { ComponentProps, ReactNode } from "react";
 
 export function ModelSelector(props: ComponentProps<typeof Dialog>) {
   return <Dialog {...props} />;

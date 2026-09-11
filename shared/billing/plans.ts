@@ -4,6 +4,7 @@
  */
 
 const billingPlanIds = ["free", "pro", "org"] as const;
+
 export type BillingPlanId = (typeof billingPlanIds)[number];
 
 /** Mirrors `Release1QuotaLimits` so UI + admission share one catalog. */
@@ -122,8 +123,10 @@ export function quotaLimitsForPlan(
   seatCount = 1
 ): PlanQuotaLimits {
   const base = planQuotaLimits[plan];
+
   if (plan !== "org") return base;
   const seats = Math.max(1, Math.floor(seatCount));
+
   return {
     user: { ...base.user },
     installation: {

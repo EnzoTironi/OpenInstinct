@@ -1,6 +1,5 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
 import type { VaultItem } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
 import {
@@ -8,7 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@web/components/ui/dialog";
-import { ContactForm } from "./form";
+import { PlusIcon } from "lucide-react";
+
 import {
   useVaultSection,
   VaultItemBrowser,
@@ -18,6 +18,7 @@ import {
   VaultSectionTrigger,
 } from "../section";
 import { useVaultSetup } from "../setup";
+import { ContactForm } from "./form";
 
 export function VaultContacts({
   items,

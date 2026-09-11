@@ -1,5 +1,14 @@
 "use client";
 
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarTrigger,
+} from "@web/components/ui/sidebar";
 import {
   ClockIcon,
   HistoryIcon,
@@ -11,15 +20,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
-import {
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarTrigger,
-} from "@web/components/ui/sidebar";
 
 const navigation = [
   { href: "/", icon: HouseIcon, id: "workspace", label: "Home" },
@@ -58,6 +58,7 @@ export function AuthenticatedNavigation() {
           <SidebarMenu>
             {navigation.map((item) => {
               const Icon = item.icon;
+
               return (
                 <SidebarMenuItem
                   className={
@@ -106,11 +107,18 @@ export function AuthenticatedMobileHeader() {
 
 function activeRoute(pathname: string) {
   if (pathname === "/") return "workspace";
+
   if (pathname.startsWith("/vault")) return "vault";
+
   if (pathname.startsWith("/personal-info")) return "personal-info";
+
   if (pathname.startsWith("/reminders")) return "reminders";
+
   if (pathname.startsWith("/chat/history")) return "history";
+
   if (pathname.startsWith("/chat")) return "chat";
+
   if (pathname.startsWith("/tasks")) return "tasks";
+
   return undefined;
 }

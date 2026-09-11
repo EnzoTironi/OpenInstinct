@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
 import { GetStartedPanel } from "../_components/get-started-panel";
 
 describe("consumer get-started", () => {
@@ -8,6 +9,7 @@ describe("consumer get-started", () => {
     const html = renderToStaticMarkup(
       createElement(GetStartedPanel, { callbackUrl: "/?welcome=1" })
     );
+
     expect(html).toContain("Get started in one flow");
     expect(html).toContain("Connect your first channel");
     expect(html).toContain("Continue with Telegram");

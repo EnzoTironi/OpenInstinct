@@ -1,7 +1,8 @@
-import { typescriptRuleTester as tester } from "./rule-tester.ts";
+import { RuleTester } from "oxlint/plugins-dev";
 
-import { noModuleMockingRule } from "@tools/oxlint/anti-slop/rules/no-module-mocking.ts";
+import { noModuleMockingRule } from "./no-module-mocking.ts";
 
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } });
 const error = { messageId: "moduleMock" };
 
 tester.run("anti-slop/no-module-mocking", noModuleMockingRule, {

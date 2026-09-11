@@ -1,7 +1,8 @@
-import { typescriptRuleTester as tester } from "./rule-tester.ts";
+import { RuleTester } from "oxlint/plugins-dev";
 
-import { noReflectGetRule } from "@tools/oxlint/anti-slop/rules/no-reflect-get.ts";
+import { noReflectGetRule } from "./no-reflect-get.ts";
 
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } });
 const error = { messageId: "reflectGet" };
 
 tester.run("anti-slop/no-reflect-get", noReflectGetRule, {

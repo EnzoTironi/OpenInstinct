@@ -1,10 +1,11 @@
-import { Effect } from "effect";
-import { and, eq } from "drizzle-orm";
 import { db, organizationMemberships } from "@db";
 import {
   assertOrgErasureAllowed,
   type OrgErasureDecision,
 } from "@shared/identity/org-erasure";
+import { and, eq } from "drizzle-orm";
+import { Effect } from "effect";
+
 import { appendOrganizationAuditReceipt } from "./organization-audit";
 import type { OrganizationAuditAppendFailed } from "./organization-audit";
 import { OrganizationMembershipMissing } from "./organizations";
@@ -35,8 +36,10 @@ export function requestOrganizationErasure(input: {
           )
         )
         .limit(1);
+
       return rows[0];
     });
+
     if (actor === undefined) {
       yield* Effect.fail(
         new OrganizationMembershipMissing({
@@ -44,6 +47,7 @@ export function requestOrganizationErasure(input: {
           userId: input.actorUserId,
         })
       );
+
       return {
         status: "denied" as const,
         reason: "not_admin" as const,

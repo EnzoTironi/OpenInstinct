@@ -1,6 +1,7 @@
-import { requireChannelModelInput } from "./policy";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+
+import { requireChannelModelInput } from "./policy";
 import {
   ChannelMediaError,
   decodeMediaText,

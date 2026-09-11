@@ -1,15 +1,17 @@
-import { accessScopeForUser } from "../../shared/identity/access-scope";
 /* eslint-disable typescript/no-unsafe-type-assertion -- Synthetic callback data supplies only fields consumed by these handlers; all services remain real. */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+
 import { PgClient } from "@effect/sql-pg";
 import { Config, Effect } from "effect";
 import type { ChannelEvents } from "eve/channels";
 import { test } from "vitest";
+
 import { privateChannelEvents } from "../../agent/lib/private-channel-events";
-import { channelPrincipal } from "../../server/channels/principal";
 import { ChannelAccounts } from "../../server/accounts";
+import { channelPrincipal } from "../../server/channels/principal";
 import { serverRuntime } from "../../server/runtime";
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 
 test("terminal channel events persist once per turn and enforce current authority", async () => {
   const url = await Effect.runPromise(Config.string("DATABASE_URL"));
@@ -17,15 +19,19 @@ test("terminal channel events persist once per turn and enforce current authorit
   await serverRuntime.runPromise(
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
+
       const rows = yield* sql<{
         name: string;
       }>`SELECT current_database() AS name`;
+
       assert.equal(rows[0]?.name, "companion_runtime_test");
     })
   );
+
   const identity = await serverRuntime.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
+
       return yield* accounts.resolveVerifiedSender({
         channel: "telegram",
         installationId: randomUUID(),
@@ -33,10 +39,12 @@ test("terminal channel events persist once per turn and enforce current authorit
       });
     })
   );
+
   try {
     const handlers = privateChannelEvents("telegram");
     const auth = channelPrincipal(identity);
     const sessionId = randomUUID();
+
     // Synthetic event/context data enters the actual handlers and database services.
     // No context operation or external service is replaced.
     // SAFETY: handlers read only session ID and auth; this fixture supplies both.
@@ -47,10 +55,12 @@ test("terminal channel events persist once per turn and enforce current authorit
       ({
         session: { id: sessionId, auth: { current, initiator } },
       }) as Parameters<NonNullable<ChannelEvents["turn.failed"]>>[2];
+
     // SAFETY: all three handlers ignore their channel argument.
     const channel = undefined as Parameters<
       NonNullable<ChannelEvents["turn.failed"]>
     >[1];
+
     const failure = {
       turnId: randomUUID(),
       sequence: 1,
@@ -58,6 +68,7 @@ test("terminal channel events persist once per turn and enforce current authorit
       message: "synthetic-provider-secret",
       details: { token: "synthetic-private-detail" },
     };
+
     await Promise.all(
       Array.from({ length: 8 }, (_, sequence) =>
         handlers["turn.failed"](
@@ -78,6 +89,7 @@ test("terminal channel events persist once per turn and enforce current authorit
       channel,
       context(null)
     );
+
     const invalid = [
       { ...auth, principalId: `better-auth:${randomUUID()}` },
       {
@@ -89,6 +101,7 @@ test("terminal channel events persist once per turn and enforce current authorit
         attributes: { ...auth.attributes, conversationId: randomUUID() },
       },
     ];
+
     await Promise.all(
       invalid.map((principal) =>
         assert.rejects(async () =>
@@ -123,6 +136,7 @@ test("terminal channel events persist once per turn and enforce current authorit
     await serverRuntime.runPromise(
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;
+
         const rows = yield* sql<{
           delivery_key: string;
           payload: { text: string };
@@ -130,6 +144,7 @@ test("terminal channel events persist once per turn and enforce current authorit
         }>`
         SELECT delivery_key, payload, status FROM channel_outbox WHERE identity_id = ${identity.id}
         ORDER BY delivery_key`;
+
         assert.deepEqual(
           rows,
           [failure.turnId, cancelledTurn]
@@ -159,9 +174,11 @@ test("terminal channel events persist once per turn and enforce current authorit
 test("authorization challenges persist exact public fields once and reject stale identity", async () => {
   const url = await Effect.runPromise(Config.string("DATABASE_URL"));
   assert.equal(new URL(url).pathname, "/companion_runtime_test");
+
   const identity = await serverRuntime.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
+
       return yield* accounts.resolveVerifiedSender({
         channel: "telegram",
         installationId: randomUUID(),
@@ -169,10 +186,12 @@ test("authorization challenges persist exact public fields once and reject stale
       });
     })
   );
+
   try {
     const handlers = privateChannelEvents("telegram");
     const auth = channelPrincipal(identity);
     const sessionId = randomUUID();
+
     // SAFETY: the actual handler reads only session.id and auth from this synthetic context.
     const callbackContext = (
       current: typeof auth | null,
@@ -181,11 +200,14 @@ test("authorization challenges persist exact public fields once and reject stale
       ({
         session: { id: sessionId, auth: { current, initiator } },
       }) as Parameters<NonNullable<ChannelEvents["authorization.required"]>>[2];
+
     const context = callbackContext(auth);
+
     // SAFETY: the handler does not read the channel argument.
     const channel = undefined as Parameters<
       NonNullable<ChannelEvents["authorization.required"]>
     >[1];
+
     const event = {
       attemptId: randomUUID(),
       turnId: randomUUID(),
@@ -201,6 +223,7 @@ test("authorization challenges persist exact public fields once and reject stale
       },
       webhookUrl: "https://internal.example.com/private-callback-token",
     };
+
     await Promise.all(
       Array.from({ length: 8 }, (_, sequence) =>
         handlers["authorization.required"](
@@ -213,10 +236,12 @@ test("authorization challenges persist exact public fields once and reject stale
     await serverRuntime.runPromise(
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;
+
         const rows = yield* sql<{
           payload: { text: string };
           status: string;
         }>`SELECT payload, status FROM channel_outbox WHERE identity_id = ${identity.id}`;
+
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.status, "queued");
         assert.equal(
@@ -232,6 +257,7 @@ test("authorization challenges persist exact public fields once and reject stale
         context
       )
     );
+
     const wrongOwner = {
       ...context,
       session: {
@@ -242,6 +268,7 @@ test("authorization challenges persist exact public fields once and reject stale
         },
       },
     };
+
     await assert.rejects(() =>
       handlers["authorization.required"](
         { ...event, attemptId: randomUUID() },
@@ -265,8 +292,10 @@ test("authorization challenges persist exact public fields once and reject stale
     await serverRuntime.runPromise(
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;
+
         const rows =
           yield* sql`SELECT id FROM channel_outbox WHERE identity_id = ${identity.id}`;
+
         assert.equal(rows.length, 1);
       })
     );

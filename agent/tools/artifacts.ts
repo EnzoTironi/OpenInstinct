@@ -2,25 +2,28 @@ import { Effect, Schema } from "effect";
 import { defineDynamic, defineTool } from "eve/tools";
 import { always } from "eve/tools/approval";
 import { z } from "zod";
+
 import { Artifacts } from "../../server/artifacts";
 import { ArtifactId, ArtifactListSchema } from "../../server/artifacts/model";
 import { readArtifactText } from "../../server/artifacts/read";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { serverRuntime } from "../../server/runtime";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
 import { approvalMessageSchema } from "../lib/approval-message";
 import { authorizeApprovalResponse } from "../lib/approval-response";
-import { requireChannelPrincipal } from "../../server/channels/principal";
 import { resolveModeValue } from "../lib/mode";
 
 const toolArtifactId = z.fromJSONSchema(
   Schema.toJsonSchemaDocument(ArtifactId).schema
 );
+
 const requireActor = Effect.fn("artifactTools.requireActor")(function* (
   auth: Parameters<typeof requireChannelPrincipal>[1]
 ) {
   const channel = yield* Schema.decodeUnknownEffect(channelProviderSchema)(
     auth?.attributes.conversationChannel
   );
+
   return yield* requireChannelPrincipal(channel, auth);
 });
 
@@ -32,15 +35,18 @@ export const artifactRead = defineTool({
     return serverRuntime.runPromise(
       Effect.gen(function* () {
         const identity = yield* requireActor(context.session.auth.current);
+
         const artifactId = yield* Schema.decodeUnknownEffect(ArtifactId)(
           input.artifactId
         );
+
         return yield* readArtifactText(identity.id, artifactId);
       }),
       { signal: context.abortSignal }
     );
   },
 });
+
 export const artifactList = defineTool({
   description:
     "List recent saved private attachments for this account, with stable IDs, source metadata and content hashes. The same filename can refer to different files: clarify the intended one when ambiguous. Listing does not read or understand their content.",
@@ -55,9 +61,11 @@ export const artifactList = defineTool({
     return serverRuntime.runPromise(
       Effect.gen(function* () {
         const identity = yield* requireActor(context.session.auth.current);
+
         const limit = yield* Schema.decodeUnknownEffect(
           ArtifactListSchema.fields.limit
         )(input.limit);
+
         return yield* (yield* Artifacts).list({
           identityId: identity.id,
           limit,
@@ -67,6 +75,7 @@ export const artifactList = defineTool({
     );
   },
 });
+
 export const artifactDelete = defineTool({
   approval: { request: always(), response: authorizeApprovalResponse },
   description:
@@ -81,9 +90,11 @@ export const artifactDelete = defineTool({
     return serverRuntime.runPromise(
       Effect.gen(function* () {
         const identity = yield* requireActor(context.session.auth.current);
+
         const artifactId = yield* Schema.decodeUnknownEffect(ArtifactId)(
           input.artifactId
         );
+
         return yield* (yield* Artifacts).delete({
           identityId: identity.id,
           artifactId,
@@ -104,6 +115,7 @@ export default defineDynamic({
         )
       )
         return null;
+
       return resolveModeValue(context, {
         interactive: {
           "artifacts-read": artifactRead,

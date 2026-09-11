@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import { Option, Schema } from "effect";
 import { billingPlanCatalog, type BillingPlanId } from "@shared/billing/plans";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
+import { Option, Schema } from "effect";
+import Link from "next/link";
+import { useState } from "react";
 
 const billingRedirectSchema = Schema.Struct({
   url: Schema.optionalKey(Schema.String),
@@ -26,8 +26,10 @@ async function postBilling(
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+
   const raw: unknown = await response.json();
   const decoded = Schema.decodeUnknownOption(billingRedirectSchema)(raw);
+
   if (Option.isNone(decoded) || !decoded.value.url || !response.ok) {
     if (
       Option.isSome(decoded) &&
@@ -37,12 +39,15 @@ async function postBilling(
         "Paid billing is disabled on this deployment (Stripe not configured)."
       );
     }
+
     const message =
       Option.isSome(decoded) && decoded.value.error
         ? decoded.value.error
         : "Billing request failed.";
+
     throw new Error(message);
   }
+
   return decoded.value.url;
 }
 
@@ -126,6 +131,7 @@ export function AccountBillingSection({
               void postBilling("/api/billing/checkout", { plan: "pro" })
                 .then((url) => {
                   window.location.assign(url);
+
                   return undefined;
                 })
                 .catch((cause: unknown) => {
@@ -135,6 +141,7 @@ export function AccountBillingSection({
                       : "Unable to start Checkout."
                   );
                   setBusy(null);
+
                   return undefined;
                 });
             }}
@@ -160,6 +167,7 @@ export function AccountBillingSection({
               })
                 .then((url) => {
                   window.location.assign(url);
+
                   return undefined;
                 })
                 .catch((cause: unknown) => {
@@ -169,6 +177,7 @@ export function AccountBillingSection({
                       : "Unable to start Org Checkout."
                   );
                   setBusy(null);
+
                   return undefined;
                 });
             }}
@@ -192,6 +201,7 @@ export function AccountBillingSection({
             })
               .then((url) => {
                 window.location.assign(url);
+
                 return undefined;
               })
               .catch((cause: unknown) => {
@@ -201,6 +211,7 @@ export function AccountBillingSection({
                     : "Unable to open Customer Portal."
                 );
                 setBusy(null);
+
                 return undefined;
               });
           }}

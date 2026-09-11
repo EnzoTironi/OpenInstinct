@@ -1,5 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { HookContext } from "eve/hooks";
 import type {
   completeScheduledAgentRun,
   deferScheduledAgentRunCompletion,
@@ -7,6 +5,8 @@ import type {
   releaseScheduledAgentRun,
   waitForScheduledAgentRunInput,
 } from "@db/services/scheduled-agent-jobs";
+import type { HookContext } from "eve/hooks";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const services = vi.hoisted(() => ({
   complete: vi.fn<typeof completeScheduledAgentRun>(),
@@ -27,8 +27,11 @@ vi.mock("@db/services/scheduled-agent-jobs", () => ({
 import completionHook from "@agent/hooks/scheduled-run-completion";
 
 const runId = "00000000-0000-4000-8000-000000000001";
+
 const leaseToken = "00000000-0000-4000-8000-000000000002";
+
 const retryLeaseToken = "00000000-0000-4000-8000-000000000005";
+
 const context = {
   agent: { name: "test-agent" },
   channel: { continuationToken: `scheduled-run:${runId}` },
@@ -339,6 +342,7 @@ describe("scheduled run completion hook", () => {
       prompt: "Which airport?",
       requestId: "request-1",
     };
+
     services.waitForInput.mockResolvedValue({
       attempts: 1,
       completedAt: null,

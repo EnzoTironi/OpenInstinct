@@ -18,11 +18,13 @@ describe("Eve bundled Linq adapter", () => {
         message: { id: "message-1" },
       })
     );
+
     const adapter = createLinqAdapter({
       apiKey: "test-key",
       baseURL: "https://linq.test",
       signingSecret: "test-secret",
     });
+
     try {
       await adapter.postMessage(
         adapter.encodeThreadId({ chatId: "chat-1" }),
@@ -36,8 +38,10 @@ describe("Eve bundled Linq adapter", () => {
       );
       expect(fetch).toHaveBeenCalledOnce();
       const [input, init] = fetch.mock.calls[0] ?? [];
+
       const request =
         input instanceof Request ? input.clone() : new Response(init?.body);
+
       await expect(request.json()).resolves.toEqual({
         message: {
           parts: [

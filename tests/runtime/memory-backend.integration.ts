@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+
 import { PgClient } from "@effect/sql-pg";
 import { Effect } from "effect";
 import type { MemoryTurnStartedContext } from "eve/memory";
 import { fileMemory, MemoryDocumentConflictError } from "eve/memory/file";
 import { afterAll, expect, test } from "vitest";
+
 import { createMemoryDocumentBackend } from "../../agent/lib/memory-document-backend";
 import { serverRuntime } from "../../server/runtime";
 
@@ -13,9 +15,11 @@ async function withDocument(body: (key: string) => Promise<void>) {
   await serverRuntime.runPromise(
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
+
       const current = yield* sql<{
         name: string;
       }>`SELECT current_database() AS name`;
+
       if (current[0]?.name !== "companion_runtime_test")
         throw new Error(
           "Memory backend proof requires its dedicated database."
@@ -23,6 +27,7 @@ async function withDocument(body: (key: string) => Promise<void>) {
     })
   );
   const key = `backend-proof/${randomUUID()}`;
+
   try {
     await body(key);
   } finally {
@@ -41,19 +46,23 @@ test("actual adapter creates, reads and maps CAS failures to the native Eve conf
   withDocument(async (key) => {
     const signal = new AbortController().signal;
     expect(await memoryDocumentBackend.read({ key, signal })).toBeNull();
+
     const first = await memoryDocumentBackend.write({
       key,
       signal,
       content: "first document",
       expectedVersion: null,
     });
+
     expect(await memoryDocumentBackend.read({ key, signal })).toEqual(first);
+
     const next = await memoryDocumentBackend.write({
       key,
       signal,
       content: "second document",
       expectedVersion: first.version,
     });
+
     expect(next.version).not.toBe(first.version);
     expect(next.content).toBe("second document");
     await Promise.all(
@@ -91,12 +100,14 @@ test("pre-aborted actual adapter reads and writes reject without creating or cha
       })
     ).rejects.toBeInstanceOf(Error);
     expect(await memoryDocumentBackend.read({ key, signal })).toBeNull();
+
     const first = await memoryDocumentBackend.write({
       key,
       signal,
       content: "keep this version",
       expectedVersion: null,
     });
+
     await expect(
       memoryDocumentBackend.write({
         key,
@@ -114,14 +125,17 @@ test("pre-aborted actual adapter reads and writes reject without creating or cha
 test("native fileMemory recall reads the context scope through the actual adapter and PostgreSQL", () =>
   withDocument(async (key) => {
     const abortSignal = new AbortController().signal;
+
     const content =
       "<!-- eve-memory-file-v1 lastAllocatedIndex=0 -->\n0: Prefer concise replies.\n";
+
     const seeded = await memoryDocumentBackend.write({
       key,
       signal: abortSignal,
       content,
       expectedVersion: null,
     });
+
     const context: MemoryTurnStartedContext = {
       abortSignal,
       memory: {
@@ -143,6 +157,7 @@ test("native fileMemory recall reads the context scope through the actual adapte
         throw new Error("Recall must not resolve a skill.");
       },
     };
+
     const provider = fileMemory({ backend: memoryDocumentBackend });
     const recalled = await provider.recall["turn.started"](context);
     expect(recalled?.messages).toHaveLength(1);
@@ -170,23 +185,29 @@ test("native fileMemory recall reads the context scope through the actual adapte
 test("aborting a real lock-blocked adapter write cannot commit after the lock is released", () =>
   withDocument(async (key) => {
     const signal = new AbortController().signal;
+
     const first = await memoryDocumentBackend.write({
       key,
       signal,
       content: "keep locked document",
       expectedVersion: null,
     });
+
     const locked = Promise.withResolvers<number>();
     const release = Promise.withResolvers<undefined>();
+
     const locker = serverRuntime.runPromise(
       Effect.flatMap(PgClient.PgClient, (sql) =>
         sql.withTransaction(
           Effect.gen(function* () {
             yield* sql`SELECT key FROM memory_document WHERE key = ${key} FOR UPDATE`;
+
             const rows = yield* sql<{
               pid: number;
             }>`SELECT pg_backend_pid() AS pid`;
+
             const pid = rows[0]?.pid;
+
             if (!pid) throw new Error("Missing lock connection");
             locked.resolve(pid);
             yield* Effect.promise(() => release.promise);
@@ -194,21 +215,26 @@ test("aborting a real lock-blocked adapter write cannot commit after the lock is
         )
       )
     );
+
     void locker.catch(locked.reject);
     const controller = new AbortController();
     let writerPid: number | undefined;
+
     try {
       const lockerPid = await locked.promise;
+
       const writing = memoryDocumentBackend.write({
         key,
         signal: controller.signal,
         content: "must not commit after abort",
         expectedVersion: first.version,
       });
+
       const rejection = writing.then(
         () => false,
         () => true
       );
+
       await expect
         .poll(
           async () => {
@@ -220,7 +246,9 @@ test("aborting a real lock-blocked adapter write cannot commit after the lock is
             WHERE datname = current_database() AND ${lockerPid} = ANY(pg_blocking_pids(pid))`
               )
             );
+
             writerPid = rows[0]?.pid;
+
             return rows.length;
           },
           { timeout: 5000, interval: 20 }
@@ -233,6 +261,7 @@ test("aborting a real lock-blocked adapter write cannot commit after the lock is
       release.resolve(undefined);
       await locker;
     }
+
     if (!writerPid) throw new Error("No blocked writer observed");
     await expect
       .poll(

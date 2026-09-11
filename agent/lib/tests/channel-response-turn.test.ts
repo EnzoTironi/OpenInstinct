@@ -1,14 +1,18 @@
 import type { MessageStreamEvent } from "eve/client";
 import { describe, expect, test } from "vitest";
+
 import { readChannelResponseTurnStream } from "../channel-response";
 
 const source = { turnId: "user-turn", text: "pode fazer" };
+
 const meta = { id: "event", at: "2026-09-08T20:00:00.000Z" };
+
 const started: MessageStreamEvent = {
   type: "turn.started",
   data: { turnId: source.turnId, sequence: 1 },
   meta,
 };
+
 const received: MessageStreamEvent = {
   type: "message.received",
   data: { turnId: source.turnId, sequence: 1, message: source.text },

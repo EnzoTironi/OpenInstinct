@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
+
 import { Effect, Redacted } from "effect";
 import { describe, expect, it } from "vitest";
+
 import { readVerifiedWebhook } from "./webhook";
 
 const testSecret = Redacted.make("unit-test-webhook-secret");
@@ -11,9 +13,11 @@ describe("webhook byte and authentication boundaries", () => {
       method: "POST",
       body: "not json",
     });
+
     const result = await Effect.runPromise(
       readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
     );
+
     expect(result.status).toBe(401);
     expect(request.bodyUsed).toBe(false);
   });
@@ -30,24 +34,29 @@ describe("webhook byte and authentication boundaries", () => {
             .digest("hex"),
         },
       });
+
       const result = await Effect.runPromise(
         readVerifiedWebhook(request, channel, Redacted.make("")).pipe(
           Effect.flip
         )
       );
+
       expect(result.status).toBe(401);
     }
   );
 
   it("bounds timeout cleanup even when stream cancellation never settles", async () => {
     let cancellationRequested = false;
+
     const body = new ReadableStream<Uint8Array>({
       pull: () => new Promise<never>(() => undefined),
       cancel: () => {
         cancellationRequested = true;
+
         return new Promise<never>(() => undefined);
       },
     });
+
     const options = {
       method: "POST",
       body,
@@ -56,7 +65,9 @@ describe("webhook byte and authentication boundaries", () => {
         "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
       },
     };
+
     const started = performance.now();
+
     const result = await Effect.runPromise(
       readVerifiedWebhook(
         new Request("https://test.invalid/channels/telegram", options),
@@ -64,6 +75,7 @@ describe("webhook byte and authentication boundaries", () => {
         testSecret
       ).pipe(Effect.flip)
     );
+
     expect(result.status).toBe(408);
     expect(cancellationRequested).toBe(true);
     expect(performance.now() - started).toBeLessThan(6000);
@@ -72,22 +84,27 @@ describe("webhook byte and authentication boundaries", () => {
 
   it("verifies Kapso over the original bytes, including whitespace", async () => {
     const body = '{ "message": { "text": "Olá" } }';
+
     const signature = createHmac("sha256", Redacted.value(testSecret))
       .update(body)
       .digest("hex");
+
     const request = new Request("https://test.invalid/channels/kapso", {
       method: "POST",
       body,
       headers: { "x-webhook-signature": signature },
     });
+
     expect(
       await Effect.runPromise(readVerifiedWebhook(request, "kapso", testSecret))
     ).toEqual({ message: { text: "Olá" } });
+
     const changed = new Request("https://test.invalid/channels/kapso", {
       method: "POST",
       body: '{"message":{"text":"Olá"}}',
       headers: { "x-webhook-signature": signature },
     });
+
     expect(
       await Effect.runPromise(
         readVerifiedWebhook(changed, "kapso", testSecret).pipe(Effect.flip)
@@ -103,6 +120,7 @@ describe("webhook byte and authentication boundaries", () => {
         "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
       },
     });
+
     expect(
       await Effect.runPromise(
         readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
@@ -118,6 +136,7 @@ describe("webhook byte and authentication boundaries", () => {
         "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
       },
     });
+
     expect(
       await Effect.runPromise(
         readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
@@ -136,6 +155,7 @@ describe("webhook byte and authentication boundaries", () => {
         text: "hello private",
       },
     });
+
     const request = new Request("https://test.invalid/channels/telegram", {
       method: "POST",
       body,
@@ -143,6 +163,7 @@ describe("webhook byte and authentication boundaries", () => {
         "x-telegram-bot-api-secret-token": Redacted.value(testSecret),
       },
     });
+
     expect(
       await Effect.runPromise(
         readVerifiedWebhook(request, "telegram", testSecret)
@@ -164,9 +185,11 @@ describe("webhook byte and authentication boundaries", () => {
         "x-telegram-bot-api-secret-token": "not-the-configured-secret",
       },
     });
+
     const result = await Effect.runPromise(
       readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
     );
+
     expect(result.status).toBe(401);
     expect(request.bodyUsed).toBe(false);
   });
@@ -179,6 +202,7 @@ describe("webhook byte and authentication boundaries", () => {
         "x-telegram-bot-api-secret-token": `${Redacted.value(testSecret)}x`,
       },
     });
+
     expect(
       await Effect.runPromise(
         readVerifiedWebhook(request, "telegram", testSecret).pipe(Effect.flip)
@@ -187,6 +211,7 @@ describe("webhook byte and authentication boundaries", () => {
   });
   it("rejects a wrong Kapso HMAC signature after reading the body", async () => {
     const body = '{ "message": { "text": "Olá" } }';
+
     const request = new Request("https://test.invalid/channels/kapso", {
       method: "POST",
       body,
@@ -196,23 +221,28 @@ describe("webhook byte and authentication boundaries", () => {
           .digest("hex"),
       },
     });
+
     const result = await Effect.runPromise(
       readVerifiedWebhook(request, "kapso", testSecret).pipe(Effect.flip)
     );
+
     expect(result.status).toBe(401);
     expect(request.bodyUsed).toBe(true);
   });
 
   it("rejects a length-mismatched Kapso HMAC signature", async () => {
     const body = "{}";
+
     const signature = createHmac("sha256", Redacted.value(testSecret))
       .update(body)
       .digest("hex");
+
     const request = new Request("https://test.invalid/channels/kapso", {
       method: "POST",
       body,
       headers: { "x-webhook-signature": `${signature}00` },
     });
+
     expect(
       await Effect.runPromise(
         readVerifiedWebhook(request, "kapso", testSecret).pipe(Effect.flip)
@@ -240,14 +270,17 @@ describe("webhook byte and authentication boundaries", () => {
         phone_number: "+15550002222",
       },
     });
+
     const signature = createHmac("sha256", Redacted.value(testSecret))
       .update(body)
       .digest("hex");
+
     const request = new Request("https://test.invalid/channels/kapso", {
       method: "POST",
       body,
       headers: { "x-webhook-signature": signature },
     });
+
     expect(
       await Effect.runPromise(readVerifiedWebhook(request, "kapso", testSecret))
     ).toMatchObject({

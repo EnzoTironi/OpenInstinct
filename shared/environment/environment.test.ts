@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Redacted } from "effect";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const requiredEnvironment = {
   BETTER_AUTH_SECRET: "test-auth-secret-0123456789abcdefghijklmnop",
@@ -14,9 +14,11 @@ describe("environment", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
+
     for (const [name, value] of Object.entries(requiredEnvironment)) {
       vi.stubEnv(name, value);
     }
+
     vi.stubEnv("LINQ_CONNECTOR", "");
     vi.stubEnv("LINQ_PHONE_NUMBER", "");
     vi.stubEnv("GOOGLE_CLIENT_ID", "");

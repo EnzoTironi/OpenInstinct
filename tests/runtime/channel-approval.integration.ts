@@ -1,21 +1,25 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+
 import { PgClient } from "@effect/sql-pg";
 import { Config, Effect } from "effect";
 import type { SessionAuthContext } from "eve/context";
 import { test } from "vitest";
+
 import { authorizeApprovalResponse } from "../../agent/lib/approval-response";
-import { channelPrincipal } from "../../server/channels/principal";
 import { ChannelAccounts } from "../../server/accounts";
+import { channelPrincipal } from "../../server/channels/principal";
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 
 test("approval responses require the exact native owner, current identity and owned session", async () => {
   const url = await Effect.runPromise(Config.string("DATABASE_URL"));
   assert.equal(new URL(url).pathname, "/companion_runtime_test");
+
   const identity = await serverRuntime.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
+
       return yield* accounts.resolveVerifiedSender({
         channel: "telegram",
         installationId: randomUUID(),
@@ -23,13 +27,16 @@ test("approval responses require the exact native owner, current identity and ow
       });
     })
   );
+
   const scope = accessScopeForUser(`better-auth:${identity.userId}`);
   const sessionId = randomUUID();
   const auth = channelPrincipal(identity);
+
   const context = (responder: SessionAuthContext, id = sessionId) => ({
     responder,
     session: { id, initiator: auth },
   });
+
   try {
     await serverRuntime.runPromise(
       Effect.gen(function* () {

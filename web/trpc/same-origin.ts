@@ -1,8 +1,10 @@
 export function isSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
+
   if (!origin) return true;
 
   let parsedOrigin: URL;
+
   try {
     parsedOrigin = new URL(origin);
   } catch {
@@ -11,6 +13,7 @@ export function isSameOrigin(request: Request) {
 
   const requestUrl = new URL(request.url);
   const allowedOrigins = new Set([requestUrl.origin]);
+
   const protocol =
     firstForwardedValue(request.headers.get("x-forwarded-proto")) ??
     requestUrl.protocol;
@@ -20,7 +23,9 @@ export function isSameOrigin(request: Request) {
     request.headers.get("host"),
   ]) {
     const host = firstForwardedValue(value);
+
     if (!host) continue;
+
     try {
       allowedOrigins.add(
         new URL(`${normalizeProtocol(protocol)}//${host}`).origin
@@ -35,6 +40,7 @@ export function isSameOrigin(request: Request) {
 
 function firstForwardedValue(value: string | null) {
   const first = value?.split(",", 1)[0]?.trim();
+
   return first?.length ? first : undefined;
 }
 

@@ -1,5 +1,6 @@
-import { Effect, Schema } from "effect";
 import { getAuthSession } from "@db/services/auth/session";
+import { Effect, Schema } from "effect";
+
 import {
   BillingCheckoutError,
   createCheckoutSession,
@@ -18,6 +19,7 @@ function checkoutErrorResponse(error: BillingCheckoutError) {
       : error.reason === "org_forbidden" || error.reason === "org_required"
         ? 403
         : 400;
+
   return Response.json(
     { error: error.message, reason: error.reason },
     { status }
@@ -26,11 +28,13 @@ function checkoutErrorResponse(error: BillingCheckoutError) {
 
 export async function POST(request: Request) {
   const session = await getAuthSession(request.headers);
+
   if (!session?.user) {
     return Response.json({ error: "Sign in to upgrade." }, { status: 401 });
   }
 
   const rawBody: unknown = await request.json().catch(() => null);
+
   return Effect.runPromise(
     Schema.decodeUnknownEffect(bodySchema)(rawBody ?? {}).pipe(
       Effect.mapError(

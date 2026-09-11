@@ -1,17 +1,19 @@
-import { deviceAuthStatus } from "../../agent/tools/device-auth";
-import { channelPrincipal } from "../../server/channels/principal";
-import type { ToolContext } from "eve/tools";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
+
+import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { PgClient } from "@effect/sql-pg";
 import { betterAuth } from "better-auth";
-import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { Config, Effect, Layer, ManagedRuntime, Schema } from "effect";
+import type { ToolContext } from "eve/tools";
 import { Pool } from "pg";
 import { test } from "vitest";
-import { NativeDeviceAuth } from "../../server/accounts/device";
+
+import { deviceAuthStatus } from "../../agent/tools/device-auth";
 import { ChannelAccounts } from "../../server/accounts";
+import { NativeDeviceAuth } from "../../server/accounts/device";
 import { channelAuthPlugin } from "../../server/channel-auth";
+import { channelPrincipal } from "../../server/channels/principal";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
 
@@ -25,7 +27,9 @@ test("native browser binding requires same-session approval before BetterAuth ca
   const url = await Effect.runPromise(
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
   );
+
   const secret = randomBytes(32).toString("base64url");
+
   const runtime = ManagedRuntime.make(
     NativeDeviceAuth.layer.pipe(
       Layer.provideMerge(ChannelAccounts.layer),
@@ -38,6 +42,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
       Layer.provideMerge(runtimeDatabase)
     )
   );
+
   const run = <A, E>(
     program: Effect.Effect<
       A,
@@ -45,8 +50,10 @@ test("native browser binding requires same-session approval before BetterAuth ca
       NativeDeviceAuth | ChannelAccounts | PgClient.PgClient
     >
   ) => runtime.runPromise(program);
+
   const pool = new Pool({ connectionString: url });
   const baseURL = "http://localhost:3000";
+
   const auth = betterAuth({
     baseURL,
     database: pool,
@@ -55,6 +62,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
     advanced: { disableOriginCheck: false, disableCSRFCheck: false },
     plugins: [channelAuthPlugin(run)],
   });
+
   const request = (
     path: string,
     body?: {
@@ -69,13 +77,18 @@ test("native browser binding requires same-session approval before BetterAuth ca
       method: body === undefined ? "GET" : "POST",
       headers: { origin, cookie, "content-type": "application/json" },
     };
+
     if (body) init.body = JSON.stringify(body);
+
     return auth.handler(new Request(`${baseURL}/api/auth${path}`, init));
   };
+
   const installationId = randomUUID();
+
   const identity = await run(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
+
       return yield* accounts.resolveVerifiedSender({
         channel: "kapso",
         installationId,
@@ -83,9 +96,11 @@ test("native browser binding requires same-session approval before BetterAuth ca
       });
     })
   );
+
   const otherIdentity = await run(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
+
       return yield* accounts.resolveVerifiedSender({
         channel: "kapso",
         installationId,
@@ -93,15 +108,18 @@ test("native browser binding requires same-session approval before BetterAuth ca
       });
     })
   );
+
   const otherScope = accessScopeForUser(`better-auth:${otherIdentity.userId}`);
   const foreignSession = randomUUID();
   const scope = accessScopeForUser(`better-auth:${identity.userId}`);
   const source = { identityId: identity.id, sessionId: randomUUID() };
   const otherSession = randomUUID();
+
   try {
     await run(
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;
+
         for (const id of [source.sessionId, otherSession])
           yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${id}, ${scope.workspaceId}, ${scope.userId})`;
       })
@@ -113,6 +131,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
       })
     );
     const principal = channelPrincipal(identity);
+
     const context: ToolContext = {
       session: {
         id: source.sessionId,
@@ -135,6 +154,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
         throw new Error("This test has no provider authorization.");
       },
     };
+
     assert.deepEqual(await deviceAuthStatus.execute({}, context), {
       requests: [],
     });
@@ -187,20 +207,25 @@ test("native browser binding requires same-session approval before BetterAuth ca
         }
       )
     );
+
     const issue = (callId: string) =>
       run(
         Effect.gen(function* () {
           const devices = yield* NativeDeviceAuth;
+
           return yield* devices.issue({ ...source, callId, purpose: "login" });
         })
       );
+
     const pending = (sessionId = source.sessionId) =>
       run(
         Effect.gen(function* () {
           const devices = yield* NativeDeviceAuth;
+
           return yield* devices.pending({ identityId: identity.id, sessionId });
         })
       );
+
     const confirm = (
       challengeId: string,
       browserBoundAt: string,
@@ -209,6 +234,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
       run(
         Effect.gen(function* () {
           const devices = yield* NativeDeviceAuth;
+
           return yield* devices.confirm({
             purpose: "login",
             identityId: identity.id,
@@ -218,6 +244,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
           });
         })
       );
+
     const issued = await issue("first");
     assert.deepEqual(await issue("first"), issued);
     const entryToken = issued.entryToken;
@@ -230,6 +257,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
       run(
         Effect.gen(function* () {
           const accounts = yield* ChannelAccounts;
+
           return yield* accounts.confirmChallenge({
             token: entryToken,
             sender: {
@@ -241,11 +269,13 @@ test("native browser binding requires same-session approval before BetterAuth ca
         })
       )
     );
+
     const body = {
       id: issued.challenge.id,
       token: entryToken,
       purpose: "login" as const,
     };
+
     assert.equal(
       (
         await request(
@@ -293,11 +323,13 @@ test("native browser binding requires same-session approval before BetterAuth ca
         .status,
       400
     );
+
     const resumed = await request(
       `/channel-auth/device?id=${body.id}&purpose=login`,
       undefined,
       browser
     );
+
     assert.equal(resumed.status, 200);
     assert.equal(resumed.headers.get("cache-control"), "no-store");
     assert.deepEqual(await resumed.json(), {
@@ -310,6 +342,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
       await run(
         Effect.gen(function* () {
           const devices = yield* NativeDeviceAuth;
+
           return yield* devices.pending({
             identityId: otherIdentity.id,
             sessionId: foreignSession,
@@ -322,6 +355,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
       run(
         Effect.gen(function* () {
           const devices = yield* NativeDeviceAuth;
+
           return yield* devices.confirm({
             purpose: "login",
             identityId: otherIdentity.id,
@@ -352,16 +386,20 @@ test("native browser binding requires same-session approval before BetterAuth ca
       ).status,
       200
     );
+
     const complete = await request(
       "/channel-auth/complete",
       { id: body.id },
       browser
     );
+
     assert.equal(complete.status, 200);
     const session = await request("/get-session", undefined, cookies(complete));
+
     const sessionBody = Schema.decodeUnknownSync(
       Schema.Struct({ user: Schema.Struct({ id: Schema.String }) })
     )(await session.json());
+
     assert.equal(sessionBody.user.id, identity.userId);
     assert.equal(
       (await request("/channel-auth/complete", { id: body.id }, browser))
@@ -371,11 +409,13 @@ test("native browser binding requires same-session approval before BetterAuth ca
     await assert.rejects(confirm(body.id, bound.browserBoundAt));
     const revoked = await issue("revoked");
     assert.ok(revoked.entryToken);
+
     const boundRevoked = await request("/channel-auth/device-bind", {
       id: revoked.challenge.id,
       purpose: "login",
       token: revoked.entryToken,
     });
+
     assert.equal(boundRevoked.status, 200);
     const revocationTarget = (await pending())[0];
     assert.ok(revocationTarget?.browserBoundAt);

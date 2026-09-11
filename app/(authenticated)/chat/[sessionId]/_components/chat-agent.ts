@@ -1,3 +1,4 @@
+import type { UserContent } from "ai";
 import type {
   CancelSessionResult,
   InputResponse,
@@ -6,7 +7,6 @@ import type {
   SendTurnOptions,
 } from "eve/client";
 import type { EveMessageData, UseEveAgentStatus } from "eve/react";
-import type { UserContent } from "ai";
 
 export interface ChatAgent {
   readonly cancel: () => Promise<CancelSessionResult>;

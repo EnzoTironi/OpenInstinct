@@ -1,5 +1,3 @@
-import { and, count, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
-import type { z } from "zod";
 import { db, workspaces, workstreams } from "@db";
 import type { AccessScope } from "@shared/identity/access-scope";
 import {
@@ -7,6 +5,9 @@ import {
   forgetWorkstreamSchema,
   saveWorkstreamSchema,
 } from "@shared/workstreams/schema";
+import { and, count, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
+import type { z } from "zod";
+
 import { ensureScope } from "./scope";
 
 export async function findWorkstreams(
@@ -16,6 +17,7 @@ export async function findWorkstreams(
 ) {
   const { query, status, offset } = findWorkstreamsSchema.parse(input);
   const pattern = `%${query.replace(/[\\%_]/gu, "\\$&")}%`;
+
   const rows = await db
     .select()
     .from(workstreams)
@@ -36,6 +38,7 @@ export async function findWorkstreams(
     .orderBy(desc(workstreams.updatedAt), workstreams.id)
     .limit(21)
     .offset(offset);
+
   return {
     items: rows.slice(0, 20).map(workstreamSummary),
     nextOffset: rows.length > 20 ? offset + 20 : null,
@@ -55,6 +58,7 @@ export async function recallWorkstreams(scope: AccessScope, scopeKey: string) {
     )
     .orderBy(desc(workstreams.updatedAt), workstreams.id)
     .limit(9);
+
   return {
     items: rows.slice(0, 8).map(workstreamSummary),
     hasMore: rows.length > 8,
@@ -78,6 +82,7 @@ export async function readWorkstream(
       )
     )
     .limit(1);
+
   return row ? workstreamResult(row) : null;
 }
 
@@ -90,6 +95,7 @@ export async function saveWorkstream(
 ) {
   const { id, expectedRevision, content } = saveWorkstreamSchema.parse(input);
   await ensureScope(scope);
+
   return db.transaction(async (transaction) => {
     // Serialize capacity checks and writes for this workspace, including new IDs.
     await transaction
@@ -97,18 +103,22 @@ export async function saveWorkstream(
       .from(workspaces)
       .where(eq(workspaces.id, scope.workspaceId))
       .for("update");
+
     const identity = and(
       eq(workstreams.workspaceId, scope.workspaceId),
       eq(workstreams.scopeKey, scopeKey),
       eq(workstreams.id, id)
     );
+
     const [current] = await transaction
       .select()
       .from(workstreams)
       .where(identity)
       .limit(1);
+
     if (current?.lastOperationId === operationId)
       return workstreamResult(current);
+
     if (
       (current?.revision ?? 0) !== expectedRevision ||
       current?.content === null
@@ -117,6 +127,7 @@ export async function saveWorkstream(
         "Workstream changed or was forgotten. Read it again and reconcile your update; use a new ID for a forgotten workstream."
       );
     }
+
     if (!current) {
       const [total] = await transaction
         .select({ value: count() })
@@ -128,11 +139,13 @@ export async function saveWorkstream(
             isNotNull(workstreams.content)
           )
         );
+
       if ((total?.value ?? 0) >= 100)
         throw new Error(
           "Workstream memory is full (100 records). Ask which obsolete workstream to forget before adding another."
         );
     }
+
     const values = {
       content,
       lastOperationId: operationId,
@@ -140,6 +153,7 @@ export async function saveWorkstream(
       sessionId,
       updatedAt: new Date(),
     };
+
     const [saved] = current
       ? await transaction
           .update(workstreams)
@@ -156,7 +170,9 @@ export async function saveWorkstream(
           .insert(workstreams)
           .values({ ...values, id, scopeKey, workspaceId: scope.workspaceId })
           .returning();
+
     if (!saved) throw new Error("The workstream could not be saved.");
+
     return workstreamResult(saved);
   });
 }
@@ -169,6 +185,7 @@ export async function forgetWorkstream(
 ) {
   const { id, expectedRevision } = forgetWorkstreamSchema.parse(input);
   await ensureScope(scope);
+
   return db.transaction(async (transaction) => {
     // Use the same lock as saves so forgetting also fences a delayed initial create.
     await transaction
@@ -176,22 +193,27 @@ export async function forgetWorkstream(
       .from(workspaces)
       .where(eq(workspaces.id, scope.workspaceId))
       .for("update");
+
     const identity = and(
       eq(workstreams.workspaceId, scope.workspaceId),
       eq(workstreams.scopeKey, scopeKey),
       eq(workstreams.id, id)
     );
+
     const [current] = await transaction
       .select()
       .from(workstreams)
       .where(identity)
       .limit(1);
+
     if (current?.content === null) return { forgotten: true };
+
     if (current && current.revision !== expectedRevision) {
       throw new Error(
         "Workstream changed. Read the current revision before forgetting it."
       );
     }
+
     // Retain only a tombstone, including when a save for this ID has not arrived yet.
     const values = {
       content: null,
@@ -200,6 +222,7 @@ export async function forgetWorkstream(
       lastOperationId: operationId,
       updatedAt: new Date(),
     };
+
     if (current) {
       await transaction.update(workstreams).set(values).where(identity);
     } else {
@@ -207,6 +230,7 @@ export async function forgetWorkstream(
         .insert(workstreams)
         .values({ ...values, id, scopeKey, workspaceId: scope.workspaceId });
     }
+
     return { forgotten: true };
   });
 }

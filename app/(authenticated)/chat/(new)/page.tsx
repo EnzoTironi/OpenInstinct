@@ -6,6 +6,7 @@ export default async function NewChatPage({
 }: PageProps<"/chat">) {
   const params = await searchParams;
   const starter = chatStarters.find((item) => item.id === params.starter);
+
   return (
     <div className="flex h-full min-h-0 items-center justify-center bg-background px-4 pb-[10vh] text-foreground sm:px-6">
       <div className="flex w-full max-w-xl flex-col items-center gap-6">

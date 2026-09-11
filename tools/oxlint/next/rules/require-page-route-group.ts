@@ -26,9 +26,11 @@ export const requirePageRouteGroupRule = defineRule({
     return {
       before() {
         const filename = normalizePath(context.filename);
+
         if (!/^page\.[jt]sx?$/.test(path.basename(filename))) return false;
 
         owner = path.dirname(filename);
+
         return !/^\(.+\)$/.test(path.basename(owner));
       },
       Program(node) {

@@ -1,12 +1,3 @@
-import { AlertCircleIcon, BrainIcon, LoaderCircleIcon } from "lucide-react";
-import { Fragment, useMemo } from "react";
-import {
-  imessageTimestamps,
-  messageTimestamps,
-  sentMessages,
-} from "../../_lib/message-events";
-import { messagesForTraceView, type TraceView } from "../../_lib/trace-view";
-import { getLatestTurnFailure } from "../../_lib/turn-failure";
 import {
   Conversation,
   ConversationContent,
@@ -16,8 +7,18 @@ import { Message, MessageContent } from "@web/components/ai-elements/message";
 import { Shimmer } from "@web/components/ai-elements/shimmer";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
-import { AgentMessage } from "./message";
+import { AlertCircleIcon, BrainIcon, LoaderCircleIcon } from "lucide-react";
+import { Fragment, useMemo } from "react";
+
+import {
+  imessageTimestamps,
+  messageTimestamps,
+  sentMessages,
+} from "../../_lib/message-events";
+import { messagesForTraceView, type TraceView } from "../../_lib/trace-view";
+import { getLatestTurnFailure } from "../../_lib/turn-failure";
 import type { ChatAgent } from "../chat-agent";
+import { AgentMessage } from "./message";
 
 export function ChatConversation({
   agent,
@@ -40,28 +41,36 @@ export function ChatConversation({
   readonly traceView: TraceView;
 }) {
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
+
   const isRestoring =
     agent.status === "resuming" && agent.data.messages.length === 0;
+
   const lastMessage = agent.data.messages.at(-1);
+
   const pendingAssistantMessageId =
     lastMessage?.role === "assistant" &&
     lastMessage.parts.every((part) => part.type === "step-start")
       ? lastMessage.id
       : undefined;
+
   const showPendingThinking =
     traceView === "trace" &&
     isBusy &&
     (agent.status === "submitted" ||
       lastMessage?.role !== "assistant" ||
       pendingAssistantMessageId !== undefined);
+
   const turnFailure =
     isBusy || isRestoring ? undefined : getLatestTurnFailure(agent.events);
+
   const errorMessage =
     (agent.error ? toErrorMessage(agent.error) : undefined) ?? turnFailure;
+
   const messages = useMemo(
     () => messagesForTraceView(agent.data.messages, agent.events, traceView),
     [agent.data.messages, agent.events, traceView]
   );
+
   const timestamps = useMemo(
     () =>
       traceView === "imessage"
@@ -69,6 +78,7 @@ export function ChatConversation({
         : messageTimestamps(agent.events),
     [agent.events, traceView]
   );
+
   const deliveredMessages = useMemo(
     () => sentMessages(agent.events),
     [agent.events]
@@ -115,6 +125,7 @@ export function ChatConversation({
             traceView === "imessage"
               ? deliveredMessages.get(message.id)
               : undefined;
+
           if (deliveries) {
             return (
               <Fragment key={message.id}>
@@ -167,9 +178,11 @@ export function ChatConversation({
 
 function toErrorMessage(cause: unknown): string {
   if (!(cause instanceof Error)) return "Unable to complete the request.";
+
   if (/<!doctype html|<html[\s>]/i.test(cause.message)) {
     return "The agent runtime is unavailable. Try again in a moment.";
   }
+
   return cause.message;
 }
 

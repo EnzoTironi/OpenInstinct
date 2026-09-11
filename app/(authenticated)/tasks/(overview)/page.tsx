@@ -1,20 +1,23 @@
-import { MessageSquareIcon } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@web/components/ui/button";
 import { listBrowserTraces } from "@db/services/browser-traces";
 import { requireRequestScope } from "@web/auth/request-scope";
+import { Button } from "@web/components/ui/button";
+import { MessageSquareIcon } from "lucide-react";
+import Link from "next/link";
+
 import { TraceHistory } from "./_components/trace-history";
 
 export default async function TasksPage() {
   const scope = await requireRequestScope();
   let initialError: string | undefined;
   let initialPage;
+
   try {
     initialPage = await listBrowserTraces(scope);
   } catch (error) {
     console.error("Unable to read browser traces", error);
     initialError = "Unable to read the browser trace history.";
   }
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:p-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

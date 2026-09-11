@@ -1,7 +1,7 @@
+import { openInstinctLowMemBuild } from "@shared/environment/env/low-mem-build";
 import { Effect, Schema } from "effect";
 import { withEve, type EveNextRewriteSections } from "eve/next";
 import type { NextConfig } from "next";
-import { openInstinctLowMemBuild } from "@shared/environment/env/low-mem-build";
 
 const nextConfig: NextConfig = openInstinctLowMemBuild
   ? {
@@ -17,7 +17,9 @@ const nextConfig: NextConfig = openInstinctLowMemBuild
       },
     }
   : {};
+
 const frameworkConfig = withEve(nextConfig);
+
 const eveRoute = "/eve/v1/:path+";
 
 class EveRoutingUnavailable extends Schema.TaggedError<EveRoutingUnavailable>()(
@@ -33,7 +35,9 @@ export default function companionConfig(
       const resolved = yield* Effect.promise(() =>
         Promise.resolve(frameworkConfig(...args))
       );
+
       const frameworkRewrites = resolved.rewrites;
+
       return {
         ...resolved,
         rewrites: () =>
@@ -45,22 +49,28 @@ export default function companionConfig(
                     "This deployment needs an Eve proxy before enabling channel webhooks.",
                 });
               }
+
               const rewrites = yield* Effect.promise(() =>
                 Promise.resolve(frameworkRewrites())
               );
+
               const sections: EveNextRewriteSections = Array.isArray(rewrites)
                 ? { beforeFiles: [], afterFiles: rewrites, fallback: [] }
                 : rewrites;
+
               const native = sections.beforeFiles?.find(
                 (route) => route.source === eveRoute
               );
+
               if (!native?.destination.endsWith(eveRoute)) {
                 return yield* new EveRoutingUnavailable({
                   message:
                     "Eve's generated route is missing or unsupported. Check the installed Eve routing configuration.",
                 });
               }
+
               const destination = native.destination.slice(0, -eveRoute.length);
+
               return {
                 ...sections,
                 beforeFiles: [

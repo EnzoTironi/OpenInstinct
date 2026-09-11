@@ -1,9 +1,9 @@
+import { agentEvalTags } from "@evals/agent/shared";
+import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import { Result, Schema } from "effect";
 import { defineEval } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
-import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
-import { agentEvalTags } from "@evals/agent/shared";
-import { accessScopeForUser } from "@shared/identity/access-scope";
 
 const cases = [
   {
@@ -24,12 +24,16 @@ export default defineEval({
     const initial = await t.send(
       "I only want price-monitor updates when the price changes. Reply with exactly 'Schedule lifecycle harness ready.'"
     );
+
     initial.expectOk();
     initial.succeeded();
     let mainEventIndex = initial.events.length;
+
     const { createScheduledAgentJob, listScheduledAgentJobs } =
       await import("@db/services/scheduled-agent-jobs");
+
     const scope = accessScopeForUser("better-auth:browser-benchmark");
+
     const conversation = {
       conversationChannel: "eve" as const,
       conversationId: initial.sessionId,
@@ -37,6 +41,7 @@ export default defineEval({
 
     const runCase = async (testCase: (typeof cases)[number]) => {
       const dueAt = new Date(Date.now() - 1_000);
+
       const job = await createScheduledAgentJob(
         scope,
         {
@@ -49,6 +54,7 @@ export default defineEval({
       );
 
       const dispatch = await t.target.dispatchSchedule("dynamic");
+
       const sessionIds = await t.require(
         dispatch.sessionIds,
         satisfies<readonly string[]>(
@@ -56,7 +62,9 @@ export default defineEval({
           "one due scheduled worker session was dispatched"
         )
       );
+
       const workerSessionId = sessionIds[0];
+
       if (!workerSessionId) {
         throw new Error("Schedule dispatch did not return a worker session.");
       }
@@ -68,6 +76,7 @@ export default defineEval({
       const stored = (await listScheduledAgentJobs(scope, conversation)).find(
         (candidate) => candidate.id === job.id
       );
+
       const runId = await t.require(
         stored?.latestRun?.id,
         satisfies<string | undefined>(
@@ -75,6 +84,7 @@ export default defineEval({
           "the scheduled worker persisted a run"
         )
       );
+
       if (!runId) throw new Error("The scheduled run was not persisted.");
 
       const reportResponse = await t.target.fetch(
@@ -85,12 +95,15 @@ export default defineEval({
           method: "POST",
         }
       );
+
       await t.require(reportResponse.status, equals(202));
 
       const report = await t.target.attachSession(initial.sessionId, {
         startIndex: mainEventIndex,
       });
+
       report.succeeded();
+
       if (testCase.expectedDelivery === null) {
         report.notCalledTool("send_message");
       } else {
@@ -99,6 +112,7 @@ export default defineEval({
             const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
               input
             );
+
             return (
               Result.isSuccess(parsed) &&
               parsed.success.kind === "message" &&
@@ -109,6 +123,7 @@ export default defineEval({
           count: 1,
         });
       }
+
       report.notCalledTool("browser-agent");
       mainEventIndex += report.events.length;
     };

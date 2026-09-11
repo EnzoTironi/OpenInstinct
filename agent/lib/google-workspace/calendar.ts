@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
+
 import { calendar, type calendar_v3 } from "@googleapis/calendar";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
-import { googleApiErrorStatus, withGoogleAuth } from "./client";
+
 import { calendarEventTime } from "./calendar-time";
+import { googleApiErrorStatus, withGoogleAuth } from "./client";
 
 export const calendarEventSchema = z.object({
   attendees: z.array(z.email()).max(50).default([]),
@@ -41,6 +43,7 @@ export async function listCalendarEvents(
       },
       { signal: ctx.abortSignal }
     );
+
     return {
       displayTimezone: input.timezone,
       events: (data.items ?? []).map((event) =>
@@ -74,6 +77,7 @@ export async function checkCalendarAvailability(
       },
       { signal: ctx.abortSignal }
     );
+
     return parseCalendarAvailability(data);
   });
 }
@@ -87,11 +91,13 @@ export function parseCalendarAvailability(
         (error) => `${calendarId}: ${error.reason ?? error.domain ?? "unknown"}`
       )
   );
+
   if (failures.length > 0) {
     throw new Error(
       `Google Calendar could not read availability for ${failures.join(", ")}.`
     );
   }
+
   return value;
 }
 
@@ -103,6 +109,7 @@ export async function createCalendarEvent(
     .update(`${ctx.session.id}:${ctx.callId}`)
     .digest("hex")
     .slice(0, 32);
+
   return withCalendar(ctx, async (client) => {
     try {
       const { data } = await client.events.insert(
@@ -123,13 +130,16 @@ export async function createCalendarEvent(
         },
         { signal: ctx.abortSignal }
       );
+
       return data;
     } catch (error) {
       if (googleApiErrorStatus(error) !== 409) throw error;
+
       const { data } = await client.events.get(
         { calendarId: payload.calendarId, eventId },
         { signal: ctx.abortSignal }
       );
+
       return data;
     }
   });

@@ -1,10 +1,10 @@
-import { defineTool, toolOutput, toolOutputPart } from "eve/tools";
-import type { ComputerBatchParams } from "@onkernel/sdk/resources/browsers/computer";
-import { z } from "zod";
-import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
+import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
 import { withVaultScreenshotMask } from "@agent/subagents/browser-agent/lib/vault-screenshot-mask";
+import type { ComputerBatchParams } from "@onkernel/sdk/resources/browsers/computer";
+import { defineTool, toolOutput, toolOutputPart } from "eve/tools";
+import { z } from "zod";
 
 const actionSchema = z.object({
   type: z.enum([
@@ -129,12 +129,14 @@ export default defineTool({
     /* oxlint-disable eslint/no-await-in-loop -- Computer actions must execute in user-specified order and batching is flushed at observation boundaries. */
     for (const action of input.actions) {
       const batchAction = toBatchAction(action);
+
       if (batchAction) {
         pendingActions.push(batchAction);
         continue;
       }
 
       await flushPendingActions();
+
       switch (action.type) {
         case "write_clipboard":
           await computer.writeClipboard(
@@ -167,6 +169,7 @@ export default defineTool({
                 action.screenshot,
                 { signal: context.abortSignal }
               );
+
               return Buffer.from(await response.arrayBuffer()).toString(
                 "base64"
               );
@@ -174,6 +177,7 @@ export default defineTool({
           );
           break;
         }
+
         case "click_mouse":
         case "drag_mouse":
         case "move_mouse":
@@ -185,6 +189,7 @@ export default defineTool({
           throw new Error(`Computer action ${action.type} was not batched.`);
       }
     }
+
     /* oxlint-enable eslint/no-await-in-loop */
     await flushPendingActions();
 
@@ -202,6 +207,7 @@ export default defineTool({
         message: output.message,
       });
     }
+
     return toolOutput.content([
       toolOutputPart.text(output.message),
       toolOutputPart.file(output.screenshotBase64, {
@@ -215,6 +221,7 @@ function requiredAction<T>(value: T | undefined, action: string): T {
   if (value === undefined) {
     throw new Error(`Computer action ${action} is missing its payload.`);
   }
+
   return value;
 }
 
@@ -268,5 +275,6 @@ function toBatchAction(
     case "write_clipboard":
       return null;
   }
+
   throw new Error("Unsupported computer action.");
 }
