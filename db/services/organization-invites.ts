@@ -278,6 +278,47 @@ export const setOrganizationMemberRoleAudited = Effect.fn(
 });
 
 /** Org admin revokes a pending invite and writes an append-only receipt. */
+const loadInviteForOrganization = Effect.fn("loadInviteForOrganization")(
+  function* (inviteId: string, organizationId: string) {
+    const invite = yield* Effect.promise(async () => {
+      const rows = await db
+        .select()
+        .from(organizationInvites)
+        .where(eq(organizationInvites.id, inviteId))
+        .limit(1);
+
+      return rows[0];
+    });
+
+    if (invite === undefined) {
+      return yield* new OrganizationInviteMissing({ inviteId });
+    }
+
+    if (invite.organizationId !== organizationId) {
+      return yield* new OrganizationInviteMissing({ inviteId });
+    }
+
+    return invite;
+  }
+);
+
+const markInviteRevoked = Effect.fn("markInviteRevoked")(function* (
+  inviteId: string
+) {
+  yield* Effect.tryPromise({
+    try: () =>
+      db
+        .update(organizationInvites)
+        .set({ status: "revoked" })
+        .where(eq(organizationInvites.id, inviteId)),
+    catch: () =>
+      new RbacDenied({
+        reason: "invalid_role",
+        message: "Failed to revoke organization invite.",
+      }),
+  });
+});
+
 export const revokeOrganizationInvite = Effect.fn("revokeOrganizationInvite")(
   function* (input: {
     inviteId: string;
@@ -300,38 +341,13 @@ export const revokeOrganizationInvite = Effect.fn("revokeOrganizationInvite")(
 
     yield* assertCanManageMembers(actor.role);
 
-    const invite = yield* Effect.promise(async () => {
-      const rows = await db
-        .select()
-        .from(organizationInvites)
-        .where(eq(organizationInvites.id, input.inviteId))
-        .limit(1);
-
-      return rows[0];
-    });
-
-    if (
-      invite === undefined ||
-      invite.organizationId !== input.organizationId
-    ) {
-      yield* new OrganizationInviteMissing({ inviteId: input.inviteId });
-
-      return;
-    }
+    const invite = yield* loadInviteForOrganization(
+      input.inviteId,
+      input.organizationId
+    );
 
     const createdAt = new Date(yield* Clock.currentTimeMillis);
-    yield* Effect.tryPromise({
-      try: () =>
-        db
-          .update(organizationInvites)
-          .set({ status: "revoked" })
-          .where(eq(organizationInvites.id, input.inviteId)),
-      catch: () =>
-        new RbacDenied({
-          reason: "invalid_role",
-          message: "Failed to revoke organization invite.",
-        }),
-    });
+    yield* markInviteRevoked(input.inviteId);
 
     yield* appendOrganizationAuditReceipt({
       id: input.receiptId,

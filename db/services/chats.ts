@@ -65,6 +65,43 @@ export async function readChat(scope: AccessScope, sessionId: string) {
   return row ? toChatSummary(row) : undefined;
 }
 
+function chatInsertValues(
+  chat: SaveChat & { readonly channel?: string },
+  scope: AccessScope,
+  now: Date
+) {
+  return {
+    channel: chat.channel ?? null,
+    costUsd: chat.usage?.costUsd ?? null,
+    createdAt: now,
+    inputTokens: chat.usage?.inputTokens ?? 0,
+    outputTokens: chat.usage?.outputTokens ?? 0,
+    sessionId: chat.sessionId,
+    title: chat.title ?? "New chat",
+    updatedAt: now,
+    workspaceId: scope.workspaceId,
+  };
+}
+
+function chatUpdateValues(
+  chat: SaveChat & { readonly channel?: string },
+  now: Date
+) {
+  const updates: Partial<typeof chats.$inferInsert> = { updatedAt: now };
+
+  if (chat.channel !== undefined) updates.channel = chat.channel;
+
+  if (chat.title !== undefined) updates.title = chat.title;
+
+  if (chat.usage !== undefined) {
+    updates.costUsd = chat.usage.costUsd;
+    updates.inputTokens = chat.usage.inputTokens;
+    updates.outputTokens = chat.usage.outputTokens;
+  }
+
+  return updates;
+}
+
 export async function saveChat(
   scope: AccessScope,
   chat: SaveChat & { readonly channel?: string }
@@ -85,36 +122,14 @@ export async function saveChat(
     );
 
   if (existing.length === 0) {
-    await db.insert(chats).values({
-      channel: chat.channel ?? null,
-      costUsd: chat.usage?.costUsd ?? null,
-      createdAt: now,
-      inputTokens: chat.usage?.inputTokens ?? 0,
-      outputTokens: chat.usage?.outputTokens ?? 0,
-      sessionId: chat.sessionId,
-      title: chat.title ?? "New chat",
-      updatedAt: now,
-      workspaceId: scope.workspaceId,
-    });
+    await db.insert(chats).values(chatInsertValues(chat, scope, now));
 
     return;
   }
 
-  const updates: Partial<typeof chats.$inferInsert> = { updatedAt: now };
-
-  if (chat.channel !== undefined) updates.channel = chat.channel;
-
-  if (chat.title !== undefined) updates.title = chat.title;
-
-  if (chat.usage !== undefined) {
-    updates.costUsd = chat.usage.costUsd;
-    updates.inputTokens = chat.usage.inputTokens;
-    updates.outputTokens = chat.usage.outputTokens;
-  }
-
   await db
     .update(chats)
-    .set(updates)
+    .set(chatUpdateValues(chat, now))
     .where(
       and(
         eq(chats.workspaceId, scope.workspaceId),

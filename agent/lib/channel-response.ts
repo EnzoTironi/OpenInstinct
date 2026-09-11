@@ -135,7 +135,6 @@ export async function readChannelResponseTurnStream(
   try {
     for (let index = 0; index <= tail; index++) {
       signal.throwIfAborted();
-      // oxlint-disable-next-line eslint/no-await-in-loop
       const item = await reader.read();
 
       if (item.done)
@@ -186,12 +185,35 @@ const requireResponseTurn = Effect.fn("requireResponseTurn")(function* (
   return undefined;
 });
 
+function rejectedResponse(
+  reason: ConstructorParameters<typeof ChannelResponseRejected>[0]["reason"]
+) {
+  return new ChannelResponseRejected({ reason });
+}
+
+const tryReadPendingInputs = Effect.fn("tryReadPendingInputs")(function* (
+  session: Session
+) {
+  return yield* Effect.tryPromise({
+    try: (signal) => readChannelInputs(session, signal),
+    catch: () => rejectedResponse("pending_unavailable"),
+  }).pipe(Effect.timeout("8 seconds"));
+});
+
+function consentDecisionReason(
+  decision: ReturnType<typeof validateChannelConsent>
+) {
+  if (decision.status === "rejected") return decision.reason;
+
+  return "invalid_decision";
+}
+
 const prepareChannelResponse = Effect.fn("prepareChannelResponse")(function* (
   input: ResponseInput,
   session: Session
 ) {
   if (session.id !== input.sessionId) {
-    return yield* new ChannelResponseRejected({ reason: "session_mismatch" });
+    return yield* rejectedResponse("session_mismatch");
   }
 
   const { identity, source } = yield* readChannelResponseContext(input);
@@ -200,17 +222,13 @@ const prepareChannelResponse = Effect.fn("prepareChannelResponse")(function* (
     text: source.text,
   });
 
-  const pending = yield* Effect.tryPromise({
-    try: (signal) => readChannelInputs(session, signal),
-    catch: () => new ChannelResponseRejected({ reason: "pending_unavailable" }),
-  }).pipe(Effect.timeout("8 seconds"));
+  const pending = yield* tryReadPendingInputs(session);
 
   const request = pending.find(
     (candidate) => candidate.requestId === input.requestId
   );
 
-  if (!request)
-    return yield* new ChannelResponseRejected({ reason: "stale_request" });
+  if (!request) return yield* rejectedResponse("stale_request");
 
   const reference = {
     requestId: request.requestId,
@@ -241,10 +259,7 @@ const prepareChannelResponse = Effect.fn("prepareChannelResponse")(function* (
   );
 
   if (decision.status !== "validated") {
-    return yield* new ChannelResponseRejected({
-      reason:
-        decision.status === "rejected" ? decision.reason : "invalid_decision",
-    });
+    return yield* rejectedResponse(consentDecisionReason(decision));
   }
 
   return {

@@ -67,18 +67,22 @@ export function recalledProjectionFrom(
  * refresh are dropped (forgotten). Prior unkeyed fragments are never kept —
  * they would resurrect unstructured notes from an older projection.
  */
-export function projectNotesForNextModelStep(
-  prior: RecalledProjection,
-  refreshed: RecalledProjection
-): RecalledProjection {
-  const refreshedIds = new Set(
-    refreshed.messages.flatMap((message) =>
-      message.id === undefined ? [] : [message.id]
-    )
-  );
+function refreshedMessageIds(refreshed: RecalledProjection) {
+  const ids = new Set<string>();
 
+  for (const message of refreshed.messages) {
+    if (message.id === undefined) continue;
+    ids.add(message.id);
+  }
+
+  return ids;
+}
+
+function seedPriorKeyedMessages(
+  prior: RecalledProjection,
+  refreshedIds: ReadonlySet<string>
+) {
   const byId = new Map<string, MemoryRecallMessage>();
-  const unkeyed: MemoryRecallMessage[] = [];
 
   for (const message of prior.messages) {
     if (message.id === undefined) continue;
@@ -86,6 +90,15 @@ export function projectNotesForNextModelStep(
     if (!refreshedIds.has(message.id)) continue;
     byId.set(message.id, message);
   }
+
+  return byId;
+}
+
+function mergeRefreshedMessages(
+  byId: Map<string, MemoryRecallMessage>,
+  refreshed: RecalledProjection
+) {
+  const unkeyed: MemoryRecallMessage[] = [];
 
   for (const message of refreshed.messages) {
     if (message.id === undefined) {
@@ -95,6 +108,17 @@ export function projectNotesForNextModelStep(
 
     byId.set(message.id, message);
   }
+
+  return unkeyed;
+}
+
+export function projectNotesForNextModelStep(
+  prior: RecalledProjection,
+  refreshed: RecalledProjection
+): RecalledProjection {
+  const refreshedIds = refreshedMessageIds(refreshed);
+  const byId = seedPriorKeyedMessages(prior, refreshedIds);
+  const unkeyed = mergeRefreshedMessages(byId, refreshed);
 
   return { messages: [...byId.values(), ...unkeyed] };
 }

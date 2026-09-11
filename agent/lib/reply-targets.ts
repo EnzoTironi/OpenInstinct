@@ -35,6 +35,49 @@ export function registerBackgroundReplyTarget(
   );
 }
 
+function resolveTaskReplyTarget(
+  taskId: string,
+  conversationId: string
+): LinqReplyTarget | undefined {
+  const target = backgroundReplyTargets.get()[taskId];
+
+  if (target?.conversationId !== conversationId) return undefined;
+
+  return target;
+}
+
+function resolveScheduleReplyTarget(
+  scheduleId: string,
+  conversationId: string,
+  auth: SessionAuth
+): LinqReplyTarget | undefined {
+  const report = scheduledReportIdentity(auth);
+
+  const anchorMatches =
+    report?.scheduleId === scheduleId && Boolean(report.replyAnchorMessageId);
+
+  if (!anchorMatches || !report?.replyAnchorMessageId) return undefined;
+
+  return {
+    conversationId,
+    messageId: report.replyAnchorMessageId,
+  };
+}
+
+function resolveReplyByKind(
+  reference: ReplyReference,
+  conversationId: string,
+  auth: SessionAuth
+): LinqReplyTarget | undefined {
+  if (reference.kind === "current") return currentLinqReplyTarget(auth);
+
+  if (reference.kind === "task") {
+    return resolveTaskReplyTarget(reference.id, conversationId);
+  }
+
+  return resolveScheduleReplyTarget(reference.id, conversationId, auth);
+}
+
 export function resolveLinqReplyTarget(
   reference: ReplyReference | undefined,
   auth: SessionAuth
@@ -45,26 +88,7 @@ export function resolveLinqReplyTarget(
 
   if (!conversationId) return undefined;
 
-  if (reference.kind === "current") {
-    return currentLinqReplyTarget(auth);
-  }
-
-  if (reference.kind === "task") {
-    const target = backgroundReplyTargets.get()[reference.id];
-
-    return target?.conversationId === conversationId ? target : undefined;
-  }
-
-  const report = scheduledReportIdentity(auth);
-
-  if (report?.scheduleId !== reference.id || !report.replyAnchorMessageId) {
-    return undefined;
-  }
-
-  return {
-    conversationId,
-    messageId: report.replyAnchorMessageId,
-  } satisfies LinqReplyTarget;
+  return resolveReplyByKind(reference, conversationId, auth);
 }
 
 function currentLinqConversationId(auth: SessionAuth) {

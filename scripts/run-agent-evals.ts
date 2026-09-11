@@ -18,7 +18,6 @@ const composeArguments = (...args: string[]) => [
   ...args,
 ];
 
-// oxlint-disable-next-line eslint/no-restricted-properties -- the eval supervisor must forward model credentials and provider configuration to its child processes
 const inheritedEnvironment = { ...process.env };
 
 let activeChild: ChildProcess | undefined;
@@ -40,6 +39,21 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
 }
 
 await runAgentEvals();
+
+async function tearDownCompose() {
+  if (!composeAttempted) return;
+
+  const exitCode = await run(
+    "docker",
+    composeArguments("down", "--volumes"),
+    inheritedEnvironment
+  );
+
+  if (exitCode === 0) return;
+
+  console.error(`docker compose teardown exited with ${String(exitCode)}`);
+  process.exitCode = 1;
+}
 
 async function runAgentEvals() {
   try {
@@ -96,20 +110,7 @@ async function runAgentEvals() {
 
     if (!interrupted) process.exitCode = exitCode ?? 1;
   } finally {
-    if (composeAttempted) {
-      const exitCode = await run(
-        "docker",
-        composeArguments("down", "--volumes"),
-        inheritedEnvironment
-      );
-
-      if (exitCode !== 0) {
-        console.error(
-          `docker compose teardown exited with ${String(exitCode)}`
-        );
-        process.exitCode = 1;
-      }
-    }
+    await tearDownCompose();
   }
 }
 
@@ -142,6 +143,38 @@ function appendValueOption(
   return index + 1;
 }
 
+function evalOptionName(argument: string) {
+  if (!argument.includes("=")) return argument;
+
+  return argument.slice(0, argument.indexOf("="));
+}
+
+function consumeEvalArgument(
+  args: string[],
+  index: number,
+  validated: string[],
+  booleanOptions: ReadonlySet<string>,
+  valueOptions: ReadonlySet<string>
+) {
+  const argument = args[index];
+
+  if (!argument) return index;
+
+  if (booleanOptions.has(argument)) {
+    validated.push(argument);
+
+    return index;
+  }
+
+  const option = evalOptionName(argument);
+
+  if (!valueOptions.has(option)) {
+    throw unsupportedEvalArgument(argument);
+  }
+
+  return appendValueOption(args, index, argument, validated);
+}
+
 function validateEvalArguments(args: string[]) {
   const booleanOptions = new Set([
     "--json",
@@ -160,24 +193,13 @@ function validateEvalArguments(args: string[]) {
   const validated: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-
-    if (!argument) continue;
-
-    if (booleanOptions.has(argument)) {
-      validated.push(argument);
-      continue;
-    }
-
-    const option = !argument.includes("=")
-      ? argument
-      : argument.slice(0, argument.indexOf("="));
-
-    if (!valueOptions.has(option)) {
-      throw unsupportedEvalArgument(argument);
-    }
-
-    index = appendValueOption(args, index, argument, validated);
+    index = consumeEvalArgument(
+      args,
+      index,
+      validated,
+      booleanOptions,
+      valueOptions
+    );
   }
 
   return validated;

@@ -101,6 +101,159 @@ const outputSchema = z.object({
   screenshotBase64: z.string().optional(),
 });
 
+type ComputerClient = ReturnType<typeof getKernel>["browsers"]["computer"];
+
+type ActionInput = z.infer<typeof actionSchema>;
+
+async function flushComputerBatch(
+  computer: ComputerClient,
+  sessionId: string,
+  pendingActions: ComputerBatchParams.Action[],
+  signal: AbortSignal | undefined
+) {
+  if (pendingActions.length === 0) return;
+  const actions = pendingActions.splice(0);
+
+  await computer.batch(sessionId, { actions }, { signal });
+}
+
+async function captureScreenshotBase64(
+  computer: ComputerClient,
+  sessionId: string,
+  screenshot: ActionInput["screenshot"],
+  signal: AbortSignal | undefined
+) {
+  return withVaultScreenshotMask(sessionId, signal, async () => {
+    const response = await computer.captureScreenshot(sessionId, screenshot, {
+      signal,
+    });
+
+    return Buffer.from(await response.arrayBuffer()).toString("base64");
+  });
+}
+
+async function runImmediateComputerAction(input: {
+  readonly action: ActionInput;
+  readonly computer: ComputerClient;
+  readonly data: unknown[];
+  readonly sessionId: string;
+  readonly signal: AbortSignal | undefined;
+}): Promise<string | undefined> {
+  const { action, computer, data, sessionId, signal } = input;
+
+  switch (action.type) {
+    case "write_clipboard":
+      await computer.writeClipboard(
+        sessionId,
+        requiredAction(action.write_clipboard, action.type),
+        { signal }
+      );
+
+      return undefined;
+    case "read_clipboard":
+      data.push(await computer.readClipboard(sessionId, { signal }));
+
+      return undefined;
+    case "get_mouse_position":
+      data.push(await computer.getMousePosition(sessionId, { signal }));
+
+      return undefined;
+    case "screenshot":
+      return captureScreenshotBase64(
+        computer,
+        sessionId,
+        action.screenshot,
+        signal
+      );
+    default:
+      throw new Error(`Computer action ${action.type} was not batched.`);
+  }
+}
+
+function computerBatchMessage(actionCount: number) {
+  const suffix = actionCount === 1 ? "" : "s";
+
+  return `Executed ${String(actionCount)} computer action${suffix}.`;
+}
+
+function optionalActionData(data: unknown[]) {
+  if (data.length === 0) return undefined;
+
+  return data;
+}
+
+function optionalScreenshotMime(screenshotBase64: string | undefined) {
+  if (!screenshotBase64) return undefined;
+
+  return "image/png" as const;
+}
+
+async function enqueueOrRunComputerAction(input: {
+  readonly action: ActionInput;
+  readonly computer: ComputerClient;
+  readonly data: unknown[];
+  readonly pendingActions: ComputerBatchParams.Action[];
+  readonly sessionId: string;
+  readonly signal: AbortSignal | undefined;
+}) {
+  const batchAction = toBatchAction(input.action);
+
+  if (batchAction) {
+    input.pendingActions.push(batchAction);
+
+    return undefined;
+  }
+
+  await flushComputerBatch(
+    input.computer,
+    input.sessionId,
+    input.pendingActions,
+    input.signal
+  );
+
+  return runImmediateComputerAction({
+    action: input.action,
+    computer: input.computer,
+    data: input.data,
+    sessionId: input.sessionId,
+    signal: input.signal,
+  });
+}
+
+async function executeComputerActions(
+  input: z.infer<typeof inputSchema>,
+  signal: AbortSignal | undefined
+) {
+  const computer = getKernel().browsers.computer;
+  const data: unknown[] = [];
+  const pendingActions: ComputerBatchParams.Action[] = [];
+  let screenshotBase64: string | undefined;
+
+  /* oxlint-disable eslint/no-await-in-loop -- Computer actions must execute in user-specified order and batching is flushed at observation boundaries. */
+  for (const action of input.actions) {
+    const captured = await enqueueOrRunComputerAction({
+      action,
+      computer,
+      data,
+      pendingActions,
+      sessionId: input.session_id,
+      signal,
+    });
+
+    screenshotBase64 = captured ?? screenshotBase64;
+  }
+
+  /* oxlint-enable eslint/no-await-in-loop */
+  await flushComputerBatch(computer, input.session_id, pendingActions, signal);
+
+  return {
+    data: optionalActionData(data),
+    message: computerBatchMessage(input.actions.length),
+    mimeType: optionalScreenshotMime(screenshotBase64),
+    screenshotBase64,
+  };
+}
+
 export default defineTool({
   description:
     "Execute a bounded batch of computer actions on one browser session. Prefer one batch over repeated calls, keep sleep actions at or below two seconds, and include a screenshot last only when visual inspection is needed; screenshots are delivered directly to the vision model.",
@@ -110,95 +263,9 @@ export default defineTool({
     const scope = await requireWorkerScope(context);
     await requireOwnedBrowserSession(scope, input.session_id);
 
-    const computer = getKernel().browsers.computer;
-    const data: unknown[] = [];
-    let pendingActions: ComputerBatchParams.Action[] = [];
-    let screenshotBase64: string | undefined;
-
-    const flushPendingActions = async () => {
-      if (pendingActions.length === 0) return;
-      const actions = pendingActions;
-      pendingActions = [];
-      await computer.batch(
-        input.session_id,
-        { actions },
-        { signal: context.abortSignal }
-      );
-    };
-
-    /* oxlint-disable eslint/no-await-in-loop -- Computer actions must execute in user-specified order and batching is flushed at observation boundaries. */
-    for (const action of input.actions) {
-      const batchAction = toBatchAction(action);
-
-      if (batchAction) {
-        pendingActions.push(batchAction);
-        continue;
-      }
-
-      await flushPendingActions();
-
-      switch (action.type) {
-        case "write_clipboard":
-          await computer.writeClipboard(
-            input.session_id,
-            requiredAction(action.write_clipboard, action.type),
-            { signal: context.abortSignal }
-          );
-          break;
-        case "read_clipboard":
-          data.push(
-            await computer.readClipboard(input.session_id, {
-              signal: context.abortSignal,
-            })
-          );
-          break;
-        case "get_mouse_position":
-          data.push(
-            await computer.getMousePosition(input.session_id, {
-              signal: context.abortSignal,
-            })
-          );
-          break;
-        case "screenshot": {
-          screenshotBase64 = await withVaultScreenshotMask(
-            input.session_id,
-            context.abortSignal,
-            async () => {
-              const response = await computer.captureScreenshot(
-                input.session_id,
-                action.screenshot,
-                { signal: context.abortSignal }
-              );
-
-              return Buffer.from(await response.arrayBuffer()).toString(
-                "base64"
-              );
-            }
-          );
-          break;
-        }
-
-        case "click_mouse":
-        case "drag_mouse":
-        case "move_mouse":
-        case "press_key":
-        case "scroll":
-        case "set_cursor":
-        case "sleep":
-        case "type_text":
-          throw new Error(`Computer action ${action.type} was not batched.`);
-      }
-    }
-
-    /* oxlint-enable eslint/no-await-in-loop */
-    await flushPendingActions();
-
-    return outputSchema.parse({
-      data: data.length > 0 ? data : undefined,
-      message: `Executed ${String(input.actions.length)} computer action${input.actions.length === 1 ? "" : "s"}.`,
-      mimeType: screenshotBase64 ? "image/png" : undefined,
-      screenshotBase64,
-    });
+    return outputSchema.parse(
+      await executeComputerActions(input, context.abortSignal)
+    );
   },
   toModelOutput(output) {
     if (!output.screenshotBase64) {

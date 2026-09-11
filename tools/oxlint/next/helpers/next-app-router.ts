@@ -195,37 +195,39 @@ const listSourceFiles = (directory: string): string[] => {
   return files;
 };
 
+const isSearchableChildDirectory = (entry: {
+  isDirectory(): boolean;
+  name: string;
+}) => entry.isDirectory() && !entry.name.startsWith("_");
+
+const childHasPageFile = (
+  childEntries: readonly { isFile(): boolean; name: string }[]
+) =>
+  childEntries.some(
+    (child) => child.isFile() && /^page\.[jt]sx?$/.test(child.name)
+  );
+
+const directoryHasPage = (childDirectory: string) => {
+  const childEntries = fs.readdirSync(childDirectory, {
+    withFileTypes: true,
+  });
+
+  return childHasPageFile(childEntries) || hasDescendantPage(childDirectory);
+};
+
 export const hasDescendantPage = (directory: string): boolean => {
   const cached = descendantPageCache.get(directory);
 
   if (cached !== undefined) return cached;
 
-  const entries = fs.readdirSync(directory, { withFileTypes: true });
+  const found = fs
+    .readdirSync(directory, { withFileTypes: true })
+    .filter(isSearchableChildDirectory)
+    .some((entry) => directoryHasPage(path.join(directory, entry.name)));
 
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith("_")) continue;
+  descendantPageCache.set(directory, found);
 
-    const childDirectory = path.join(directory, entry.name);
-
-    const childEntries = fs.readdirSync(childDirectory, {
-      withFileTypes: true,
-    });
-
-    if (
-      childEntries.some(
-        (child) => child.isFile() && /^page\.[jt]sx?$/.test(child.name)
-      ) ||
-      hasDescendantPage(childDirectory)
-    ) {
-      descendantPageCache.set(directory, true);
-
-      return true;
-    }
-  }
-
-  descendantPageCache.set(directory, false);
-
-  return false;
+  return found;
 };
 
 const getImportedSources = (contents: string) => {
@@ -242,6 +244,25 @@ const getImportedSources = (contents: string) => {
   return sources;
 };
 
+const recordImportEdge = (
+  importersByTarget: ImportGraph,
+  importer: string,
+  source: string,
+  sourceDirectory: string,
+  appDirectory: string
+) => {
+  const target = resolveLocalImport(importer, source, sourceDirectory);
+  const targetFile = target && resolveImportFile(target);
+
+  if (!targetFile) return;
+
+  if (!isWithin(targetFile, appDirectory)) return;
+
+  const importers = importersByTarget.get(targetFile) ?? new Set<string>();
+  importers.add(importer);
+  importersByTarget.set(targetFile, importers);
+};
+
 export const getAppImportGraph = (
   appDirectory: string,
   sourceDirectory: string
@@ -256,14 +277,13 @@ export const getAppImportGraph = (
     const contents = fs.readFileSync(importer, "utf8");
 
     for (const source of getImportedSources(contents)) {
-      const target = resolveLocalImport(importer, source, sourceDirectory);
-      const targetFile = target && resolveImportFile(target);
-
-      if (!targetFile || !isWithin(targetFile, appDirectory)) continue;
-
-      const importers = importersByTarget.get(targetFile) ?? new Set<string>();
-      importers.add(importer);
-      importersByTarget.set(targetFile, importers);
+      recordImportEdge(
+        importersByTarget,
+        importer,
+        source,
+        sourceDirectory,
+        appDirectory
+      );
     }
   }
 
@@ -285,15 +305,7 @@ const getRouteOwner = (filename: string, appDirectory: string) => {
   return path.join(appDirectory, ...routeSegments);
 };
 
-export const getCommonDirectory = (
-  directories: string[]
-): string | undefined => {
-  const [first, ...rest] = directories.map((directory) =>
-    normalizePath(directory).split(path.sep)
-  );
-
-  if (!first) return undefined;
-
+const sharedPrefixLength = (first: string[], rest: string[][]) => {
   let length = first.length;
 
   for (const segments of rest) {
@@ -304,7 +316,24 @@ export const getCommonDirectory = (
     length = index;
   }
 
-  return first.slice(0, length).join(path.sep) || path.sep;
+  return length;
+};
+
+export const getCommonDirectory = (
+  directories: string[]
+): string | undefined => {
+  const [first, ...rest] = directories.map((directory) =>
+    normalizePath(directory).split(path.sep)
+  );
+
+  if (!first) return undefined;
+
+  const length = sharedPrefixLength(first, rest);
+  const joined = first.slice(0, length).join(path.sep);
+
+  if (joined) return joined;
+
+  return path.sep;
 };
 
 export const getConsumerRouteOwners = (
