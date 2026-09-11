@@ -1,0 +1,29 @@
+# agent-doctor — Effect health checks for OpenInstinct.
+# Keep agent-hygiene tier off: it flags idiomatic TS control flow and would
+# dominate the score without improving Effect correctness.
+
+[tiers]
+agent = false
+
+
+# Cognitive complexity: agent-doctor 0.7 hardcodes limit 15 (no working toml
+# threshold for 6). User-facing limit is **6** via oxlint-plugin-complexity
+# (`complexity/complexity` cognitive: 6 in oxlint.config.ts). Keep this rule
+# enabled as a second gate at the default 15.
+
+[rules]
+# Schema.TaggedErrorClass is not exported by effect@4.0.0-rc.112 (AGENTS.md still
+# documents Schema.TaggedError). Re-enable when the rename ships.
+v4-schema-renames = "off"
+
+# Rule assumes TaggedError/YieldableError; remaining hits are plain `Error`,
+# which is not yieldable under tsc (TS2488).
+no-unnecessary-fail-of-yieldable = "off"
+
+# Intentional pinned effect/unstable/* imports (http/sql/cli/process) across the
+# app — agent-doctor 0.7 has no path-scoped overrides.
+v4-unstable-import-awareness = "off"
+
+# Hits are Node builtins in tests/scripts/harnesses only (fs/http/child_process
+# fixture servers). App Effect code already uses platform services.
+prefer-node-effect-counterparts = "off"

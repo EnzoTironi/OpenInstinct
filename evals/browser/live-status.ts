@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+
 import { z } from "zod";
+
 import {
   browserBenchmarkLiveStatusSchema,
   type BrowserBenchmarkLiveStatus,
@@ -10,6 +12,7 @@ import {
 export type { BrowserBenchmarkLiveStatus } from "./live-status-schema.ts";
 
 const writes = new Map<string, Promise<void>>();
+
 const nodeErrorSchema = z.object({ code: z.string() });
 
 export async function readBrowserBenchmarkLiveStatus(path: string) {
@@ -19,6 +22,7 @@ export async function readBrowserBenchmarkLiveStatus(path: string) {
     );
   } catch (error) {
     const parsed = nodeErrorSchema.safeParse(error);
+
     if (parsed.success && parsed.data.code === "ENOENT") return null;
     throw error;
   }
@@ -45,18 +49,23 @@ export async function updateBrowserBenchmarkLiveStatus(
   update: (status: BrowserBenchmarkLiveStatus) => BrowserBenchmarkLiveStatus
 ) {
   const previous = writes.get(path) ?? Promise.resolve();
+
   const next = previous.then(async () => {
     await withFileLock(path, async () => {
       const current = await readBrowserBenchmarkLiveStatus(path);
+
       if (!current || current.runId !== runId) return;
       await writeBrowserBenchmarkLiveStatus(path, {
         ...update(current),
         updatedAt: new Date().toISOString(),
       });
     });
+
     return undefined;
   });
+
   writes.set(path, next);
+
   try {
     await next;
   } finally {
@@ -64,29 +73,50 @@ export async function updateBrowserBenchmarkLiveStatus(
   }
 }
 
-async function withFileLock(path: string, action: () => Promise<void>) {
-  const lockPath = `${path}.lock`;
-  await mkdir(dirname(path), { recursive: true });
+function shouldRetryBusyLock(
+  parsed: ReturnType<typeof nodeErrorSchema.safeParse>,
+  attempt: number
+) {
+  if (!parsed.success) return false;
+
+  if (parsed.data.code !== "EEXIST") return false;
+
+  return attempt < 600;
+}
+
+async function waitForLockRetry(lockPath: string, attempt: number) {
+  if (attempt % 100 === 99 && (await lockIsStale(lockPath))) {
+    await rm(lockPath, { force: true, recursive: true });
+
+    return;
+  }
+
+  await delay(50);
+}
+
+async function acquireFileLock(lockPath: string) {
   for (let attempt = 0; ; attempt += 1) {
     try {
       // oxlint-disable-next-line eslint/no-await-in-loop -- lock creation is the sequential acquisition attempt itself
       await mkdir(lockPath);
-      break;
+
+      return;
     } catch (error) {
-      const parsed = nodeErrorSchema.safeParse(error);
-      if (!parsed.success || parsed.data.code !== "EEXIST" || attempt >= 600) {
+      if (!shouldRetryBusyLock(nodeErrorSchema.safeParse(error), attempt)) {
         throw error;
       }
-      // oxlint-disable-next-line eslint/no-await-in-loop -- lock acquisition retries must inspect the current lock before the next sequential attempt
-      if (attempt % 100 === 99 && (await lockIsStale(lockPath))) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- stale lock cleanup must finish before retrying acquisition
-        await rm(lockPath, { force: true, recursive: true });
-      } else {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- bounded backoff intentionally serializes lock acquisition attempts
-        await delay(50);
-      }
+
+      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential lock acquisition retries
+      await waitForLockRetry(lockPath, attempt);
     }
   }
+}
+
+async function withFileLock(path: string, action: () => Promise<void>) {
+  const lockPath = `${path}.lock`;
+  await mkdir(dirname(path), { recursive: true });
+  await acquireFileLock(lockPath);
+
   try {
     await action();
   } finally {
@@ -99,6 +129,7 @@ async function lockIsStale(path: string) {
     return Date.now() - (await stat(path)).mtimeMs > 30_000;
   } catch (error) {
     const parsed = nodeErrorSchema.safeParse(error);
+
     if (parsed.success && parsed.data.code === "ENOENT") return false;
     throw error;
   }

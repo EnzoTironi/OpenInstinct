@@ -1,7 +1,8 @@
-import { defineHook, type HookContext } from "eve/hooks";
 import { saveChat } from "@db/services/chats";
 import { ensureScope } from "@db/services/scope";
 import { claimSession } from "@db/services/sessions";
+import { defineHook, type HookContext } from "eve/hooks";
+
 import { scopeFromPrincipal } from "../../shared/identity/principal-scope";
 
 export default defineHook({
@@ -11,6 +12,7 @@ export default defineHook({
     },
     async "message.received"(_event, ctx) {
       const scope = await claimOwnedSession(ctx);
+
       if (!scope) return;
 
       await saveChat(scope, {
@@ -23,10 +25,12 @@ export default defineHook({
 
 async function claimOwnedSession(ctx: HookContext) {
   const initiator = ctx.session.auth.initiator;
+
   if (!initiator) return undefined;
 
   const scope = scopeFromPrincipal(initiator);
   await ensureScope(scope);
   await claimSession(scope, ctx.session.id);
+
   return scope;
 }

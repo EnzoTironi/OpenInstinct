@@ -1,5 +1,3 @@
-import { and, eq, sql } from "drizzle-orm";
-import { Effect, Schema } from "effect";
 import {
   db,
   organizationMemberships,
@@ -15,6 +13,8 @@ import {
   type WorkspaceRole,
   RbacDenied,
 } from "@shared/identity/org-rbac";
+import { and, eq, sql } from "drizzle-orm";
+import { Clock, Effect, Schema } from "effect";
 
 export class OrganizationMembershipMissing extends Schema.TaggedError<OrganizationMembershipMissing>()(
   "OrganizationMembershipMissing",
@@ -39,6 +39,7 @@ async function loadOrgMembership(organizationId: string, userId: string) {
       )
     )
     .limit(1);
+
   return rows[0];
 }
 
@@ -57,6 +58,7 @@ async function loadWorkspaceMembership(workspaceId: string, userId: string) {
       )
     )
     .limit(1);
+
   return rows[0];
 }
 
@@ -86,12 +88,12 @@ export async function createOrganization(input: {
  * Attach a new company workspace under an org. Caller must be org admin.
  * Seeds the caller as workspace admin.
  */
-export function createCompanyWorkspace(input: {
-  organizationId: string;
-  workspaceId: string;
-  actorUserId: string;
-}): Effect.Effect<void, RbacDenied | OrganizationMembershipMissing> {
-  return Effect.gen(function* () {
+export const createCompanyWorkspace = Effect.fn("createCompanyWorkspace")(
+  function* (input: {
+    organizationId: string;
+    workspaceId: string;
+    actorUserId: string;
+  }) {
     const membership = yield* Effect.tryPromise({
       try: () => loadOrgMembership(input.organizationId, input.actorUserId),
       catch: () =>
@@ -100,20 +102,20 @@ export function createCompanyWorkspace(input: {
           userId: input.actorUserId,
         }),
     });
+
     if (membership === undefined) {
-      yield* Effect.fail(
-        new OrganizationMembershipMissing({
-          organizationId: input.organizationId,
-          userId: input.actorUserId,
-        })
-      );
+      yield* new OrganizationMembershipMissing({
+        organizationId: input.organizationId,
+        userId: input.actorUserId,
+      });
+
       return;
     }
 
     yield* assertCanManageMembers(membership.role);
     yield* assertWorkspaceRoleForKind("company", "admin");
 
-    const createdAt = new Date();
+    const createdAt = new Date(yield* Clock.currentTimeMillis);
     yield* Effect.tryPromise({
       try: () =>
         db.transaction(async (tx) => {
@@ -135,33 +137,33 @@ export function createCompanyWorkspace(input: {
           message: "Failed to create company workspace.",
         }),
     });
-  });
-}
+  }
+);
 
 /** Org admin adds/updates an org member role (member cannot elevate). */
-export function setOrganizationMemberRole(input: {
-  organizationId: string;
-  actorUserId: string;
-  targetUserId: string;
-  role: CompanyRole;
-}): Effect.Effect<void, RbacDenied | OrganizationMembershipMissing> {
-  return Effect.gen(function* () {
+export const setOrganizationMemberRole = Effect.fn("setOrganizationMemberRole")(
+  function* (input: {
+    organizationId: string;
+    actorUserId: string;
+    targetUserId: string;
+    role: CompanyRole;
+  }) {
     const actor = yield* Effect.promise(() =>
       loadOrgMembership(input.organizationId, input.actorUserId)
     );
+
     if (actor === undefined) {
-      yield* Effect.fail(
-        new OrganizationMembershipMissing({
-          organizationId: input.organizationId,
-          userId: input.actorUserId,
-        })
-      );
+      yield* new OrganizationMembershipMissing({
+        organizationId: input.organizationId,
+        userId: input.actorUserId,
+      });
+
       return;
     }
 
     yield* assertCanAssignRole(actor.role, input.role);
 
-    const createdAt = new Date();
+    const createdAt = new Date(yield* Clock.currentTimeMillis);
     yield* Effect.promise(async () => {
       await db
         .insert(organizationMemberships)
@@ -179,27 +181,27 @@ export function setOrganizationMemberRole(input: {
           set: { role: input.role },
         });
     });
-  });
-}
+  }
+);
 
 /** Workspace admin/owner manages workspace membership (member cannot elevate). */
-export function setWorkspaceMemberRole(input: {
-  workspaceId: string;
-  actorUserId: string;
-  targetUserId: string;
-  role: WorkspaceRole;
-}): Effect.Effect<void, RbacDenied | WorkspaceMembershipMissing> {
-  return Effect.gen(function* () {
+export const setWorkspaceMemberRole = Effect.fn("setWorkspaceMemberRole")(
+  function* (input: {
+    workspaceId: string;
+    actorUserId: string;
+    targetUserId: string;
+    role: WorkspaceRole;
+  }) {
     const actor = yield* Effect.promise(() =>
       loadWorkspaceMembership(input.workspaceId, input.actorUserId)
     );
+
     if (actor === undefined) {
-      yield* Effect.fail(
-        new WorkspaceMembershipMissing({
-          workspaceId: input.workspaceId,
-          userId: input.actorUserId,
-        })
-      );
+      yield* new WorkspaceMembershipMissing({
+        workspaceId: input.workspaceId,
+        userId: input.actorUserId,
+      });
+
       return;
     }
 
@@ -207,7 +209,7 @@ export function setWorkspaceMemberRole(input: {
     yield* assertWorkspaceRoleForKind(kind, input.role);
     yield* assertCanAssignRole(actor.role, input.role);
 
-    const createdAt = new Date();
+    const createdAt = new Date(yield* Clock.currentTimeMillis);
     yield* Effect.promise(async () => {
       await db
         .insert(workspaceMemberships)
@@ -225,8 +227,8 @@ export function setWorkspaceMemberRole(input: {
           set: { role: input.role },
         });
     });
-  });
-}
+  }
+);
 
 /** Count org admins (used by tests / future last-admin guards). */
 export async function countOrganizationAdmins(organizationId: string) {
@@ -241,5 +243,6 @@ export async function countOrganizationAdmins(organizationId: string) {
         eq(organizationMemberships.role, "admin")
       )
     );
+
   return rows[0]?.count ?? 0;
 }

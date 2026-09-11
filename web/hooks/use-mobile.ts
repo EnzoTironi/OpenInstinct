@@ -9,6 +9,7 @@ export function useIsMobile() {
 function subscribe(onStoreChange: () => void) {
   const mediaQuery = window.matchMedia("(max-width: 767px)");
   mediaQuery.addEventListener("change", onStoreChange);
+
   return () => {
     mediaQuery.removeEventListener("change", onStoreChange);
   };

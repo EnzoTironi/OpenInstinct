@@ -1,3 +1,13 @@
+import {
+  recallPersonalProfile,
+  updatePersonalProfile,
+} from "@agent/lib/personal-memory-controls";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { scopeFromPrincipal } from "@shared/identity/principal-scope";
+import {
+  userProfilePatchSchema,
+  userProfileSchema,
+} from "@shared/user-profile/schema";
 import type { SessionContext } from "eve/context";
 import {
   defineMemory,
@@ -7,17 +17,8 @@ import {
 } from "eve/memory";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { scopeFromPrincipal } from "@shared/identity/principal-scope";
-import {
-  recallPersonalProfile,
-  updatePersonalProfile,
-} from "@agent/lib/personal-memory-controls";
+
 import { serverRuntime } from "../../server/runtime";
-import type { AccessScope } from "@shared/identity/access-scope";
-import {
-  userProfilePatchSchema,
-  userProfileSchema,
-} from "@shared/user-profile/schema";
 import { resolveModeValue } from "../lib/mode";
 
 function resolvePersonalInfoAccessScope(
@@ -28,6 +29,7 @@ function resolvePersonalInfoAccessScope(
     context.session.auth.initiator,
   ].find((principal) => {
     if (principal?.principalType !== "user") return false;
+
     return z.string().safeParse(principal.attributes.workspaceId).success;
   });
 
@@ -36,6 +38,7 @@ function resolvePersonalInfoAccessScope(
 
 async function recallUserProfile(context: MemoryOperationContext) {
   const scope = resolvePersonalInfoAccessScope(context);
+
   if (!scope) return null;
 
   const profile = await serverRuntime.runPromise(
@@ -69,6 +72,7 @@ export default defineMemory({
     },
     async tools(context) {
       const current = context.session.auth.current;
+
       if (
         current?.principalType !== "user" ||
         resolveModeValue(context, { interactive: true }) !== true
@@ -96,6 +100,7 @@ export default defineMemory({
   }),
   scope(context) {
     const scope = resolvePersonalInfoAccessScope(context)?.workspaceId ?? null;
+
     return resolveModeValue(context, {
       interactive: scope,
       "scheduled-worker": scope,

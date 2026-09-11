@@ -1,11 +1,13 @@
 /* oxlint-disable eslint/no-await-in-loop -- Migrations and their statements must be applied in order. */
 import { readFile } from "node:fs/promises";
-import { PGlite } from "@electric-sql/pglite";
-import { Effect } from "effect";
-import { drizzle } from "drizzle-orm/pglite";
-import { afterEach, describe, expect, it, vi } from "vitest";
+
 import * as Database from "@db";
+import { PGlite } from "@electric-sql/pglite";
 import { RbacDenied } from "@shared/identity/org-rbac";
+import { drizzle } from "drizzle-orm/pglite";
+import { Effect } from "effect";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import * as schema from "../schema";
 
 const databases: PGlite[] = [];
@@ -20,6 +22,7 @@ describe("C01 organizations service", () => {
   it("creates orgs, company workspaces, and blocks member elevation", async () => {
     const client = new PGlite();
     databases.push(client);
+
     for (const migration of [
       "0000_fluffy_the_spike.sql",
       "0029_org-workspace-rbac.sql",
@@ -68,6 +71,7 @@ describe("C01 organizations service", () => {
         })
         .pipe(Effect.flip)
     );
+
     expect(denied).toEqual(
       new RbacDenied({
         reason: "not_admin",
@@ -94,6 +98,7 @@ describe("C01 organizations service", () => {
         })
         .pipe(Effect.flip)
     );
+
     expect(workspaceDenied).toEqual(
       new RbacDenied({
         reason: "not_admin",
@@ -108,6 +113,7 @@ async function applyMigration(database: PGlite, filename: string) {
     new URL(`../migrations/${filename}`, import.meta.url),
     "utf8"
   );
+
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
   }

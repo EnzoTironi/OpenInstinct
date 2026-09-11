@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+
 import appConfig from "./vitest.config.ts";
 
 export default defineConfig({

@@ -1,5 +1,5 @@
-import { Effect, Schema } from "effect";
 import { type BillingPlanId, quotaLimitsForPlan } from "@shared/billing/plans";
+import { Effect, Schema } from "effect";
 
 /**
  * Release-1 self-host minimum quotas (P11 admission).
@@ -45,6 +45,7 @@ export function admissionLimitsForPlan(
   seatCount = 1
 ): Release1QuotaLimits {
   const limits = quotaLimitsForPlan(plan, seatCount);
+
   return {
     user: { ...limits.user },
     installation: { ...limits.installation },
@@ -60,9 +61,11 @@ const quotaResourceSchema = Schema.Literals([
   "sandbox_seconds",
   "active_users",
 ]);
+
 type QuotaResource = typeof quotaResourceSchema.Type;
 
 const quotaScopeSchema = Schema.Literals(["user", "installation"]);
+
 type QuotaScope = typeof quotaScopeSchema.Type;
 
 const nonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
@@ -82,6 +85,9 @@ const quotaUsageStruct = Schema.Struct({
     activeUsersPerDay: nonNegativeInt,
   }),
 });
+
+const decodeEffect_quotaUsageStruct =
+  Schema.decodeUnknownEffect(quotaUsageStruct);
 
 export interface QuotaUsage {
   user: {
@@ -110,6 +116,8 @@ const quotaDemandStruct = Schema.Struct({
   activeUser: Schema.optionalKey(Schema.Literals([0, 1])),
 });
 
+const decodeQuotaDemandStruct = Schema.decodeUnknownEffect(quotaDemandStruct);
+
 export interface QuotaDemand {
   concurrentTurns?: number;
   modelTokens?: number;
@@ -132,34 +140,44 @@ export class QuotaAdmissionError extends Schema.TaggedError<QuotaAdmissionError>
   }
 ) {}
 
+const quotaResourceUnits = {
+  model_tokens: "model tokens",
+  tool_calls: "tool calls",
+  proactive_messages: "proactive messages",
+  storage_bytes: "bytes of storage",
+  sandbox_seconds: "sandbox active seconds",
+  active_users: "active users",
+  concurrent_turns: "concurrent turns",
+} as const satisfies Record<QuotaResource, string>;
+
+const quotaResourceHorizons = {
+  model_tokens: "for today",
+  tool_calls: "for today",
+  proactive_messages: "for today",
+  storage_bytes: "for this account",
+  sandbox_seconds: "for today",
+  active_users: "for today",
+  concurrent_turns: "right now",
+} as const satisfies Record<QuotaResource, string>;
+
 export function quotaFailureMessage(error: QuotaAdmissionError) {
-  if (error.reason === "invalid_input")
+  if (error.reason === "invalid_input") {
     return "Quota admission rejected invalid usage or demand input.";
+  }
+
+  return formatQuotaLimitMessage(error);
+}
+
+function formatQuotaLimitMessage(error: QuotaAdmissionError) {
   const resource = error.resource ?? "concurrent_turns";
   const scope = error.scope ?? "user";
   const used = error.used ?? 0;
   const limit = error.limit ?? 0;
   const requested = error.requested ?? 0;
-  const unit =
-    resource === "model_tokens"
-      ? "model tokens"
-      : resource === "tool_calls"
-        ? "tool calls"
-        : resource === "proactive_messages"
-          ? "proactive messages"
-          : resource === "storage_bytes"
-            ? "bytes of storage"
-            : resource === "sandbox_seconds"
-              ? "sandbox active seconds"
-              : resource === "active_users"
-                ? "active users"
-                : "concurrent turns";
-  const horizon =
-    resource === "concurrent_turns"
-      ? "right now"
-      : resource === "storage_bytes"
-        ? "for this account"
-        : "for today";
+  const unit = quotaResourceUnits[resource];
+
+  const horizon = quotaResourceHorizons[resource];
+
   return `This ${scope} has reached its ${unit} limit ${horizon} (${String(used)} used of ${String(limit)}; requested ${String(requested)}). Try again later, upgrade at /pricing, or ask the operator to raise quotas.`;
 }
 
@@ -176,85 +194,159 @@ function checks(
   usage: QuotaUsage,
   demand: QuotaDemand
 ): Check[] {
-  const out: Check[] = [];
-  if (demand.concurrentTurns !== undefined) {
-    out.push({
+  return [
+    ...concurrentTurnChecks(limits, usage, demand),
+    ...modelTokenChecks(limits, usage, demand),
+    ...toolCallChecks(limits, usage, demand),
+    ...proactiveMessageChecks(limits, usage, demand),
+    ...storageByteChecks(limits, usage, demand),
+    ...sandboxSecondChecks(limits, usage, demand),
+    ...activeUserChecks(limits, usage, demand),
+  ];
+}
+
+function concurrentTurnChecks(
+  limits: Release1QuotaLimits,
+  usage: QuotaUsage,
+  demand: QuotaDemand
+): Check[] {
+  if (demand.concurrentTurns === undefined) return [];
+
+  const requested = demand.concurrentTurns;
+
+  return [
+    {
       scope: "user",
       resource: "concurrent_turns",
       used: usage.user.concurrentTurns,
-      requested: demand.concurrentTurns,
+      requested,
       limit: limits.user.concurrentTurns,
-    });
-    out.push({
+    },
+    {
       scope: "installation",
       resource: "concurrent_turns",
       used: usage.installation.concurrentTurns,
-      requested: demand.concurrentTurns,
+      requested,
       limit: limits.installation.concurrentTurns,
-    });
-  }
-  if (demand.modelTokens !== undefined) {
-    out.push({
+    },
+  ];
+}
+
+function modelTokenChecks(
+  limits: Release1QuotaLimits,
+  usage: QuotaUsage,
+  demand: QuotaDemand
+): Check[] {
+  if (demand.modelTokens === undefined) return [];
+
+  const requested = demand.modelTokens;
+
+  return [
+    {
       scope: "user",
       resource: "model_tokens",
       used: usage.user.dailyModelTokens,
-      requested: demand.modelTokens,
+      requested,
       limit: limits.user.dailyModelTokens,
-    });
-    out.push({
+    },
+    {
       scope: "installation",
       resource: "model_tokens",
       used: usage.installation.dailyModelTokens,
-      requested: demand.modelTokens,
+      requested,
       limit: limits.installation.dailyModelTokens,
-    });
-  }
-  if (demand.toolCalls !== undefined) {
-    out.push({
+    },
+  ];
+}
+
+function toolCallChecks(
+  limits: Release1QuotaLimits,
+  usage: QuotaUsage,
+  demand: QuotaDemand
+): Check[] {
+  if (demand.toolCalls === undefined) return [];
+
+  return [
+    {
       scope: "user",
       resource: "tool_calls",
       used: usage.user.dailyToolCalls,
       requested: demand.toolCalls,
       limit: limits.user.dailyToolCalls,
-    });
-  }
-  if (demand.proactiveMessages !== undefined) {
-    out.push({
+    },
+  ];
+}
+
+function proactiveMessageChecks(
+  limits: Release1QuotaLimits,
+  usage: QuotaUsage,
+  demand: QuotaDemand
+): Check[] {
+  if (demand.proactiveMessages === undefined) return [];
+
+  return [
+    {
       scope: "user",
       resource: "proactive_messages",
       used: usage.user.dailyProactiveMessages,
       requested: demand.proactiveMessages,
       limit: limits.user.dailyProactiveMessages,
-    });
-  }
-  if (demand.storageBytes !== undefined) {
-    out.push({
+    },
+  ];
+}
+
+function storageByteChecks(
+  limits: Release1QuotaLimits,
+  usage: QuotaUsage,
+  demand: QuotaDemand
+): Check[] {
+  if (demand.storageBytes === undefined) return [];
+
+  return [
+    {
       scope: "user",
       resource: "storage_bytes",
       used: usage.user.storageBytes,
       requested: demand.storageBytes,
       limit: limits.user.storageBytes,
-    });
-  }
-  if (demand.sandboxSeconds !== undefined) {
-    out.push({
+    },
+  ];
+}
+
+function sandboxSecondChecks(
+  limits: Release1QuotaLimits,
+  usage: QuotaUsage,
+  demand: QuotaDemand
+): Check[] {
+  if (demand.sandboxSeconds === undefined) return [];
+
+  return [
+    {
       scope: "user",
       resource: "sandbox_seconds",
       used: usage.user.sandboxActiveSecondsPerDay,
       requested: demand.sandboxSeconds,
       limit: limits.user.sandboxActiveSecondsPerDay,
-    });
-  }
-  if (demand.activeUser === 1) {
-    out.push({
+    },
+  ];
+}
+
+function activeUserChecks(
+  limits: Release1QuotaLimits,
+  usage: QuotaUsage,
+  demand: QuotaDemand
+): Check[] {
+  if (demand.activeUser !== 1) return [];
+
+  return [
+    {
       scope: "installation",
       resource: "active_users",
       used: usage.installation.activeUsersPerDay,
       requested: 1,
       limit: limits.installation.activeUsersPerDay,
-    });
-  }
-  return out;
+    },
+  ];
 }
 
 /** Empty usage snapshot for tests and fresh windows. */
@@ -277,7 +369,7 @@ export function emptyQuotaUsage(): QuotaUsage {
 }
 
 function decodeUsage(usage: QuotaUsage) {
-  return Schema.decodeUnknownEffect(quotaUsageStruct)(usage).pipe(
+  return decodeEffect_quotaUsageStruct(usage).pipe(
     Effect.map((decoded): QuotaUsage => ({
       user: { ...decoded.user },
       installation: { ...decoded.installation },
@@ -287,7 +379,7 @@ function decodeUsage(usage: QuotaUsage) {
 }
 
 function decodeDemand(demand: QuotaDemand) {
-  return Schema.decodeUnknownEffect(quotaDemandStruct)(demand).pipe(
+  return decodeQuotaDemandStruct(demand).pipe(
     Effect.map((decoded): QuotaDemand => ({ ...decoded })),
     Effect.mapError(() => new QuotaAdmissionError({ reason: "invalid_input" }))
   );
@@ -301,18 +393,23 @@ export const admitQuota = Effect.fn("admitQuota")(function* (
 ) {
   const decodedUsage = yield* decodeUsage(usage);
   const decodedDemand = yield* decodeDemand(demand);
-  for (const check of checks(limits, decodedUsage, decodedDemand)) {
-    if (check.used + check.requested > check.limit) {
-      return yield* new QuotaAdmissionError({
-        reason: "exceeded",
-        scope: check.scope,
-        resource: check.resource,
-        limit: check.limit,
-        used: check.used,
-        requested: check.requested,
-      });
-    }
-  }
+
+  yield* Effect.forEach(
+    checks(limits, decodedUsage, decodedDemand),
+    (check) =>
+      check.used + check.requested > check.limit
+        ? new QuotaAdmissionError({
+            reason: "exceeded",
+            scope: check.scope,
+            resource: check.resource,
+            limit: check.limit,
+            used: check.used,
+            requested: check.requested,
+          })
+        : Effect.void,
+    { concurrency: 1, discard: true }
+  );
+
   return decodedDemand;
 });
 
@@ -331,6 +428,7 @@ export function reserveQuota(
   const storageBytes = demand.storageBytes ?? 0;
   const sandboxSeconds = demand.sandboxSeconds ?? 0;
   const activeUser = demand.activeUser === 1 ? 1 : 0;
+
   return {
     user: {
       concurrentTurns: usage.user.concurrentTurns + concurrentTurns,
@@ -356,6 +454,7 @@ export function settleConcurrentTurns(
   turns: number
 ): QuotaUsage {
   const release = Math.max(0, turns);
+
   return {
     user: {
       ...usage.user,

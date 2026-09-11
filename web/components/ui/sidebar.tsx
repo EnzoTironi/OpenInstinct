@@ -1,13 +1,9 @@
 "use client";
 
-/* oxlint-disable typescript/consistent-type-definitions, tailwindcss/enforce-shorthand, typescript/restrict-template-expressions, typescript/no-confusing-void-expression, typescript/no-unsafe-type-assertion -- generated shadcn Sidebar primitive */
+/* oxlint-disable typescript/consistent-type-definitions, tailwindcss/enforce-shorthand, typescript/no-confusing-void-expression, typescript/no-unsafe-type-assertion -- generated shadcn Sidebar primitive */
 
-import * as React from "react";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { cva, type VariantProps } from "class-variance-authority";
-
-import { useIsMobile } from "@web/hooks/use-mobile";
 import { cn } from "@web/components/class-names";
 import { Button } from "@web/components/ui/button";
 import { Input } from "@web/components/ui/input";
@@ -25,15 +21,24 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@web/components/ui/tooltip";
+import { useIsMobile } from "@web/hooks/use-mobile";
+import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
+import * as React from "react";
 import { z } from "zod";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
+
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+
 const SIDEBAR_WIDTH = "12rem";
+
 const SIDEBAR_WIDTH_MOBILE = "18rem";
+
 const SIDEBAR_WIDTH_ICON = "3rem";
+
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+
 const sidebarStateUpdaterSchema = z.function({
   input: [z.boolean()],
   output: z.boolean(),
@@ -53,6 +58,7 @@ const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
 function useSidebar() {
   const context = React.useContext(SidebarContext);
+
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider.");
   }
@@ -80,12 +86,15 @@ function SidebarProvider({
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
+
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const booleanValue = z.boolean().safeParse(value);
+
       const openState = booleanValue.success
         ? booleanValue.data
         : sidebarStateUpdaterSchema.parse(value)(open);
+
       if (setOpenProp) {
         setOpenProp(openState);
       } else {
@@ -118,6 +127,7 @@ function SidebarProvider({
     };
 
     window.addEventListener("keydown", handleKeyDown);
+
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 
@@ -235,9 +245,7 @@ function Sidebar({
           "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
-          variant === "floating" || variant === "inset"
-            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
+          sidebarGapIconClass(variant)
         )}
       />
       <div
@@ -246,9 +254,7 @@ function Sidebar({
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
           // Adjust the padding for floating and inset variants.
-          variant === "floating" || variant === "inset"
-            ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+          sidebarContainerClass(variant),
           className
         )}
         {...props}
@@ -263,6 +269,30 @@ function Sidebar({
       </div>
     </div>
   );
+}
+
+function isFloatingOrInset(variant: "sidebar" | "floating" | "inset"): boolean {
+  return variant === "floating" || variant === "inset";
+}
+
+function sidebarGapIconClass(
+  variant: "sidebar" | "floating" | "inset"
+): string {
+  if (isFloatingOrInset(variant)) {
+    return "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]";
+  }
+
+  return "group-data-[collapsible=icon]:w-(--sidebar-width-icon)";
+}
+
+function sidebarContainerClass(
+  variant: "sidebar" | "floating" | "inset"
+): string {
+  if (isFloatingOrInset(variant)) {
+    return "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]";
+  }
+
+  return "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l";
 }
 
 function SidebarTrigger({
@@ -524,6 +554,7 @@ function SidebarMenuButton({
     tooltip?: string | React.ComponentProps<typeof TooltipContent>;
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const { isMobile, state } = useSidebar();
+
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
@@ -546,6 +577,7 @@ function SidebarMenuButton({
   }
 
   const tooltipText = z.string().safeParse(tooltip);
+
   // SAFETY: A failed string parse leaves only TooltipContent's object props in the declared union.
   const tooltipProps = tooltipText.success
     ? { children: tooltipText.data }

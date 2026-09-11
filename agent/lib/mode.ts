@@ -12,7 +12,9 @@ interface AgentModeContext {
 
 function agentMode(authenticator: string | undefined) {
   if (authenticator === "scheduled-worker") return "scheduled-worker" as const;
+
   if (authenticator === "scheduled-result") return "scheduled-report" as const;
+
   return "interactive" as const;
 }
 
@@ -22,7 +24,9 @@ function sessionAgentMode(auth: AgentModeContext["session"]["auth"]) {
   if (auth.initiator?.authenticator === "scheduled-worker") {
     return "scheduled-worker" as const;
   }
+
   const caller = auth.current ?? auth.initiator;
+
   return agentMode(caller?.authenticator);
 }
 
@@ -38,5 +42,6 @@ export function resolveModeInstructions(
   contentByMode: Partial<Record<AgentMode, string>>
 ) {
   const content = resolveModeValue(context, contentByMode);
+
   return content === null ? null : defineInstructions({ content });
 }

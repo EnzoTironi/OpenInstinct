@@ -1,10 +1,11 @@
-import { SparklesIcon, XIcon } from "lucide-react";
-import type { RefObject } from "react";
 import {
   getSubagentStatus,
   type SubagentSession,
 } from "@app/_lib/subagent-sessions";
 import { Button } from "@web/components/ui/button";
+import { SparklesIcon, XIcon } from "lucide-react";
+import type { RefObject } from "react";
+
 import { agentLabel } from "./presentation";
 import { SubagentTrace } from "./trace";
 import { useSessionHistory } from "./use-session-history";

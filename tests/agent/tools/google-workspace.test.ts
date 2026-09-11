@@ -1,7 +1,7 @@
-import type { ToolContext } from "eve/tools";
-import { describe, expect, it, vi } from "vitest";
 import type * as GmailModule from "@agent/lib/google-workspace/gmail";
 import type { updateGmail } from "@agent/lib/google-workspace/gmail";
+import type { ToolContext } from "eve/tools";
+import { describe, expect, it, vi } from "vitest";
 
 const gmail = vi.hoisted(() => ({
   update: vi
@@ -19,6 +19,7 @@ import { gmailUpdate } from "@agent/tools/gmail";
 describe("Google Workspace tools", () => {
   it("reports the selected Gmail update without an action discriminator", async () => {
     const context = toolContext();
+
     const result = await gmailUpdate.execute(
       { messageIds: ["message-1", "message-2"], update: "archive" },
       context

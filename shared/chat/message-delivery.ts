@@ -55,12 +55,14 @@ const attachmentsSchema = Schema.Array(attachmentSchema).check(
   Schema.isMinLength(1),
   Schema.isMaxLength(4)
 );
+
 const messageFields = {
   attachments: Schema.optionalKey(attachmentsSchema),
   kind: Schema.Literal("message"),
   text: Schema.optionalKey(textSchema),
   replyTo: Schema.optionalKey(replyReferenceSchema),
 };
+
 const messageOutputSchema = Schema.Union([
   Schema.Struct({ ...messageFields, text: textSchema }),
   Schema.Struct({ ...messageFields, attachments: attachmentsSchema }),
@@ -69,16 +71,15 @@ const messageOutputSchema = Schema.Union([
 const linkOutputSchema = Schema.Struct({
   kind: Schema.Literal("link"),
   replyTo: Schema.optionalKey(replyReferenceSchema),
-  url: httpsUrlSchema
-    .pipe(
-      Schema.check(
-        Schema.makeFilter((url) => url.trim().length <= 2048, {
-          message: "Native links must not exceed 2048 characters.",
-          toJsonSchema: () => ({ maxLength: 2048 }),
-        })
-      )
-    )
-    .pipe(Schema.decodeTo(Schema.String, SchemaTransformation.trim())),
+  url: httpsUrlSchema.pipe(
+    Schema.check(
+      Schema.makeFilter((url) => url.trim().length <= 2048, {
+        message: "Native links must not exceed 2048 characters.",
+        toJsonSchema: () => ({ maxLength: 2048 }),
+      })
+    ),
+    Schema.decodeTo(Schema.String, SchemaTransformation.trim())
+  ),
 }).annotate({ parseOptions: { onExcessProperty: "error" } });
 
 export const sendMessageOutputSchema = Schema.Union([

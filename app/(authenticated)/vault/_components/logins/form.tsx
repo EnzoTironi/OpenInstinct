@@ -1,11 +1,14 @@
 "use client";
 
-import { type SubmitEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { z } from "zod";
+import {
+  loginIdentifierSchema,
+  loginIdentifierTypeSchema,
+  loginOriginSchema,
+  serializeLoginVaultPayload,
+} from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@web/components/ui/field";
 import { DialogFooter } from "@web/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@web/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -14,13 +17,20 @@ import {
   SelectValue,
 } from "@web/components/ui/select";
 import {
-  loginIdentifierSchema,
-  loginIdentifierTypeSchema,
-  loginOriginSchema,
-  serializeLoginVaultPayload,
-} from "@shared/vault/schema";
-import { api } from "@web/trpc/client";
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useState,
+} from "react";
+import { z } from "zod";
+
 import { FormField } from "../field";
+import {
+  patchVaultForm,
+  useVaultFormSubmit,
+  useVaultItemCreate,
+  vaultFormErrors,
+} from "../use-vault-form";
 
 const loginFormSchema = z
   .object({
@@ -39,6 +49,7 @@ const loginFormSchema = z
       type: form.identifierType,
       value: form.identifier,
     });
+
     if (!identifier.success) {
       for (const issue of identifier.error.issues) {
         context.addIssue({
@@ -48,6 +59,7 @@ const loginFormSchema = z
         });
       }
     }
+
     if (form.identifierType === "username" && !form.password) {
       context.addIssue({
         code: "custom",
@@ -57,158 +69,179 @@ const loginFormSchema = z
     }
   });
 
-export function LoginForm({
-  initialIdentifierType,
-  initialLabel = "",
-  initialOrigin = "",
-  onSaved,
-}: {
-  readonly initialIdentifierType?: z.infer<typeof loginIdentifierTypeSchema>;
-  readonly initialLabel?: string;
-  readonly initialOrigin?: string;
-  readonly onSaved: () => void;
-}) {
-  const router = useRouter();
-  const create = api.vault.create.useMutation({
-    onSuccess: () => {
-      router.refresh();
-      onSaved();
+type LoginFormState = z.input<typeof loginFormSchema>;
+
+type IdentifierType = z.infer<typeof loginIdentifierTypeSchema>;
+
+function createLoginPayload(data: z.output<typeof loginFormSchema>) {
+  return {
+    account: "",
+    kind: "login" as const,
+    label: data.nickname,
+    secret: serializeLoginVaultPayload({
+      authentication: loginAuthentication(data),
+      identifier: {
+        type: data.identifierType,
+        value: data.identifier,
+      },
+      kind: "login",
+      origin: data.origin,
+      version: 2,
+    }),
+  };
+}
+
+function useLoginIdentityHandlers(
+  setForm: Dispatch<SetStateAction<LoginFormState>>
+) {
+  const onNicknameChange = useCallback(
+    (nickname: string) => {
+      patchVaultForm(setForm, "nickname", nickname);
     },
-  });
+    [setForm]
+  );
+
+  const onOriginChange = useCallback(
+    (origin: string) => {
+      patchVaultForm(setForm, "origin", origin);
+    },
+    [setForm]
+  );
+
+  const onIdentifierChange = useCallback(
+    (identifier: string) => {
+      patchVaultForm(setForm, "identifier", identifier);
+    },
+    [setForm]
+  );
+
+  const onPasswordChange = useCallback(
+    (password: string) => {
+      patchVaultForm(setForm, "password", password);
+    },
+    [setForm]
+  );
+
+  return {
+    onIdentifierChange,
+    onNicknameChange,
+    onOriginChange,
+    onPasswordChange,
+  };
+}
+
+function useLoginIdentifierTypeHandler(
+  setForm: Dispatch<SetStateAction<LoginFormState>>
+) {
+  return useCallback(
+    (value: string | null) => {
+      if (value === null) return;
+      const identifierType = loginIdentifierTypeSchema.parse(value);
+      patchVaultForm(setForm, "identifierType", identifierType);
+    },
+    [setForm]
+  );
+}
+
+function useLoginForm(
+  initialIdentifierType: IdentifierType | undefined,
+  initialLabel: string,
+  initialOrigin: string,
+  onSaved: () => void
+) {
+  const create = useVaultItemCreate(onSaved);
   const [attempted, setAttempted] = useState(false);
-  const [form, setForm] = useState<z.input<typeof loginFormSchema>>({
+
+  const [form, setForm] = useState<LoginFormState>({
     identifier: "",
     identifierType: initialIdentifierType ?? "email",
     nickname: initialLabel,
     origin: initialOrigin,
     password: "",
   });
+
   const result = loginFormSchema.safeParse(form);
-  const errors =
-    attempted && !result.success
-      ? z.flattenError(result.error).fieldErrors
-      : {};
+  const errors = vaultFormErrors(attempted, result);
+  const handlers = useLoginIdentityHandlers(setForm);
+  const onIdentifierTypeChange = useLoginIdentifierTypeHandler(setForm);
 
-  const submit = (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAttempted(true);
-    if (!result.success) return;
+  const submit = useVaultFormSubmit(
+    setAttempted,
+    result,
+    create.mutate,
+    createLoginPayload
+  );
 
-    const authentication = loginAuthentication(result.data);
-    create.mutate({
-      account: "",
-      kind: "login",
-      label: result.data.nickname,
-      secret: serializeLoginVaultPayload({
-        authentication,
-        identifier: {
-          type: result.data.identifierType,
-          value: result.data.identifier,
-        },
-        kind: "login",
-        origin: result.data.origin,
-        version: 2,
-      }),
-    });
+  return {
+    create,
+    errors,
+    form,
+    onIdentifierTypeChange,
+    passwordOptional: form.identifierType !== "username",
+    submit,
+    ...handlers,
   };
+}
 
-  const passwordOptional = form.identifierType !== "username";
+export function LoginForm({
+  initialIdentifierType,
+  initialLabel = "",
+  initialOrigin = "",
+  onSaved,
+}: {
+  readonly initialIdentifierType?: IdentifierType;
+  readonly initialLabel?: string;
+  readonly initialOrigin?: string;
+  readonly onSaved: () => void;
+}) {
+  const form = useLoginForm(
+    initialIdentifierType,
+    initialLabel,
+    initialOrigin,
+    onSaved
+  );
 
   return (
-    <form noValidate onSubmit={submit}>
+    <form noValidate onSubmit={form.submit}>
       <FieldGroup>
-        {initialLabel ? null : (
-          <FormField
-            error={errors.nickname?.[0]}
-            id="vault-login-label"
-            label="Name"
-            onChange={(nickname) => {
-              setForm((current) => ({ ...current, nickname }));
-            }}
-            placeholder="GitHub"
-            value={form.nickname}
-          />
-        )}
+        <LoginNicknameField
+          error={form.errors.nickname?.[0]}
+          hidden={Boolean(initialLabel)}
+          onChange={form.onNicknameChange}
+          value={form.form.nickname}
+        />
         <FormField
           autoComplete="url"
-          error={errors.origin?.[0]}
+          error={form.errors.origin?.[0]}
           id="vault-login-origin"
           inputMode="url"
           label="Website"
-          onChange={(origin) => {
-            setForm((current) => ({ ...current, origin }));
-          }}
+          onChange={form.onOriginChange}
           placeholder="https://www.ubereats.com"
           type="url"
-          value={form.origin}
+          value={form.form.origin}
         />
-        <div
-          className={
-            initialIdentifierType
-              ? undefined
-              : "grid gap-3 sm:grid-cols-[0.8fr_1.4fr]"
-          }
-        >
-          {initialIdentifierType ? null : (
-            <Field>
-              <FieldLabel htmlFor="vault-login-identifier-type">
-                Sign in with
-              </FieldLabel>
-              <Select
-                onValueChange={(value) => {
-                  const identifierType = loginIdentifierTypeSchema.parse(value);
-                  setForm((current) => ({
-                    ...current,
-                    identifierType,
-                  }));
-                }}
-                value={form.identifierType}
-              >
-                <SelectTrigger
-                  className="w-full"
-                  id="vault-login-identifier-type"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="username">Username</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          )}
-          <FormField
-            autoComplete="username"
-            error={errors.identifier?.[0]}
-            id="vault-login-identifier"
-            label={identifierLabel(form.identifierType)}
-            onChange={(identifier) => {
-              setForm((current) => ({ ...current, identifier }));
-            }}
-            placeholder={identifierPlaceholder(form.identifierType)}
-            value={form.identifier}
-          />
-        </div>
+        <LoginIdentifierSection
+          error={form.errors.identifier?.[0]}
+          identifierType={form.form.identifierType}
+          lockType={Boolean(initialIdentifierType)}
+          onIdentifierChange={form.onIdentifierChange}
+          onIdentifierTypeChange={form.onIdentifierTypeChange}
+          value={form.form.identifier}
+        />
         <FormField
           autoComplete="new-password"
-          description={
-            passwordOptional
-              ? "Leave blank if you sign in with a one-time code."
-              : undefined
-          }
-          error={errors.password?.[0]}
+          description={passwordDescription(form.passwordOptional)}
+          error={form.errors.password?.[0]}
           id="vault-login-password"
-          label={passwordOptional ? "Password (optional)" : "Password"}
-          onChange={(password) => {
-            setForm((current) => ({ ...current, password }));
-          }}
+          label={passwordLabel(form.passwordOptional)}
+          onChange={form.onPasswordChange}
           type="password"
-          value={form.password}
+          value={form.form.password}
         />
       </FieldGroup>
       <DialogFooter>
-        <Button disabled={create.isPending} type="submit">
+        <Button disabled={form.create.isPending} type="submit">
           Save login
         </Button>
       </DialogFooter>
@@ -216,17 +249,129 @@ export function LoginForm({
   );
 }
 
-function identifierPlaceholder(
-  type: z.infer<typeof loginIdentifierTypeSchema>
-) {
+function LoginNicknameField({
+  error,
+  hidden,
+  onChange,
+  value,
+}: {
+  readonly error?: string;
+  readonly hidden: boolean;
+  readonly onChange: (value: string) => void;
+  readonly value: string;
+}) {
+  if (hidden) return null;
+
+  return (
+    <FormField
+      error={error}
+      id="vault-login-label"
+      label="Name"
+      onChange={onChange}
+      placeholder="GitHub"
+      value={value}
+    />
+  );
+}
+
+function LoginIdentifierSection({
+  error,
+  identifierType,
+  lockType,
+  onIdentifierChange,
+  onIdentifierTypeChange,
+  value,
+}: {
+  readonly error?: string;
+  readonly identifierType: IdentifierType;
+  readonly lockType: boolean;
+  readonly onIdentifierChange: (value: string) => void;
+  readonly onIdentifierTypeChange: (value: string | null) => void;
+  readonly value: string;
+}) {
+  return (
+    <div className={identifierSectionClass(lockType)}>
+      <LoginIdentifierTypeSelect
+        hidden={lockType}
+        onValueChange={onIdentifierTypeChange}
+        value={identifierType}
+      />
+      <FormField
+        autoComplete="username"
+        error={error}
+        id="vault-login-identifier"
+        label={identifierLabel(identifierType)}
+        onChange={onIdentifierChange}
+        placeholder={identifierPlaceholder(identifierType)}
+        value={value}
+      />
+    </div>
+  );
+}
+
+function LoginIdentifierTypeSelect({
+  hidden,
+  onValueChange,
+  value,
+}: {
+  readonly hidden: boolean;
+  readonly onValueChange: (value: string | null) => void;
+  readonly value: IdentifierType;
+}) {
+  if (hidden) return null;
+
+  return (
+    <Field>
+      <FieldLabel htmlFor="vault-login-identifier-type">
+        Sign in with
+      </FieldLabel>
+      <Select onValueChange={onValueChange} value={value}>
+        <SelectTrigger className="w-full" id="vault-login-identifier-type">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="email">Email</SelectItem>
+          <SelectItem value="phone">Phone</SelectItem>
+          <SelectItem value="username">Username</SelectItem>
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
+
+function identifierSectionClass(lockType: boolean) {
+  if (lockType) return undefined;
+
+  return "grid gap-3 sm:grid-cols-[0.8fr_1.4fr]";
+}
+
+function passwordDescription(passwordOptional: boolean) {
+  if (passwordOptional) {
+    return "Leave blank if you sign in with a one-time code.";
+  }
+
+  return undefined;
+}
+
+function passwordLabel(passwordOptional: boolean) {
+  if (passwordOptional) return "Password (optional)";
+
+  return "Password";
+}
+
+function identifierPlaceholder(type: IdentifierType) {
   if (type === "email") return "name@example.com";
+
   if (type === "phone") return "+1 555 555 5555";
+
   return "username";
 }
 
-function identifierLabel(type: z.infer<typeof loginIdentifierTypeSchema>) {
+function identifierLabel(type: IdentifierType) {
   if (type === "email") return "Email";
+
   if (type === "phone") return "Phone number";
+
   return "Username";
 }
 
@@ -234,13 +379,16 @@ function loginAuthentication(form: z.output<typeof loginFormSchema>) {
   if (form.password) {
     return { password: form.password, type: "password" as const };
   }
+
   if (form.identifierType === "email") return { type: "email_otp" as const };
+
   if (form.identifierType === "phone") return { type: "sms_otp" as const };
   throw new Error("Username logins require a password.");
 }
 
 function normalizeLoginOrigin(value: string) {
   const candidate = value.includes("://") ? value : `https://${value}`;
+
   try {
     return new URL(candidate).origin;
   } catch {

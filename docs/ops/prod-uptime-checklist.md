@@ -1,7 +1,6 @@
 # Prod uptime + backup (companion.tironi.xyz)
 
-Operator checklist after Mac → Fly compute cutover (H01 option C). **Never print
-secrets.** F01 rotation is **Partial** (2026-09-10 authorized execute); remaining families stay Enzo-gated — see [credential-rotation.md](credential-rotation.md).
+Operator checklist after Mac → Fly compute cutover (H01 option C). **Never print secrets.** F01 rotation is **Partial** (2026-09-10 authorized execute); remaining families stay Enzo-gated — see [credential-rotation.md](credential-rotation.md).
 
 ## Live topology (ponytail)
 
@@ -25,23 +24,19 @@ Alchemy unmanaged PG — Fly app companion-pg-prod
   DB name: open_instinct_prod  (private .internal)
 ```
 
-Mac `companion-runtime` LaunchAgent should stay **unloaded** while Fly serves
-traffic. Prefer Fly `companion-cf-tunnel` for the named-tunnel connector (see
-[ingress README](../../infrastructure/ingress/README.md)); keep the Mac
-`companion-cloudflared` plist on disk for rollback only.
+Mac `companion-runtime` LaunchAgent should stay **unloaded** while Fly serves traffic. Prefer Fly `companion-cf-tunnel` for the named-tunnel connector (see [ingress README](../../infrastructure/ingress/README.md)); keep the Mac `companion-cloudflared` plist on disk for rollback only.
 
 ## External uptime + push alert (required)
 
-**Manual curl / `fly status` alone is not enough.** Prod needs something that
-watches the public path and **pushes** on failure (phone / email / chat).
+**Manual curl / `fly status` alone is not enough.** Prod needs something that watches the public path and **pushes** on failure (phone / email / chat).
 
 ### What we chose (no new paid SaaS)
 
-| Option                                         | Status                                                                                                              |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Fly.io native notify on machine health failure | **Unavailable** — Fly has no `fly notifications` / push on failing `[checks]`; health checks affect routing only    |
-| Better Stack / UptimeRobot free API            | **Blocked** — no API tokens / account credentials present in this environment; do not invent accounts from a worker |
-| Tiny probe + schedule + push sink              | **Shipped** — see below                                                                                             |
+| Option | Status |
+| --- | --- |
+| Fly.io native notify on machine health failure | **Unavailable** — Fly has no `fly notifications` / push on failing `[checks]`; health checks affect routing only |
+| Better Stack / UptimeRobot free API | **Blocked** — no API tokens / account credentials present in this environment; do not invent accounts from a worker |
+| Tiny probe + schedule + push sink | **Shipped** — see below |
 
 ### Probe
 
@@ -50,33 +45,21 @@ watches the public path and **pushes** on failure (phone / email / chat).
 # expect: welcome=200, tg=401, kapso=401, exit 0
 ```
 
-Checks `https://companion.tironi.xyz/welcome` → **200** and unsigned Telegram /
-Kapso channel POSTs → **401**. On failure exits **1** and pushes if a sink is
-configured:
+Checks `https://companion.tironi.xyz/welcome` → **200** and unsigned Telegram / Kapso channel POSTs → **401**. On failure exits **1** and pushes if a sink is configured:
 
-| Env name (value never in git) | Sink                                                                   |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `COMPANION_UPTIME_ALERT_URL`  | Generic `POST` text/plain webhook                                      |
-| `COMPANION_UPTIME_NTFY_TOPIC` | Free [ntfy.sh](https://ntfy.sh) topic (subscribe in the ntfy app)      |
-| (Darwin, no env)              | macOS Notification Center fallback                                     |
-| (none)                        | Rely on process exit — cron mail / GitHub Actions failure notification |
+| Env name (value never in git) | Sink |
+| --- | --- |
+| `COMPANION_UPTIME_ALERT_URL` | Generic `POST` text/plain webhook |
+| `COMPANION_UPTIME_NTFY_TOPIC` | Free [ntfy.sh](https://ntfy.sh) topic (subscribe in the ntfy app) |
+| (Darwin, no env) | macOS Notification Center fallback |
+| (none) | Rely on process exit — cron mail / GitHub Actions failure notification |
 
 ### Schedulers (install at least one external)
 
-1. **GitHub Actions (primary external)** — workflow
-   [`.github/workflows/companion-uptime.yml`](../../.github/workflows/companion-uptime.yml)
-   runs every ~10 minutes + `workflow_dispatch`. A red run notifies the workflow
-   author via GitHub. Optional repo secrets (names only):
-   `COMPANION_UPTIME_ALERT_URL`, `COMPANION_UPTIME_NTFY_TOPIC`.
-2. **Mac LaunchAgent (local backup)** — copy
-   [`com.openinstinct.companion-uptime.plist.example`](../../infrastructure/ingress/com.openinstinct.companion-uptime.plist.example)
-   to `~/Library/LaunchAgents/`, replace `REPLACE` paths, optionally set an
-   alert env, then:
-   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.openinstinct.companion-uptime.plist`
+1. **GitHub Actions (primary external)** — workflow [`.github/workflows/companion-uptime.yml`](../../.github/workflows/companion-uptime.yml) runs every ~10 minutes + `workflow_dispatch`. A red run notifies the workflow author via GitHub. Optional repo secrets (names only): `COMPANION_UPTIME_ALERT_URL`, `COMPANION_UPTIME_NTFY_TOPIC`.
+2. **Mac LaunchAgent (local backup)** — copy [`com.openinstinct.companion-uptime.plist.example`](../../infrastructure/ingress/com.openinstinct.companion-uptime.plist.example) to `~/Library/LaunchAgents/`, replace `REPLACE` paths, optionally set an alert env, then: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.openinstinct.companion-uptime.plist`
 
-Operator one-time: confirm GitHub → Settings → Notifications includes Actions
-failures, **or** set a ntfy/webhook secret so failures reach a phone even when
-email is quiet.
+Operator one-time: confirm GitHub → Settings → Notifications includes Actions failures, **or** set a ntfy/webhook secret so failures reach a phone even when email is quiet.
 
 ## Minimal uptime / health (every check)
 
@@ -116,8 +99,7 @@ fly status -a companion-cf-tunnel
 # expect: exit 0
 ```
 
-Helpers: `./scripts/fly-companion.sh status`, `./scripts/fly-alchemy-pg.sh verify --stage prod`,
-`./scripts/companion-uptime-probe.sh`.
+Helpers: `./scripts/fly-companion.sh status`, `./scripts/fly-alchemy-pg.sh verify --stage prod`, `./scripts/companion-uptime-probe.sh`.
 
 ## Backup — companion-pg-prod
 
@@ -125,8 +107,7 @@ App: `companion-pg-prod` · Volume: `pgdata` (10GB, `gru`) · Image: `postgres:1
 
 ### A) Fly volume snapshots (fast disaster recovery)
 
-Scheduled snapshots may be empty right after first provision — create one
-explicitly after cutover and after any schema-heavy migrate:
+Scheduled snapshots may be empty right after first provision — create one explicitly after cutover and after any schema-heavy migrate:
 
 ```sh
 VOL_ID=$(fly volumes list -a companion-pg-prod -j | jq -r '.[0].id')
@@ -134,15 +115,11 @@ fly volumes snapshots create "$VOL_ID" -a companion-pg-prod
 fly volumes snapshots list "$VOL_ID" -a companion-pg-prod
 ```
 
-Restore is an operator action: create a new volume from a snapshot, attach it to
-a replacement Machine (or re-run Alchemy carefully). **Do not** `fly volumes
-destroy` the live `pgdata` volume. Prod Alchemy policy retains volume on
-destroy tracking — still treat destroy as dangerous.
+Restore is an operator action: create a new volume from a snapshot, attach it to a replacement Machine (or re-run Alchemy carefully). **Do not** `fly volumes destroy` the live `pgdata` volume. Prod Alchemy policy retains volume on destroy tracking — still treat destroy as dangerous.
 
 ### B) Logical `pg_dump` (portable)
 
-Dump from inside the PG Machine (password stays on the Machine — do not echo
-it). Example shape:
+Dump from inside the PG Machine (password stays on the Machine — do not echo it). Example shape:
 
 ```sh
 # On companion-pg-prod (fly ssh). Writes a custom-format dump under /tmp.
@@ -161,41 +138,31 @@ Restore into a **new** empty database / staging Machine first:
 # pg_restore -U postgres -d open_instinct_prod --clean --if-exists open_instinct_prod.dump
 ```
 
-Prefer restoring to a scratch DB name, run `pnpm db:migrate` drift checks, then
-cut `DATABASE_URL*` — never overwrite prod blindly.
+Prefer restoring to a scratch DB name, run `pnpm db:migrate` drift checks, then cut `DATABASE_URL*` — never overwrite prod blindly.
 
 ## Rollback — tunnel → Mac 127.0.0.1:3000
 
 If Fly compute misbehaves and Mac must take traffic again:
 
-1. Ensure Alchemy / local Postgres still reachable for the Mac runtime, and
-   `~/Library/LaunchAgents/com.openinstinct.companion-runtime.plist` exists.
-2. Load Mac runtime:
-   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.openinstinct.companion-runtime.plist`
-   (or `kickstart -k` once loaded). Confirm local `:3000` serves `/welcome`.
-3. In Cloudflare Zero Trust → named tunnel `openinstinct-companion`, set the
-   public hostname `companion.tironi.xyz` origin back to
-   `http://127.0.0.1:3000` (keep `companion-cloudflared` running).
-4. Verify: `https://companion.tironi.xyz/welcome` → 200; unsigned channel POST →
-   **401**. Prefer headers **without** `via: fly.io` once origin is Mac-only.
-5. Do **not** destroy `companion-tironi`, `companion-pg-prod`, or the `pgdata`
-   volume during rollback.
+1. Ensure Alchemy / local Postgres still reachable for the Mac runtime, and `~/Library/LaunchAgents/com.openinstinct.companion-runtime.plist` exists.
+2. Load Mac runtime: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.openinstinct.companion-runtime.plist` (or `kickstart -k` once loaded). Confirm local `:3000` serves `/welcome`.
+3. In Cloudflare Zero Trust → named tunnel `openinstinct-companion`, set the public hostname `companion.tironi.xyz` origin back to `http://127.0.0.1:3000` (keep `companion-cloudflared` running).
+4. Verify: `https://companion.tironi.xyz/welcome` → 200; unsigned channel POST → **401**. Prefer headers **without** `via: fly.io` once origin is Mac-only.
+5. Do **not** destroy `companion-tironi`, `companion-pg-prod`, or the `pgdata` volume during rollback.
 
 Forward cutover (Mac → Fly) remains documented in [hosted-fly.md](hosted-fly.md).
 
 ## Remaining human gates (not worker-executable)
 
-| Gate                                                    | Status                                                                                                                | Who                     |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| **F01 credential rotation**                             | **Partial** (2026-09-10) — see [credential-rotation.md](credential-rotation.md); do not re-rotate from this checklist | Enzo                    |
-| **Meta / Kapso template** `companion_account_notice_v1` | Still **PENDING** (O02 incomplete)                                                                                    | Enzo + Meta review      |
-| **Live Telegram private reply proof**                   | Optional spot-check — cleared as stale automation blocker in [enzo-live-actions](enzo-live-actions.md)                | Enzo                    |
-| **G03 group mention**                                   | Live add `@ZoenOSBot` + mention (see [enzo-live-actions](enzo-live-actions.md))                                       | Enzo                    |
-| Billing / Stripe secrets                                | Out of scope for this hardening pass (ignored per operator)                                                           | Enzo / Stripe dashboard |
+| Gate | Status | Who |
+| --- | --- | --- |
+| **F01 credential rotation** | **Partial** (2026-09-10) — see [credential-rotation.md](credential-rotation.md); do not re-rotate from this checklist | Enzo |
+| **Meta / Kapso template** `companion_account_notice_v1` | Still **PENDING** (O02 incomplete) | Enzo + Meta review |
+| **Live Telegram private reply proof** | Optional spot-check — cleared as stale automation blocker in [enzo-live-actions](enzo-live-actions.md) | Enzo |
+| **G03 group mention** | Live add `@ZoenOSBot` + mention (see [enzo-live-actions](enzo-live-actions.md)) | Enzo |
+| Billing / Stripe secrets | Out of scope for this hardening pass (ignored per operator) | Enzo / Stripe dashboard |
 
-Workers may update this doc and run unsigned 401 / welcome / Fly status checks.
-Workers must **not** rotate F01, unload `companion-cloudflared`, destroy volumes,
-apply live webhook URL changes (dry-run only), or invent Stripe keys.
+Workers may update this doc and run unsigned 401 / welcome / Fly status checks. Workers must **not** rotate F01, unload `companion-cloudflared`, destroy volumes, apply live webhook URL changes (dry-run only), or invent Stripe keys.
 
 ## Deploy note
 

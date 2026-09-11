@@ -10,6 +10,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+
 import { channelIdentities } from "./channels";
 import { channelInbox } from "./messaging";
 import { workspaces } from "./workspaces";

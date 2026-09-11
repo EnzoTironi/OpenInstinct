@@ -37,9 +37,11 @@ export const noRoutePrivateImportsRule = defineRule({
       },
       ...visitLocalImports((node, source) => {
         const target = resolveLocalImport(filename, source, sourceDirectory);
+
         if (!target || !isWithin(target, appDirectory)) return;
 
         const segments = path.relative(appDirectory, target).split(path.sep);
+
         const privateIndex = segments.findIndex((segment) =>
           PRIVATE_ROUTE_DIRECTORIES.has(segment)
         );
@@ -50,6 +52,7 @@ export const noRoutePrivateImportsRule = defineRule({
           appDirectory,
           ...segments.slice(0, privateIndex)
         );
+
         if (!isWithin(filename, owner)) {
           context.report({
             node,

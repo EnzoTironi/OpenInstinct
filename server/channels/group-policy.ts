@@ -1,7 +1,9 @@
 import { Effect, Schema } from "effect";
+
 import { ProviderReferenceSchema } from "./inbound";
 
 const ChatKindSchema = Schema.Literals(["private", "group"]);
+
 export type ChatKind = typeof ChatKindSchema.Type;
 
 export interface GroupMentionSignals {
@@ -18,7 +20,9 @@ export const detectTelegramChatKind = (
   chatType: string
 ): ChatKind | "unsupported" => {
   if (chatType === "private") return "private";
+
   if (chatType === "group" || chatType === "supergroup") return "group";
+
   return "unsupported";
 };
 
@@ -28,15 +32,41 @@ export const detectKapsoChatKind = (conversation: {
 }): ChatKind => {
   if (conversation.is_group === true || conversation.type === "group")
     return "group";
+
   return "private";
 };
 
 const telegramMentionPattern = (botUsername: string) => {
   const name = botUsername.replace(/^@/, "");
+
   return new RegExp(`(?:^|\\s)@${name}(?:\\b|$)`, "i");
 };
 
 /** UTF-16 entity offsets match Telegram Bot API text indexing. */
+function entityMentionsBot(
+  text: string,
+  name: string,
+  entity: {
+    readonly type: string;
+    readonly offset: number;
+    readonly length: number;
+    readonly user?: { readonly id: number };
+  },
+  botId: string
+) {
+  if (entity.type === "mention") {
+    const slice = text.slice(entity.offset, entity.offset + entity.length);
+
+    return slice.replace(/^@/, "").toLowerCase() === name.toLowerCase();
+  }
+
+  if (entity.type !== "text_mention") return false;
+
+  if (entity.user === undefined) return false;
+
+  return String(entity.user.id) === botId;
+}
+
 export const telegramTextMentionsBot = (
   text: string | undefined,
   botUsername: string,
@@ -51,23 +81,16 @@ export const telegramTextMentionsBot = (
   botId: string
 ): boolean => {
   const name = botUsername.replace(/^@/, "");
+
   if (!text) return false;
+
   if (telegramMentionPattern(name).test(text)) return true;
+
   if (!entities?.length) return false;
-  for (const entity of entities) {
-    if (entity.type === "mention") {
-      const slice = text.slice(entity.offset, entity.offset + entity.length);
-      if (slice.replace(/^@/, "").toLowerCase() === name.toLowerCase())
-        return true;
-    }
-    if (
-      entity.type === "text_mention" &&
-      entity.user !== undefined &&
-      String(entity.user.id) === botId
-    )
-      return true;
-  }
-  return false;
+
+  return entities.some((entity) =>
+    entityMentionsBot(text, name, entity, botId)
+  );
 };
 
 const GroupIdentityBindingSchema = Schema.Struct({
@@ -86,6 +109,10 @@ const GroupIdentityBindingSchema = Schema.Struct({
   deliveryTargetId: ProviderReferenceSchema,
 });
 
+const decodeEffect_GroupIdentityBindingSchema = Schema.decodeUnknownEffect(
+  GroupIdentityBindingSchema
+);
+
 /**
  * Bind a group conversation to an already-linked private `channel_identity`.
  * Actor authority stays on the sender row; conversation scope is group-keyed.
@@ -100,7 +127,8 @@ export const bindGroupChannelIdentity = Effect.fn("bindGroupChannelIdentity")(
     readonly chatId: string;
   }) {
     const conversationScope = `group:${input.channel}:${input.installationId}:${input.chatId}`;
-    return yield* Schema.decodeUnknownEffect(GroupIdentityBindingSchema)({
+
+    return yield* decodeEffect_GroupIdentityBindingSchema({
       identityId: input.identityId,
       channel: input.channel,
       installationId: input.installationId,
@@ -133,12 +161,15 @@ export const extractKapsoGroupMentionSignals = (input: {
   readonly contextFromMe?: boolean;
 }): GroupMentionSignals => {
   const biz = digitsOnly(input.installationPhoneDigits);
+
   const mentionedBot =
     input.kapso?.mentioned === true ||
     input.kapso?.mentioned_business === true ||
     Boolean(input.mentions?.some((m) => digitsOnly(m) === biz)) ||
     Boolean(input.mentionedIds?.some((m) => digitsOnly(m) === biz));
+
   const replyToBot =
     input.kapso?.reply_to_business === true || input.contextFromMe === true;
+
   return { mentionedBot, replyToBot };
 };

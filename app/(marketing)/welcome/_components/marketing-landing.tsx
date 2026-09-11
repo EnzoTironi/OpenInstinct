@@ -1,12 +1,4 @@
-import Link from "next/link";
-import {
-  Building2Icon,
-  LockIcon,
-  MessageCircleIcon,
-  SparklesIcon,
-  UserIcon,
-  UsersIcon,
-} from "lucide-react";
+import { billingPlanCatalog } from "@shared/billing/plans";
 import { Button } from "@web/components/ui/button";
 import {
   Card,
@@ -15,7 +7,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@web/components/ui/card";
-import { billingPlanCatalog } from "@shared/billing/plans";
+import {
+  Building2Icon,
+  LockIcon,
+  MessageCircleIcon,
+  SparklesIcon,
+  UserIcon,
+  UsersIcon,
+} from "lucide-react";
+import Link from "next/link";
+
 import { MarketingShell } from "../../_components/marketing-shell";
 
 const audiences = [
@@ -77,7 +78,9 @@ const planOrder = [
 
 function priceLabel(planId: "free" | "pro" | "org", amount: number) {
   if (planId === "free") return "$0";
+
   if (planId === "org") return `$${String(amount)}/seat`;
+
   return `$${String(amount)}`;
 }
 

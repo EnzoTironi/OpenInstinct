@@ -1,15 +1,15 @@
 // Exercise the installed, pinned Eve runtime; its callback registry and context must share one package instance.
 import { randomUUID } from "node:crypto";
-import { expect, it } from "vitest";
+
 import { defineDynamic } from "eve/tools";
-import { markDynamicCallbackRebind } from "../../node_modules/eve/dist/src/internal/dynamic-tool-rebind.js";
+import { expect, it } from "vitest";
 
 import type { SessionAuthContext } from "../../node_modules/eve/dist/src/channel/types.js";
+import { buildResponseAuthorizationTools } from "../../node_modules/eve/dist/src/context/build-dynamic-tools.js";
 import {
   ContextContainer,
   contextStorage,
 } from "../../node_modules/eve/dist/src/context/container.js";
-import { buildResponseAuthorizationTools } from "../../node_modules/eve/dist/src/context/build-dynamic-tools.js";
 import {
   SessionIdKey,
   SessionKey,
@@ -25,6 +25,7 @@ import {
 import { hasPendingApprovalBatch } from "../../node_modules/eve/dist/src/harness/input-requests.js";
 import { appendPendingInputBatch } from "../../node_modules/eve/dist/src/harness/pending-input-batches.js";
 import type { HarnessSession } from "../../node_modules/eve/dist/src/harness/types.js";
+import { markDynamicCallbackRebind } from "../../node_modules/eve/dist/src/internal/dynamic-tool-rebind.js";
 import { createTurnStartedEvent } from "../../node_modules/eve/dist/src/protocol/message.js";
 import type { ResolvedDynamicToolResolver } from "../../node_modules/eve/dist/src/runtime/types.js";
 import type { InputRequest } from "../../node_modules/eve/dist/src/shared/input.js";
@@ -44,6 +45,7 @@ function callbackOwner(name: string): DynamicToolCallbackOwner {
     name,
   };
 }
+
 import { restoreTurnDynamicToolCallbacks } from "../../node_modules/eve/dist/src/execution/restore-turn-dynamic-tools.js";
 import { normalizeToolDefinition } from "../../node_modules/eve/dist/src/internal/authored-definition/schema-backed.js";
 
@@ -57,6 +59,7 @@ it.each([
     const defined = defineDynamic({
       events: { "turn.started": () => null },
     });
+
     const tool = enabled ? markDynamicCallbackRebind(defined) : defined;
     expect(normalizeToolDefinition(tool, "Expected a dynamic tool.")).toEqual({
       eventNames: ["turn.started"],
@@ -73,6 +76,81 @@ const responder: SessionAuthContext = {
   authenticator: "local-component-test",
 };
 
+interface ColdCalls {
+  resolver: number;
+  policy: number;
+  execute: number;
+}
+
+const approvalRequestCallback = () => "user-approval" as const;
+
+const makeExecuteCallback = (calls: ColdCalls) => () => {
+  calls.execute += 1;
+
+  return { local: true };
+};
+
+const makePolicyCallback = (calls: ColdCalls) => () => {
+  calls.policy += 1;
+
+  return { status: "allowed" };
+};
+
+const makeColdEntry = (calls: ColdCalls) => {
+  const entry = defineTool({
+    description: "Local approval gate",
+    inputSchema: { type: "object" },
+    execute: async () => ({ local: true }),
+    approval: {
+      request: approvalRequestCallback,
+      response: () => ({ status: "allowed" }),
+    },
+  });
+
+  stampDurableDynamicToolCallbacks(entry, {
+    execute: { closure: {}, callback: makeExecuteCallback(calls) },
+    approvalRequest: { closure: {}, callback: approvalRequestCallback },
+    approvalResponse: { closure: {}, callback: makePolicyCallback(calls) },
+  });
+
+  return entry;
+};
+
+const makeColdResolver = (
+  name: string,
+  entry: ReturnType<typeof makeColdEntry>,
+  calls: ColdCalls
+): ResolvedDynamicToolResolver => ({
+  slug: name,
+  eventNames: ["turn.started"],
+  events: {
+    "turn.started": () => {
+      calls.resolver += 1;
+
+      return { [name]: entry };
+    },
+  },
+  rebindMissingCallbacks: true,
+  sourceId: `local:${name}`,
+  sourceKind: "module",
+  logicalPath: `agent/tools/${name}.ts`,
+});
+
+const coldTurnMetadata = (name: string) => [
+  {
+    name,
+    resolverSlug: name,
+    entryKey: `${name}:${name}`,
+    description: "Local approval gate",
+    inputSchema: { type: "object" },
+    callbacks: {
+      execute: { closure: {} },
+      approvalRequest: { closure: {} },
+      approvalResponse: { closure: {} },
+    },
+  },
+];
+
 function coldTurn() {
   const name = `local_gate_${randomUUID().replaceAll("-", "")}`;
   const ctx = new ContextContainer();
@@ -83,61 +161,11 @@ function coldTurn() {
     turn: { id: "turn_0", sequence: 0 },
   });
   // Only durable metadata survives a cold process; no callback is registered.
-  ctx.set(TurnDynamicToolMetadataKey, [
-    {
-      name,
-      resolverSlug: name,
-      entryKey: `${name}:${name}`,
-      description: "Local approval gate",
-      inputSchema: { type: "object" },
-      callbacks: {
-        execute: { closure: {} },
-        approvalRequest: { closure: {} },
-        approvalResponse: { closure: {} },
-      },
-    },
-  ]);
-  const calls = { resolver: 0, policy: 0, execute: 0 };
-  const entry = defineTool({
-    description: "Local approval gate",
-    inputSchema: { type: "object" },
-    execute: async () => ({ local: true }),
-    approval: {
-      request: () => "user-approval",
-      response: () => ({ status: "allowed" }),
-    },
-  });
-  stampDurableDynamicToolCallbacks(entry, {
-    execute: {
-      closure: {},
-      callback: () => {
-        calls.execute += 1;
-        return { local: true };
-      },
-    },
-    approvalRequest: { closure: {}, callback: () => "user-approval" },
-    approvalResponse: {
-      closure: {},
-      callback: () => {
-        calls.policy += 1;
-        return { status: "allowed" };
-      },
-    },
-  });
-  const resolver: ResolvedDynamicToolResolver = {
-    slug: name,
-    eventNames: ["turn.started"],
-    events: {
-      "turn.started": () => {
-        calls.resolver += 1;
-        return { [name]: entry };
-      },
-    },
-    rebindMissingCallbacks: true,
-    sourceId: `local:${name}`,
-    sourceKind: "module",
-    logicalPath: `agent/tools/${name}.ts`,
-  };
+  ctx.set(TurnDynamicToolMetadataKey, coldTurnMetadata(name));
+  const calls: ColdCalls = { resolver: 0, policy: 0, execute: 0 };
+  const entry = makeColdEntry(calls);
+  const resolver = makeColdResolver(name, entry, calls);
+
   const session: HarnessSession = setHarnessEmissionState(
     {
       agent: {
@@ -152,6 +180,7 @@ function coldTurn() {
     },
     { sessionStarted: true, sequence: 0, stepIndex: 1, turnId: "turn_0" }
   );
+
   const request: InputRequest = {
     action: {
       callId: "local-call",
@@ -169,14 +198,17 @@ function coldTurn() {
     prompt: "Approve local computation",
     requestId: "local-approval",
   };
+
   expect(
     lookupDurableDynamicCallback(callbackOwner(name), "approvalResponse")
   ).toBeUndefined();
+
   return { ctx, calls, name, resolver, session, request };
 }
 
 async function endTurn(session: HarnessSession): Promise<HarnessSession> {
   const events: string[] = [];
+
   const emission = await emitTurnEpilogue(
     async (event) => {
       events.push(event.type);
@@ -189,7 +221,9 @@ async function endTurn(session: HarnessSession): Promise<HarnessSession> {
     },
     "conversation"
   );
+
   expect(events).toEqual(["turn.completed", "session.waiting"]);
+
   return setHarnessEmissionState(session, emission);
 }
 
@@ -198,6 +232,7 @@ async function endTurn(session: HarnessSession): Promise<HarnessSession> {
 // oxlint-disable-next-line vitest/no-disabled-tests -- 0.52 fail-closed rebind needs transformed durable descriptors this helper surface does not stamp.
 it.skip("restores a cold parked approval before its response policy is coordinated", async () => {
   const fixture = coldTurn();
+
   const parked = await endTurn(
     appendPendingInputBatch({
       requests: [fixture.request],
@@ -206,6 +241,7 @@ it.skip("restores a cold parked approval before its response policy is coordinat
       session: fixture.session,
     })
   );
+
   expect(isHarnessBetweenTurns(parked)).toBe(true);
   expect(hasPendingApprovalBatch(parked)).toBe(true);
 
@@ -217,6 +253,7 @@ it.skip("restores a cold parked approval before its response policy is coordinat
       messages: [],
       resolvers: [fixture.resolver],
     });
+
     const accepted = await coordinateApprovalDelivery({
       now: 100,
       session: parked,
@@ -233,17 +270,21 @@ it.skip("restores a cold parked approval before its response policy is coordinat
       },
       tools: new Map(),
     });
+
     expect(accepted.kind).toBe("continue-coordination");
     expect(isHarnessBetweenTurns(accepted.session)).toBe(true);
+
     const tools = buildResponseAuthorizationTools({
       context: fixture.ctx,
       authoredTools: new Map(),
     });
+
     const authorized = await coordinateApprovalDelivery({
       now: 101,
       session: accepted.session,
       tools,
     });
+
     expect(getApprovalAuditState(authorized.session.state).settlements).toEqual(
       [
         expect.objectContaining({
@@ -277,6 +318,7 @@ it("does not restore obsolete interactive callbacks for a settled report turn", 
         events: {
           "turn.started": () => {
             fixture.calls.resolver += 1;
+
             // The new caller no longer exposes the old interactive tools.
             return {};
           },

@@ -1,16 +1,16 @@
 "use client";
 
-import { type SubmitEvent, useState } from "react";
-import { z } from "zod";
-import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
-import { Button } from "@web/components/ui/button";
-import { Input } from "@web/components/ui/input";
-import { Label } from "@web/components/ui/label";
 import {
   userProfileSchema,
   type UserProfile,
 } from "@shared/user-profile/schema";
+import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
+import { Button } from "@web/components/ui/button";
+import { Input } from "@web/components/ui/input";
+import { Label } from "@web/components/ui/label";
 import { api } from "@web/trpc/client";
+import { type SubmitEvent, useState } from "react";
+import { z } from "zod";
 
 export function PersonalInfoForm({
   initialProfile,
@@ -24,6 +24,7 @@ export function PersonalInfoForm({
     event.preventDefault();
     setStatus(undefined);
     const values = Object.fromEntries(new FormData(event.currentTarget));
+
     const parsed = userProfileSchema.safeParse({
       addressLine1: nullableFormValue(values.addressLine1),
       addressLine2: nullableFormValue(values.addressLine2),
@@ -37,8 +38,10 @@ export function PersonalInfoForm({
       postalCode: nullableFormValue(values.postalCode),
       region: nullableFormValue(values.region),
     });
+
     if (!parsed.success) {
       setStatus("error");
+
       return;
     }
 
@@ -204,5 +207,6 @@ function ProfileField({
 
 function nullableFormValue(value: FormDataEntryValue | undefined) {
   const parsed = z.string().trim().min(1).safeParse(value);
+
   return parsed.success ? parsed.data : null;
 }

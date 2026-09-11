@@ -1,5 +1,6 @@
-import { Effect, Schema } from "effect";
 import { getAuthSession } from "@db/services/auth/session";
+import { Effect, Schema, Match } from "effect";
+
 import {
   BillingPortalError,
   createCustomerPortalSession,
@@ -9,13 +10,15 @@ const bodySchema = Schema.Struct({
   organizationId: Schema.optionalKey(Schema.String),
 });
 
+const decodeBodySchema = Schema.decodeUnknownEffect(bodySchema);
+
 function portalErrorResponse(error: BillingPortalError) {
-  const status =
-    error.reason === "stripe_not_configured"
-      ? 503
-      : error.reason === "no_customer"
-        ? 404
-        : 400;
+  const status = Match.value(error.reason).pipe(
+    Match.when("stripe_not_configured", () => 503),
+    Match.when("no_customer", () => 404),
+    Match.orElse(() => 400)
+  );
+
   return Response.json(
     { error: error.message, reason: error.reason },
     { status }
@@ -24,6 +27,7 @@ function portalErrorResponse(error: BillingPortalError) {
 
 export async function POST(request: Request) {
   const session = await getAuthSession(request.headers);
+
   if (!session?.user) {
     return Response.json(
       { error: "Sign in to manage billing." },
@@ -32,8 +36,9 @@ export async function POST(request: Request) {
   }
 
   const rawBody: unknown = await request.json().catch(() => ({}));
+
   return Effect.runPromise(
-    Schema.decodeUnknownEffect(bodySchema)(rawBody).pipe(
+    decodeBodySchema(rawBody).pipe(
       Effect.mapError(
         () =>
           new BillingPortalError({

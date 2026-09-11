@@ -1,5 +1,6 @@
 import type { MessageStreamEvent } from "eve/client";
 import { describe, expect, it } from "vitest";
+
 import {
   collectSubagentSessions,
   getSubagentStatus,
@@ -8,6 +9,7 @@ import {
 } from "./subagent-sessions";
 
 const meta = { at: "2026-08-27T12:00:00.000Z", id: "evt_01" };
+
 const called = {
   type: "subagent.called",
   data: {
@@ -110,6 +112,7 @@ describe("collectSubagentSessions", () => {
       },
       meta: { ...meta, id: "evt_02" },
     } satisfies MessageStreamEvent;
+
     const continuedFirstChild = {
       ...called,
       data: { ...called.data, callId: "call_3" },
@@ -127,6 +130,7 @@ describe("collectSubagentSessions", () => {
 describe("getSubagentSubscriptionKey", () => {
   it("changes when a continued child receives a new call", () => {
     const [first] = collectSubagentSessions([called]);
+
     const [continued] = collectSubagentSessions([
       called,
       {
@@ -135,6 +139,7 @@ describe("getSubagentSubscriptionKey", () => {
         meta: { ...meta, id: "evt_02" },
       },
     ]);
+
     if (!first || !continued) {
       throw new Error("Expected collected subagent sessions");
     }
@@ -185,7 +190,9 @@ describe("getSubagentStatus", () => {
     "preserves %s after the session returns to waiting",
     (type, expected) => {
       const [session] = collectSubagentSessions([called]);
+
       if (!session) throw new Error("Expected a collected subagent session");
+
       const turnBoundary =
         type === "turn.failed"
           ? {
@@ -203,6 +210,7 @@ describe("getSubagentStatus", () => {
               data: { sequence: 0, turnId: "turn_1" },
               meta: { ...meta, id: "evt_02" },
             };
+
       const events = [
         turnBoundary,
         {

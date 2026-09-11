@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   averageBenchmarkImprovement,
   compareBenchmarkTasks,
@@ -41,6 +42,7 @@ describe("browser benchmark comparison", () => {
       id: "task",
       success: true,
     };
+
     const candidate = {
       costUsd: 1,
       durationMs: 5_000,

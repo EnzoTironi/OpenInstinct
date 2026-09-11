@@ -1,15 +1,15 @@
 "use client";
 
+import { cjk } from "@streamdown/cjk";
+import { code } from "@streamdown/code";
+import { math } from "@streamdown/math";
+import { mermaid } from "@streamdown/mermaid";
+import { cn } from "@web/components/class-names";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@web/components/ui/collapsible";
-import { cn } from "@web/components/class-names";
-import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
-import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import {
@@ -46,6 +46,7 @@ function useControllableState<Value>({
 }) {
   const [localValue, setLocalValue] = useState(defaultValue);
   const resolvedValue = value ?? localValue;
+
   const setValue = useCallback(
     (nextValue: Value) => {
       if (value === undefined) setLocalValue(nextValue);
@@ -59,9 +60,11 @@ function useControllableState<Value>({
 
 export const useReasoning = () => {
   const context = useContext(ReasoningContext);
+
   if (!context) {
     throw new Error("Reasoning components must be used within Reasoning");
   }
+
   return context;
 };
 
@@ -74,6 +77,7 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
 };
 
 const AUTO_CLOSE_DELAY = 1000;
+
 const MS_IN_S = 1000;
 
 export const Reasoning = memo(
@@ -96,6 +100,7 @@ export const Reasoning = memo(
       onChange: onOpenChange,
       value: open,
     });
+
     const [duration, setDuration] = useControllableState<number | undefined>({
       defaultValue: undefined,
       value: durationProp,
@@ -142,6 +147,7 @@ export const Reasoning = memo(
           clearTimeout(timer);
         };
       }
+
       return undefined;
     }, [isStreaming, isOpen, setIsOpen]);
 
@@ -182,9 +188,11 @@ const defaultGetThinkingMessage = (isStreaming: boolean, duration?: number) => {
   if (isStreaming || duration === 0) {
     return <Shimmer duration={1}>Thinking...</Shimmer>;
   }
+
   if (duration === undefined) {
     return <p>Thought for a few seconds</p>;
   }
+
   return <p>Thought for {duration} seconds</p>;
 };
 
@@ -237,7 +245,7 @@ export const ReasoningContent = memo(
     <CollapsibleContent
       className={cn(
         "mt-4",
-        "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
+        "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=open]:animate-in text-muted-foreground outline-none",
         className
       )}
       {...props}
@@ -250,5 +258,7 @@ export const ReasoningContent = memo(
 );
 
 Reasoning.displayName = "Reasoning";
+
 ReasoningTrigger.displayName = "ReasoningTrigger";
+
 ReasoningContent.displayName = "ReasoningContent";

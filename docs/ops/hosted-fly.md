@@ -1,27 +1,19 @@
 # Hosted Fly cutover (H01) — Mac → always-on off-Mac
 
-Operator recipe so Companion can leave **Mac-only** hosting for consumer /
-prosumer installs, while keeping the **Mac LaunchAgent** path as an optional
-local / prosumer mode.
+Operator recipe so Companion can leave **Mac-only** hosting for consumer / prosumer installs, while keeping the **Mac LaunchAgent** path as an optional local / prosumer mode.
 
-| Layer              | Choice                                                                                                                                                                         |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Compute            | **Fly Machines** (`fly.toml` + root `Dockerfile`) running `pnpm start`                                                                                                         |
-| Postgres           | **Alchemy unmanaged** — Docker (`alchemy.run.ts`) **or** Fly.Machine+volume (`alchemy.fly-postgres.run.ts`) + stage policy — **not** Fly Managed Postgres / `Fly.Postgres` MPG |
-| Public HTTPS / DNS | **Cloudflare** named tunnel for `companion.tironi.xyz` (TG + Kapso); connector on Fly `companion-cf-tunnel` (not Mac)                                                          |
-| Local optional     | Mac LaunchAgent + Alchemy on Docker Desktop (`scripts/launch-companion-prod.sh`)                                                                                               |
+| Layer | Choice |
+| --- | --- |
+| Compute | **Fly Machines** (`fly.toml` + root `Dockerfile`) running `pnpm start` |
+| Postgres | **Alchemy unmanaged** — Docker (`alchemy.run.ts`) **or** Fly.Machine+volume (`alchemy.fly-postgres.run.ts`) + stage policy — **not** Fly Managed Postgres / `Fly.Postgres` MPG |
+| Public HTTPS / DNS | **Cloudflare** named tunnel for `companion.tironi.xyz` (TG + Kapso); connector on Fly `companion-cf-tunnel` (not Mac) |
+| Local optional | Mac LaunchAgent + Alchemy on Docker Desktop (`scripts/launch-companion-prod.sh`) |
 
-Never commit secrets, print secret values, force-push `main`, destroy Mac prod
-blindly, or rotate F01 from this recipe.
+Never commit secrets, print secret values, force-push `main`, destroy Mac prod blindly, or rotate F01 from this recipe.
 
 ## Why not Fly Managed Postgres?
 
-Release-2 ops keep **Alchemy** as the Postgres provisioner so stage names,
-database names (`open_instinct_<stage>`), env-file hints, and prod volume
-retain-on-destroy stay consistent with
-[`infrastructure/companion-stage.ts`](../../infrastructure/companion-stage.ts).
-Alchemy's `Fly.Postgres` resource is **Managed Postgres (MPG)** and is
-**out of scope** here.
+Release-2 ops keep **Alchemy** as the Postgres provisioner so stage names, database names (`open_instinct_<stage>`), env-file hints, and prod volume retain-on-destroy stay consistent with [`infrastructure/companion-stage.ts`](../../infrastructure/companion-stage.ts). Alchemy's `Fly.Postgres` resource is **Managed Postgres (MPG)** and is **out of scope** here.
 
 ## Architecture (ponytail)
 
@@ -43,16 +35,13 @@ DATABASE_URL ──► Alchemy unmanaged Postgres
                  (Docker A/B on host, or Fly.Machine+volume option C)
 ```
 
-- Channel webhooks still hit Next `/api/channels/{telegram,kapso}` and rewrite
-  to Eve. **Next without Eve on the baked rewrite port fails webhooks.**
+- Channel webhooks still hit Next `/api/channels/{telegram,kapso}` and rewrite to Eve. **Next without Eve on the baked rewrite port fails webhooks.**
 - Prefer `pnpm start` (already the image `CMD`). Do not run Next alone.
-- Zoen product DNS `app.zoen.space` stays on the existing Fly product app —
-  **do not** point it at Companion.
+- Zoen product DNS `app.zoen.space` stays on the existing Fly product app — **do not** point it at Companion.
 
 ## Alchemy Docker Postgres — reachable from Fly
 
-Use the **same** Alchemy stack and stages as Mac
-(`local` → `dev` → `staging` → `prod`). Deploy Postgres with:
+Use the **same** Alchemy stack and stages as Mac (`local` → `dev` → `staging` → `prod`). Deploy Postgres with:
 
 ```sh
 pnpm --dir infrastructure plan --stage prod
@@ -63,36 +52,26 @@ Fly Machines cannot talk to Mac `127.0.0.1`. Pick **one** topology:
 
 ### A) Preferred for first cutover — Docker host + Fly WireGuard
 
-1. Keep Alchemy Docker Postgres on an always-on Docker host (Mac is fine for
-   prosumer; for true off-Mac DB, use a small always-on Linux Docker host in
-   the same metro as `primary_region`).
-2. Install a [Fly WireGuard peer](https://fly.io/docs/networking/private-networking/)
-   on that host (or use `fly proxy` / `fly mpg proxy` is **not** used — we are
-   not on MPG).
-3. From the peer, reach Alchemy's published loopback port (Alchemy binds
-   `127.0.0.1:<ephemeral>→5432`). Set Fly secrets `DATABASE_URL` /
-   `DATABASE_URL_UNPOOLED` to the stage database name
-   (`open_instinct_prod`, …) using that reachable host/port.
-4. Confirm `pg_isready` / migrate from a one-off Fly machine or WireGuard
-   laptop before pointing webhooks at Fly compute.
+1. Keep Alchemy Docker Postgres on an always-on Docker host (Mac is fine for prosumer; for true off-Mac DB, use a small always-on Linux Docker host in the same metro as `primary_region`).
+2. Install a [Fly WireGuard peer](https://fly.io/docs/networking/private-networking/) on that host (or use `fly proxy` / `fly mpg proxy` is **not** used — we are not on MPG).
+3. From the peer, reach Alchemy's published loopback port (Alchemy binds `127.0.0.1:<ephemeral>→5432`). Set Fly secrets `DATABASE_URL` / `DATABASE_URL_UNPOOLED` to the stage database name (`open_instinct_prod`, …) using that reachable host/port.
+4. Confirm `pg_isready` / migrate from a one-off Fly machine or WireGuard laptop before pointing webhooks at Fly compute.
 
 ### B) Colocated Docker host in the Fly region
 
-Same Alchemy program; Docker context is a VPS/host near `gru` (or your
-`primary_region`). Publish Postgres only on a private interface / WireGuard /
-Tailscale — not the public Internet. Wire `DATABASE_URL*` the same way.
+Same Alchemy program; Docker context is a VPS/host near `gru` (or your `primary_region`). Publish Postgres only on a private interface / WireGuard / Tailscale — not the public Internet. Wire `DATABASE_URL*` the same way.
 
 ### C) Preferred for true off-Mac — Alchemy `Fly.Machine` + volume
 
 Alchemy-managed **unmanaged** Postgres on the Fly private network:
 
-| Piece          | Choice                                                                                                                               |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Stack entry    | [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts)                                     |
-| Resources      | `Fly.App` + `Fly.Secret(POSTGRES_PASSWORD)` + `Fly.Machine` (`postgres:17-alpine`) + volume mount at `/data` (`PGDATA=/data/pgdata`) |
-| Database names | Same `CompanionStagePolicy` as Docker (`open_instinct_<stage>`)                                                                      |
-| Network        | **No** public proxy services — reachable only via 6PN / `.internal`                                                                  |
-| Explicitly not | Fly Managed Postgres / `fly mpg` / Alchemy `Fly.Postgres` MPG                                                                        |
+| Piece | Choice |
+| --- | --- |
+| Stack entry | [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) |
+| Resources | `Fly.App` + `Fly.Secret(POSTGRES_PASSWORD)` + `Fly.Machine` (`postgres:17-alpine`) + volume mount at `/data` (`PGDATA=/data/pgdata`) |
+| Database names | Same `CompanionStagePolicy` as Docker (`open_instinct_<stage>`) |
+| Network | **No** public proxy services — reachable only via 6PN / `.internal` |
+| Explicitly not | Fly Managed Postgres / `fly mpg` / Alchemy `Fly.Postgres` MPG |
 
 Operator commands (secrets never printed):
 
@@ -126,34 +105,29 @@ Wire compute secrets (values from your store — do not paste into git/PRs):
 ./scripts/fly-companion.sh secrets-check
 ```
 
-Migrate from a host that can reach the PG app (WireGuard peer, or `fly ssh`
-on compute after secrets are set):
+Migrate from a host that can reach the PG app (WireGuard peer, or `fly ssh` on compute after secrets are set):
 
 ```sh
 pnpm db:migrate
 pnpm workflow:migrate
 ```
 
-**A/B remain valid** for prosumer / Mac-local Docker. Use C when Fly compute
-must not depend on Mac `127.0.0.1` and you want Alchemy stage naming without MPG.
+**A/B remain valid** for prosumer / Mac-local Docker. Use C when Fly compute must not depend on Mac `127.0.0.1` and you want Alchemy stage naming without MPG.
 
-Honest limits: this is a single-node unmanaged Postgres Machine (you operate
-restarts/disk). Alchemy `RemovalPolicy.retain` applies on destroy for `prod`
-the same policy idea as Docker volumes — still treat destroy as dangerous.
-Scheduled Fly volume snapshots default on for the mount.
+Honest limits: this is a single-node unmanaged Postgres Machine (you operate restarts/disk). Alchemy `RemovalPolicy.retain` applies on destroy for `prod` the same policy idea as Docker volumes — still treat destroy as dangerous. Scheduled Fly volume snapshots default on for the mount.
 
 ## Fly app recipe (compute)
 
 Repo files:
 
-| File                                                                                             | Role                                                                                     |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| [`fly.toml`](../../fly.toml)                                                                     | Always-on HTTP on :3000 (`gru`); TCP `checks.alive` (avoid HTTP 307 health fails)        |
-| [`Dockerfile`](../../Dockerfile)                                                                 | Multi-stage Node 24; Eve+Next; `just-bash` resolve check; `CMD` → `fly-entrypoint.sh`    |
-| [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh)                                   | Materialize Codex/ChatGPT auth secrets then `exec pnpm start`                            |
-| [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh)                                     | `validate` / `status` / `deploy-dry` / `secrets-check`                                   |
-| [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh)                                   | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify` |
-| [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) | Alchemy stack: Fly.App + Machine + volume (not MPG)                                      |
+| File | Role |
+| --- | --- |
+| [`fly.toml`](../../fly.toml) | Always-on HTTP on :3000 (`gru`); TCP `checks.alive` (avoid HTTP 307 health fails) |
+| [`Dockerfile`](../../Dockerfile) | Multi-stage Node 24; Eve+Next; `just-bash` resolve check; `CMD` → `fly-entrypoint.sh` |
+| [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh) | Materialize Codex/ChatGPT auth secrets then `exec pnpm start` |
+| [`scripts/fly-companion.sh`](../../scripts/fly-companion.sh) | `validate` / `status` / `deploy-dry` / `secrets-check` |
+| [`scripts/fly-alchemy-pg.sh`](../../scripts/fly-alchemy-pg.sh) | Option C: Alchemy Fly unmanaged PG `plan` / `deploy` / `status` / `url-shape` / `verify` |
+| [`infrastructure/alchemy.fly-postgres.run.ts`](../../infrastructure/alchemy.fly-postgres.run.ts) | Alchemy stack: Fly.App + Machine + volume (not MPG) |
 
 ### One-time app create (operator)
 
@@ -166,26 +140,25 @@ fly apps create companion-tironi --org personal
 
 ### Secrets (names only — set values locally; never paste into git/PRs)
 
-Minimum for a standing Companion (see [self-host](../self-host.md) for the full
-table):
+Minimum for a standing Companion (see [self-host](../self-host.md) for the full table):
 
-| Secret name                                      | Notes                                                                                       |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                   | Alchemy stage DB — for option C use `<pg-app>.internal` (see `url-shape`); not Mac loopback |
-| `DATABASE_URL_UNPOOLED`                          | Same DB; migrate-friendly                                                                   |
-| `BETTER_AUTH_SECRET`                             | ≥32 chars                                                                                   |
-| `BETTER_AUTH_URL`                                | `https://companion.tironi.xyz` (keep hostname through cutover)                              |
-| `COMPANION_PUBLIC_BASE_URL`                      | Same public origin                                                                          |
-| `SECRET_ENCRYPTION_KEY`                          | base64 32-byte; **do not rotate casually** (F01)                                            |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` | Existing bot                                                                                |
-| `KAPSO_*`                                        | Existing Kapso phone / webhook secrets                                                      |
-| `WORKFLOW_LOCAL_BASE_URL`                        | `http://127.0.0.1:4274` (Eve stays loopback in the Machine)                                 |
-| Model / Blob / Google / Kernel                   | As required by the install profile                                                          |
-| `CHATGPT_AUTH_JSON`                              | ChatGPT/Codex auth JSON → `/root/.eve/auth/chatgpt.json` (mode 600) via entrypoint          |
-| `CODEX_AUTH_JSON`                                | Codex CLI auth JSON → `/root/.codex/auth.json` (mode 600) via entrypoint                    |
-| `COMPANION_MODEL_PROVIDER`                       | Live Spark: `codex-local` (model `gpt-5.3-codex-spark`)                                     |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`    | Optional hosted billing ([consumer-billing](../consumer-billing.md))                        |
-| `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ORG_SEAT`     | Stripe Price ids for Pro / Org seat                                                         |
+| Secret name | Notes |
+| --- | --- |
+| `DATABASE_URL` | Alchemy stage DB — for option C use `<pg-app>.internal` (see `url-shape`); not Mac loopback |
+| `DATABASE_URL_UNPOOLED` | Same DB; migrate-friendly |
+| `BETTER_AUTH_SECRET` | ≥32 chars |
+| `BETTER_AUTH_URL` | `https://companion.tironi.xyz` (keep hostname through cutover) |
+| `COMPANION_PUBLIC_BASE_URL` | Same public origin |
+| `SECRET_ENCRYPTION_KEY` | base64 32-byte; **do not rotate casually** (F01) |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` | Existing bot |
+| `KAPSO_*` | Existing Kapso phone / webhook secrets |
+| `WORKFLOW_LOCAL_BASE_URL` | `http://127.0.0.1:4274` (Eve stays loopback in the Machine) |
+| Model / Blob / Google / Kernel | As required by the install profile |
+| `CHATGPT_AUTH_JSON` | ChatGPT/Codex auth JSON → `/root/.eve/auth/chatgpt.json` (mode 600) via entrypoint |
+| `CODEX_AUTH_JSON` | Codex CLI auth JSON → `/root/.codex/auth.json` (mode 600) via entrypoint |
+| `COMPANION_MODEL_PROVIDER` | Live Spark: `codex-local` (model `gpt-5.3-codex-spark`) |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Optional hosted billing ([consumer-billing](../consumer-billing.md)) |
+| `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ORG_SEAT` | Stripe Price ids for Pro / Org seat |
 
 ```sh
 # Example shape only — values come from your secret store, not this doc:
@@ -207,20 +180,16 @@ pnpm workflow:migrate
 # fly deploy -c fly.toml
 ```
 
-Prefer **`deploy-dry` + PR** before the first live `fly deploy`. Keep Mac
-`launch-companion-prod` / cloudflared LaunchAgents loaded until ingress is
-retargeted and health-checked.
+Prefer **`deploy-dry` + PR** before the first live `fly deploy`. Keep Mac `launch-companion-prod` / cloudflared LaunchAgents loaded until ingress is retargeted and health-checked.
 
 ## Codex / ChatGPT auth on Fly (Spark)
 
-Live Companion on Fly can use **`codex-local`** with model **`gpt-5.3-codex-spark`**.
-Auth must exist on the Machine filesystem before `pnpm start`; do **not** bake tokens
-into the image.
+Live Companion on Fly can use **`codex-local`** with model **`gpt-5.3-codex-spark`**. Auth must exist on the Machine filesystem before `pnpm start`; do **not** bake tokens into the image.
 
-| Secret name         | Written by [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh) |
-| ------------------- | ------------------------------------------------------------------------- |
-| `CHATGPT_AUTH_JSON` | `/root/.eve/auth/chatgpt.json` (chmod 600)                                |
-| `CODEX_AUTH_JSON`   | `/root/.codex/auth.json` (chmod 600)                                      |
+| Secret name | Written by [`scripts/fly-entrypoint.sh`](../../scripts/fly-entrypoint.sh) |
+| --- | --- |
+| `CHATGPT_AUTH_JSON` | `/root/.eve/auth/chatgpt.json` (chmod 600) |
+| `CODEX_AUTH_JSON` | `/root/.codex/auth.json` (chmod 600) |
 
 Refresh from the Mac operator machine (values never committed / never printed):
 
@@ -233,12 +202,9 @@ Refresh from the Mac operator machine (values never committed / never printed):
 ./scripts/fly-companion.sh secrets-check   # names only
 ```
 
-A plain `CMD ["pnpm", "start", …]` without the entrypoint drops these files on
-redeploy even when the Fly secrets remain set.
+A plain `CMD ["pnpm", "start", …]` without the entrypoint drops these files on redeploy even when the Fly secrets remain set.
 
-If a Machine still has an inline `init.cmd` override (e.g. from a one-off
-`fly machine update -C '…'`), clear it after deploying an image that includes
-`scripts/fly-entrypoint.sh` so the image `CMD` wins:
+If a Machine still has an inline `init.cmd` override (e.g. from a one-off `fly machine update -C '…'`), clear it after deploying an image that includes `scripts/fly-entrypoint.sh` so the image `CMD` wins:
 
 ```sh
 fly machine update <machine-id> -a companion-tironi -C '' -y
@@ -246,41 +212,22 @@ fly machine update <machine-id> -a companion-tironi -C '' -y
 
 ### Eve bash sandbox (`just-bash`)
 
-Eve treats `just-bash` as an **optional peer**. Without it, the agent `bash`
-tool fails at runtime (`Cannot find package 'just-bash'`). Companion installs
-`just-bash` as a runtime dependency; the Dockerfile runner stage asserts
-`require.resolve('just-bash')` so a missing peer fails the image build.
+Eve treats `just-bash` as an **optional peer**. Without it, the agent `bash` tool fails at runtime (`Cannot find package 'just-bash'`). Companion installs `just-bash` as a runtime dependency; the Dockerfile runner stage asserts `require.resolve('just-bash')` so a missing peer fails the image build.
 
 ## Cutover Mac → Fly (keep `companion.tironi.xyz`)
 
-Goal: **same** public hostname so Telegram + Kapso webhooks do not need a URL
-change if the tunnel origin alone moves.
+Goal: **same** public hostname so Telegram + Kapso webhooks do not need a URL change if the tunnel origin alone moves.
 
-1. **Prep** — Alchemy unmanaged `prod` PG healthy (option C `deploy` + `verify`, or A/B reachable); Fly secrets set;
-   `./scripts/fly-companion.sh validate` OK; optional `deploy-dry` OK.
-2. **Deploy compute** — `fly deploy` once; confirm `https://<app>.fly.dev`
-   returns the app (unsigned channel POST → **401**, not 502).
-3. **Retarget Cloudflare tunnel origin** — in Zero Trust / tunnel config, point
-   `companion.tironi.xyz` at the Fly Machine instead of Mac
-   `http://127.0.0.1:3000`. Options:
+1. **Prep** — Alchemy unmanaged `prod` PG healthy (option C `deploy` + `verify`, or A/B reachable); Fly secrets set; `./scripts/fly-companion.sh validate` OK; optional `deploy-dry` OK.
+2. **Deploy compute** — `fly deploy` once; confirm `https://<app>.fly.dev` returns the app (unsigned channel POST → **401**, not 502).
+3. **Retarget Cloudflare tunnel origin** — in Zero Trust / tunnel config, point `companion.tironi.xyz` at the Fly Machine instead of Mac `http://127.0.0.1:3000`. Options:
    - Tunnel origin → `http://<fly-private-ipv6>:3000` / Flycast, or
    - Origin → public `https://<app>.fly.dev` (extra hop; fine for first cut), or
-   - Run `cloudflared` as a **separate** Fly app (`companion-cf-tunnel`) with
-     secret `TUNNEL_TOKEN` — see [`infrastructure/ingress/fly-tunnel/fly.toml`](../../infrastructure/ingress/fly-tunnel/fly.toml)
-     and `./scripts/fly-companion-tunnel.sh` (**done 2026-09-10**; Mac connector unloaded).
-4. **Verify hostname** — `https://companion.tironi.xyz` → Next; unsigned
-   `/api/channels/telegram` POST → **401**; `/welcome` → **200**. Confirm this
-   still works **after** Mac `companion-cloudflared` is stopped.
-5. **Webhooks** — if `COMPANION_PUBLIC_BASE_URL` unchanged, providers can stay.
-   Still dry-run: `pnpm ingress:set-webhooks -- --dry-run`. Apply only if the
-   public origin or paths changed.
-6. **Drain Mac compute** — after soak, unload Mac runtime LaunchAgent
-   (`companion-runtime`). Unload `companion-cloudflared` only after the Fly
-   connector (`companion-cf-tunnel`) is registered and hostname verified.
-7. **Rollback** — reload Mac `com.openinstinct.companion-cloudflared` LaunchAgent
-   (token file unchanged); optionally stop `companion-cf-tunnel` Machines after
-   Mac is healthy. Origin can stay on `https://companion-tironi.fly.dev`. Do
-   **not** destroy Alchemy `prod` volume.
+   - Run `cloudflared` as a **separate** Fly app (`companion-cf-tunnel`) with secret `TUNNEL_TOKEN` — see [`infrastructure/ingress/fly-tunnel/fly.toml`](../../infrastructure/ingress/fly-tunnel/fly.toml) and `./scripts/fly-companion-tunnel.sh` (**done 2026-09-10**; Mac connector unloaded).
+4. **Verify hostname** — `https://companion.tironi.xyz` → Next; unsigned `/api/channels/telegram` POST → **401**; `/welcome` → **200**. Confirm this still works **after** Mac `companion-cloudflared` is stopped.
+5. **Webhooks** — if `COMPANION_PUBLIC_BASE_URL` unchanged, providers can stay. Still dry-run: `pnpm ingress:set-webhooks -- --dry-run`. Apply only if the public origin or paths changed.
+6. **Drain Mac compute** — after soak, unload Mac runtime LaunchAgent (`companion-runtime`). Unload `companion-cloudflared` only after the Fly connector (`companion-cf-tunnel`) is registered and hostname verified.
+7. **Rollback** — reload Mac `com.openinstinct.companion-cloudflared` LaunchAgent (token file unchanged); optionally stop `companion-cf-tunnel` Machines after Mac is healthy. Origin can stay on `https://companion-tironi.fly.dev`. Do **not** destroy Alchemy `prod` volume.
 
 ## Mac path (optional prosumer / local)
 
@@ -290,8 +237,7 @@ Unchanged:
 - LaunchAgents under [`infrastructure/ingress/`](../../infrastructure/ingress/README.md)
 - [`scripts/launch-companion-prod.sh`](../../scripts/launch-companion-prod.sh)
 
-Use Mac when you want always-on on a trusted desktop; use Fly when the Mac
-must sleep or leave the critical path.
+Use Mac when you want always-on on a trusted desktop; use Fly when the Mac must sleep or leave the critical path.
 
 ## Validation helpers
 
@@ -309,23 +255,14 @@ must sleep or leave the critical path.
 
 ## Remote build memory (Depot OOM)
 
-`deploy-dry` / `fly deploy` build on Fly **Depot** by default. Companion’s
-`eve build` + `next build` peak RSS can OOM the default builder (**exit 137**)
-during the Next/TypeScript phase.
+`deploy-dry` / `fly deploy` build on Fly **Depot** by default. Companion’s `eve build` + `next build` peak RSS can OOM the default builder (**exit 137**) during the Next/TypeScript phase.
 
 Mitigations already in-repo:
 
-- [`Dockerfile`](../../Dockerfile) sets `NODE_OPTIONS=--max-old-space-size=2048`,
-  `OPEN_INSTINCT_LOW_MEM_BUILD=1`, and runs Eve then Next in **separate** `RUN`
-  layers (avoids turbo + stacked peaks).
-- Low-mem Next flags (Docker-only): `experimental.cpus=1`,
-  `webpackMemoryOptimizations`, skip TS in `next build` (CI still typechecks).
+- [`Dockerfile`](../../Dockerfile) sets `NODE_OPTIONS=--max-old-space-size=2048`, `OPEN_INSTINCT_LOW_MEM_BUILD=1`, and runs Eve then Next in **separate** `RUN` layers (avoids turbo + stacked peaks).
+- Low-mem Next flags (Docker-only): `experimental.cpus=1`, `webpackMemoryOptimizations`, skip TS in `next build` (CI still typechecks).
 
-`scripts/fly-companion.sh deploy-dry` defaults to **classic** remote builders
-(`--depot=false`, typically ~8GB). Depot still OOMs on the default org builder
-for this image; resize at
-[Fly dashboard → App Builders](https://fly.io/dashboard/personal/builders)
-before `COMPANION_FLY_DEPOT=true`.
+`scripts/fly-companion.sh deploy-dry` defaults to **classic** remote builders (`--depot=false`, typically ~8GB). Depot still OOMs on the default org builder for this image; resize at [Fly dashboard → App Builders](https://fly.io/dashboard/personal/builders) before `COMPANION_FLY_DEPOT=true`.
 
 ## Related
 

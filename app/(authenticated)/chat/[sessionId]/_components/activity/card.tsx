@@ -1,16 +1,17 @@
-import type { MessageStreamEvent } from "eve/client";
-import { ChevronRightIcon } from "lucide-react";
+import { formatChatUsage } from "@app/(authenticated)/chat/_lib/chat-usage";
 import {
   getSubagentTask,
   type SubagentSession,
   type SubagentStatus,
 } from "@app/_lib/subagent-sessions";
-import { formatChatUsage } from "@app/(authenticated)/chat/_lib/chat-usage";
+import type { ChatUsage } from "@shared/chat/schema";
 import { Button } from "@web/components/ui/button";
 import { Card, CardContent } from "@web/components/ui/card";
 import { Field } from "@web/components/ui/field";
 import { Switch } from "@web/components/ui/switch";
-import type { ChatUsage } from "@shared/chat/schema";
+import type { MessageStreamEvent } from "eve/client";
+import { ChevronRightIcon } from "lucide-react";
+
 import type { TraceView } from "../../_lib/trace-view";
 import { agentLabel, StatusIndicator } from "./presentation";
 
@@ -83,10 +84,12 @@ export function ActivityCard({
                 {sessions.map((session) => {
                   const status =
                     statuses.get(session.childSessionId) ?? "starting";
+
                   const task =
                     getSubagentTask(
                       eventsBySession.get(session.childSessionId) ?? []
                     ) ?? session.task;
+
                   return (
                     <Button
                       aria-label={`${agentLabel(session.name)} task, ${status}`}

@@ -1,6 +1,4 @@
-import { approvalMessageSchema } from "./approval-message";
 import type { Session } from "eve/channels";
-import { ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
 import {
   defaultMessageReducer,
   inputRequestSchema,
@@ -8,6 +6,9 @@ import {
   type InputRequest,
   type MessageStreamEvent,
 } from "eve/client";
+import { ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
+
+import { approvalMessageSchema } from "./approval-message";
 
 export const channelQuestionSchema = ASK_QUESTION_INPUT_SCHEMA.refine(
   (input) =>
@@ -19,6 +20,7 @@ export function renderChannelInput(request: InputRequest) {
   if (request.kind === "tool-approval") {
     return approvalMessageSchema.parse(request.action.input.approvalMessage);
   }
+
   return approvalMessageSchema.parse(channelQuestionText(request));
 }
 
@@ -45,6 +47,7 @@ export function pendingChannelInputs(data: EveMessageData): InputRequest[] {
         part.toolMetadata.eve.inputResponse
       )
         return [];
+
       return [
         inputRequestSchema.parse({
           ...part.toolMetadata.eve.inputRequest,
@@ -63,7 +66,9 @@ export function pendingChannelInputs(data: EveMessageData): InputRequest[] {
 export async function readChannelInputs(session: Session, signal: AbortSignal) {
   signal.throwIfAborted();
   const tail = await session.getStreamTailIndex();
+
   if (tail < 0) return [];
+
   return readChannelInputStream(
     await session.getEventStream({ startIndex: 0 }),
     tail,
@@ -77,23 +82,29 @@ export async function readChannelInputStream(
   signal: AbortSignal
 ) {
   const reader = stream.getReader();
+
   const cancel = () => {
     void reader.cancel();
   };
+
   signal.addEventListener("abort", cancel, { once: true });
   const reducer = defaultMessageReducer();
   let data = reducer.initial();
+
   try {
     for (let index = 0; index <= tail; index++) {
       signal.throwIfAborted();
       // The durable stream must be reduced in event order.
       // oxlint-disable-next-line eslint/no-await-in-loop
       const item = await reader.read();
+
       if (item.done)
         throw new Error("The session stream ended before its captured tail.");
       data = reducer.reduce(data, item.value);
     }
+
     signal.throwIfAborted();
+
     return pendingChannelInputs(data);
   } finally {
     signal.removeEventListener("abort", cancel);

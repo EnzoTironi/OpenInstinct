@@ -1,8 +1,11 @@
 import { createHash } from "node:crypto";
+
 import { Effect, Schema } from "effect";
+
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
 
 export const IdentityId = Schema.String.check(Schema.isUUID());
+
 const reference = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(256),
@@ -22,8 +25,10 @@ export const ClaimChannelInputResponseSchema = Schema.Struct({
   turnId: reference,
   decision: Schema.Literals(["approve", "cancel"]),
 });
+
 export type ClaimChannelInputResponse =
   typeof ClaimChannelInputResponseSchema.Type;
+
 export const MarkChannelInputResponseSchema = Schema.Struct({
   id: IdentityId,
   status: Schema.Literals(["accepted", "uncertain"]),
@@ -57,6 +62,7 @@ export const MessagePayloadSchema = Schema.Struct({
     { message: "A message needs text or an attachment reference." }
   )
 );
+
 export type MessagePayload = typeof MessagePayloadSchema.Type;
 
 export const AcceptInputSchema = Schema.Struct({
@@ -65,12 +71,15 @@ export const AcceptInputSchema = Schema.Struct({
   sourceMessageId: reference,
   payload: MessagePayloadSchema,
 });
+
 export type AcceptInput = typeof AcceptInputSchema.Type;
+
 export const EnqueueInputSchema = Schema.Struct({
   identityId: IdentityId,
   deliveryKey: reference,
   payload: MessagePayloadSchema,
 });
+
 export type EnqueueInput = typeof EnqueueInputSchema.Type;
 
 export const ClaimInputSchema = Schema.Struct({
@@ -79,12 +88,15 @@ export const ClaimInputSchema = Schema.Struct({
     Schema.isBetween({ minimum: 1, maximum: 300 })
   ),
 });
+
 export type ClaimInput = typeof ClaimInputSchema.Type;
+
 export const LeaseSchema = Schema.Struct({
   identityId: IdentityId,
   id: IdentityId,
   leaseToken: IdentityId,
 });
+
 export type Lease = typeof LeaseSchema.Type;
 
 const actorPrincipal = Schema.String.check(
@@ -92,11 +104,13 @@ const actorPrincipal = Schema.String.check(
   Schema.isMaxLength(256),
   Schema.isTrimmed()
 );
+
 const resolutionNote = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(200),
   Schema.isTrimmed()
 );
+
 const providerMessageId = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(512),
@@ -121,6 +135,7 @@ const OutboxResolutionDecisionSchema = Schema.Union([
     acknowledgment: Schema.Literal("duplicate_delivery_risk_accepted"),
   }),
 ]);
+
 export type OutboxResolutionDecision =
   typeof OutboxResolutionDecisionSchema.Type;
 
@@ -131,6 +146,7 @@ export const ResolveOutboxUncertainSchema = Schema.Struct({
   actorPrincipalId: actorPrincipal,
   note: Schema.optionalKey(resolutionNote),
 });
+
 export type ResolveOutboxUncertainInput =
   typeof ResolveOutboxUncertainSchema.Type;
 
@@ -142,6 +158,7 @@ export const DeliveryFailureSchema = Schema.Literals([
   "lease_expired",
   "identity_revoked",
 ]);
+
 export type DeliveryFailure = typeof DeliveryFailureSchema.Type;
 
 const MessageStatus = Schema.Literals([
@@ -153,12 +170,14 @@ const MessageStatus = Schema.Literals([
   "failed",
   "cancelled",
 ]);
+
 export const NativeInboxContentSchema = Schema.Union([
   Schema.NonEmptyString,
   Schema.Array(
     Schema.Struct({ type: Schema.Literal("text"), text: Schema.NonEmptyString })
   ).check(Schema.isMinLength(1)),
 ]).annotate({ parseOptions: { onExcessProperty: "error" } });
+
 export const NativeInboxHandoffSchema = Schema.Struct({
   protocol: Schema.Literal("eve-keyed-input-v1"),
   inputId: IdentityId,
@@ -167,12 +186,14 @@ export const NativeInboxHandoffSchema = Schema.Struct({
   principalId: Schema.NonEmptyString,
   content: Schema.NullOr(NativeInboxContentSchema),
 }).annotate({ parseOptions: { onExcessProperty: "error" } });
+
 export const ChannelTranscriptSchema = Schema.String.check(
   Schema.isTrimmed(),
   Schema.isMinLength(1),
   Schema.isMaxLength(3000),
   Schema.makeFilter((text) => text.isWellFormed())
 );
+
 export const PrepareInboxHandoffSchema = Schema.Struct({
   lease: LeaseSchema,
   content: NativeInboxContentSchema,
@@ -195,29 +216,35 @@ const MessageReceiptSchema = Schema.Struct({
   resultId: Schema.NullOr(Schema.String),
   lastError: Schema.NullOr(Schema.String),
 });
+
 export const MessageClaimSchema = Schema.Struct({
   ...MessageReceiptSchema.fields,
   status: Schema.Literal("dispatching"),
   leaseToken: IdentityId,
   leaseExpiresAt: Schema.String,
 });
+
 export type MessageClaim = typeof MessageClaimSchema.Type;
 
 export class InvalidMessage extends Schema.TaggedError<InvalidMessage>()(
   "InvalidMessage",
   { message: Schema.String }
 ) {}
+
 export class IdentityInactive extends Schema.TaggedError<IdentityInactive>()(
   "IdentityInactive",
   { identityId: IdentityId }
 ) {}
+
 export class PayloadConflict extends Schema.TaggedError<PayloadConflict>()(
   "PayloadConflict",
   { id: IdentityId }
 ) {}
+
 export class LeaseLost extends Schema.TaggedError<LeaseLost>()("LeaseLost", {
   id: IdentityId,
 }) {}
+
 export class OutboxResolutionRejected extends Schema.TaggedError<OutboxResolutionRejected>()(
   "OutboxResolutionRejected",
   {
@@ -225,6 +252,7 @@ export class OutboxResolutionRejected extends Schema.TaggedError<OutboxResolutio
     reason: Schema.Literals(["not_uncertain", "conflict", "identity_inactive"]),
   }
 ) {}
+
 export class MessagingStorageError extends Schema.TaggedError<MessagingStorageError>()(
   "MessagingStorageError",
   { message: Schema.String }
@@ -264,6 +292,7 @@ export function canonicalPayload(payload: MessagePayload) {
     })),
     replyToMessageId: payload.replyToMessageId,
   };
+
   return {
     payload: normalized,
     hash: createHash("sha256").update(JSON.stringify(normalized)).digest("hex"),

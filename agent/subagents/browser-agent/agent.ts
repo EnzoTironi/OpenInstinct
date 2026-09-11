@@ -1,6 +1,6 @@
-import { defineAgent, defineDynamic } from "eve";
 import { resolveModeValue } from "@agent/lib/mode";
 import { taskCompletionSchema } from "@agent/subagents/browser-agent/lib/completion";
+import { defineAgent, defineDynamic } from "eve";
 
 export default defineDynamic({
   build: {
@@ -18,6 +18,7 @@ export default defineDynamic({
           thresholdPercent: 0.7,
         },
       });
+
       return resolveModeValue(context, {
         interactive: worker,
         "scheduled-worker": worker,

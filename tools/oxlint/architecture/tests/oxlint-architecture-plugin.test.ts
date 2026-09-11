@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { RuleTester } from "oxlint/plugins-dev";
-import { test } from "vitest";
+
 import plugin from "@tools/oxlint/architecture/index.ts";
 import { noForbiddenLayerImportsRule } from "@tools/oxlint/architecture/rules/no-forbidden-layer-imports.ts";
+import { RuleTester } from "oxlint/plugins-dev";
+import { test } from "vitest";
 
 const tester = new RuleTester();
+
 const repositoryRoot = "/repo";
 
 test("exports the repository architecture rules", () => {

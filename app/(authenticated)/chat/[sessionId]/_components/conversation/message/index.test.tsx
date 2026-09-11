@@ -1,6 +1,7 @@
 import type { EveMessage } from "eve/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
 import { AgentMessage } from ".";
 
 describe("agent messages", () => {
@@ -150,6 +151,7 @@ describe("agent messages", () => {
       turnId: "turn-auth",
       authorization: { url: "https://example.com/connect", userCode: "ABCD" },
     } as const;
+
     const pending = renderAuthorizationPart(challenge);
     expect(pending).toContain("Sign in with Google Workspace");
     expect(pending).toContain('href="https://example.com/connect"');

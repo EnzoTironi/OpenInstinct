@@ -1,6 +1,5 @@
-import { PgClient } from "@effect/sql-pg";
-import { Effect, Schema } from "effect";
 import { readAuthSession } from "@db/services/auth/session";
+import { PgClient } from "@effect/sql-pg";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import {
   accountOnlineWipeLimits,
@@ -8,10 +7,14 @@ import {
   accountPrivacyExportExcluded,
   accountPrivacyExportLimits,
 } from "@shared/identity/account-privacy-limits";
+import { Effect, Schema } from "effect";
+
 import { PersonalMemory } from "../personal-memory";
 import { requirePersonalMemoryWebSession } from "../personal-memory/access";
 import type { PersonalMemoryError } from "../personal-memory/access";
 import { inspectPersonalMemory } from "../personal-memory/export";
+
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
 /**
  * Account privacy export/delete gates.
@@ -31,6 +34,7 @@ const requirePrivacySession = Effect.fn("requirePrivacySession")(function* (
   headers: Headers
 ) {
   const session = yield* readAuthSession(headers);
+
   if (!session)
     return yield* new AccountPrivacyError({ reason: "unauthenticated" });
   const scope = accessScopeForUser(`better-auth:${session.user.id}`);
@@ -41,6 +45,7 @@ const requirePrivacySession = Effect.fn("requirePrivacySession")(function* (
         : new AccountPrivacyError({ reason: "unauthenticated" })
     )
   );
+
   return { session, scope };
 });
 
@@ -53,6 +58,7 @@ export const exportAccountPrivacy = Effect.fn("exportAccountPrivacy")(
           : new AccountPrivacyError({ reason: "unauthenticated" })
       )
     );
+
     return {
       scope: "account-privacy-export" as const,
       generatedAt: snapshot.generatedAt,
@@ -70,6 +76,7 @@ export const deleteAccountOnlineData = Effect.fn("deleteAccountOnlineData")(
   function* (headers: Headers) {
     const { session, scope } = yield* requirePrivacySession(headers);
     const memory = yield* PersonalMemory;
+
     const wiped = yield* memory
       .wipe(scope)
       .pipe(
@@ -79,13 +86,17 @@ export const deleteAccountOnlineData = Effect.fn("deleteAccountOnlineData")(
             : new AccountPrivacyError({ reason: "unauthenticated" })
         )
       );
+
     const sql = yield* PgClient.PgClient;
     yield* sql`DELETE FROM public.session WHERE "userId" = ${session.user.id}`;
+
     // Re-check membership after wipe; session rows are already gone.
     const membership = yield* sql`SELECT workspace_id FROM workspace_memberships
       WHERE user_id = ${scope.userId} AND workspace_id = ${scope.workspaceId}`;
+
     if (membership.length !== 1)
       return yield* new AccountPrivacyError({ reason: "unauthenticated" });
+
     return {
       status: "partial_online_wipe" as const,
       wiped: wiped.wiped,
@@ -103,7 +114,8 @@ export const exportAccountPrivacyResponse = Effect.fn(
   "exportAccountPrivacyResponse"
 )(function* (headers: Headers) {
   const body = yield* exportAccountPrivacy(headers);
-  return new Response(JSON.stringify(body, null, 2), {
+
+  return new Response(encodeJson(body), {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "content-disposition":
@@ -118,7 +130,8 @@ export const deleteAccountOnlineDataResponse = Effect.fn(
   "deleteAccountOnlineDataResponse"
 )(function* (headers: Headers) {
   const body = yield* deleteAccountOnlineData(headers);
-  return new Response(JSON.stringify(body, null, 2), {
+
+  return new Response(encodeJson(body), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",

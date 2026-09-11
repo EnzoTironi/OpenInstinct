@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
+import Link from "next/link";
 
 export interface LinkedChannelSummary {
   readonly channel: "telegram" | "kapso";
@@ -16,14 +16,19 @@ export function describeLinkedChannels(
 ) {
   if (identities.length === 0) return "No messenger linked yet.";
   const labels: string[] = [];
+
   for (const identity of identities) {
     const label = channelLabel(identity.channel);
+
     if (!labels.includes(label)) labels.push(label);
   }
+
   const first = labels.at(0);
+
   if (first !== undefined && labels.length === 1) {
     return first + " is linked to your account.";
   }
+
   return labels.join(" and ") + " are linked to your account.";
 }
 
@@ -35,7 +40,9 @@ export function FirstRunStatus({
   readonly welcome: boolean;
 }) {
   const linked = identities.length > 0;
+
   if (!welcome && linked) return null;
+
   if (linked) {
     return (
       <Alert>
@@ -66,6 +73,7 @@ export function FirstRunStatus({
       </Alert>
     );
   }
+
   return (
     <Alert>
       <AlertTitle>Connect a messenger to finish setup</AlertTitle>

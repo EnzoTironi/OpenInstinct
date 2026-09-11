@@ -7,7 +7,7 @@ class BrowserUnavailable extends Schema.TaggedError<BrowserUnavailable>()(
 ) {}
 
 const configuredKernel = Config.schema(
-  Schema.Redacted(Schema.NonEmptyString.check(Schema.isTrimmed())),
+  Schema.RedactedFromValue(Schema.NonEmptyString.check(Schema.isTrimmed())),
   "KERNEL_API_KEY"
 ).pipe(
   Effect.map((apiKey) => new Kernel({ apiKey: Redacted.value(apiKey) })),
@@ -24,5 +24,6 @@ let client: Kernel | undefined;
 
 export function getKernel() {
   client ??= Effect.runSync(configuredKernel);
+
   return client;
 }

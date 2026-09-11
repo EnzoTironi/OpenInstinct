@@ -1,7 +1,7 @@
+import { openInstinctLowMemBuild } from "@shared/environment/env/low-mem-build";
 import { Effect, Schema } from "effect";
 import { withEve, type EveNextRewriteSections } from "eve/next";
 import type { NextConfig } from "next";
-import { openInstinctLowMemBuild } from "@shared/environment/env/low-mem-build";
 
 const nextConfig: NextConfig = openInstinctLowMemBuild
   ? {
@@ -17,7 +17,9 @@ const nextConfig: NextConfig = openInstinctLowMemBuild
       },
     }
   : {};
+
 const frameworkConfig = withEve(nextConfig);
+
 const eveRoute = "/eve/v1/:path+";
 
 class EveRoutingUnavailable extends Schema.TaggedError<EveRoutingUnavailable>()(
@@ -25,59 +27,83 @@ class EveRoutingUnavailable extends Schema.TaggedError<EveRoutingUnavailable>()(
   { message: Schema.String }
 ) {}
 
-export default function companionConfig(
+function toRewriteSections(
+  rewrites: Awaited<ReturnType<NonNullable<NextConfig["rewrites"]>>>
+): EveNextRewriteSections {
+  if (Array.isArray(rewrites)) {
+    return { beforeFiles: [], afterFiles: rewrites, fallback: [] };
+  }
+
+  return rewrites;
+}
+
+function isEveNativeRoute(route: {
+  readonly source: string;
+  readonly destination: string;
+}) {
+  return route.source === eveRoute && route.destination.endsWith(eveRoute);
+}
+
+function channelProxyRewrites(destination: string) {
+  return ["telegram", "kapso"].map((channel) => ({
+    source: `/api/channels/${channel}`,
+    destination: `${destination}/channels/${channel}`,
+  }));
+}
+
+function scheduledRunProxyRewrites(destination: string) {
+  return ["report", "respond"].map((operation) => ({
+    source: `/internal/scheduled-run/${operation}`,
+    destination: `${destination}/internal/scheduled-run/${operation}`,
+  }));
+}
+
+const resolveCompanionRewrites = Effect.fn("resolveCompanionRewrites")(
+  function* (
+    frameworkRewrites: NonNullable<NextConfig["rewrites"]> | undefined
+  ) {
+    if (!frameworkRewrites) {
+      return yield* new EveRoutingUnavailable({
+        message:
+          "This deployment needs an Eve proxy before enabling channel webhooks.",
+      });
+    }
+
+    const rewrites = yield* Effect.promise(() =>
+      Promise.resolve(frameworkRewrites())
+    );
+
+    const sections = toRewriteSections(rewrites);
+    const native = sections.beforeFiles?.find(isEveNativeRoute);
+
+    if (!native) {
+      return yield* new EveRoutingUnavailable({
+        message:
+          "Eve's generated route is missing or unsupported. Check the installed Eve routing configuration.",
+      });
+    }
+
+    const destination = native.destination.slice(0, -eveRoute.length);
+
+    return {
+      ...sections,
+      beforeFiles: [
+        ...(sections.beforeFiles ?? []),
+        ...channelProxyRewrites(destination),
+        ...scheduledRunProxyRewrites(destination),
+      ],
+    };
+  }
+);
+
+export default async function companionConfig(
   ...args: Parameters<typeof frameworkConfig>
 ) {
-  return Effect.runPromise(
-    Effect.gen(function* () {
-      const resolved = yield* Effect.promise(() =>
-        Promise.resolve(frameworkConfig(...args))
-      );
-      const frameworkRewrites = resolved.rewrites;
-      return {
-        ...resolved,
-        rewrites: () =>
-          Effect.runPromise(
-            Effect.gen(function* () {
-              if (!frameworkRewrites) {
-                return yield* new EveRoutingUnavailable({
-                  message:
-                    "This deployment needs an Eve proxy before enabling channel webhooks.",
-                });
-              }
-              const rewrites = yield* Effect.promise(() =>
-                Promise.resolve(frameworkRewrites())
-              );
-              const sections: EveNextRewriteSections = Array.isArray(rewrites)
-                ? { beforeFiles: [], afterFiles: rewrites, fallback: [] }
-                : rewrites;
-              const native = sections.beforeFiles?.find(
-                (route) => route.source === eveRoute
-              );
-              if (!native?.destination.endsWith(eveRoute)) {
-                return yield* new EveRoutingUnavailable({
-                  message:
-                    "Eve's generated route is missing or unsupported. Check the installed Eve routing configuration.",
-                });
-              }
-              const destination = native.destination.slice(0, -eveRoute.length);
-              return {
-                ...sections,
-                beforeFiles: [
-                  ...(sections.beforeFiles ?? []),
-                  ...["telegram", "kapso"].map((channel) => ({
-                    source: `/api/channels/${channel}`,
-                    destination: `${destination}/channels/${channel}`,
-                  })),
-                  ...["report", "respond"].map((operation) => ({
-                    source: `/internal/scheduled-run/${operation}`,
-                    destination: `${destination}/internal/scheduled-run/${operation}`,
-                  })),
-                ],
-              };
-            })
-          ),
-      };
-    })
-  );
+  const resolved = await Promise.resolve(frameworkConfig(...args));
+
+  return {
+    ...resolved,
+    rewrites: () =>
+      Effect.runPromise(resolveCompanionRewrites(resolved.rewrites)),
+  };
 }

@@ -2,10 +2,12 @@ import { Effect, Schema } from "effect";
 
 /** Company control-plane roles (org + company workspace). */
 const companyRoleSchema = Schema.Literals(["admin", "member"]);
+
 export type CompanyRole = typeof companyRoleSchema.Type;
 
 /** Workspace membership roles including personal `owner`. */
 const workspaceRoleSchema = Schema.Literals(["owner", "admin", "member"]);
+
 export type WorkspaceRole = typeof workspaceRoleSchema.Type;
 
 export class RbacDenied extends Schema.TaggedError<RbacDenied>()("RbacDenied", {
@@ -30,13 +32,16 @@ export function canAssignRole(
   targetRole: WorkspaceRole | CompanyRole
 ): boolean {
   if (!canManageMembers(actorRole)) return false;
+
   if (targetRole === "owner") {
     // `owner` is reserved for personal workspaces; company actors never assign it.
     return actorRole === "owner";
   }
+
   if (targetRole === "admin") {
     return actorRole === "admin" || actorRole === "owner";
   }
+
   return true;
 }
 
@@ -53,22 +58,19 @@ export function assertCanManageMembers(
       );
 }
 
-export function assertCanAssignRole(
+export const assertCanAssignRole = Effect.fn("assertCanAssignRole")(function* (
   actorRole: WorkspaceRole | CompanyRole,
   targetRole: WorkspaceRole | CompanyRole
-): Effect.Effect<void, RbacDenied> {
-  return Effect.gen(function* () {
-    yield* assertCanManageMembers(actorRole);
-    if (!canAssignRole(actorRole, targetRole)) {
-      yield* Effect.fail(
-        new RbacDenied({
-          reason: "cannot_elevate",
-          message: "Members cannot elevate roles; only admins may grant admin.",
-        })
-      );
-    }
-  });
-}
+) {
+  yield* assertCanManageMembers(actorRole);
+
+  if (!canAssignRole(actorRole, targetRole)) {
+    yield* new RbacDenied({
+      reason: "cannot_elevate",
+      message: "Members cannot elevate roles; only admins may grant admin.",
+    });
+  }
+});
 
 /**
  * Personal workspaces must keep a single `owner` membership role.
@@ -88,6 +90,7 @@ export function assertWorkspaceRoleForKind(
           })
         );
   }
+
   if (role === "owner") {
     return Effect.fail(
       new RbacDenied({
@@ -96,6 +99,7 @@ export function assertWorkspaceRoleForKind(
       })
     );
   }
+
   return Effect.void;
 }
 

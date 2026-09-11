@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+
 import { workspaces } from "./workspaces";
 
 export const chats = pgTable(

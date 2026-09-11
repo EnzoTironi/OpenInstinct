@@ -11,6 +11,7 @@ export const browserActivityKinds = [
 ] as const;
 
 export type BrowserActivityKind = (typeof browserActivityKinds)[number];
+
 export type BrowserActivityDurations = Partial<
   Record<BrowserActivityKind, number>
 >;
@@ -47,6 +48,7 @@ export function browserTraceActivityDurations(
   return sumBrowserActivityDurations(
     events.flatMap((event) => {
       const kind = browserTraceActivityKind(event);
+
       return kind ? [{ at: Date.parse(event.at), kind }] : [];
     }),
     now
@@ -65,15 +67,41 @@ export function sumBrowserActivityDurations(
 
   for (const point of points) {
     if (!Number.isFinite(point.at)) continue;
+
     if (current) {
       addDuration(durations, current.kind, Math.max(0, point.at - current.at));
     }
+
     current = point;
   }
+
   if (current) {
     addDuration(durations, current.kind, Math.max(0, now - current.at));
   }
+
   return durations;
+}
+
+const waitingActivityTypes = new Set([
+  "input.requested",
+  "authorization.required",
+]);
+
+const modelActivityTypes = new Set([
+  "message.received",
+  "message.completed",
+  "action.result",
+  "input.resolved",
+  "authorization.completed",
+  "result.completed",
+]);
+
+function actionsRequestedActivityKind(label: string): BrowserActivityKind {
+  if (label === "Load skill") {
+    return "setup";
+  }
+
+  return browserActivityKindForTool(label);
 }
 
 function browserTraceActivityKind(event: {
@@ -81,26 +109,17 @@ function browserTraceActivityKind(event: {
   readonly type: string;
 }): BrowserActivityKind | null {
   if (event.type === "actions.requested") {
-    return event.label === "Load skill"
-      ? "setup"
-      : browserActivityKindForTool(event.label);
+    return actionsRequestedActivityKind(event.label);
   }
-  if (
-    event.type === "input.requested" ||
-    event.type === "authorization.required"
-  ) {
+
+  if (waitingActivityTypes.has(event.type)) {
     return "waiting";
   }
-  if (
-    event.type === "message.received" ||
-    event.type === "message.completed" ||
-    event.type === "action.result" ||
-    event.type === "input.resolved" ||
-    event.type === "authorization.completed" ||
-    event.type === "result.completed"
-  ) {
+
+  if (modelActivityTypes.has(event.type)) {
     return "model";
   }
+
   return null;
 }
 

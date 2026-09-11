@@ -1,19 +1,22 @@
-import { redirect } from "next/navigation";
+import { getAuthSession } from "@db/services/auth/session";
+import { safeCallbackUrl } from "@web/auth/channel/client";
+import { ChannelAuthForm } from "@web/auth/channel/form";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { ChannelAuthForm } from "@web/auth/channel/form";
-import { safeCallbackUrl } from "@web/auth/channel/client";
-import { getAuthSession } from "@db/services/auth/session";
+import { redirect } from "next/navigation";
 
 export default async function SignInPage({
   searchParams,
 }: PageProps<"/sign-in">) {
   const params = await searchParams;
   const callbackValue = params.callbackUrl;
+
   const callbackUrl = safeCallbackUrl(
     Array.isArray(callbackValue) ? callbackValue[0] : callbackValue
   );
+
   if (await getAuthSession(await headers())) redirect(callbackUrl);
+
   return (
     <main className="flex min-h-svh items-center justify-center bg-background px-4 py-8 text-foreground">
       <section className="w-full max-w-sm space-y-6">

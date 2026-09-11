@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const nullableText = (maximum: number) =>
   z.string().trim().min(1).max(maximum).nullable();
+
 const emailAddress = z
   .string()
   .trim()
@@ -37,6 +38,7 @@ export const userProfilePatchSchema = userProfileSchema
   });
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
+
 export type UserProfilePatch = z.infer<typeof userProfilePatchSchema>;
 
 export const emptyUserProfile = {
@@ -59,6 +61,7 @@ export function hasUserProfileValues(profile: UserProfile) {
 
 export function parseUserProfile(input: UserProfile) {
   const profile = userProfileSchema.parse(input);
+
   return {
     ...profile,
     countryCode: profile.countryCode?.toUpperCase() ?? null,

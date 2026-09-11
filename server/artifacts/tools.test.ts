@@ -1,23 +1,27 @@
 import { randomUUID } from "node:crypto";
+
+import { Predicate } from "effect";
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { Predicate } from "effect";
+
+import { authorizeApprovalResponse } from "../../agent/lib/approval-response";
 import {
   artifactDelete,
   artifactList,
   artifactRead,
 } from "../../agent/tools/artifacts";
-import { authorizeApprovalResponse } from "../../agent/lib/approval-response";
 
 const validate = (
   tool: { readonly inputSchema: unknown },
   input: Record<string, string | number>
 ) => {
   const schema = tool.inputSchema;
+
   if (!(schema instanceof z.ZodType))
     throw new Error(
       "The actual artifact tool must expose its Standard Schema validator."
     );
+
   return schema["~standard"].validate(input);
 };
 
@@ -56,6 +60,7 @@ describe("artifact tool authority boundary", () => {
   });
   test("deletion requires the existing native approval gate and a complete authored proposal", async () => {
     const approval = artifactDelete.approval;
+
     if (!Predicate.isObject(approval))
       throw new Error("Missing approval policy");
     expect(Predicate.isFunction(approval.request)).toBe(true);

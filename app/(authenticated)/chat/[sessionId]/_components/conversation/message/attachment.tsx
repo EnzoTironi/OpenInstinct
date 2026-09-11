@@ -1,22 +1,25 @@
-import type { EveMessagePart } from "eve/react";
-import { ExternalLinkIcon, FileIcon, ImageIcon } from "lucide-react";
 import { Button } from "@web/components/ui/button";
 import { Card, CardContent } from "@web/components/ui/card";
+import type { EveMessagePart } from "eve/react";
+import { ExternalLinkIcon, FileIcon, ImageIcon } from "lucide-react";
 
 type EveFilePart = Extract<EveMessagePart, { type: "file" }>;
 
 export function AttachmentPart({ part }: { readonly part: EveFilePart }) {
   const label = part.filename ?? "Attachment";
+
   const detail = [part.mediaType, formatBytes(part.size)]
     .filter(Boolean)
     .join(" · ");
+
   const isImage = part.mediaType.startsWith("image/") && part.url !== undefined;
   const Icon = isImage ? ImageIcon : FileIcon;
+
   const content = (
     <>
       {isImage ? (
         // Browser artifacts use runtime URLs that cannot be declared in Next Image configuration.
-        // oxlint-disable-next-line nextjs/no-img-element -- runtime browser artifact URL
+        // oxlint-disable-next-line next/no-img-element, nextjs/no-img-element, react-doctor/nextjs-no-img-element -- runtime browser artifact URL
         <img
           alt={label}
           className="size-12 shrink-0 rounded-sm object-cover"
@@ -64,7 +67,10 @@ export function AttachmentPart({ part }: { readonly part: EveFilePart }) {
 
 function formatBytes(size: number | undefined): string | undefined {
   if (size === undefined) return undefined;
+
   if (size < 1024) return `${String(size)} B`;
+
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }

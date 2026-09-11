@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import type { SessionAuthContext } from "eve/context";
+
 import { BrowserWorkerAccess } from "../../../../server/browser-worker";
 import { serverRuntime } from "../../../../server/runtime";
 
@@ -15,6 +16,7 @@ export async function assertLiveWorkerAuthority(principal: SessionAuthContext) {
   await serverRuntime.runPromise(
     Effect.gen(function* () {
       const access = yield* BrowserWorkerAccess;
+
       return yield* access.authorize(principal);
     }).pipe(
       Effect.catchTag("BrowserWorkerAccessError", (error) =>

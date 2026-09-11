@@ -1,18 +1,16 @@
-import { Effect, Schema } from "effect";
-import { and, eq } from "drizzle-orm";
+import { db, organizationMemberships } from "@db";
 import {
   findEntitlementByStripeCustomer,
   readEntitlement,
   upsertEntitlement,
 } from "@db/services/billing";
-import { db, organizationMemberships } from "@db";
-import { applicationOrigin } from "@shared/environment/origin";
 import { isPaidPlan, type BillingPlanId } from "@shared/billing/plans";
-import {
-  requireStripe,
-  stripePriceIdForPlan,
-  StripeNotConfiguredError,
-} from "./stripe";
+import { applicationOrigin } from "@shared/environment/origin";
+import { and, eq } from "drizzle-orm";
+import { Effect, Schema } from "effect";
+import type { Stripe } from "stripe";
+
+import { requireStripe, stripePriceIdForPlan } from "./stripe";
 
 export class BillingCheckoutError extends Schema.TaggedError<BillingCheckoutError>()(
   "BillingCheckoutError",
@@ -40,8 +38,259 @@ async function assertOrgAdmin(organizationId: string, userId: string) {
       )
     )
     .limit(1);
+
   return rows[0]?.role === "admin";
 }
+
+const billingFail = (reason: BillingCheckoutError["reason"], message: string) =>
+  new BillingCheckoutError({ reason, message });
+
+const requireOrgCheckoutAdmin = Effect.fn("Billing.requireOrgCheckoutAdmin")(
+  function* (organizationId: string | undefined, userId: string) {
+    if (!organizationId) {
+      return yield* billingFail(
+        "org_required",
+        "Org Checkout requires an organizationId."
+      );
+    }
+
+    const allowed = yield* loadOrgAdmin(organizationId, userId);
+
+    if (!allowed) {
+      return yield* billingFail(
+        "org_forbidden",
+        "Only organization admins can purchase Org seats."
+      );
+    }
+
+    return yield* Effect.void;
+  }
+);
+
+function loadOrgAdmin(organizationId: string, userId: string) {
+  return Effect.tryPromise({
+    try: () => assertOrgAdmin(organizationId, userId),
+    catch: () =>
+      billingFail("org_forbidden", "Unable to verify organization admin."),
+  });
+}
+
+function loadEntitlement(
+  subjectType: "organization" | "user",
+  subjectId: string
+) {
+  return Effect.tryPromise({
+    try: () => readEntitlement(subjectType, subjectId),
+    catch: () =>
+      billingFail("stripe_failed", "Unable to load current entitlement."),
+  });
+}
+
+function loadUserBillingCustomer(userId: string) {
+  return Effect.tryPromise({
+    try: () => readEntitlement("user", userId),
+    catch: () =>
+      billingFail("stripe_failed", "Unable to load user billing customer."),
+  });
+}
+
+function lookupCustomerBinding(customerId: string) {
+  return Effect.tryPromise({
+    try: () => findEntitlementByStripeCustomer(customerId),
+    catch: () => null,
+  });
+}
+
+function createStripeCustomer(options: {
+  readonly stripe: Stripe;
+  readonly email?: string | null;
+  readonly subjectType: "organization" | "user";
+  readonly subjectId: string;
+  readonly userId: string;
+}) {
+  return Effect.tryPromise({
+    try: () =>
+      options.stripe.customers.create({
+        email: options.email ?? undefined,
+        metadata: {
+          instinctSubjectType: options.subjectType,
+          instinctSubjectId: options.subjectId,
+          instinctUserId: options.userId,
+        },
+      }),
+    catch: () =>
+      billingFail("stripe_failed", "Unable to create Stripe customer."),
+  });
+}
+
+function persistStripeCustomerId(options: {
+  readonly subjectType: "organization" | "user";
+  readonly subjectId: string;
+  readonly entitlement: Awaited<ReturnType<typeof readEntitlement>>;
+  readonly stripeCustomerId: string;
+}) {
+  return Effect.tryPromise({
+    try: () =>
+      upsertEntitlement({
+        subjectType: options.subjectType,
+        subjectId: options.subjectId,
+        plan: options.entitlement.plan,
+        status: options.entitlement.status,
+        seatCount: options.entitlement.seatCount,
+        stripeCustomerId: options.stripeCustomerId,
+      }),
+    catch: () =>
+      billingFail("stripe_failed", "Unable to persist Stripe customer id."),
+  });
+}
+
+function createCheckoutSessionRemote(options: {
+  readonly stripe: Stripe;
+  readonly priceId: string;
+  readonly seatCount: number;
+  readonly stripeCustomerId: string;
+  readonly subjectId: string;
+  readonly subjectType: "organization" | "user";
+  readonly userId: string;
+  readonly plan: BillingPlanId;
+}) {
+  const origin = applicationOrigin();
+
+  const metadata = {
+    instinctPlan: options.plan,
+    instinctSubjectType: options.subjectType,
+    instinctSubjectId: options.subjectId,
+    instinctUserId: options.userId,
+    instinctSeatCount: String(options.seatCount),
+  };
+
+  return Effect.tryPromise({
+    try: () =>
+      options.stripe.checkout.sessions.create({
+        mode: "subscription",
+        customer: options.stripeCustomerId,
+        client_reference_id: options.subjectId,
+        line_items: [{ price: options.priceId, quantity: options.seatCount }],
+        success_url: `${origin}/account?billing=success`,
+        cancel_url: `${origin}/pricing?billing=canceled`,
+        metadata,
+        subscription_data: { metadata },
+        allow_promotion_codes: true,
+      }),
+    catch: () =>
+      billingFail("stripe_failed", "Unable to create Stripe Checkout session."),
+  });
+}
+
+function customerBelongsToSubject(
+  bound: Awaited<ReturnType<typeof findEntitlementByStripeCustomer>> | null,
+  subjectType: "organization" | "user",
+  subjectId: string
+) {
+  if (!bound) return true;
+
+  return bound.subjectType === subjectType && bound.subjectId === subjectId;
+}
+
+const reuseOrClearCustomerId = Effect.fn("Billing.reuseOrClearCustomerId")(
+  function* (
+    customerId: string | null,
+    subjectType: "organization" | "user",
+    subjectId: string
+  ) {
+    if (!customerId) return null;
+
+    const bound = yield* lookupCustomerBinding(customerId);
+
+    if (customerBelongsToSubject(bound, subjectType, subjectId)) {
+      return customerId;
+    }
+
+    return null;
+  }
+);
+
+const mintCheckoutCustomer = Effect.fn("Billing.mintCheckoutCustomer")(
+  function* (options: {
+    readonly stripe: Stripe;
+    readonly subjectType: "organization" | "user";
+    readonly subjectId: string;
+    readonly userId: string;
+    readonly email?: string | null;
+    readonly entitlement: Awaited<ReturnType<typeof readEntitlement>>;
+  }) {
+    const customer = yield* createStripeCustomer({
+      stripe: options.stripe,
+      email: options.email,
+      subjectType: options.subjectType,
+      subjectId: options.subjectId,
+      userId: options.userId,
+    });
+
+    yield* persistStripeCustomerId({
+      subjectType: options.subjectType,
+      subjectId: options.subjectId,
+      entitlement: options.entitlement,
+      stripeCustomerId: customer.id,
+    });
+
+    return customer.id;
+  }
+);
+
+const resolveCheckoutCustomerId = Effect.fn(
+  "Billing.resolveCheckoutCustomerId"
+)(function* (options: {
+  readonly stripe: Stripe;
+  readonly subjectType: "organization" | "user";
+  readonly subjectId: string;
+  readonly userId: string;
+  readonly email?: string | null;
+  readonly entitlement: Awaited<ReturnType<typeof readEntitlement>>;
+}) {
+  let customerId = options.entitlement.stripeCustomerId;
+
+  if (!customerId) {
+    const existingUser = yield* loadUserBillingCustomer(options.userId);
+    customerId = existingUser.stripeCustomerId;
+  }
+
+  customerId = yield* reuseOrClearCustomerId(
+    customerId,
+    options.subjectType,
+    options.subjectId
+  );
+
+  if (customerId) return customerId;
+
+  return yield* mintCheckoutCustomer(options);
+});
+
+function checkoutSeatCount(plan: BillingPlanId, seatCount?: number) {
+  if (plan !== "org") return 1;
+
+  return Math.max(1, Math.floor(seatCount ?? 1));
+}
+
+interface CheckoutSubject {
+  readonly subjectType: "organization" | "user";
+  readonly subjectId: string;
+}
+
+function checkoutSubject(
+  plan: BillingPlanId,
+  userId: string,
+  organizationId?: string
+): CheckoutSubject {
+  if (plan === "org" && organizationId) {
+    return { subjectType: "organization", subjectId: organizationId };
+  }
+
+  return { subjectType: "user", subjectId: userId };
+}
+
+const mapStripeConfigError = (error: { readonly message: string }) =>
+  billingFail("stripe_not_configured", error.message);
 
 export const createCheckoutSession = Effect.fn("createCheckoutSession")(
   function* (input: {
@@ -52,178 +301,57 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
     seatCount?: number;
   }) {
     if (!isPaidPlan(input.plan)) {
-      return yield* new BillingCheckoutError({
-        reason: "invalid_plan",
-        message: "Free does not require Checkout.",
-      });
+      return yield* billingFail(
+        "invalid_plan",
+        "Free does not require Checkout."
+      );
     }
 
-    let stripe;
-    let priceId: string;
-    try {
-      stripe = requireStripe();
-      priceId = stripePriceIdForPlan(input.plan);
-    } catch (error) {
-      if (error instanceof StripeNotConfiguredError) {
-        return yield* new BillingCheckoutError({
-          reason: "stripe_not_configured",
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    const stripe = yield* requireStripe().pipe(
+      Effect.mapError(mapStripeConfigError)
+    );
 
-    const seatCount =
-      input.plan === "org" ? Math.max(1, Math.floor(input.seatCount ?? 1)) : 1;
+    const priceId = yield* stripePriceIdForPlan(input.plan).pipe(
+      Effect.mapError(mapStripeConfigError)
+    );
 
-    const organizationId = input.organizationId;
     if (input.plan === "org") {
-      if (!organizationId) {
-        return yield* new BillingCheckoutError({
-          reason: "org_required",
-          message: "Org Checkout requires an organizationId.",
-        });
-      }
-      const allowed = yield* Effect.tryPromise({
-        try: () => assertOrgAdmin(organizationId, input.userId),
-        catch: () =>
-          new BillingCheckoutError({
-            reason: "org_forbidden",
-            message: "Unable to verify organization admin.",
-          }),
-      });
-      if (!allowed) {
-        return yield* new BillingCheckoutError({
-          reason: "org_forbidden",
-          message: "Only organization admins can purchase Org seats.",
-        });
-      }
+      yield* requireOrgCheckoutAdmin(input.organizationId, input.userId);
     }
 
-    const subjectType = input.plan === "org" ? "organization" : "user";
-    const subjectId =
-      input.plan === "org" && organizationId ? organizationId : input.userId;
+    const { subjectType, subjectId } = checkoutSubject(
+      input.plan,
+      input.userId,
+      input.organizationId
+    );
 
-    const entitlement = yield* Effect.tryPromise({
-      try: () => readEntitlement(subjectType, subjectId),
-      catch: () =>
-        new BillingCheckoutError({
-          reason: "stripe_failed",
-          message: "Unable to load current entitlement.",
-        }),
+    const entitlement = yield* loadEntitlement(subjectType, subjectId);
+
+    const stripeCustomerId = yield* resolveCheckoutCustomerId({
+      stripe,
+      subjectType,
+      subjectId,
+      userId: input.userId,
+      email: input.email,
+      entitlement,
     });
 
-    let customerId = entitlement.stripeCustomerId;
-    if (!customerId) {
-      const existingUser = yield* Effect.tryPromise({
-        try: () => readEntitlement("user", input.userId),
-        catch: () =>
-          new BillingCheckoutError({
-            reason: "stripe_failed",
-            message: "Unable to load user billing customer.",
-          }),
-      });
-      customerId = existingUser.stripeCustomerId;
-    }
-
-    if (customerId) {
-      const existingCustomerId = customerId;
-      const bound = yield* Effect.tryPromise({
-        try: () => findEntitlementByStripeCustomer(existingCustomerId),
-        catch: () => null,
-      });
-      if (
-        bound &&
-        (bound.subjectType !== subjectType || bound.subjectId !== subjectId)
-      ) {
-        customerId = null;
-      }
-    }
-
-    if (!customerId) {
-      const customer = yield* Effect.tryPromise({
-        try: () =>
-          stripe.customers.create({
-            email: input.email ?? undefined,
-            metadata: {
-              instinctSubjectType: subjectType,
-              instinctSubjectId: subjectId,
-              instinctUserId: input.userId,
-            },
-          }),
-        catch: () =>
-          new BillingCheckoutError({
-            reason: "stripe_failed",
-            message: "Unable to create Stripe customer.",
-          }),
-      });
-      customerId = customer.id;
-      yield* Effect.tryPromise({
-        try: () =>
-          upsertEntitlement({
-            subjectType,
-            subjectId,
-            plan: entitlement.plan,
-            status: entitlement.status,
-            seatCount: entitlement.seatCount,
-            stripeCustomerId: customerId,
-          }),
-        catch: () =>
-          new BillingCheckoutError({
-            reason: "stripe_failed",
-            message: "Unable to persist Stripe customer id.",
-          }),
-      });
-    }
-
-    if (!customerId) {
-      return yield* new BillingCheckoutError({
-        reason: "stripe_failed",
-        message: "Stripe customer id missing after create.",
-      });
-    }
-
-    const stripeCustomerId = customerId;
-    const origin = applicationOrigin();
-    const session = yield* Effect.tryPromise({
-      try: () =>
-        stripe.checkout.sessions.create({
-          mode: "subscription",
-          customer: stripeCustomerId,
-          client_reference_id: subjectId,
-          line_items: [{ price: priceId, quantity: seatCount }],
-          success_url: `${origin}/account?billing=success`,
-          cancel_url: `${origin}/pricing?billing=canceled`,
-          metadata: {
-            instinctPlan: input.plan,
-            instinctSubjectType: subjectType,
-            instinctSubjectId: subjectId,
-            instinctUserId: input.userId,
-            instinctSeatCount: String(seatCount),
-          },
-          subscription_data: {
-            metadata: {
-              instinctPlan: input.plan,
-              instinctSubjectType: subjectType,
-              instinctSubjectId: subjectId,
-              instinctUserId: input.userId,
-              instinctSeatCount: String(seatCount),
-            },
-          },
-          allow_promotion_codes: true,
-        }),
-      catch: () =>
-        new BillingCheckoutError({
-          reason: "stripe_failed",
-          message: "Unable to create Stripe Checkout session.",
-        }),
+    const session = yield* createCheckoutSessionRemote({
+      stripe,
+      priceId,
+      seatCount: checkoutSeatCount(input.plan, input.seatCount),
+      stripeCustomerId,
+      subjectId,
+      subjectType,
+      userId: input.userId,
+      plan: input.plan,
     });
 
     if (!session.url) {
-      return yield* new BillingCheckoutError({
-        reason: "stripe_failed",
-        message: "Stripe Checkout session missing redirect URL.",
-      });
+      return yield* billingFail(
+        "stripe_failed",
+        "Stripe Checkout session missing redirect URL."
+      );
     }
 
     return { url: session.url };

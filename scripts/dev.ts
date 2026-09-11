@@ -3,10 +3,12 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+
 const composeProject = `open-instinct-${createHash("sha256")
   .update(repositoryRoot)
   .digest("hex")
   .slice(0, 12)}`;
+
 const composeArguments = (...args: string[]) => [
   "compose",
   "--project-name",
@@ -19,6 +21,7 @@ const inheritedEnvironment = { ...process.env };
 
 function developmentEnvironment(port: string) {
   const localDatabaseUrl = `postgresql://postgres:postgres@127.0.0.1:${port}/open_instinct`;
+
   return {
     ...inheritedEnvironment,
     DATABASE_URL: localDatabaseUrl,
@@ -31,23 +34,30 @@ async function resolvePostgresPort() {
     "docker",
     composeArguments("port", "postgres", "5432")
   );
+
   if (output === undefined) return undefined;
   const port = /:(\d+)$/.exec(output.trim())?.[1];
+
   if (!port) {
     throw new Error("Could not resolve the local PostgreSQL port.");
   }
+
   return port;
 }
 
 let activeChild: ChildProcess | undefined;
+
 let composeAttempted = false;
+
 let shutdownSignal: NodeJS.Signals | undefined;
 
 function interrupt(child: ChildProcess, signal: NodeJS.Signals) {
   const childPid = child.pid;
+
   try {
     if (process.platform === "win32") {
       child.kill(signal);
+
       return;
     }
 
@@ -56,6 +66,7 @@ function interrupt(child: ChildProcess, signal: NodeJS.Signals) {
         "Cannot forward a signal before the child process starts."
       );
     }
+
     process.kill(-childPid, signal);
   } catch (error) {
     if (
@@ -71,10 +82,12 @@ function interrupt(child: ChildProcess, signal: NodeJS.Signals) {
 }
 
 const shutdownSignals: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];
+
 for (const signal of shutdownSignals) {
   process.on(signal, () => {
     if (shutdownSignal === undefined) {
       shutdownSignal = signal;
+
       if (activeChild !== undefined) {
         interrupt(activeChild, signal);
       }
@@ -99,6 +112,7 @@ async function run(
     env,
     stdio: "inherit",
   });
+
   activeChild = child;
 
   try {
@@ -125,6 +139,7 @@ async function runForOutput(command: string, args: string[]) {
     env: inheritedEnvironment,
     stdio: ["inherit", "pipe", "inherit"],
   });
+
   activeChild = child;
   child.stdout.setEncoding("utf8");
   let output = "";
@@ -134,11 +149,13 @@ async function runForOutput(command: string, args: string[]) {
 
   try {
     const code = await childExitCode(child);
+
     if (code !== 0 && shutdownSignal === undefined) {
       throw new Error(
         `${command} ${args.join(" ")} exited with ${String(code)}`
       );
     }
+
     return shutdownSignal === undefined ? output : undefined;
   } finally {
     if (activeChild === child) {
@@ -156,6 +173,7 @@ function childExitCode(child: ChildProcess) {
 
 try {
   composeAttempted = true;
+
   let shouldContinue = await run(
     "docker",
     composeArguments("up", "--detach", "--wait"),
@@ -164,6 +182,7 @@ try {
 
   if (shouldContinue) {
     const port = await resolvePostgresPort();
+
     if (port !== undefined) {
       const environment = developmentEnvironment(port);
       shouldContinue = await run("pnpm", ["db:migrate"], {

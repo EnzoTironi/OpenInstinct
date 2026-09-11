@@ -22,6 +22,7 @@ export async function createHTTPContext(
     if (error instanceof UnauthenticatedError) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
+
     throw error;
   }
 }

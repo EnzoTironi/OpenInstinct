@@ -1,5 +1,6 @@
 import type { MessageStreamEvent } from "eve/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { readLatestSessionHistory } from "./session-history";
 
 describe("session history", () => {
@@ -11,6 +12,7 @@ describe("session history", () => {
     const events = Array.from({ length: 6 }, (_, index) =>
       receivedMessage(index)
     );
+
     const fetchMock = vi.fn<() => Promise<Response>>(() =>
       Promise.resolve(
         new Response(events.map((event) => JSON.stringify(event)).join("\n"), {
@@ -18,6 +20,7 @@ describe("session history", () => {
         })
       )
     );
+
     vi.stubGlobal("fetch", fetchMock);
 
     const history = await readLatestSessionHistory("session/one");

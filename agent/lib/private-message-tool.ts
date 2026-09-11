@@ -1,9 +1,12 @@
 import { Effect, Schema } from "effect";
 import { defineTool, toolOutput } from "eve/tools";
+
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { ChannelTransport } from "../../server/channels/transport";
 import { serverRuntime } from "../../server/runtime";
-import { requireChannelPrincipal } from "../../server/channels/principal";
 import { taskReportDeliveryId } from "./task-report";
+
+const decodeNonEmptyString = Schema.decodeUnknownEffect(Schema.NonEmptyString);
 
 const Message = Schema.Struct({
   kind: Schema.Literal("message"),
@@ -29,34 +32,40 @@ export const privateMessageTool = (channel: "telegram" | "kapso") =>
         throw new Error(
           "Return the result to the parent conversation instead of sending a message."
         );
+
       return serverRuntime.runPromise(
         Effect.gen(function* () {
           const auth =
             context.session.auth.current ??
             context.session.auth.initiator ??
             null;
+
           const identity = yield* requireChannelPrincipal(channel, auth);
+
           const reply = input.replyTo
-            ? yield* Schema.decodeUnknownEffect(Schema.NonEmptyString)(
-                auth?.attributes.sourceMessageId
-              )
+            ? yield* decodeNonEmptyString(auth?.attributes.sourceMessageId)
             : undefined;
+
           const transport = yield* ChannelTransport;
           const reportId = taskReportDeliveryId(context);
+
           const enqueue = reportId
             ? transport.enqueueTaskReport
             : transport.enqueueText;
+
           const base = {
             identityId: identity.id,
             deliveryKey:
               reportId ?? `tool:${context.session.id}:${context.callId}`,
             text: input.text,
           };
+
           const intent = reply ? { ...base, replyToMessageId: reply } : base;
           yield* enqueue(intent);
           yield* transport.drainOutbox(identity.id);
           // Read the exact intent again through idempotent enqueue, not aggregate lane state.
           const receipts = yield* enqueue(intent);
+
           return {
             deliveries: receipts.map((receipt) => ({
               id: receipt.id,

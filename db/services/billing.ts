@@ -1,13 +1,15 @@
-import { and, eq, isNotNull } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+
 import { billingEntitlements, db } from "@db";
 import {
   type BillingPlanId,
   quotaLimitsForPlan,
   type PlanQuotaLimits,
 } from "@shared/billing/plans";
+import { and, eq, isNotNull } from "drizzle-orm";
 
 export type BillingSubjectType = "user" | "organization";
+
 export type BillingEntitlementStatus =
   | "active"
   | "trialing"
@@ -41,12 +43,15 @@ function toResolved(
   row: typeof billingEntitlements.$inferSelect
 ): ResolvedEntitlement {
   const plan: BillingPlanId = isBillingPlanId(row.plan) ? row.plan : "free";
+
   const paidActive =
     plan === "free" ||
     row.status === "active" ||
     row.status === "trialing" ||
     row.status === "past_due";
+
   const effectivePlan: BillingPlanId = paidActive ? plan : "free";
+
   return {
     plan: effectivePlan,
     status: row.status,
@@ -71,8 +76,54 @@ export async function readEntitlement(
       )
     )
     .limit(1);
+
   const row = rows[0];
+
   return row ? toResolved(row) : freeEntitlement();
+}
+
+function entitlementUpdateFields(input: {
+  plan: BillingPlanId;
+  status: BillingEntitlementStatus;
+  seatCount: number;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
+  currentPeriodEnd?: Date | null;
+}) {
+  return {
+    plan: input.plan,
+    status: input.status,
+    seatCount: input.seatCount,
+    stripeCustomerId: input.stripeCustomerId,
+    stripeSubscriptionId: input.stripeSubscriptionId,
+    stripePriceId: input.stripePriceId,
+    currentPeriodEnd: input.currentPeriodEnd,
+  };
+}
+
+function entitlementInsertFields(input: {
+  subjectType: BillingSubjectType;
+  subjectId: string;
+  plan: BillingPlanId;
+  status: BillingEntitlementStatus;
+  seatCount: number;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
+  currentPeriodEnd?: Date | null;
+}) {
+  return {
+    subjectType: input.subjectType,
+    subjectId: input.subjectId,
+    plan: input.plan,
+    status: input.status,
+    seatCount: input.seatCount,
+    stripeCustomerId: input.stripeCustomerId ?? null,
+    stripeSubscriptionId: input.stripeSubscriptionId ?? null,
+    stripePriceId: input.stripePriceId ?? null,
+    currentPeriodEnd: input.currentPeriodEnd ?? null,
+  };
 }
 
 export async function upsertEntitlement(input: {
@@ -87,6 +138,7 @@ export async function upsertEntitlement(input: {
   currentPeriodEnd?: Date | null;
 }) {
   const now = new Date();
+
   const existing = await db
     .select({ id: billingEntitlements.id })
     .from(billingEntitlements)
@@ -99,48 +151,28 @@ export async function upsertEntitlement(input: {
     .limit(1);
 
   const seatCount = Math.max(1, input.seatCount ?? 1);
+  const withSeats = { ...input, seatCount };
+
   if (existing[0]) {
     await db
       .update(billingEntitlements)
       .set({
-        plan: input.plan,
-        status: input.status,
-        seatCount,
-        stripeCustomerId:
-          input.stripeCustomerId === undefined
-            ? undefined
-            : input.stripeCustomerId,
-        stripeSubscriptionId:
-          input.stripeSubscriptionId === undefined
-            ? undefined
-            : input.stripeSubscriptionId,
-        stripePriceId:
-          input.stripePriceId === undefined ? undefined : input.stripePriceId,
-        currentPeriodEnd:
-          input.currentPeriodEnd === undefined
-            ? undefined
-            : input.currentPeriodEnd,
+        ...entitlementUpdateFields(withSeats),
         updatedAt: now,
       })
       .where(eq(billingEntitlements.id, existing[0].id));
+
     return existing[0].id;
   }
 
   const id = randomUUID();
   await db.insert(billingEntitlements).values({
     id,
-    subjectType: input.subjectType,
-    subjectId: input.subjectId,
-    plan: input.plan,
-    status: input.status,
-    seatCount,
-    stripeCustomerId: input.stripeCustomerId ?? null,
-    stripeSubscriptionId: input.stripeSubscriptionId ?? null,
-    stripePriceId: input.stripePriceId ?? null,
-    currentPeriodEnd: input.currentPeriodEnd ?? null,
+    ...entitlementInsertFields(withSeats),
     createdAt: now,
     updatedAt: now,
   });
+
   return id;
 }
 
@@ -155,6 +187,7 @@ export async function findEntitlementByStripeCustomer(customerId: string) {
       )
     )
     .limit(1);
+
   return rows[0] ?? null;
 }
 
@@ -171,5 +204,6 @@ export async function findEntitlementByStripeSubscription(
       )
     )
     .limit(1);
+
   return rows[0] ?? null;
 }

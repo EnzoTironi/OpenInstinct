@@ -1,10 +1,11 @@
-import { Effect, Layer, ManagedRuntime } from "effect";
-import { symmetricEncodeJWT } from "better-auth/crypto";
-import { describe, expect, it } from "vitest";
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
-import { accessScopeForUser } from "@shared/identity/access-scope";
 import { googleWorkspaceScopes } from "@shared/google-workspace/connection";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import { symmetricEncodeJWT } from "better-auth/crypto";
+import { Effect, Layer, ManagedRuntime } from "effect";
 import type { SessionAuthContext } from "eve/context";
+import { describe, expect, it } from "vitest";
+
 import { BrowserWorkerAccess } from "../browser-worker";
 import { BrowserWorkerAccessError } from "../browser-worker/access";
 import {
@@ -32,6 +33,7 @@ const secretsLayer =
 
 function membershipPrincipal(userId = "better-auth:alice"): SessionAuthContext {
   const scope = accessScopeForUser(userId);
+
   return {
     attributes: { workspaceId: scope.workspaceId },
     authenticator: "test",
@@ -42,6 +44,7 @@ function membershipPrincipal(userId = "better-auth:alice"): SessionAuthContext {
 
 function channelPrincipal(): SessionAuthContext {
   const scope = accessScopeForUser("better-auth:alice");
+
   return {
     attributes: {
       channelIdentityId: "11111111-1111-4111-8111-111111111111",
@@ -79,6 +82,7 @@ describe("native Google authorization boundary", () => {
       "companion-google-workspace-link",
       -600
     );
+
     const runtime = ManagedRuntime.make(secretsLayer);
     await expect(
       runtime.runPromise(readGoogleWorkspaceChallenge(flow, "alice"))
@@ -93,6 +97,7 @@ describe("native Google authorization boundary", () => {
       "companion-google-workspace-link",
       600
     );
+
     expect(flow).not.toContain("alice");
     const runtime = ManagedRuntime.make(secretsLayer);
     expect(
@@ -136,6 +141,7 @@ describe("native Google authorization boundary", () => {
     const business = googleWorkspaceScopes.filter((scope) =>
       scope.startsWith("https://www.googleapis.com/auth/")
     );
+
     expect(
       hasGoogleWorkspaceScopes(
         [
@@ -146,6 +152,7 @@ describe("native Google authorization boundary", () => {
         ].join(" ")
       )
     ).toBe(true);
+
     for (const missing of business)
       expect(
         hasGoogleWorkspaceScopes(
@@ -161,13 +168,16 @@ describe("Google Workspace live consent authority", () => {
     const principal = membershipPrincipal();
     const scope = accessScopeForUser(principal.principalId);
     const runtime = challengeRuntime(() => Effect.succeed(scope));
+
     const href = await runtime.runPromise(
       createGoogleWorkspaceChallenge(principal, callback)
     );
+
     const url = new URL(href);
     expect(url.pathname).toBe("/api/google-workspace/connect");
     const flow = url.searchParams.get("flow");
     expect(flow).toEqual(expect.any(String));
+
     if (!flow) throw new Error("expected encrypted flow");
     expect(
       await runtime.runPromise(readGoogleWorkspaceChallenge(flow, "alice"))
@@ -177,9 +187,11 @@ describe("Google Workspace live consent authority", () => {
 
   it("denies challenge issuance after channel revoke even when ownership remains (fixture)", async () => {
     const principal = channelPrincipal();
+
     const runtime = challengeRuntime(() =>
       Effect.fail(new BrowserWorkerAccessError({ reason: "revoked" }))
     );
+
     await expect(
       runtime.runPromise(createGoogleWorkspaceChallenge(principal, callback))
     ).rejects.toMatchObject({ reason: "unauthenticated" });
@@ -188,6 +200,7 @@ describe("Google Workspace live consent authority", () => {
 
   it("denies challenge issuance after schedule pause even when ownership remains (fixture)", async () => {
     const scope = accessScopeForUser("better-auth:alice");
+
     const principal: SessionAuthContext = {
       attributes: {
         channelIdentityId: "11111111-1111-4111-8111-111111111111",
@@ -202,9 +215,11 @@ describe("Google Workspace live consent authority", () => {
       principalId: scope.userId,
       principalType: "user",
     };
+
     const runtime = challengeRuntime(() =>
       Effect.fail(new BrowserWorkerAccessError({ reason: "paused" }))
     );
+
     await expect(
       runtime.runPromise(createGoogleWorkspaceChallenge(principal, callback))
     ).rejects.toMatchObject({ reason: "unauthenticated" });
@@ -215,6 +230,7 @@ describe("Google Workspace live consent authority", () => {
     const runtime = challengeRuntime(() =>
       Effect.fail(new BrowserWorkerAccessError({ reason: "unavailable" }))
     );
+
     await expect(
       runtime.runPromise(
         createGoogleWorkspaceChallenge(membershipPrincipal(), callback)

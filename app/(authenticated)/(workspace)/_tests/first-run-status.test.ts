@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
 import {
   FirstRunStatus,
   describeLinkedChannels,
@@ -26,6 +27,7 @@ describe("first-run status", () => {
         identities: [{ channel: "telegram", senderId: "42" }],
       })
     );
+
     expect(html).toContain("You&#x27;re set up");
     expect(html).toContain("Telegram is linked");
     expect(html).toContain('href="/chat"');
@@ -36,6 +38,7 @@ describe("first-run status", () => {
     const html = renderToStaticMarkup(
       createElement(FirstRunStatus, { welcome: true, identities: [] })
     );
+
     expect(html).toContain("Connect a messenger to finish setup");
     expect(html).toContain('href="/account"');
   });
@@ -47,6 +50,7 @@ describe("first-run status", () => {
         identities: [{ channel: "kapso", senderId: "9" }],
       })
     );
+
     expect(html).toBe("");
   });
 });

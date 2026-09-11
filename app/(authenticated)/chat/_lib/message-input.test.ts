@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { chatTitle, messageContent } from "./message-input";
 
 describe("chat message input", () => {

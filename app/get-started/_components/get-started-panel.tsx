@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { ChannelAuthForm } from "@web/auth/channel/form";
+import Link from "next/link";
 
 const steps = [
   {

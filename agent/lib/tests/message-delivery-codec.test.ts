@@ -1,17 +1,24 @@
 import { asSchema } from "ai";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import messaging from "../../tools/messaging";
-import { sendMessageOutputSchema } from "../../../shared/chat/message-delivery";
+
 import {
   isToolSchema,
   serializeInputSchema,
   toInputSchema,
 } from "../../../node_modules/eve/dist/src/tools/schema.js";
+import { sendMessageOutputSchema } from "../../../shared/chat/message-delivery";
+import messaging from "../../tools/messaging";
+
+const decodeSendMessageOutputSchema = Schema.decodeUnknownSync(
+  sendMessageOutputSchema
+);
 
 // Exercise the installed codec and the real dynamic definition without provider I/O.
 const onTurnStarted = messaging.events["turn.started"];
+
 if (!onTurnStarted) throw new Error("Messaging turn handler is required.");
+
 const tools = await onTurnStarted(
   {},
   {
@@ -20,9 +27,12 @@ const tools = await onTurnStarted(
     session: { id: "codec-proof", auth: { current: null, initiator: null } },
   }
 );
+
 if (!tools || !("send_message" in tools))
   throw new Error("Interactive messaging tools are required.");
+
 const original = tools.send_message.inputSchema;
+
 const decodeJsonObject = Schema.decodeSync(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))
 );
@@ -30,9 +40,11 @@ const decodeJsonObject = Schema.decodeSync(
 describe("message delivery native Eve codec", () => {
   it("recognizes the actual tool and serializes both discriminated variants", async () => {
     expect(isToolSchema(original)).toBe(true);
+
     const encoded = decodeJsonObject(
       JSON.stringify(serializeInputSchema(original))
     );
+
     expect(encoded).toHaveProperty("anyOf");
     const restored = toInputSchema(encoded);
     expect(isToolSchema(restored)).toBe(true);
@@ -43,7 +55,9 @@ describe("message delivery native Eve codec", () => {
     const restored = toInputSchema(
       decodeJsonObject(JSON.stringify(serializeInputSchema(original)))
     );
+
     const validations: Promise<void>[] = [];
+
     for (const schema of [toInputSchema(original), restored]) {
       for (const input of [
         { kind: "message", text: "Hello", replyTo: { kind: "current" } },
@@ -71,12 +85,13 @@ describe("message delivery native Eve codec", () => {
           (async () => {
             const validation = await schema["~standard"].validate(input);
             expect(validation).toEqual({
-              value: Schema.decodeUnknownSync(sendMessageOutputSchema)(input),
+              value: decodeSendMessageOutputSchema(input),
             });
           })()
         );
       }
     }
+
     await Promise.all(validations);
   });
 
@@ -84,16 +99,17 @@ describe("message delivery native Eve codec", () => {
     const restored = toInputSchema(
       decodeJsonObject(JSON.stringify(serializeInputSchema(original)))
     );
+
     const input = {
       kind: "message",
       attachments: [{ kind: "file", url: "https://example.com", extra: true }],
     };
+
     const validation = await restored["~standard"].validate(input);
     expect(validation.issues).toBeUndefined();
+
     if (validation.issues) throw new Error("Attachment metadata was rejected.");
-    expect(
-      Schema.decodeUnknownSync(sendMessageOutputSchema)(validation.value)
-    ).toEqual({
+    expect(decodeSendMessageOutputSchema(validation.value)).toEqual({
       kind: "message",
       attachments: [{ kind: "file", url: "https://example.com" }],
     });
@@ -103,7 +119,9 @@ describe("message delivery native Eve codec", () => {
     const restored = toInputSchema(
       decodeJsonObject(JSON.stringify(serializeInputSchema(original)))
     );
+
     const validations: Promise<void>[] = [];
+
     for (const schema of [toInputSchema(original), restored]) {
       for (const input of [
         null,
@@ -137,6 +155,7 @@ describe("message delivery native Eve codec", () => {
         );
       }
     }
+
     await Promise.all(validations);
   });
 });

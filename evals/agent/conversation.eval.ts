@@ -1,13 +1,21 @@
-import { Result, Schema } from "effect";
-import { defineEval, type EveEvalContext } from "eve/evals";
-import { includes, satisfies } from "eve/evals/expect";
-import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
-import { reactToMessageOutputSchema } from "@shared/chat/reaction";
 import {
   agentEvalTags,
   assertPlainTextDelivery,
   requireDeliveredText,
 } from "@evals/agent/shared";
+import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
+import { reactToMessageOutputSchema } from "@shared/chat/reaction";
+import { Result, Schema } from "effect";
+import { defineEval, type EveEvalContext } from "eve/evals";
+import { includes, satisfies } from "eve/evals/expect";
+
+const decodeReactToMessageOutputSchema = Schema.decodeUnknownResult(
+  reactToMessageOutputSchema
+);
+
+const decodeSendMessageOutputSchema = Schema.decodeUnknownResult(
+  sendMessageOutputSchema
+);
 
 const cases: readonly {
   description: string;
@@ -114,9 +122,8 @@ const reactionEvals = [
       thanked.calledTool("react_to_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(reactToMessageOutputSchema)(
-            input
-          );
+          const parsed = decodeReactToMessageOutputSchema(input);
+
           return (
             Result.isSuccess(parsed) &&
             parsed.success.operation === "add" &&
@@ -157,6 +164,7 @@ const replyEvals = [
     tags: [...agentEvalTags, "conversation", "reply", "background"],
     async test(t) {
       const taskId = "task_movie_search_01";
+
       const turn = await t.send("Continue with the completed work.", {
         clientContext: [
           "Background task reporting. This turn was triggered by completed background work after unrelated conversation occurred.",
@@ -173,14 +181,14 @@ const replyEvals = [
           })}`,
         ],
       });
+
       turn.expectOk();
       turn.succeeded();
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
-            input
-          );
+          const parsed = decodeSendMessageOutputSchema(input);
+
           return (
             Result.isSuccess(parsed) &&
             parsed.success.kind === "message" &&
@@ -200,6 +208,7 @@ const replyEvals = [
     tags: [...agentEvalTags, "conversation", "reply", "automation"],
     async test(t) {
       const automationId = "00000000-0000-4000-8000-000000000003";
+
       const turn = await t.send("Continue with the scheduled update.", {
         clientContext: [
           "A background scheduled run has completed after the conversation moved on.",
@@ -208,14 +217,14 @@ const replyEvals = [
           "Worker outcome: The appointment is Thursday, so the user should finish the form today.",
         ],
       });
+
       turn.expectOk();
       turn.succeeded();
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
-            input
-          );
+          const parsed = decodeSendMessageOutputSchema(input);
+
           return (
             Result.isSuccess(parsed) &&
             parsed.success.kind === "message" &&
@@ -239,9 +248,8 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
-            input
-          );
+          const parsed = decodeSendMessageOutputSchema(input);
+
           return (
             Result.isSuccess(parsed) &&
             parsed.success.kind === "message" &&
@@ -263,13 +271,13 @@ const replyEvals = [
       const question = await t.send(
         "Ask me in a normal text whether I want you to focus on Boston or New York."
       );
+
       question.expectOk();
       question.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
-            input
-          );
+          const parsed = decodeSendMessageOutputSchema(input);
+
           return (
             Result.isSuccess(parsed) &&
             parsed.success.kind === "message" &&
@@ -279,17 +287,18 @@ const replyEvals = [
         status: "completed",
       });
       await requireDeliveredText(t, question);
+
       const answer = await t.send(
         "Boston. Briefly confirm that you will focus there."
       );
+
       answer.expectOk();
       answer.succeeded();
       answer.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
-            input
-          );
+          const parsed = decodeSendMessageOutputSchema(input);
+
           return (
             Result.isSuccess(parsed) &&
             parsed.success.kind === "message" &&
@@ -314,14 +323,14 @@ const replyEvals = [
       const second = await t.send(
         "Separate question: what is the capital of France? Keep it brief."
       );
+
       second.expectOk();
       second.succeeded();
       second.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
-            input
-          );
+          const parsed = decodeSendMessageOutputSchema(input);
+
           return (
             Result.isSuccess(parsed) &&
             parsed.success.kind === "message" &&
@@ -346,14 +355,14 @@ const replyEvals = [
           "Send the announcement as a brief user-visible message.",
         ],
       });
+
       turn.expectOk();
       turn.succeeded();
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
-            input
-          );
+          const parsed = decodeSendMessageOutputSchema(input);
+
           return (
             Result.isSuccess(parsed) &&
             parsed.success.kind === "message" &&

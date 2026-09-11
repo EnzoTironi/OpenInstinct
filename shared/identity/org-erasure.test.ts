@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+
 import {
   assertOrgErasureAllowed,
   OrgErasureDenied,
@@ -33,6 +34,7 @@ describe("C02 org erasure / retention gates", () => {
         actorRole: "member",
       })
     );
+
     expect(decision.status).toBe("denied");
     expect(decision.reason).toBe("not_admin");
   });
@@ -45,6 +47,7 @@ describe("C02 org erasure / retention gates", () => {
         actorRole: "admin",
       })
     );
+
     expect(decision.status).toBe("denied");
     expect(decision.reason).toBe("cascade_unimplemented");
     expect(decision.notErased).toEqual(orgErasureSurfaces);
@@ -60,6 +63,7 @@ describe("C02 org erasure / retention gates", () => {
         retentionHold: true,
       })
     );
+
     expect(decision.reason).toBe("retention_hold");
   });
 });

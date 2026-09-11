@@ -1,13 +1,17 @@
-import { renderChannelInput } from "./channel-input";
-import { taskReportDeliveryId } from "./task-report";
-import { channelConsentRevision } from "./channel-consent";
 import { createHash } from "node:crypto";
-import { Effect } from "effect";
+
+import { Effect, Schema } from "effect";
 import type { ChannelEvents } from "eve/channels";
+
 import type { Identity } from "../../server/accounts";
+import { requireChannelPrincipal } from "../../server/channels/principal";
 import { ChannelTransport } from "../../server/channels/transport";
 import { serverRuntime } from "../../server/runtime";
-import { requireChannelPrincipal } from "../../server/channels/principal";
+import { channelConsentRevision } from "./channel-consent";
+import { renderChannelInput } from "./channel-input";
+import { taskReportDeliveryId } from "./task-report";
+
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
 export function privateChannelEvents(channel: Identity["channel"]) {
   const terminal = (
@@ -16,12 +20,14 @@ export function privateChannelEvents(channel: Identity["channel"]) {
     >
   ) => {
     if (context.session.parent) return Promise.resolve();
+
     return serverRuntime.runPromise(
       Effect.gen(function* () {
         const auth =
           context.session.auth.current ??
           context.session.auth.initiator ??
           null;
+
         const identity = yield* requireChannelPrincipal(channel, auth);
         const transport = yield* ChannelTransport;
         yield* transport.enqueueText({
@@ -32,9 +38,11 @@ export function privateChannelEvents(channel: Identity["channel"]) {
       })
     );
   };
+
   return {
     "message.completed": (event, _channel, context) => {
       const text = event.message;
+
       if (
         context.session.parent ||
         !text?.trim() ||
@@ -42,18 +50,22 @@ export function privateChannelEvents(channel: Identity["channel"]) {
         event.finishReason === "tool-calls"
       )
         return Promise.resolve();
+
       return serverRuntime.runPromise(
         Effect.gen(function* () {
           const auth =
             context.session.auth.current ??
             context.session.auth.initiator ??
             null;
+
           const identity = yield* requireChannelPrincipal(channel, auth);
           const transport = yield* ChannelTransport;
           const reportId = taskReportDeliveryId(context);
+
           const enqueue = reportId
             ? transport.enqueueTaskReport
             : transport.enqueueText;
+
           yield* enqueue({
             identityId: identity.id,
             deliveryKey:
@@ -91,13 +103,16 @@ function enqueueAuthorization(
   >[2]
 ) {
   if (context.session.parent) return Promise.resolve();
+
   return serverRuntime.runPromise(
     Effect.gen(function* () {
       const auth =
         context.session.auth.current ?? context.session.auth.initiator ?? null;
+
       const identity = yield* requireChannelPrincipal(channel, auth);
       const transport = yield* ChannelTransport;
       const challenge = event.authorization;
+
       const text = [
         `Connect ${challenge?.displayName ?? event.name}`,
         event.description,
@@ -107,9 +122,10 @@ function enqueueAuthorization(
       ]
         .filter((line) => line !== undefined)
         .join("\n\n");
+
       const key = createHash("sha256")
         .update(
-          JSON.stringify([
+          encodeJson([
             context.session.id,
             event.turnId,
             event.stepIndex,
@@ -118,6 +134,7 @@ function enqueueAuthorization(
           ])
         )
         .digest("hex");
+
       yield* transport.enqueueText({
         identityId: identity.id,
         deliveryKey: `authorization:${key}`,
@@ -133,25 +150,32 @@ function enqueueInput(
   context: Parameters<NonNullable<ChannelEvents<unknown>["input.requested"]>>[2]
 ) {
   if (context.session.parent) return Promise.resolve();
+
   return serverRuntime.runPromise(
     Effect.gen(function* () {
       const identity = yield* requireChannelPrincipal(
         channel,
         context.session.auth.current ?? context.session.auth.initiator ?? null
       );
+
       const transport = yield* ChannelTransport;
-      for (const request of event.requests) {
-        yield* transport.enqueueText({
-          identityId: identity.id,
-          deliveryKey: `input:${context.session.id}:${request.requestId}`,
-          text: renderChannelInput(request),
-          inputRequest: {
-            sessionId: context.session.id,
-            requestId: request.requestId,
-            revision: channelConsentRevision(request),
-          },
-        });
-      }
+
+      yield* Effect.forEach(
+        event.requests,
+        (request) =>
+          transport.enqueueText({
+            identityId: identity.id,
+            deliveryKey: `input:${context.session.id}:${request.requestId}`,
+            text: renderChannelInput(request),
+            inputRequest: {
+              sessionId: context.session.id,
+              requestId: request.requestId,
+              revision: channelConsentRevision(request),
+            },
+          }),
+        { concurrency: 1, discard: true }
+      );
+
       yield* transport.drainOutbox(identity.id);
     })
   );

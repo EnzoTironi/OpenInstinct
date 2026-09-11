@@ -1,8 +1,8 @@
+import type { isScheduledAgentRunLeaseActive } from "@db/services/scheduled-agent-run-leases";
+import type { getGatewayModel } from "@db/services/settings";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import type { DynamicResolveContext } from "eve";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { isScheduledAgentRunLeaseActive } from "@db/services/scheduled-agent-run-leases";
-import type { getGatewayModel } from "@db/services/settings";
 
 const services = vi.hoisted(() => ({
   getModel: vi.fn<typeof getGatewayModel>(),
@@ -12,6 +12,7 @@ const services = vi.hoisted(() => ({
 vi.mock("@db/services/scheduled-agent-run-leases", () => ({
   isScheduledAgentRunLeaseActive: services.isActive,
 }));
+
 vi.mock("@db/services/settings", () => ({
   getGatewayModel: services.getModel,
 }));
@@ -19,7 +20,9 @@ vi.mock("@db/services/settings", () => ({
 import agent from "@agent/agent";
 
 const runId = "00000000-0000-4000-8000-000000000001";
+
 const oldLeaseToken = "00000000-0000-4000-8000-000000000002";
+
 const retryLeaseToken = "00000000-0000-4000-8000-000000000003";
 
 beforeEach(() => {

@@ -1,14 +1,16 @@
-import type { EveChannelInput } from "eve/channels/eve";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   finalizeScheduledReport,
   releaseScheduledReport,
 } from "@db/services/scheduled-agent-jobs";
+import type { EveChannelInput } from "eve/channels/eve";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const channelCapture = vi.hoisted(() => {
   const configs: EveChannelInput[] = [];
+
   return { configs };
 });
+
 const delivery = vi.hoisted(() => ({
   finalize: vi.fn<typeof finalizeScheduledReport>(),
   release: vi.fn<typeof releaseScheduledReport>(),
@@ -16,14 +18,17 @@ const delivery = vi.hoisted(() => ({
 
 vi.mock(import("eve/channels/eve"), async (importOriginal) => {
   const original = await importOriginal();
+
   return {
     ...original,
     eveChannel(config: EveChannelInput) {
       channelCapture.configs.push(config);
+
       return original.eveChannel(config);
     },
   };
 });
+
 vi.mock("@db/services/scheduled-agent-jobs", () => ({
   finalizeScheduledReport: delivery.finalize,
   releaseScheduledReport: delivery.release,
@@ -33,8 +38,11 @@ vi.mock("@db/services/scheduled-agent-jobs", () => ({
 await import("@agent/channels/eve");
 
 const events = channelCapture.configs[0]?.events;
+
 const handleActionResult = events?.["action.result"];
+
 const handleMessageCompleted = events?.["message.completed"];
+
 if (!handleActionResult || !handleMessageCompleted) {
   throw new Error("The Eve channel must configure scheduled report delivery.");
 }

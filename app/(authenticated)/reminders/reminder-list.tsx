@@ -1,13 +1,15 @@
+import { Badge } from "@web/components/ui/badge";
 import type { Effect } from "effect";
 import Link from "next/link";
+
 import type { listReminders } from "../../../server/schedules/queries";
-import { Badge } from "@web/components/ui/badge";
 
 const jobLabels = {
   active: "Active",
   paused: "Paused",
   completed: "No future occurrences",
 };
+
 const runLabels = {
   queued: "Waiting to run",
   running: "In progress",
@@ -15,6 +17,7 @@ const runLabels = {
   completed: "Run finished",
   dead_letter: "Run failed",
 };
+
 const reportLabels = {
   not_ready: "Report not ready",
   not_needed: "No report needed",
@@ -26,12 +29,14 @@ const reportLabels = {
   cancelled: "Delivery stopped; some parts may have been sent",
   uncertain: "Delivery uncertain; automatic retry blocked",
 };
+
 const channelLabels = {
   eve: "Companion",
   linq: "Linq",
   telegram: "Telegram",
   kapso: "WhatsApp",
 };
+
 const dateFormatter = new Intl.DateTimeFormat("en", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -39,6 +44,8 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
 });
 
 type ReminderPage = Effect.Success<ReturnType<typeof listReminders>>;
+
+type Reminder = ReminderPage["reminders"][number];
 
 export function ReminderList({ reminders, hasMore }: ReminderPage) {
   return (
@@ -75,11 +82,83 @@ export function ReminderList({ reminders, hasMore }: ReminderPage) {
   );
 }
 
-function ReminderCard({
+function nextOccurrenceLabel(status: Reminder["status"]): string {
+  if (status === "paused") return "Saved next occurrence: ";
+
+  return "Next occurrence: ";
+}
+
+function NextRunValue({ nextRunAt }: { readonly nextRunAt: Date | null }) {
+  if (!nextRunAt) return "None scheduled";
+
+  return (
+    <time dateTime={nextRunAt.toISOString()}>
+      {dateFormatter.format(nextRunAt)} UTC
+    </time>
+  );
+}
+
+function LatestRunRow({ reminder }: { readonly reminder: Reminder }) {
+  if (!reminder.latestRunStatus) return null;
+
+  const scheduled = reminder.latestScheduledFor
+    ? ` · ${dateFormatter.format(reminder.latestScheduledFor)} UTC`
+    : "";
+
+  return (
+    <div>
+      <dt className="inline">Latest run: </dt>
+      <dd className="inline">
+        {runLabels[reminder.latestRunStatus]}
+        {scheduled}
+      </dd>
+    </div>
+  );
+}
+
+function LatestReportRow({ reminder }: { readonly reminder: Reminder }) {
+  if (!reminder.latestReportStatus) return null;
+
+  return (
+    <div>
+      <dt className="inline">Delivery: </dt>
+      <dd className="inline">{reportLabels[reminder.latestReportStatus]}</dd>
+    </div>
+  );
+}
+
+function unavailableConversationMessage(reminder: Reminder): string {
+  if (reminder.conversationChannel !== "eve") {
+    return `Return to the original conversation in ${channelLabels[reminder.conversationChannel]} to manage this schedule.`;
+  }
+
+  return "The original conversation is not available to this account.";
+}
+
+function ReminderConversationLink({
   reminder,
 }: {
-  readonly reminder: ReminderPage["reminders"][number];
+  readonly reminder: Reminder;
 }) {
+  if (reminder.originalSessionId) {
+    return (
+      <Link
+        className="type-label underline underline-offset-4"
+        href={`/chat/${encodeURIComponent(reminder.originalSessionId)}`}
+      >
+        Return to original conversation
+      </Link>
+    );
+  }
+
+  return (
+    <p className="type-caption text-muted-foreground">
+      {unavailableConversationMessage(reminder)}
+    </p>
+  );
+}
+
+function ReminderCard({ reminder }: { readonly reminder: Reminder }) {
   return (
     <li className="space-y-3 rounded-lg border border-border/50 p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -93,55 +172,15 @@ function ReminderCard({
       </p>
       <dl className="space-y-1 type-caption text-muted-foreground">
         <div>
-          <dt className="inline">
-            {reminder.status === "paused"
-              ? "Saved next occurrence: "
-              : "Next occurrence: "}
-          </dt>
+          <dt className="inline">{nextOccurrenceLabel(reminder.status)}</dt>
           <dd className="inline">
-            {reminder.nextRunAt ? (
-              <time dateTime={reminder.nextRunAt.toISOString()}>
-                {dateFormatter.format(reminder.nextRunAt)} UTC
-              </time>
-            ) : (
-              "None scheduled"
-            )}
+            <NextRunValue nextRunAt={reminder.nextRunAt} />
           </dd>
         </div>
-        {reminder.latestRunStatus ? (
-          <div>
-            <dt className="inline">Latest run: </dt>
-            <dd className="inline">
-              {runLabels[reminder.latestRunStatus]}
-              {reminder.latestScheduledFor
-                ? ` · ${dateFormatter.format(reminder.latestScheduledFor)} UTC`
-                : ""}
-            </dd>
-          </div>
-        ) : null}
-        {reminder.latestReportStatus ? (
-          <div>
-            <dt className="inline">Delivery: </dt>
-            <dd className="inline">
-              {reportLabels[reminder.latestReportStatus]}
-            </dd>
-          </div>
-        ) : null}
+        <LatestRunRow reminder={reminder} />
+        <LatestReportRow reminder={reminder} />
       </dl>
-      {reminder.originalSessionId ? (
-        <Link
-          className="type-label underline underline-offset-4"
-          href={`/chat/${encodeURIComponent(reminder.originalSessionId)}`}
-        >
-          Return to original conversation
-        </Link>
-      ) : (
-        <p className="type-caption text-muted-foreground">
-          {reminder.conversationChannel !== "eve"
-            ? `Return to the original conversation in ${channelLabels[reminder.conversationChannel]} to manage this schedule.`
-            : "The original conversation is not available to this account."}
-        </p>
-      )}
+      <ReminderConversationLink reminder={reminder} />
     </li>
   );
 }

@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
 import {
   channelHttpError,
   channelFailureMessage,
@@ -24,6 +25,7 @@ describe("shared channel authorization", () => {
         callbackUrl: "/account",
       })
     );
+
     expect(html).toContain("Link Telegram");
     expect(html).toContain("Link WhatsApp");
     expect(html).toContain("Confirm the link in that chat");
@@ -34,6 +36,7 @@ describe("shared channel authorization", () => {
     const html = renderToStaticMarkup(
       createElement(ChannelAuthForm, { purpose: "login", callbackUrl: "/" })
     );
+
     expect(html).toContain("Continue with Telegram");
     expect(html).toContain("Continue with WhatsApp");
     expect(html).not.toContain("Link Telegram");
@@ -63,6 +66,7 @@ describe("shared channel authorization", () => {
           onRestart: () => undefined,
         })
       );
+
       expect(html).toContain("current Companion account");
       expect(html).not.toContain("Enter this browser");
       expect(html).toContain(present);
@@ -88,6 +92,7 @@ describe("shared channel authorization", () => {
           onRestart: () => undefined,
         })
       );
+
       expect(html).toContain("existing association");
       expect(html).toContain("Accounts and their data are not combined");
       expect(html).not.toContain("Enter this browser");
@@ -148,6 +153,7 @@ describe("reauthentication redirect policy", () => {
       status: "fulfilled" as const,
       value: { data: { success: true }, error: null },
     };
+
     expect(reauthenticationDestination(outcome, "/account")).toBe(
       "/sign-in?callbackUrl=%2Faccount"
     );

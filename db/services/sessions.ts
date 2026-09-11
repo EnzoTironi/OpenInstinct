@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
-import type { AccessScope } from "@shared/identity/access-scope";
 import { agentSessions, db } from "@db";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { and, eq } from "drizzle-orm";
 
 export async function claimSession(scope: AccessScope, sessionId: string) {
   await db
@@ -25,6 +25,7 @@ export async function waitForSessionOwnership(
     if (await isSessionOwned(scope, sessionId)) return true;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
+
   /* oxlint-enable eslint/no-await-in-loop */
   return false;
 }
@@ -40,5 +41,6 @@ export async function isSessionOwned(scope: AccessScope, sessionId: string) {
       )
     )
     .limit(1);
+
   return rows.length > 0;
 }

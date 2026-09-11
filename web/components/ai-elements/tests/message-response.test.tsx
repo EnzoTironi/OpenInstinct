@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import {
   ArtifactMessageImage,
   MessageResponse,
 } from "@web/components/ai-elements/message";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
 
 describe("message response rendering", () => {
   it("uses the synchronous renderer for settled text", () => {
@@ -37,6 +37,7 @@ describe("message response rendering", () => {
         src: "/artifacts/0d01e667-d128-4bb7-a248-1ae21db72f4f",
       })
     );
+
     const externalMarkup = renderToStaticMarkup(
       createElement(ArtifactMessageImage, {
         alt: "External product",

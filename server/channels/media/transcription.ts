@@ -1,11 +1,13 @@
-import { ChannelTranscriptSchema } from "../../messaging/model";
 import { NodeServices } from "@effect/platform-node";
 import { createGateway, transcribe } from "ai";
 import { Config, Effect, FileSystem, Redacted, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+
+import { ChannelTranscriptSchema } from "../../messaging/model";
 import { ChannelMediaError, mediaLimits } from "./policy";
 
 const audioType = Schema.Literals(["audio/ogg", "audio/wav"]);
+
 const probeResult = Schema.Struct({
   streams: Schema.Array(
     Schema.Struct({
@@ -22,17 +24,45 @@ const probeResult = Schema.Struct({
   }),
 });
 
+const decodeSchema_fromJsonString_probeResult = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(probeResult)
+);
+
+const decodeChannelTranscriptSchema = Schema.decodeUnknownEffect(
+  ChannelTranscriptSchema
+);
+
+const invalidMedia = () => new ChannelMediaError({ reason: "invalid_media" });
+
+const audioContainerFormat = (mediaType: typeof audioType.Type) => {
+  if (mediaType === "audio/ogg") return "ogg";
+
+  return "wav";
+};
+
+const emptyProbeStdout = () => Buffer.alloc(0);
+
+const appendProbeStdout = (body: Buffer, chunk: Uint8Array) => {
+  if (body.length + chunk.length > 8192) return Effect.fail(invalidMedia());
+
+  return Effect.succeed(Buffer.concat([body, chunk]));
+};
+
 export const validateAudioDuration = Effect.fn("validateAudioDuration")(
   function* (bytes: Uint8Array, mediaType: typeof audioType.Type) {
-    if (bytes.length > mediaLimits.audioBytes)
+    if (bytes.length > mediaLimits.audioBytes) {
       return yield* new ChannelMediaError({ reason: "too_large" });
+    }
+
     const fs = yield* FileSystem.FileSystem;
     const path = yield* fs.makeTempFileScoped({ prefix: "companion-audio-" });
     yield* fs.writeFile(path, bytes, { mode: 0o600 });
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
     const executable = yield* Config.string("COMPANION_FFPROBE_PATH").pipe(
       Config.withDefault("ffprobe")
     );
+
     const handle = yield* spawner.spawn(
       ChildProcess.make(
         executable,
@@ -48,7 +78,7 @@ export const validateAudioDuration = Effect.fn("validateAudioDuration")(
           "-protocol_whitelist",
           "file",
           "-f",
-          mediaType === "audio/ogg" ? "ogg" : "wav",
+          audioContainerFormat(mediaType),
           "-i",
           path,
           "-show_entries",
@@ -65,24 +95,21 @@ export const validateAudioDuration = Effect.fn("validateAudioDuration")(
         }
       )
     );
+
     const output = yield* handle.stdout.pipe(
-      Stream.runFoldEffect(
-        () => Buffer.alloc(0),
-        (body, chunk) =>
-          body.length + chunk.length > 8192
-            ? Effect.fail(new ChannelMediaError({ reason: "invalid_media" }))
-            : Effect.succeed(Buffer.concat([body, chunk]))
-      )
+      Stream.runFoldEffect(emptyProbeStdout, appendProbeStdout)
     );
-    if ((yield* handle.exitCode) !== 0)
-      return yield* new ChannelMediaError({ reason: "invalid_media" });
-    const probe = yield* Schema.decodeUnknownEffect(
-      Schema.fromJsonString(probeResult)
-    )(output.toString("utf8")).pipe(
-      Effect.mapError(() => new ChannelMediaError({ reason: "invalid_media" }))
-    );
-    if (probe.format.duration > mediaLimits.audioSeconds)
+
+    if ((yield* handle.exitCode) !== 0) return yield* invalidMedia();
+
+    const probe = yield* decodeSchema_fromJsonString_probeResult(
+      output.toString("utf8")
+    ).pipe(Effect.mapError(invalidMedia));
+
+    if (probe.format.duration > mediaLimits.audioSeconds) {
       return yield* new ChannelMediaError({ reason: "duration_limit" });
+    }
+
     return probe.format.duration;
   },
   Effect.scoped,
@@ -108,7 +135,9 @@ export const transcribeChannelAudio = Effect.fn("transcribeChannelAudio")(
         () => new ChannelMediaError({ reason: "transcription_unavailable" })
       )
     );
+
     yield* validateAudioDuration(bytes, mediaType);
+
     const result = yield* Effect.tryPromise({
       try: (signal) =>
         transcribe({
@@ -121,9 +150,8 @@ export const transcribeChannelAudio = Effect.fn("transcribeChannelAudio")(
         }),
       catch: () => new ChannelMediaError({ reason: "transcription_failed" }),
     });
-    return yield* Schema.decodeUnknownEffect(ChannelTranscriptSchema)(
-      result.text.trim()
-    ).pipe(
+
+    return yield* decodeChannelTranscriptSchema(result.text.trim()).pipe(
       Effect.mapError(
         () => new ChannelMediaError({ reason: "transcription_failed" })
       )

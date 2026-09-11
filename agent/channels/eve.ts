@@ -1,31 +1,36 @@
+import {
+  finalizeScheduledReportDelivery,
+  releaseScheduledReportDelivery,
+  scheduledReportFromSession,
+} from "@agent/lib/schedules/report-lifecycle";
+import { AuthUnavailable } from "@db/services/auth";
+import { getAuthSession } from "@db/services/auth/session";
+import { isSessionOwned } from "@db/services/sessions";
+import { sendMessageToolResultSchema } from "@shared/chat/message-delivery";
+import {
+  accessScopeForUser,
+  type AccessScope,
+} from "@shared/identity/access-scope";
+import { Effect, Result, Schedule, Schema } from "effect";
 import { defineChannel } from "eve/channels";
-import { eveChannel } from "eve/channels/eve";
 import {
   ForbiddenError,
   localDev,
   routeAuth,
   UnauthenticatedError,
 } from "eve/channels/auth";
-import { Effect, Result, Schedule, Schema } from "effect";
-import { AuthUnavailable } from "@db/services/auth";
-import { isSessionOwned } from "@db/services/sessions";
-import {
-  accessScopeForUser,
-  type AccessScope,
-} from "@shared/identity/access-scope";
-import { getAuthSession } from "@db/services/auth/session";
-import { sendMessageToolResultSchema } from "@shared/chat/message-delivery";
-import {
-  finalizeScheduledReportDelivery,
-  releaseScheduledReportDelivery,
-  scheduledReportFromSession,
-} from "@agent/lib/schedules/report-lifecycle";
+import { eveChannel } from "eve/channels/eve";
+
+const decodeSendMessageToolResultSchema = Schema.decodeUnknownResult(
+  sendMessageToolResultSchema
+);
 
 const authenticateLocalDev = localDev();
 
 const authenticate: Parameters<typeof routeAuth>[1] = [
   async (request) => {
     const identity = await requestIdentityFromRequest(request);
+
     if (!identity) return null;
     const { scope } = identity;
 
@@ -44,6 +49,7 @@ const authenticate: Parameters<typeof routeAuth>[1] = [
   },
   async (request) => {
     const local = await authenticateLocalDev(request);
+
     if (!local) return null;
 
     const scope = accessScopeForUser("better-auth:browser-benchmark");
@@ -75,15 +81,14 @@ const channel = eveChannel({
     async "action.result"(event, _channel, session) {
       if (
         event.status === "completed" &&
-        Result.isSuccess(
-          Schema.decodeUnknownResult(sendMessageToolResultSchema)(event.result)
-        )
+        Result.isSuccess(decodeSendMessageToolResultSchema(event.result))
       ) {
         await finalizeScheduledReportDelivery(session);
       }
     },
     async "message.completed"(event, _channel, session) {
       if (event.finishReason === "tool-calls") return;
+
       if (scheduledReportFromSession(session)) {
         await finalizeScheduledReportDelivery(session, "suppressed");
       }
@@ -116,7 +121,6 @@ const ownedCallbackRoutes = new Set([
 
 export default defineChannel({
   ...channel,
-  // oxlint-disable-next-line oxc/no-map-spread -- Keep Eve's original route definitions intact when adding the app authorization boundary.
   routes: channel.routes.map((route) => {
     if (
       route.transport === "websocket" ||
@@ -124,11 +128,14 @@ export default defineChannel({
     ) {
       return route;
     }
+
     return {
       ...route,
       async handler(request, context) {
         const principal = await routeAuth(request, authenticate);
+
         if (principal instanceof Response) return principal;
+
         return route.handler(request, context);
       },
     };
@@ -141,8 +148,10 @@ const subjectFreeRoutes = new Set(["/eve/v1/info", "/eve/v1/session"]);
 
 async function requireOwnedRouteSubject(scope: AccessScope, request: Request) {
   const { pathname } = new URL(request.url);
+
   if (subjectFreeRoutes.has(pathname)) return;
   const sessionId = sessionIdFromPath(pathname);
+
   if (
     !sessionId ||
     !(await Effect.runPromise(waitForSessionOwnership(scope, sessionId), {
@@ -155,12 +164,16 @@ async function requireOwnedRouteSubject(scope: AccessScope, request: Request) {
 
 export function sessionIdFromPath(pathname: string) {
   const session = /^\/eve\/v1\/session\/([^/]+)/.exec(pathname)?.[1];
+
   if (session) return decodePathSegment(session);
+
   const hookToken =
     /^\/eve\/v1\/(?:callback|connections\/[^/]+\/callback(?:\/[^/]+)?)\/([^/]+)$/.exec(
       pathname
     )?.[1];
+
   const token = hookToken ? decodePathSegment(hookToken) : undefined;
+
   return token ? sessionIdFromHookToken(token) : undefined;
 }
 
@@ -184,7 +197,9 @@ function decodePathSegment(segment: string) {
 
 async function requestIdentityFromRequest(request: Request) {
   const session = await getAuthSession(request.headers);
+
   if (!session) return undefined;
+
   return {
     scope: accessScopeForUser(`better-auth:${session.user.id}`),
     sessionId: session.session.id,

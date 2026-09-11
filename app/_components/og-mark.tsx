@@ -19,11 +19,13 @@ export function OpenGraphMark({
   size = 40,
 }: OpenGraphMarkProps) {
   const top = parseOklch(color);
+
   const left = oklchToHex({
     c: top.c * 0.8,
     h: top.h,
     l: top.l * 0.8,
   });
+
   const right = oklchToHex({
     c: top.c * 0.82,
     h: top.h,
@@ -95,6 +97,7 @@ function parseOklch(color: string): OklchColor {
   }
 
   const [, lightness, chroma, hue] = match;
+
   if (!lightness || !chroma || !hue) {
     throw new Error(`Could not parse OpenGraphMark color: ${color}`);
   }
@@ -152,14 +155,17 @@ function oklchToHex({ c, h, l }: OklchColor) {
   const lRoot = l + 0.3963377774 * a + 0.2158037573 * labB;
   const mRoot = l - 0.1055613458 * a - 0.0638541728 * labB;
   const sRoot = l - 0.0894841775 * a - 1.291485548 * labB;
+
   const linearR =
     4.0767416621 * lRoot ** 3 -
     3.3077115913 * mRoot ** 3 +
     0.2309699292 * sRoot ** 3;
+
   const linearG =
     -1.2684380046 * lRoot ** 3 +
     2.6097574011 * mRoot ** 3 -
     0.3413193965 * sRoot ** 3;
+
   const linearB =
     -0.0041960863 * lRoot ** 3 -
     0.7034186147 * mRoot ** 3 +

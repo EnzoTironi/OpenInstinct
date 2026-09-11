@@ -1,7 +1,8 @@
 import { Effect, type Schema } from "effect";
+
 import { bindGroupChannelIdentity } from "./group-policy";
-import { parseTelegramUpdate, type TelegramInstallation } from "./telegram";
 import type { InboundEvent } from "./inbound";
+import { parseTelegramUpdate, type TelegramInstallation } from "./telegram";
 
 export interface TelegramGroupHarnessResult {
   readonly accepted: boolean;
@@ -39,7 +40,9 @@ export const runTelegramGroupMentionHarness = Effect.fn(
     input.installation,
     input.nowMs
   ).pipe(Effect.orElseSucceed(() => [] as const));
+
   const event = events[0];
+
   if (!event) {
     return {
       accepted: false,
@@ -48,6 +51,7 @@ export const runTelegramGroupMentionHarness = Effect.fn(
       reason: "dropped_by_mention_policy_or_empty",
     } satisfies TelegramGroupHarnessResult;
   }
+
   if (event.chatKind !== "group") {
     return {
       accepted: false,
@@ -56,6 +60,7 @@ export const runTelegramGroupMentionHarness = Effect.fn(
       reason: "not_group_event",
     } satisfies TelegramGroupHarnessResult;
   }
+
   const binding = yield* bindGroupChannelIdentity({
     identityId: input.identityId,
     channel: "telegram",
@@ -63,6 +68,7 @@ export const runTelegramGroupMentionHarness = Effect.fn(
     senderId: event.senderId,
     chatId: event.chatId,
   }).pipe(Effect.orElseSucceed(() => null));
+
   if (binding?.channel !== "telegram") {
     return {
       accepted: false,
@@ -71,6 +77,7 @@ export const runTelegramGroupMentionHarness = Effect.fn(
       reason: "dropped_by_mention_policy_or_empty",
     } satisfies TelegramGroupHarnessResult;
   }
+
   return {
     accepted: true,
     events,

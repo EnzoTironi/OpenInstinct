@@ -22,48 +22,54 @@ export interface ClassifiedNativeLoginControl extends NativeLoginControlDescript
   readonly token: (typeof nativeLoginAutofillTokens)[number];
 }
 
-export function classifyNativeLoginControl(
-  descriptor: NativeLoginControlDescriptor
-): ClassifiedNativeLoginControl | null {
-  const autocompleteTokens = descriptor.autocomplete
-    .toLowerCase()
-    .split(/\s+/u)
-    .filter(Boolean);
-  if (
-    autocompleteTokens.some((token) =>
-      ["new-password", "one-time-code"].includes(token)
-    )
-  ) {
-    return null;
-  }
+const blockedAutocompleteTokens = new Set(["new-password", "one-time-code"]);
 
+const hasBlockedAutocomplete = (tokens: readonly string[]) =>
+  tokens.some((token) => blockedAutocompleteTokens.has(token));
+
+const classifyFromAutocomplete = (
+  descriptor: NativeLoginControlDescriptor,
+  autocompleteTokens: readonly string[]
+): ClassifiedNativeLoginControl | null => {
   for (const token of nativeLoginAutofillTokens) {
     if (autocompleteTokens.includes(token)) {
       return { ...descriptor, score: 100, token };
     }
   }
 
-  const searchable = normalizeText(
-    [descriptor.name, descriptor.label].filter(Boolean).join(" ")
-  );
-  if (/\b(?:new|confirm|create|repeat)\s*password\b/u.test(searchable)) {
-    return null;
-  }
+  return null;
+};
+
+const classifyFromType = (
+  descriptor: NativeLoginControlDescriptor
+): ClassifiedNativeLoginControl | null => {
   if (descriptor.type === "password") {
     return { ...descriptor, score: 90, token: "current-password" };
   }
+
   if (descriptor.type === "email") {
     return { ...descriptor, score: 85, token: "email" };
   }
+
   if (descriptor.type === "tel") {
     return { ...descriptor, score: 85, token: "tel" };
   }
+
+  return null;
+};
+
+const classifyFromSearchable = (
+  descriptor: NativeLoginControlDescriptor,
+  searchable: string
+): ClassifiedNativeLoginControl | null => {
   if (/\b(?:e-?mail|email address)\b/u.test(searchable)) {
     return { ...descriptor, score: 75, token: "email" };
   }
+
   if (/\b(?:phone|telephone|mobile)\b/u.test(searchable)) {
     return { ...descriptor, score: 75, token: "tel" };
   }
+
   if (
     /\b(?:user\s*name|username|login|account|member|membership|mileageplus)\b/u.test(
       searchable
@@ -71,40 +77,130 @@ export function classifyNativeLoginControl(
   ) {
     return { ...descriptor, score: 70, token: "username" };
   }
+
   return null;
+};
+
+export function classifyNativeLoginControl(
+  descriptor: NativeLoginControlDescriptor
+): ClassifiedNativeLoginControl | null {
+  const autocompleteTokens = descriptor.autocomplete
+    .toLowerCase()
+    .split(/\s+/u)
+    .filter(Boolean);
+
+  if (hasBlockedAutocomplete(autocompleteTokens)) return null;
+
+  const fromAutocomplete = classifyFromAutocomplete(
+    descriptor,
+    autocompleteTokens
+  );
+
+  if (fromAutocomplete) return fromAutocomplete;
+
+  const searchable = normalizeText(
+    [descriptor.name, descriptor.label].filter(Boolean).join(" ")
+  );
+
+  if (/\b(?:new|confirm|create|repeat)\s*password\b/u.test(searchable)) {
+    return null;
+  }
+
+  return (
+    classifyFromType(descriptor) ??
+    classifyFromSearchable(descriptor, searchable)
+  );
 }
+
+const claimValues = (
+  claims: readonly Pick<AutofillClaim, "token" | "value">[]
+) => new Map(claims.map(({ token, value }) => [token, value]));
+
+const controlIsFocused = (control: { readonly focused: boolean }) =>
+  control.focused;
+
+const sameFormAsFocused = (focused: { readonly formIndex: number | null }) => {
+  return (control: { readonly formIndex: number | null }) =>
+    control.formIndex === focused.formIndex;
+};
+
+const isIdentifierControl = (
+  control: ClassifiedNativeLoginControl,
+  values: ReadonlyMap<string, string>
+) => {
+  if (control.token === "current-password") return false;
+
+  if (values.has(control.token)) return true;
+
+  return values.has("username");
+};
+
+const isPasswordControl = (
+  control: ClassifiedNativeLoginControl,
+  values: ReadonlyMap<string, string>
+) => {
+  if (control.token !== "current-password") return false;
+
+  return values.has(control.token);
+};
+
+const identifierValue = (
+  values: ReadonlyMap<string, string>,
+  token: ClassifiedNativeLoginControl["token"]
+) => {
+  const exact = values.get(token);
+
+  if (exact !== undefined) return exact;
+
+  return values.get("username");
+};
+
+const pushFillIfPresent = <T extends ClassifiedNativeLoginControl>(
+  selected: { readonly control: T; readonly value: string }[],
+  control: T | undefined,
+  value: string | undefined
+) => {
+  if (!control) return;
+
+  if (value === undefined) return;
+  selected.push({ control, value });
+};
 
 export function selectNativeLoginFills<T extends ClassifiedNativeLoginControl>(
   controls: readonly T[],
   claims: readonly Pick<AutofillClaim, "token" | "value">[]
 ) {
-  const focused = controls.find((control) => control.focused);
+  const focused = controls.find(controlIsFocused);
+
   if (!focused) return [];
 
   const sameSurface = controls
-    .filter((control) => control.formIndex === focused.formIndex)
+    .filter(sameFormAsFocused(focused))
     .toSorted(compareLoginControls);
-  const values = new Map(claims.map(({ token, value }) => [token, value]));
+
+  const values = claimValues(claims);
   const selected: { readonly control: T; readonly value: string }[] = [];
 
-  const identifier = sameSurface.find(
-    (control) =>
-      control.token !== "current-password" &&
-      (values.has(control.token) || values.has("username"))
+  const identifier = sameSurface.find((control) =>
+    isIdentifierControl(control, values)
   );
-  if (identifier) {
-    const value = values.get(identifier.token) ?? values.get("username");
-    if (value !== undefined) selected.push({ control: identifier, value });
-  }
 
-  const password = sameSurface.find(
-    (control) =>
-      control.token === "current-password" && values.has(control.token)
+  pushFillIfPresent(
+    selected,
+    identifier,
+    identifier ? identifierValue(values, identifier.token) : undefined
   );
-  if (password) {
-    const value = values.get(password.token);
-    if (value !== undefined) selected.push({ control: password, value });
-  }
+
+  const password = sameSurface.find((control) =>
+    isPasswordControl(control, values)
+  );
+
+  pushFillIfPresent(
+    selected,
+    password,
+    password ? values.get(password.token) : undefined
+  );
+
   return selected;
 }
 
@@ -164,7 +260,9 @@ function compareLoginControls(
   right: ClassifiedNativeLoginControl
 ) {
   if (left.focused !== right.focused) return left.focused ? -1 : 1;
+
   if (left.score !== right.score) return right.score - left.score;
+
   return left.index - right.index;
 }
 

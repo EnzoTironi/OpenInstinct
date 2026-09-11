@@ -4,8 +4,16 @@ import {
   randomBytes,
   randomUUID,
 } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
-import { z } from "zod";
+
+import { db, vaultItems } from "@db";
+import { getInstallationSecrets } from "@db/services/installation-secrets";
+import { ensureScope } from "@db/services/scope";
+import {
+  deleteEncryptedSecret,
+  readEncryptedSecret,
+  writeEncryptedSecret,
+} from "@db/services/secrets";
+import type { AccessScope } from "@shared/identity/access-scope";
 import {
   loginAccountHint,
   parsePaymentCardSecret,
@@ -14,15 +22,8 @@ import {
   vaultItemKindSchema,
   type VaultCreateItem,
 } from "@shared/vault/schema";
-import type { AccessScope } from "@shared/identity/access-scope";
-import { db, vaultItems } from "@db";
-import {
-  deleteEncryptedSecret,
-  readEncryptedSecret,
-  writeEncryptedSecret,
-} from "@db/services/secrets";
-import { ensureScope } from "@db/services/scope";
-import { getInstallationSecrets } from "@db/services/installation-secrets";
+import { and, desc, eq } from "drizzle-orm";
+import { z } from "zod";
 
 const vaultRecordSchema = z.object({
   account: z.string(),
@@ -70,6 +71,7 @@ export async function listVaultItems(scope: AccessScope) {
 export async function readVaultItems(scope: AccessScope) {
   await ensureScope(scope);
   const records = await listVaultItems(scope);
+
   return Promise.all(
     records.map(async (record) =>
       Object.assign({}, record, {
@@ -87,6 +89,7 @@ export async function readVaultItem(scope: AccessScope, id: string) {
       and(eq(vaultItems.workspaceId, scope.workspaceId), eq(vaultItems.id, id))
     )
     .limit(1);
+
   return vaultRecordSchema
     .optional()
     .parse(rows[0] ? serializeVaultRecord(rows[0]) : undefined);
@@ -99,8 +102,10 @@ export async function deleteVaultItem(scope: AccessScope, id: string) {
       and(eq(vaultItems.workspaceId, scope.workspaceId), eq(vaultItems.id, id))
     )
     .returning({ id: vaultItems.id });
+
   if (rows.length === 0) return false;
   await deleteEncryptedSecret(scope, id);
+
   return true;
 }
 
@@ -130,8 +135,10 @@ export async function saveVaultItem(
 
 export async function readVaultSecret(scope: AccessScope, id: string) {
   const encrypted = await readEncryptedSecret(scope, id);
+
   if (!encrypted) return undefined;
   const { secretEncryptionKey } = await getInstallationSecrets();
+
   return decryptVaultSecret(scope, id, encrypted, secretEncryptionKey);
 }
 
@@ -152,21 +159,27 @@ function vaultAccountHint(input: VaultCreateItem) {
   switch (input.kind) {
     case "login": {
       const payload = parseLoginVaultPayload(input.secret);
+
       if (!payload)
         throw new Error("The saved login is incomplete or invalid.");
+
       return loginAccountHint(
         payload.identifier,
         "origin" in payload ? payload.origin : undefined
       );
     }
+
     case "payment": {
       const card = parsePaymentCardSecret(input.secret);
+
       return `${paymentCardBrand(card.number)} · •••• ${card.number.slice(-4)}`;
     }
+
     case "address":
     case "contact":
       return "";
   }
+
   throw new Error("Unsupported vault item kind.");
 }
 
@@ -177,16 +190,20 @@ function encryptVaultSecret(
   secretEncryptionKey: string
 ) {
   const iv = randomBytes(12);
+
   const cipher = createCipheriv(
     "aes-256-gcm",
     Buffer.from(secretEncryptionKey, "base64"),
     iv
   );
+
   cipher.setAAD(vaultSecretAad(scope, id));
+
   const ciphertext = Buffer.concat([
     cipher.update(value, "utf8"),
     cipher.final(),
   ]);
+
   return [
     "v1",
     iv.toString("base64url"),
@@ -202,6 +219,7 @@ function decryptVaultSecret(
   secretEncryptionKey: string
 ) {
   const [version, encodedIv, encodedTag, encodedCiphertext] = value.split(".");
+
   if (version !== "v1" || !encodedIv || !encodedTag || !encodedCiphertext) {
     throw new Error("The stored secret uses an unsupported format.");
   }
@@ -211,8 +229,10 @@ function decryptVaultSecret(
     Buffer.from(secretEncryptionKey, "base64"),
     Buffer.from(encodedIv, "base64url")
   );
+
   decipher.setAAD(vaultSecretAad(scope, id));
   decipher.setAuthTag(Buffer.from(encodedTag, "base64url"));
+
   return Buffer.concat([
     decipher.update(Buffer.from(encodedCiphertext, "base64url")),
     decipher.final(),

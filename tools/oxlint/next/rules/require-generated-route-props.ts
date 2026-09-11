@@ -1,7 +1,6 @@
 import path from "node:path";
 
 import { defineRule } from "@oxlint/plugins";
-
 import type { ESTree } from "@oxlint/plugins";
 
 import { isStringLiteral } from "../../shared/literals.ts";
@@ -54,12 +53,14 @@ const getFunction = (
   node: ESTree.Node | null | undefined
 ): FunctionNode | undefined => {
   const expression = unwrapExpression(node);
+
   switch (expression?.type) {
     case "ArrowFunctionExpression":
     case "FunctionDeclaration":
     case "FunctionExpression":
       return expression;
   }
+
   return undefined;
 };
 
@@ -68,6 +69,7 @@ const getIdentifierName = (node: ESTree.Node | null | undefined) =>
 
 const getRouteLiteral = (node: ESTree.TSType | undefined) => {
   if (node?.type !== "TSLiteralType") return undefined;
+
   return isStringLiteral(node.literal) ? node.literal.value : undefined;
 };
 
@@ -81,57 +83,97 @@ const hasGeneratedType = (
 
   if (!("typeAnnotation" in parameter)) return false;
   const annotation = parameter.typeAnnotation?.typeAnnotation;
+
   if (annotation?.type !== "TSTypeReference") return false;
+
   if (getIdentifierName(annotation.typeName) !== helper) return false;
 
   const typeArguments = annotation.typeArguments?.params ?? [];
+
   return (
     typeArguments.length === 1 && getRouteLiteral(typeArguments[0]) === route
   );
 };
+
+function unwrapExportedDeclaration(statement: ProgramStatement) {
+  if (statement.type === "ExportNamedDeclaration") {
+    return statement.declaration;
+  }
+
+  return statement;
+}
+
+function addImportBindings(
+  statement: ESTree.ImportDeclaration,
+  bindings: Set<string>
+) {
+  for (const specifier of statement.specifiers) {
+    bindings.add(specifier.local.name);
+  }
+}
+
+function addVariableBindings(
+  declaration: ESTree.VariableDeclaration,
+  bindings: Set<string>
+) {
+  for (const declarator of declaration.declarations) {
+    const name = getIdentifierName(declarator.id);
+
+    if (name) bindings.add(name);
+  }
+}
+
+function addNamedDeclarationBinding(
+  declaration: ProgramStatement | ESTree.Declaration | null | undefined,
+  bindings: Set<string>
+) {
+  if (!declaration || !("id" in declaration)) return;
+
+  const name = getIdentifierName(declaration.id);
+
+  if (name) bindings.add(name);
+}
 
 const getLocalBindings = (body: ProgramStatement[]) => {
   const bindings = new Set<string>();
 
   for (const statement of body) {
     if (statement.type === "ImportDeclaration") {
-      for (const specifier of statement.specifiers) {
-        bindings.add(specifier.local.name);
-      }
+      addImportBindings(statement, bindings);
       continue;
     }
 
-    const declaration =
-      statement.type === "ExportNamedDeclaration"
-        ? statement.declaration
-        : statement;
+    const declaration = unwrapExportedDeclaration(statement);
 
     if (declaration?.type === "VariableDeclaration") {
-      for (const declarator of declaration.declarations) {
-        const name = getIdentifierName(declarator.id);
-        if (name) bindings.add(name);
-      }
+      addVariableBindings(declaration, bindings);
       continue;
     }
 
-    const name =
-      declaration && "id" in declaration
-        ? getIdentifierName(declaration.id)
-        : undefined;
-    if (name) bindings.add(name);
+    addNamedDeclarationBinding(declaration, bindings);
   }
 
   return bindings;
 };
 
+function addVariableFunctions(
+  declaration: ESTree.VariableDeclaration,
+  functions: Map<string, FunctionNode>
+) {
+  for (const declarator of declaration.declarations) {
+    if (declarator.id.type !== "Identifier") continue;
+
+    const fn = getFunction(declarator.init);
+
+    if (fn) functions.set(declarator.id.name, fn);
+  }
+}
+
 const getDeclaredFunctions = (body: ProgramStatement[]) => {
   const functions = new Map<string, FunctionNode>();
 
   for (const statement of body) {
-    const declaration =
-      statement.type === "ExportNamedDeclaration"
-        ? statement.declaration
-        : statement;
+    const declaration = unwrapExportedDeclaration(statement);
 
     if (declaration?.type === "FunctionDeclaration" && declaration.id) {
       functions.set(declaration.id.name, declaration);
@@ -139,12 +181,8 @@ const getDeclaredFunctions = (body: ProgramStatement[]) => {
     }
 
     if (declaration?.type !== "VariableDeclaration") continue;
-    for (const declarator of declaration.declarations) {
-      if (declarator.id.type !== "Identifier") continue;
 
-      const fn = getFunction(declarator.init);
-      if (fn) functions.set(declarator.id.name, fn);
-    }
+    addVariableFunctions(declaration, functions);
   }
 
   return functions;
@@ -155,11 +193,170 @@ const resolveFunction = (
   functions: Map<string, FunctionNode>
 ) => {
   const fn = getFunction(node);
+
   if (fn) return fn;
 
   const name = getIdentifierName(unwrapExpression(node));
+
   return name ? functions.get(name) : undefined;
 };
+
+type ReportParameter = (
+  parameter: ESTree.ParamPattern | undefined,
+  helper: string,
+  entry: string,
+  localBindings: Set<string>
+) => void;
+
+function reportPageOrLayoutProps(options: {
+  readonly program: ESTree.Program;
+  readonly functions: Map<string, FunctionNode>;
+  readonly localBindings: Set<string>;
+  readonly kind: string;
+  readonly reportParameter: ReportParameter;
+}) {
+  const defaultExport = options.program.body.find(
+    (statement) => statement.type === "ExportDefaultDeclaration"
+  );
+
+  if (!defaultExport) return;
+
+  const fn = resolveFunction(defaultExport.declaration, options.functions);
+
+  if (!fn) return;
+
+  options.reportParameter(
+    fn.params[0],
+    options.kind === "page" ? "PageProps" : "LayoutProps",
+    `${options.kind} props`,
+    options.localBindings
+  );
+}
+
+function reportRouteFunctionDeclaration(
+  declaration: {
+    readonly id?: ESTree.Node | null;
+    readonly params: readonly ESTree.ParamPattern[];
+  },
+  localBindings: Set<string>,
+  reportParameter: ReportParameter
+) {
+  const name = getIdentifierName(declaration.id);
+
+  if (!name || !HTTP_METHODS.has(name)) return;
+
+  reportParameter(
+    declaration.params[1],
+    "RouteContext",
+    `${name} context`,
+    localBindings
+  );
+}
+
+function reportRouteVariableDeclaration(
+  declaration: ESTree.VariableDeclaration,
+  localBindings: Set<string>,
+  reportParameter: ReportParameter
+) {
+  for (const declarator of declaration.declarations) {
+    const name = getIdentifierName(declarator.id);
+
+    if (!name || !HTTP_METHODS.has(name)) continue;
+
+    const fn = getFunction(declarator.init);
+
+    if (!fn) continue;
+
+    reportParameter(
+      fn.params[1],
+      "RouteContext",
+      `${name} context`,
+      localBindings
+    );
+  }
+}
+
+function resolveHttpExport(
+  specifier: ESTree.ExportSpecifier,
+  functions: Map<string, FunctionNode>
+) {
+  const exportedName = getIdentifierName(specifier.exported);
+
+  if (!exportedName || !HTTP_METHODS.has(exportedName)) return null;
+
+  const localName = getIdentifierName(specifier.local);
+
+  if (!localName) return null;
+
+  const fn = functions.get(localName);
+
+  if (!fn) return null;
+
+  return { exportedName, fn };
+}
+
+function reportRouteSpecifiers(
+  statement: ESTree.ExportNamedDeclaration,
+  functions: Map<string, FunctionNode>,
+  localBindings: Set<string>,
+  reportParameter: ReportParameter
+) {
+  for (const specifier of statement.specifiers) {
+    const resolved = resolveHttpExport(specifier, functions);
+
+    if (!resolved) continue;
+
+    reportParameter(
+      resolved.fn.params[1],
+      "RouteContext",
+      `${resolved.exportedName} context`,
+      localBindings
+    );
+  }
+}
+
+function reportNamedRouteExport(
+  statement: ESTree.ExportNamedDeclaration,
+  functions: Map<string, FunctionNode>,
+  localBindings: Set<string>,
+  reportParameter: ReportParameter
+) {
+  if (statement.declaration?.type === "FunctionDeclaration") {
+    reportRouteFunctionDeclaration(
+      statement.declaration,
+      localBindings,
+      reportParameter
+    );
+  }
+
+  if (statement.declaration?.type === "VariableDeclaration") {
+    reportRouteVariableDeclaration(
+      statement.declaration,
+      localBindings,
+      reportParameter
+    );
+  }
+
+  reportRouteSpecifiers(statement, functions, localBindings, reportParameter);
+}
+
+function reportRouteHandlerContexts(options: {
+  readonly program: ESTree.Program;
+  readonly functions: Map<string, FunctionNode>;
+  readonly localBindings: Set<string>;
+  readonly reportParameter: ReportParameter;
+}) {
+  for (const statement of options.program.body) {
+    if (statement.type !== "ExportNamedDeclaration") continue;
+
+    reportNamedRouteExport(
+      statement,
+      options.functions,
+      options.localBindings,
+      options.reportParameter
+    );
+  }
+}
 
 export const requireGeneratedRoutePropsRule = defineRule({
   meta: {
@@ -204,17 +401,21 @@ export const requireGeneratedRoutePropsRule = defineRule({
     return {
       before() {
         const filename = normalizePath(context.filename);
+
         const match = /^(layout|page|route)\.tsx?$/.exec(
           path.basename(filename)
         );
+
         if (!match) return false;
 
         const appDirectory = findAppDirectory(filename);
+
         if (!appDirectory || !isWithin(filename, appDirectory)) return false;
 
         kind = match[1] ?? "";
         route = getAppRoute(filename, appDirectory);
         reportedParameters = new Set();
+
         return undefined;
       },
       Program(program) {
@@ -222,71 +423,23 @@ export const requireGeneratedRoutePropsRule = defineRule({
         const localBindings = getLocalBindings(program.body);
 
         if (kind === "page" || kind === "layout") {
-          const defaultExport = program.body.find(
-            (statement) => statement.type === "ExportDefaultDeclaration"
-          );
-          if (!defaultExport) return;
+          reportPageOrLayoutProps({
+            program,
+            functions,
+            localBindings,
+            kind,
+            reportParameter,
+          });
 
-          const fn = resolveFunction(defaultExport.declaration, functions);
-          if (!fn) return;
-
-          reportParameter(
-            fn.params[0],
-            kind === "page" ? "PageProps" : "LayoutProps",
-            `${kind} props`,
-            localBindings
-          );
           return;
         }
 
-        for (const statement of program.body) {
-          if (statement.type !== "ExportNamedDeclaration") continue;
-
-          if (statement.declaration?.type === "FunctionDeclaration") {
-            const name = getIdentifierName(statement.declaration.id);
-            if (name && HTTP_METHODS.has(name)) {
-              reportParameter(
-                statement.declaration.params[1],
-                "RouteContext",
-                `${name} context`,
-                localBindings
-              );
-            }
-          }
-
-          if (statement.declaration?.type === "VariableDeclaration") {
-            for (const declarator of statement.declaration.declarations) {
-              const name = getIdentifierName(declarator.id);
-              if (!name || !HTTP_METHODS.has(name)) continue;
-
-              const fn = getFunction(declarator.init);
-              if (fn) {
-                reportParameter(
-                  fn.params[1],
-                  "RouteContext",
-                  `${name} context`,
-                  localBindings
-                );
-              }
-            }
-          }
-
-          for (const specifier of statement.specifiers) {
-            const exportedName = getIdentifierName(specifier.exported);
-            if (!exportedName || !HTTP_METHODS.has(exportedName)) continue;
-
-            const localName = getIdentifierName(specifier.local);
-            const fn = localName ? functions.get(localName) : undefined;
-            if (fn) {
-              reportParameter(
-                fn.params[1],
-                "RouteContext",
-                `${exportedName} context`,
-                localBindings
-              );
-            }
-          }
-        }
+        reportRouteHandlerContexts({
+          program,
+          functions,
+          localBindings,
+          reportParameter,
+        });
       },
       after() {
         reportedParameters.clear();

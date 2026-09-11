@@ -10,7 +10,9 @@ const timezoneSchema = z
   .refine(
     (timezone) => {
       try {
+        // oxlint-disable-next-line react-doctor/js-hoist-intl -- timeZone is the value under validation
         new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
+
         return true;
       } catch {
         return false;
@@ -65,10 +67,12 @@ interface ZonedParts {
 }
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
+
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function zonedParts(at: number, timezone: string): ZonedParts {
   let formatter = formatters.get(timezone);
+
   if (!formatter) {
     formatter = new Intl.DateTimeFormat("en-US", {
       day: "2-digit",
@@ -83,9 +87,12 @@ function zonedParts(at: number, timezone: string): ZonedParts {
     });
     formatters.set(timezone, formatter);
   }
+
   const parts = formatter.formatToParts(new Date(at));
+
   const value = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? "0";
+
   return {
     day: Number(value("day")),
     hour: Number(value("hour")) % 24,
@@ -99,6 +106,7 @@ function zonedParts(at: number, timezone: string): ZonedParts {
 
 function zoneOffset(at: number, timezone: string) {
   const parts = zonedParts(at, timezone);
+
   return (
     Date.UTC(
       parts.year,
@@ -123,39 +131,64 @@ function fromWallClock(
   const firstPass = naive - zoneOffset(naive, timezone);
   const resolved = naive - zoneOffset(firstPass, timezone);
   const readBack = zonedParts(resolved, timezone);
+
   if (readBack.hour === hour && readBack.minute === minute) return resolved;
 
   const shifted = Date.UTC(year, month - 1, day, hour + 1, minute);
+
   return (
     shifted - zoneOffset(shifted - zoneOffset(shifted, timezone), timezone)
   );
 }
 
-export function computeNextRun(
-  timing: ScheduleTiming,
+function nextOnceRun(atIso: string, after: Date): Date | null {
+  const at = new Date(atIso);
+
+  if (at.getTime() > after.getTime()) return at;
+
+  return null;
+}
+
+function nextIntervalRun(
+  anchoredAt: string,
+  everyMinutes: number,
+  after: Date
+): Date {
+  const anchor = Date.parse(anchoredAt);
+  const interval = everyMinutes * 60_000;
+
+  if (anchor > after.getTime()) return new Date(anchor);
+  const elapsedIntervals = Math.floor((after.getTime() - anchor) / interval);
+
+  return new Date(anchor + (elapsedIntervals + 1) * interval);
+}
+
+function calendarMatchesFrequency(
+  frequency: "daily" | "weekdays" | "weekly",
+  weekday: number,
+  requiredWeekday: number | undefined
+) {
+  if (frequency === "weekdays") return weekday !== 0 && weekday !== 6;
+
+  if (frequency === "weekly") return weekday === requiredWeekday;
+
+  return true;
+}
+
+function nextCalendarRun(
+  timing: Extract<ScheduleTiming, { kind: "calendar" }>,
   after: Date
 ): Date | null {
-  if (timing.kind === "once") {
-    const at = new Date(timing.at);
-    return at.getTime() > after.getTime() ? at : null;
-  }
-
-  if (timing.kind === "interval") {
-    const anchor = Date.parse(timing.anchoredAt);
-    const interval = timing.everyMinutes * 60_000;
-    if (anchor > after.getTime()) return new Date(anchor);
-    const elapsedIntervals = Math.floor((after.getTime() - anchor) / interval);
-    return new Date(anchor + (elapsedIntervals + 1) * interval);
-  }
-
   const [hourText, minuteText] = timing.localTime.split(":");
   const hour = Number(hourText);
   const minute = Number(minuteText);
   const start = zonedParts(after.getTime(), timing.timezone);
+
   for (let offset = 0; offset <= 14; offset += 1) {
     const day = new Date(
       Date.UTC(start.year, start.month - 1, start.day) + offset * 86_400_000
     );
+
     const candidate = fromWallClock(
       timing.timezone,
       day.getUTCFullYear(),
@@ -164,14 +197,89 @@ export function computeNextRun(
       hour,
       minute
     );
+
     if (candidate <= after.getTime()) continue;
     const weekday = zonedParts(candidate, timing.timezone).weekday;
-    if (timing.frequency === "weekdays" && (weekday === 0 || weekday === 6)) {
+
+    if (!calendarMatchesFrequency(timing.frequency, weekday, timing.weekday)) {
       continue;
     }
-    if (timing.frequency === "weekly" && weekday !== timing.weekday) continue;
+
     return new Date(candidate);
   }
+
+  return null;
+}
+
+export function computeNextRun(
+  timing: ScheduleTiming,
+  after: Date
+): Date | null {
+  if (timing.kind === "once") return nextOnceRun(timing.at, after);
+
+  if (timing.kind === "interval") {
+    return nextIntervalRun(timing.anchoredAt, timing.everyMinutes, after);
+  }
+
+  return nextCalendarRun(timing, after);
+}
+
+function latestOnceRun(atIso: string, at: Date): Date | null {
+  const occurrence = new Date(atIso);
+
+  if (occurrence.getTime() <= at.getTime()) return occurrence;
+
+  return null;
+}
+
+function latestIntervalRun(
+  anchoredAt: string,
+  everyMinutes: number,
+  at: Date
+): Date | null {
+  const anchor = Date.parse(anchoredAt);
+
+  if (anchor > at.getTime()) return null;
+  const interval = everyMinutes * 60_000;
+
+  return new Date(
+    anchor + Math.floor((at.getTime() - anchor) / interval) * interval
+  );
+}
+
+function latestCalendarRun(
+  timing: Extract<ScheduleTiming, { kind: "calendar" }>,
+  at: Date
+): Date | null {
+  const [hourText, minuteText] = timing.localTime.split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const start = zonedParts(at.getTime(), timing.timezone);
+
+  for (let offset = 0; offset <= 14; offset += 1) {
+    const day = new Date(
+      Date.UTC(start.year, start.month - 1, start.day) - offset * 86_400_000
+    );
+
+    const candidate = fromWallClock(
+      timing.timezone,
+      day.getUTCFullYear(),
+      day.getUTCMonth() + 1,
+      day.getUTCDate(),
+      hour,
+      minute
+    );
+
+    if (candidate > at.getTime()) continue;
+    const weekday = zonedParts(candidate, timing.timezone).weekday;
+
+    if (!calendarMatchesFrequency(timing.frequency, weekday, timing.weekday)) {
+      continue;
+    }
+
+    return new Date(candidate);
+  }
+
   return null;
 }
 
@@ -179,43 +287,11 @@ export function computeLatestRun(
   timing: ScheduleTiming,
   at: Date
 ): Date | null {
-  if (timing.kind === "once") {
-    const occurrence = new Date(timing.at);
-    return occurrence.getTime() <= at.getTime() ? occurrence : null;
-  }
+  if (timing.kind === "once") return latestOnceRun(timing.at, at);
 
   if (timing.kind === "interval") {
-    const anchor = Date.parse(timing.anchoredAt);
-    if (anchor > at.getTime()) return null;
-    const interval = timing.everyMinutes * 60_000;
-    return new Date(
-      anchor + Math.floor((at.getTime() - anchor) / interval) * interval
-    );
+    return latestIntervalRun(timing.anchoredAt, timing.everyMinutes, at);
   }
 
-  const [hourText, minuteText] = timing.localTime.split(":");
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-  const start = zonedParts(at.getTime(), timing.timezone);
-  for (let offset = 0; offset <= 14; offset += 1) {
-    const day = new Date(
-      Date.UTC(start.year, start.month - 1, start.day) - offset * 86_400_000
-    );
-    const candidate = fromWallClock(
-      timing.timezone,
-      day.getUTCFullYear(),
-      day.getUTCMonth() + 1,
-      day.getUTCDate(),
-      hour,
-      minute
-    );
-    if (candidate > at.getTime()) continue;
-    const weekday = zonedParts(candidate, timing.timezone).weekday;
-    if (timing.frequency === "weekdays" && (weekday === 0 || weekday === 6)) {
-      continue;
-    }
-    if (timing.frequency === "weekly" && weekday !== timing.weekday) continue;
-    return new Date(candidate);
-  }
-  return null;
+  return latestCalendarRun(timing, at);
 }

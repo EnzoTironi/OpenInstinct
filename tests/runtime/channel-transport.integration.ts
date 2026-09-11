@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+
 import { PgClient } from "@effect/sql-pg";
 import { ConfigProvider, Effect, Layer } from "effect";
 import { expect, test } from "vitest";
+
 import { ChannelAccounts } from "../../server/accounts";
 import { Kapso } from "../../server/channels/kapso";
 import { ProviderRetryable } from "../../server/channels/provider-errors";
@@ -12,9 +14,8 @@ import {
   splitChannelText,
 } from "../../server/channels/transport";
 import { Messaging, PayloadConflict } from "../../server/messaging";
-
-import { runtimeDatabase } from "./database";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
+import { runtimeDatabase } from "./database";
 
 const unusedAdapterMethod = () => Effect.die("unused");
 
@@ -24,15 +25,19 @@ const dependencies = Layer.mergeAll(
   Telegram.layer,
   Kapso.layer
 ).pipe(Layer.provideMerge(runtimeDatabase));
+
 const services = ChannelTransport.layer.pipe(Layer.provideMerge(dependencies));
+
+interface TransportFixture {
+  transport: ChannelTransport["Service"];
+  messaging: Messaging["Service"];
+  sql: PgClient.PgClient;
+  identities: readonly string[];
+  userId: string;
+}
+
 const fixture = Effect.fn("transport.fixture")(function* (
-  body: (
-    transport: ChannelTransport["Service"],
-    messaging: Messaging["Service"],
-    sql: PgClient.PgClient,
-    identities: readonly string[],
-    userId: string
-  ) => Effect.Effect<void, unknown>
+  body: (context: TransportFixture) => Effect.Effect<void, unknown>
 ) {
   const sql = yield* PgClient.PgClient;
   const userId = randomUUID();
@@ -42,7 +47,7 @@ const fixture = Effect.fn("transport.fixture")(function* (
     () =>
       sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`.pipe(
         Effect.andThen(sql`DELETE FROM "user" WHERE id = ${userId}`),
-        Effect.orDie
+        Effect.catch((error) => Effect.die(error))
       )
   );
   yield* sql`INSERT INTO workspaces (id) VALUES (${scope.workspaceId})`;
@@ -55,45 +60,58 @@ const fixture = Effect.fn("transport.fixture")(function* (
       id,
       index
     ) => sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
-    VALUES (${id}, ${index === 6 ? "kapso" : "telegram"}, 'transport-proof', ${id}, ${userId})`
+    VALUES (${id}, ${index === 6 ? "kapso" : "telegram"}, 'transport-proof', ${id}, ${userId})`,
+    { concurrency: 1 }
   );
-  yield* body(
-    yield* ChannelTransport,
-    yield* Messaging,
+  yield* body({
+    transport: yield* ChannelTransport,
+    messaging: yield* Messaging,
     sql,
     identities,
-    userId
-  );
+    userId,
+  });
 });
+
 const run = (body: Parameters<typeof fixture>[0]) =>
   Effect.runPromise(
     fixture(body).pipe(Effect.scoped, Effect.provide(services))
   );
 
 test("input delivery requires every original chunk, current revision and matching identity", () =>
-  run((transport, _messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case1")(function* ({
+      transport,
+      messaging: _messaging,
+      sql,
+      identities,
+    }) {
       const [identityId, otherIdentityId] = identities;
+
       if (!identityId || !otherIdentityId)
-        throw new Error("Missing identities");
+        return yield* Effect.fail(new Error("Missing identities"));
+
       const inputRequest = {
         sessionId: "session-delivery-proof",
         requestId: "request-delivery-proof",
         revision: "a".repeat(64),
       };
+
       const text = "details ".repeat(700);
+
       const receipts = yield* transport.enqueueText({
         identityId,
         deliveryKey: `input:${inputRequest.sessionId}:${inputRequest.requestId}`,
         text,
         inputRequest,
       });
+
       expect(receipts).toHaveLength(2);
       expect(
         yield* transport.deliveredInput(identityId, inputRequest)
       ).toBeNull();
       const first = receipts[0];
-      if (!first) throw new Error("Missing first receipt");
+
+      if (!first) return yield* Effect.fail(new Error("Missing first receipt"));
       // These rows model accepted delivery facts; this test does not qualify a provider send.
       yield* sql`UPDATE channel_outbox SET status = 'sent',
         sent_at = '2026-09-08T12:00:00Z', provider_message_id = 'part-1'
@@ -146,132 +164,346 @@ test("splits at 4000 UTF-16 units without splitting surrogate pairs or changing 
   ).rejects.toBeInstanceOf(ChannelTransportError);
 });
 
+type MessagingService = Messaging["Service"];
+
+type TransportService = ChannelTransport["Service"];
+
+type FairnessLane = "inbox" | "outbox";
+
+type SevenIdentities = NonNullable<ReturnType<typeof requireSevenIdentities>>;
+
+const identityIds = (rows: readonly { readonly id: string }[]) =>
+  rows.map((row) => row.id);
+
+const receiptIds = (
+  receipts: readonly { readonly id: string }[] | undefined
+) => {
+  if (!receipts) return undefined;
+
+  return receipts.map((receipt) => receipt.id);
+};
+
+const putLaneMessage = (
+  lane: FairnessLane,
+  messaging: MessagingService,
+  identityId: string,
+  key: string
+) => {
+  if (lane === "inbox") {
+    return messaging.accept({
+      identityId,
+      eventId: key,
+      sourceMessageId: key,
+      payload: { text: "fixture" },
+    });
+  }
+
+  return messaging.enqueue({
+    identityId,
+    deliveryKey: key,
+    payload: { text: "fixture" },
+  });
+};
+
+const seedFairnessMessages = (
+  lane: FairnessLane,
+  messaging: MessagingService,
+  identities: readonly string[],
+  selected: SevenIdentities
+) =>
+  Effect.gen(function* () {
+    yield* Effect.forEach(
+      identities,
+      (id) => putLaneMessage(lane, messaging, id, "first"),
+      { concurrency: 1 }
+    );
+    yield* Effect.forEach(
+      Array.from({ length: 30 }, (_, index) => String(index)),
+      (key) => putLaneMessage(lane, messaging, selected.noisy, key),
+      { concurrency: 1 }
+    );
+    yield* Effect.forEach(
+      [selected.uncertain, selected.expired, selected.busy],
+      (id) => putLaneMessage(lane, messaging, id, "second"),
+      { concurrency: 1 }
+    );
+  });
+
+const blockFairnessLeases = (
+  lane: FairnessLane,
+  messaging: MessagingService,
+  sql: PgClient.PgClient,
+  selected: SevenIdentities
+) =>
+  Effect.gen(function* () {
+    const claim =
+      lane === "inbox" ? messaging.claimInbox : messaging.claimOutbox;
+
+    const stop =
+      lane === "inbox"
+        ? messaging.markInboxUncertain
+        : messaging.markOutboxUncertain;
+
+    const lease = yield* claim({
+      identityId: selected.uncertain,
+      leaseSeconds: 30,
+    });
+
+    if (!lease) return yield* Effect.fail(new Error("Missing lease"));
+    yield* stop({
+      lease: {
+        id: lease.id,
+        identityId: lease.identityId,
+        leaseToken: lease.leaseToken,
+      },
+      reason: "handoff_unknown",
+    });
+
+    if (lane === "inbox") {
+      yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${lease.id}`;
+    }
+
+    yield* claim({ identityId: selected.expired, leaseSeconds: 30 });
+    yield* claim({ identityId: selected.busy, leaseSeconds: 30 });
+  });
+
+const ageFairnessRows = (
+  lane: FairnessLane,
+  sql: PgClient.PgClient,
+  identities: readonly string[],
+  selected: SevenIdentities
+) =>
+  Effect.gen(function* () {
+    const table = sql(lane === "inbox" ? "channel_inbox" : "channel_outbox");
+    const received = sql(lane === "inbox" ? "received_at" : "created_at");
+    yield* sql`UPDATE ${table} SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE identity_id = ${selected.expired} AND status = 'dispatching'`;
+    yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${selected.revoked}`;
+    yield* Effect.forEach(
+      identities,
+      (id, index) =>
+        sql`UPDATE ${table} SET ${received} = clock_timestamp() - ${100 - index} * interval '1 minute' WHERE identity_id = ${id}`,
+      { concurrency: 1 }
+    );
+  });
+
+const fairnessCandidatesFor = (
+  lane: FairnessLane,
+  transport: TransportService
+) =>
+  lane === "inbox" ? transport.inboxCandidates : transport.outboxCandidates;
+
+const expectedTelegramFairness = (
+  lane: FairnessLane,
+  selected: SevenIdentities
+) => {
+  if (lane === "inbox") {
+    return [selected.noisy, selected.other, selected.expired];
+  }
+
+  return [selected.noisy, selected.other, selected.expired, selected.revoked];
+};
+
+const loadFairnessSnapshot = (
+  lane: FairnessLane,
+  transport: TransportService,
+  sql: PgClient.PgClient,
+  selected: SevenIdentities
+) =>
+  Effect.gen(function* () {
+    const candidates = fairnessCandidatesFor(lane, transport);
+    const telegram25 = identityIds(yield* candidates("telegram", 25));
+    const telegram2 = identityIds(yield* candidates("telegram", 2));
+    const kapso25 = identityIds(yield* candidates("kapso", 25));
+
+    const telegramOverflow = yield* candidates("telegram", 26).pipe(
+      Effect.flip
+    );
+
+    if (lane !== "outbox") {
+      return {
+        telegram25,
+        telegram2,
+        kapso25,
+        telegramOverflow,
+        drain: null,
+      } as const;
+    }
+
+    const revokedDrain = yield* transport.drainOutbox(selected.revoked);
+
+    const rows = yield* sql<{
+      status: string;
+    }>`SELECT status FROM channel_outbox WHERE identity_id = ${selected.revoked}`;
+
+    const expiredDrain = yield* transport.drainOutbox(selected.expired);
+    const afterDrain = identityIds(yield* candidates("telegram", 25));
+
+    return {
+      telegram25,
+      telegram2,
+      kapso25,
+      telegramOverflow,
+      drain: {
+        revokedDrain,
+        allCancelled: rows.every((row) => row.status === "cancelled"),
+        expiredDrain,
+        afterDrain,
+      },
+    } as const;
+  });
+
+const enqueueConcurrentTaskReports = (
+  transport: TransportService,
+  identityId: string,
+  deliveryKey: string,
+  wording: readonly string[]
+) =>
+  Effect.all(
+    wording.map((reportText) =>
+      transport.enqueueTaskReport({ identityId, deliveryKey, text: reportText })
+    ),
+    { concurrency: 8 }
+  );
+
+const seedRecoveryIdentity = Effect.fn("transport.recoveryIdentity")(function* (
+  messaging: MessagingService,
+  sql: PgClient.PgClient,
+  preparedId: string,
+  unmarkedId: string,
+  identityId: string
+) {
+  yield* messaging.accept({
+    identityId,
+    eventId: "recovery-candidate",
+    sourceMessageId: "source",
+    payload: { text: "one" },
+  });
+
+  const claim = yield* messaging.claimInbox({
+    identityId,
+    leaseSeconds: 30,
+  });
+
+  if (!claim) return yield* Effect.fail(new Error("Expected initial claim"));
+
+  if (identityId === unmarkedId) {
+    yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${claim.id}`;
+  }
+
+  const lease = {
+    identityId,
+    id: claim.id,
+    leaseToken: claim.leaseToken,
+  };
+
+  if (identityId === preparedId) {
+    yield* messaging.prepareInboxHandoff({
+      transcripts: [],
+      lease,
+      content: "one",
+    });
+  }
+
+  yield* messaging.markInboxUncertain({
+    lease,
+    reason: "handoff_unknown",
+  });
+});
+
+function requireSevenIdentities(identities: readonly string[]) {
+  const [noisy, other, uncertain, expired, busy, revoked, anotherChannel] =
+    identities;
+
+  if (
+    !noisy ||
+    !other ||
+    !uncertain ||
+    !expired ||
+    !busy ||
+    !revoked ||
+    !anotherChannel
+  ) {
+    return null;
+  }
+
+  return {
+    noisy,
+    other,
+    uncertain,
+    expired,
+    busy,
+    revoked,
+    anotherChannel,
+  } as const;
+}
+
 test.each(["inbox", "outbox"] as const)(
   "%s candidates are fair per identity and exclude blockers",
   (lane) =>
-    run((transport, messaging, sql, identities) =>
-      Effect.gen(function* () {
-        const table = sql(
-          lane === "inbox" ? "channel_inbox" : "channel_outbox"
+    run(
+      Effect.fn("transport.case2")(function* ({
+        transport,
+        messaging,
+        sql,
+        identities,
+      }) {
+        const selected = requireSevenIdentities(identities);
+
+        if (!selected) return yield* Effect.fail(new Error("Missing fixtures"));
+
+        yield* seedFairnessMessages(lane, messaging, identities, selected);
+        yield* blockFairnessLeases(lane, messaging, sql, selected);
+        yield* ageFairnessRows(lane, sql, identities, selected);
+
+        const snapshot = yield* loadFairnessSnapshot(
+          lane,
+          transport,
+          sql,
+          selected
         );
-        const received = sql(lane === "inbox" ? "received_at" : "created_at");
-        const [
-          noisy,
-          other,
-          uncertain,
-          expired,
-          busy,
-          revoked,
-          anotherChannel,
-        ] = identities;
-        if (
-          !noisy ||
-          !other ||
-          !uncertain ||
-          !expired ||
-          !busy ||
-          !revoked ||
-          !anotherChannel
-        )
-          throw new Error("Missing fixtures");
-        const put = (identityId: string, key: string) =>
-          lane === "inbox"
-            ? messaging.accept({
-                identityId,
-                eventId: key,
-                sourceMessageId: key,
-                payload: { text: "fixture" },
-              })
-            : messaging.enqueue({
-                identityId,
-                deliveryKey: key,
-                payload: { text: "fixture" },
-              });
-        yield* Effect.forEach(identities, (id) => put(id, "first"));
-        yield* Effect.forEach(
-          Array.from({ length: 30 }, (_, index) => String(index)),
-          (key) => put(noisy, key)
+
+        expect(snapshot.telegram25).toEqual(
+          expectedTelegramFairness(lane, selected)
         );
-        yield* Effect.forEach([uncertain, expired, busy], (id) =>
-          put(id, "second")
-        );
-        const claim =
-          lane === "inbox" ? messaging.claimInbox : messaging.claimOutbox;
-        const stop =
-          lane === "inbox"
-            ? messaging.markInboxUncertain
-            : messaging.markOutboxUncertain;
-        const lease = yield* claim({ identityId: uncertain, leaseSeconds: 30 });
-        if (!lease) throw new Error("Missing lease");
-        yield* stop({
-          lease: {
-            id: lease.id,
-            identityId: lease.identityId,
-            leaseToken: lease.leaseToken,
-          },
-          reason: "handoff_unknown",
+        expect(snapshot.telegram2).toEqual([selected.noisy, selected.other]);
+        expect(snapshot.kapso25).toEqual([selected.anotherChannel]);
+        expect(snapshot.telegramOverflow).toBeInstanceOf(ChannelTransportError);
+
+        if (!snapshot.drain) return;
+
+        expect(snapshot.drain.revokedDrain).toEqual({
+          state: "idle",
+          sent: 0,
+          failed: 0,
+          uncertain: 0,
         });
-        if (lane === "inbox")
-          yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${lease.id}`;
-        yield* claim({ identityId: expired, leaseSeconds: 30 });
-        yield* claim({ identityId: busy, leaseSeconds: 30 });
-        yield* sql`UPDATE ${table} SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE identity_id = ${expired} AND status = 'dispatching'`;
-        yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${revoked}`;
-        yield* Effect.forEach(
-          identities,
-          (id, index) =>
-            sql`UPDATE ${table} SET ${received} = clock_timestamp() - ${100 - index} * interval '1 minute' WHERE identity_id = ${id}`
-        );
-        const candidates =
-          lane === "inbox"
-            ? transport.inboxCandidates
-            : transport.outboxCandidates;
-        expect(
-          (yield* candidates("telegram", 25)).map((identity) => identity.id)
-        ).toEqual(
-          lane === "inbox"
-            ? [noisy, other, expired]
-            : [noisy, other, expired, revoked]
-        );
-        expect(
-          (yield* candidates("telegram", 2)).map((identity) => identity.id)
-        ).toEqual([noisy, other]);
-        expect(
-          (yield* candidates("kapso", 25)).map((identity) => identity.id)
-        ).toEqual([anotherChannel]);
-        expect(
-          yield* candidates("telegram", 26).pipe(Effect.flip)
-        ).toBeInstanceOf(ChannelTransportError);
-        if (lane === "outbox") {
-          expect(yield* transport.drainOutbox(revoked)).toEqual({
-            state: "idle",
-            sent: 0,
-            failed: 0,
-            uncertain: 0,
-          });
-          const rows = yield* sql<{
-            status: string;
-          }>`SELECT status FROM channel_outbox WHERE identity_id = ${revoked}`;
-          expect(rows.every((row) => row.status === "cancelled")).toBe(true);
-          expect(yield* transport.drainOutbox(expired)).toEqual({
-            state: "uncertain",
-            sent: 0,
-            failed: 0,
-            uncertain: 1,
-          });
-          expect(
-            (yield* candidates("telegram", 25)).map((identity) => identity.id)
-          ).toEqual([noisy, other]);
-        }
+        expect(snapshot.drain.allCancelled).toBe(true);
+        expect(snapshot.drain.expiredDrain).toEqual({
+          state: "uncertain",
+          sent: 0,
+          failed: 0,
+          uncertain: 1,
+        });
+        expect(snapshot.drain.afterDrain).toEqual([
+          selected.noisy,
+          selected.other,
+        ]);
       })
     )
 );
 
 test("validates active identity and rejects mismatched channel or revocation", () =>
-  run((transport, _messaging, sql, identities, userId) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case3")(function* ({
+      transport,
+      messaging: _messaging,
+      sql,
+      identities,
+      userId,
+    }) {
       const id = identities[0];
-      if (!id) throw new Error("Missing fixture");
+
+      if (!id) return yield* Effect.fail(new Error("Missing fixture"));
       expect(yield* transport.activeIdentity(id, "telegram")).toMatchObject({
         id,
         userId,
@@ -297,17 +529,25 @@ test("validates active identity and rejects mismatched channel or revocation", (
   ));
 
 test("enqueues stable chunks idempotently and rolls back partial writes on conflict", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case4")(function* ({
+      transport,
+      messaging,
+      sql,
+      identities,
+    }) {
       const id = identities[0];
-      if (!id) throw new Error("Missing fixture");
+
+      if (!id) return yield* Effect.fail(new Error("Missing fixture"));
       const text = `${"a".repeat(3999)}😀${"b".repeat(5000)}`;
+
       const input = {
         identityId: id,
         deliveryKey: "reply",
         text,
         replyToMessageId: "123",
       };
+
       const first = yield* transport.enqueueText(input);
       const replay = yield* transport.enqueueText(input);
       expect(replay.map((receipt) => receipt.id)).toEqual(
@@ -360,29 +600,41 @@ test("enqueues stable chunks idempotently and rolls back partial writes on confl
           })
           .pipe(Effect.flip)
       ).toBeInstanceOf(PayloadConflict);
+
       const partial =
         yield* sql`SELECT id FROM channel_outbox WHERE identity_id = ${id} AND delivery_key = 'atomic:0'`;
+
       expect(partial).toHaveLength(0);
     })
   ));
 
 test("unsupported stored media fails before any provider configuration or send", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case5")(function* ({
+      transport,
+      messaging,
+      sql,
+      identities,
+    }) {
       const id = identities[0];
-      if (!id) throw new Error("Missing fixture");
+
+      if (!id) return yield* Effect.fail(new Error("Missing fixture"));
+
       const receipt = yield* messaging.enqueue({
         identityId: id,
         deliveryKey: "media",
         payload: { attachments: [{ id: "opaque", mediaType: "image/png" }] },
       });
+
       expect(yield* transport.drainOutbox(id).pipe(Effect.flip)).toMatchObject({
         reason: "unsupported_payload",
       });
+
       const rows = yield* sql<{
         status: string;
         last_error: string;
       }>`SELECT status, last_error FROM channel_outbox WHERE id = ${receipt.id}`;
+
       expect(rows[0]).toEqual({
         status: "failed",
         last_error: "adapter_rejected",
@@ -406,15 +658,23 @@ test.each([
     reason: "installation_mismatch",
   },
 ])("fails $reason before dispatch without provider I/O", ({ config, reason }) =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case6")(function* ({
+      transport,
+      messaging,
+      sql,
+      identities,
+    }) {
       const id = identities[0];
-      if (!id) throw new Error("Missing fixture");
+
+      if (!id) return yield* Effect.fail(new Error("Missing fixture"));
+
       const receipt = yield* messaging.enqueue({
         identityId: id,
         deliveryKey: "preflight",
         payload: { text: "must not leave database" },
       });
+
       const failure = yield* transport
         .drainOutbox(id)
         .pipe(
@@ -424,31 +684,44 @@ test.each([
           ),
           Effect.flip
         );
+
       expect(failure).toMatchObject({ reason });
+
       const rows = yield* sql<{
         status: string;
       }>`SELECT status FROM channel_outbox WHERE id = ${receipt.id}`;
+
       expect(rows[0]?.status).toBe("failed");
     })
   )
 );
 
 test("claims atomic text chunks in enqueue order despite tied timestamps and reversed UUID order", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case7")(function* ({
+      transport,
+      messaging,
+      sql,
+      identities,
+    }) {
       const identityId = identities[0];
-      if (!identityId) throw new Error("Missing fixture");
+
+      if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
       const chunks = ["a", "b", "c", "d"].map((letter) => letter.repeat(4000));
+
       const receipts = yield* transport.enqueueText({
         identityId,
         deliveryKey: "ordered",
         text: chunks.join(""),
       });
+
       expect(receipts).toHaveLength(4);
+
       const timestamps = yield* sql<{
         count: number;
       }>`SELECT count(DISTINCT created_at)::int AS count
         FROM channel_outbox WHERE identity_id = ${identityId}`;
+
       expect(timestamps[0]?.count).toBe(1);
       // Make the old UUID tie-breaker deterministically wrong using real stored fixtures.
       const prefix = randomUUID().slice(0, 24);
@@ -456,19 +729,24 @@ test("claims atomic text chunks in enqueue order despite tied timestamps and rev
         receipts,
         (receipt, index) =>
           sql`UPDATE channel_outbox SET id = ${`${prefix}${String(4 - index).padStart(12, "0")}`}
-          WHERE id = ${receipt.id}`
+          WHERE id = ${receipt.id}`,
+        { concurrency: 1 }
       );
       const delivered: string[] = [];
-      yield* Effect.forEach(chunks, (text, index) =>
-        Effect.gen(function* () {
+      yield* Effect.forEach(
+        chunks,
+        Effect.fn("transport.orderedChunk")(function* (text, index) {
           const claim = yield* messaging.claimOutbox({
             identityId,
             leaseSeconds: 30,
           });
-          if (!claim) throw new Error("Missing ordered claim");
+
+          if (!claim)
+            return yield* Effect.fail(new Error("Missing ordered claim"));
           expect(claim.key).toBe(`ordered:${String(index)}`);
           expect(claim.payload.text).toBe(text);
           delivered.push(text);
+
           // This receipt exercises queue settlement only; it is not provider evidence.
           const settled = yield* messaging.markSent({
             lease: { identityId, id: claim.id, leaseToken: claim.leaseToken },
@@ -477,8 +755,10 @@ test("claims atomic text chunks in enqueue order despite tied timestamps and rev
               providerMessageId: `storage-order-fixture-${String(index)}`,
             },
           });
+
           expect(settled.status).toBe("sent");
-        })
+        }),
+        { concurrency: 1 }
       );
       expect(delivered.join("")).toBe(chunks.join(""));
       expect(
@@ -488,10 +768,16 @@ test("claims atomic text chunks in enqueue order despite tied timestamps and rev
   ));
 
 test("rejects a stored chunk key hole even when its count matches the requested chunks", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case8")(function* ({
+      transport,
+      messaging,
+      sql,
+      identities,
+    }) {
       const identityId = identities[0];
-      if (!identityId) throw new Error("Missing fixture");
+
+      if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
       yield* messaging.enqueue({
         identityId,
         deliveryKey: "hole:0",
@@ -511,50 +797,63 @@ test("rejects a stored chunk key hole even when its count matches the requested 
           })
           .pipe(Effect.flip)
       ).toBeInstanceOf(PayloadConflict);
+
       const rows = yield* sql<{
         key: string;
       }>`SELECT delivery_key AS key FROM channel_outbox
         WHERE identity_id = ${identityId} ORDER BY delivery_key`;
+
       expect(rows.map((row) => row.key)).toEqual(["hole:0", "hole:2"]);
     })
   ));
 
 test("settled task reports retain the first atomic delivery across concurrent rewording", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case9")(function* ({
+      transport,
+      messaging: _messaging,
+      sql,
+      identities,
+    }) {
       const identityId = identities[0];
-      if (!identityId) throw new Error("Missing fixture");
+
+      if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
       const deliveryKey = `task-report:${"a".repeat(64)}`;
+
       const wording = [
         "First combined result. ".repeat(220),
         "A reworded duplicate.",
-      ];
-      const [first, second] = yield* Effect.all(
-        wording.map((text) =>
-          transport.enqueueTaskReport({ identityId, deliveryKey, text })
-        ),
-        { concurrency: "unbounded" }
+      ] as const;
+
+      const [first, second] = yield* enqueueConcurrentTaskReports(
+        transport,
+        identityId,
+        deliveryKey,
+        wording
       );
-      expect(first?.map((receipt) => receipt.id)).toEqual(
-        second?.map((receipt) => receipt.id)
-      );
+
+      expect(receiptIds(first)).toEqual(receiptIds(second));
+
       const saved = yield* sql<{
         text: string;
       }>`SELECT payload->>'text' AS text FROM channel_outbox WHERE identity_id = ${identityId} ORDER BY delivery_key`;
+
       expect(wording).toContain(saved.map((receipt) => receipt.text).join(""));
+
       const replay = yield* transport.enqueueTaskReport({
         identityId,
         deliveryKey,
         text: "A third version in a later turn.",
       });
-      expect(replay.map((receipt) => receipt.id)).toEqual(
-        first?.map((receipt) => receipt.id)
-      );
+
+      expect(receiptIds(replay)).toEqual(receiptIds(first));
+
       const distinct = yield* transport.enqueueTaskReport({
         identityId,
         deliveryKey: `task-report:${"b".repeat(64)}`,
         text: "Another completed cohort.",
       });
+
       expect(distinct[0]?.id).not.toBe(first?.[0]?.id);
       yield* transport.enqueueText({
         identityId,
@@ -584,55 +883,46 @@ test("settled task reports retain the first atomic delivery across concurrent re
   ));
 
 test("the dispatcher recovers native inputs before and after preparation while blocking unmarked inputs and output", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case10")(function* ({
+      transport,
+      messaging,
+      sql,
+      identities,
+    }) {
       const [preparedId, unpreparedId, outboundId, unmarkedId] = identities;
-      if (!preparedId || !unpreparedId || !outboundId || !unmarkedId)
-        throw new Error("Missing identities");
+
+      if (!preparedId || !unpreparedId || !outboundId || !unmarkedId) {
+        return yield* Effect.fail(new Error("Missing identities"));
+      }
+
       yield* Effect.forEach(
         [preparedId, unpreparedId, unmarkedId],
         (identityId) =>
-          Effect.gen(function* () {
-            yield* messaging.accept({
-              identityId,
-              eventId: "recovery-candidate",
-              sourceMessageId: "source",
-              payload: { text: "one" },
-            });
-            const claim = yield* messaging.claimInbox({
-              identityId,
-              leaseSeconds: 30,
-            });
-            if (!claim) throw new Error("Expected initial claim");
-            if (identityId === unmarkedId)
-              yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${claim.id}`;
-            const lease = {
-              identityId,
-              id: claim.id,
-              leaseToken: claim.leaseToken,
-            };
-            if (identityId === preparedId)
-              yield* messaging.prepareInboxHandoff({
-                transcripts: [],
-                lease,
-                content: "one",
-              });
-            yield* messaging.markInboxUncertain({
-              lease,
-              reason: "handoff_unknown",
-            });
-          })
+          seedRecoveryIdentity(
+            messaging,
+            sql,
+            preparedId,
+            unmarkedId,
+            identityId
+          ),
+        { concurrency: 1 }
       );
       yield* messaging.enqueue({
         identityId: outboundId,
         deliveryKey: "uncertain-send",
         payload: { text: "reply" },
       });
+
       const outbound = yield* messaging.claimOutbox({
         identityId: outboundId,
         leaseSeconds: 30,
       });
-      if (!outbound) throw new Error("Expected outbox claim");
+
+      if (!outbound) {
+        return yield* Effect.fail(new Error("Expected outbox claim"));
+      }
+
       yield* messaging.markOutboxUncertain({
         lease: {
           identityId: outboundId,
@@ -641,19 +931,19 @@ test("the dispatcher recovers native inputs before and after preparation while b
         },
         reason: "adapter_unavailable",
       });
-      const candidates = yield* transport.inboxCandidates("telegram", 25);
-      expect(candidates.map((candidate) => candidate.id)).toContain(preparedId);
-      expect(candidates.map((candidate) => candidate.id)).toContain(
-        unpreparedId
+
+      const inbox = identityIds(
+        yield* transport.inboxCandidates("telegram", 25)
       );
-      expect(candidates.map((candidate) => candidate.id)).not.toContain(
-        unmarkedId
+
+      const outbox = identityIds(
+        yield* transport.outboxCandidates("telegram", 25)
       );
-      expect(
-        (yield* transport.outboxCandidates("telegram", 25)).map(
-          (candidate) => candidate.id
-        )
-      ).not.toContain(outboundId);
+
+      expect(inbox).toContain(preparedId);
+      expect(inbox).toContain(unpreparedId);
+      expect(inbox).not.toContain(unmarkedId);
+      expect(outbox).not.toContain(outboundId);
     })
   ));
 
@@ -672,45 +962,61 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
         })
       ),
   } satisfies Telegram["Service"];
+
   const rateLimitedTelegram = Layer.succeed(
     Telegram,
     rateLimitedTelegramService
   );
+
   const idleKapsoService = {
     parse: unusedAdapterMethod,
     downloadMedia: unusedAdapterMethod,
     sendText: unusedAdapterMethod,
   } satisfies Kapso["Service"];
+
   const idleKapso = Layer.succeed(Kapso, idleKapsoService);
+
   const localDependencies = Layer.mergeAll(
     Messaging.layer,
     ChannelAccounts.layer,
     rateLimitedTelegram,
     idleKapso
   ).pipe(Layer.provideMerge(runtimeDatabase));
+
   const localServices = ChannelTransport.layer.pipe(
     Layer.provideMerge(localDependencies)
   );
+
   const localRun = (body: Parameters<typeof fixture>[0]) =>
     Effect.runPromise(
       fixture(body).pipe(Effect.scoped, Effect.provide(localServices))
     );
-  return localRun((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+
+  return localRun(
+    Effect.fn("transport.local")(function* ({
+      transport,
+      messaging,
+      sql,
+      identities,
+    }) {
       const identityId = identities[0];
-      if (!identityId) throw new Error("Missing fixture");
+
+      if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
       yield* sql`UPDATE channel_identity SET installation_id = '123456'
         WHERE id = ${identityId}`;
+
       const receipt = yield* messaging.enqueue({
         identityId,
         deliveryKey: "rate-limit-one",
         payload: { text: "temporary throttle" },
       });
+
       const follower = yield* messaging.enqueue({
         identityId,
         deliveryKey: "rate-limit-two",
         payload: { text: "must wait behind deferred head" },
       });
+
       expect(
         yield* transport.drainOutbox(identityId).pipe(
           Effect.provideService(
@@ -727,6 +1033,7 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
         failed: 0,
         uncertain: 0,
       });
+
       const rows = yield* sql<{
         id: string;
         status: string;
@@ -736,6 +1043,7 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
         (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp()) AS ready
         FROM channel_outbox WHERE identity_id = ${identityId}
         ORDER BY sequence`;
+
       expect(rows[0]).toMatchObject({
         id: receipt.id,
         status: "queued",
@@ -753,10 +1061,12 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
       yield* sql`UPDATE channel_outbox
         SET lease_expires_at = clock_timestamp() - interval '1 second'
         WHERE id = ${receipt.id}`;
+
       const claim = yield* messaging.claimOutbox({
         identityId,
         leaseSeconds: 30,
       });
+
       expect(claim?.id).toBe(receipt.id);
       expect(claim?.key).toBe("rate-limit-one");
     })

@@ -1,8 +1,8 @@
+import type { PromptInputMessage } from "@web/components/ai-elements/prompt-input";
 import type { useEveAgent } from "eve/react";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import type { PromptInputMessage } from "@web/components/ai-elements/prompt-input";
 
 type AgentOptions = Parameters<typeof useEveAgent>[0];
 
@@ -42,6 +42,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("eve/react", () => ({
   useEveAgent: (options: AgentOptions) => {
     mocks.options = options;
+
     return mocks.agent;
   },
 }));
@@ -61,6 +62,7 @@ vi.mock("@web/components/ai-elements/prompt-input", () => ({
     onSubmit: (message: PromptInputMessage) => void | Promise<void>;
   }) => {
     mocks.promptSubmit = onSubmit;
+
     return <form>{children}</form>;
   },
   PromptInputBody: ({ children }: { children: ReactNode }) => children,

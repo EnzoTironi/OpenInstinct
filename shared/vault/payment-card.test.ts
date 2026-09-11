@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
 import {
   paymentCardBrand,
   paymentCardSecretStringSchema,
   paymentCardType,
   serializePaymentCard,
 } from "@shared/vault/schema";
+import { describe, expect, it } from "vitest";
 
 describe("payment card vault values", () => {
   it("serializes a complete structured card secret", () => {

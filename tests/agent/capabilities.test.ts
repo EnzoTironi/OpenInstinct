@@ -1,7 +1,3 @@
-import { Predicate } from "effect";
-import { accessScopeForUser } from "@shared/identity/access-scope";
-import type { DynamicResolveContext } from "eve/tools";
-import { describe, expect, it } from "vitest";
 import personalInfoMemory from "@agent/memory/personal_info";
 import workstreamMemory from "@agent/memory/workstreams";
 import browserAgent from "@agent/subagents/browser-agent/agent";
@@ -11,72 +7,73 @@ import gmail from "@agent/tools/gmail";
 import messaging from "@agent/tools/messaging";
 import schedules from "@agent/tools/schedules";
 import vault from "@agent/tools/vault";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import { Predicate } from "effect";
+import type { DynamicResolveContext } from "eve/tools";
+import { expect, it } from "vitest";
 
 const groupedTools = [calendar, contacts, gmail, messaging, schedules, vault];
 
-describe("authored mode capability matrix", () => {
-  it("gives interactive turns the authored coordinator capabilities", async () => {
-    expect(await authoredCapabilities("linq-message")).toEqual([
-      "browser-agent",
-      "calendar-check-availability",
-      "calendar-create-event",
-      "calendar-list-events",
-      "contacts-search",
-      "gmail-read-thread",
-      "gmail-search",
-      "gmail-send",
-      "gmail-update",
-      "personal_info__update",
-      "react_to_message",
-      "request_vault_import",
-      "request_vault_setup",
-      "schedules-answer",
-      "schedules-create",
-      "schedules-list",
-      "schedules-update",
-      "send_message",
-      "workstreams__find",
-      "workstreams__forget",
-      "workstreams__read",
-      "workstreams__save",
-    ]);
-  });
-
-  it("gives scheduled workers only authored read and execution capabilities", async () => {
-    expect(await authoredCapabilities("scheduled-worker")).toEqual([
-      "browser-agent",
-      "calendar-check-availability",
-      "calendar-list-events",
-      "contacts-search",
-      "gmail-read-thread",
-      "gmail-search",
-    ]);
-  });
-
-  it("limits authored scheduled reporting tools to delivery or resuming its own run", async () => {
-    expect(await authoredCapabilities("scheduled-result")).toEqual([
-      "request_vault_setup",
-      "schedules-answer",
-      "send_message",
-    ]);
-  });
+it("gives interactive turns the authored coordinator capabilities", async () => {
+  expect(await authoredCapabilities("linq-message")).toEqual([
+    "browser-agent",
+    "calendar-check-availability",
+    "calendar-create-event",
+    "calendar-list-events",
+    "contacts-search",
+    "gmail-read-thread",
+    "gmail-search",
+    "gmail-send",
+    "gmail-update",
+    "personal_info__update",
+    "react_to_message",
+    "request_vault_import",
+    "request_vault_setup",
+    "schedules-answer",
+    "schedules-create",
+    "schedules-list",
+    "schedules-update",
+    "send_message",
+    "workstreams__find",
+    "workstreams__forget",
+    "workstreams__read",
+    "workstreams__save",
+  ]);
 });
 
-async function authoredCapabilities(authenticator: string) {
-  const context = dynamicContext(authenticator);
-  const capabilities: string[] = [];
+it("gives scheduled workers only authored read and execution capabilities", async () => {
+  expect(await authoredCapabilities("scheduled-worker")).toEqual([
+    "browser-agent",
+    "calendar-check-availability",
+    "calendar-list-events",
+    "contacts-search",
+    "gmail-read-thread",
+    "gmail-search",
+  ]);
+});
 
-  const resolvedGroups = await Promise.all(
-    groupedTools.map(async (definition) => {
-      const resolve = definition.events["turn.started"];
-      const resolved = resolve ? await resolve({}, context) : null;
-      return Predicate.isObject(resolved) && !("execute" in resolved)
-        ? Object.keys(resolved)
-        : [];
-    })
-  );
-  capabilities.push(...resolvedGroups.flat());
+it("limits authored scheduled reporting tools to delivery or resuming its own run", async () => {
+  expect(await authoredCapabilities("scheduled-result")).toEqual([
+    "request_vault_setup",
+    "schedules-answer",
+    "send_message",
+  ]);
+});
 
+const resolveGroupedDefinition = async (
+  definition: (typeof groupedTools)[number],
+  context: DynamicResolveContext
+) => {
+  const resolve = definition.events["turn.started"];
+  const resolved = resolve ? await resolve({}, context) : null;
+
+  if (Predicate.isObject(resolved) && !("execute" in resolved))
+    return Object.keys(resolved);
+
+  return [];
+};
+
+const personalInfoCapabilityNames = async (context: DynamicResolveContext) => {
   const personalInfoTools = await personalInfoMemory.provider.tools({
     ...context,
     memory: {
@@ -89,12 +86,13 @@ async function authoredCapabilities(authenticator: string) {
     },
     turn: { id: "turn-1", input: [], sequence: 1 },
   });
-  if (personalInfoTools) {
-    capabilities.push(
-      ...Object.keys(personalInfoTools).map((name) => `personal_info__${name}`)
-    );
-  }
 
+  if (!personalInfoTools) return [];
+
+  return Object.keys(personalInfoTools).map((name) => `personal_info__${name}`);
+};
+
+const workstreamCapabilityNames = async (context: DynamicResolveContext) => {
   const workstreamTools = await workstreamMemory.provider.tools({
     ...context,
     memory: {
@@ -107,17 +105,37 @@ async function authoredCapabilities(authenticator: string) {
     },
     turn: { id: "turn-1", input: [], sequence: 1 },
   });
-  if (workstreamTools)
-    capabilities.push(
-      ...Object.keys(workstreamTools).map((name) => `workstreams__${name}`)
-    );
 
+  if (!workstreamTools) return [];
+
+  return Object.keys(workstreamTools).map((name) => `workstreams__${name}`);
+};
+
+const browserAgentCapability = async (context: DynamicResolveContext) => {
   const resolveBrowserAgent = browserAgent.events["turn.started"];
-  if (resolveBrowserAgent && (await resolveBrowserAgent({}, context))) {
-    capabilities.push("browser-agent");
-  }
 
-  return capabilities.toSorted();
+  if (!resolveBrowserAgent) return [];
+
+  if (!(await resolveBrowserAgent({}, context))) return [];
+
+  return ["browser-agent"];
+};
+
+async function authoredCapabilities(authenticator: string) {
+  const context = dynamicContext(authenticator);
+
+  const resolvedGroups = await Promise.all(
+    groupedTools.map((definition) =>
+      resolveGroupedDefinition(definition, context)
+    )
+  );
+
+  return [
+    ...resolvedGroups.flat(),
+    ...(await personalInfoCapabilityNames(context)),
+    ...(await workstreamCapabilityNames(context)),
+    ...(await browserAgentCapability(context)),
+  ].toSorted();
 }
 
 function dynamicContext(authenticator: string) {

@@ -37,6 +37,7 @@ export const preferNearestRoutePrivateOwnerRule = defineRule({
         filename = normalizePath(context.filename);
         sourceDirectory = findSourceDirectory(filename, context.cwd);
         appDirectory = path.join(sourceDirectory, "app");
+
         if (!isWithin(filename, appDirectory)) return false;
 
         relativeSegments = path
@@ -45,24 +46,30 @@ export const preferNearestRoutePrivateOwnerRule = defineRule({
         privateIndex = relativeSegments.findIndex((segment) =>
           PRIVATE_ROUTE_DIRECTORIES.has(segment)
         );
+
         return privateIndex >= 0;
       },
       Program(node) {
         const importGraph = getAppImportGraph(appDirectory, sourceDirectory);
+
         const consumerOwners = getConsumerRouteOwners(
           filename,
           importGraph,
           appDirectory
         );
+
         if (!consumerOwners.length) return;
 
         const owner = path.join(
           appDirectory,
           ...relativeSegments.slice(0, privateIndex)
         );
+
         const consumer = getCommonDirectory(consumerOwners);
+
         if (!consumer || normalizePath(consumer) === normalizePath(owner))
           return;
+
         if (!isWithin(consumer, owner)) return;
 
         context.report({

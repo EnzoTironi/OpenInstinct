@@ -1,11 +1,15 @@
 import { createHmac } from "node:crypto";
+
 import { Effect, Redacted } from "effect";
 import { describe, expect, it } from "vitest";
+
 import { parseKapsoWebhook } from "./kapso";
 import { readVerifiedWebhook } from "./webhook";
 
 const testSecret = Redacted.make("unit-test-webhook-secret");
+
 const now = 1_800_000_000_000;
+
 const installation = {
   phoneNumberId: "123456789",
   phoneNumber: "+15550001111",
@@ -15,6 +19,7 @@ const signedRequest = (body: string) => {
   const signature = createHmac("sha256", Redacted.value(testSecret))
     .update(body)
     .digest("hex");
+
   return new Request("https://test.invalid/channels/kapso", {
     method: "POST",
     body,
@@ -43,12 +48,15 @@ describe("Kapso private delivery qualification (fixture)", () => {
         phone_number: "+15550002222",
       },
     });
+
     const verified = await Effect.runPromise(
       readVerifiedWebhook(signedRequest(body), "kapso", testSecret)
     );
+
     const events = await Effect.runPromise(
       parseKapsoWebhook(verified, installation, now)
     );
+
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       channel: "kapso",
@@ -83,9 +91,11 @@ describe("Kapso private delivery qualification (fixture)", () => {
         type: "group",
       },
     });
+
     const verified = await Effect.runPromise(
       readVerifiedWebhook(signedRequest(body), "kapso", testSecret)
     );
+
     expect(
       await Effect.runPromise(parseKapsoWebhook(verified, installation, now))
     ).toEqual([]);

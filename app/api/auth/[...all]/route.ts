@@ -1,5 +1,5 @@
-import { toNextJsHandler } from "better-auth/next-js";
 import { getAuth } from "@db/services/auth";
+import { toNextJsHandler } from "better-auth/next-js";
 
 async function loadHandlers() {
   return toNextJsHandler(await getAuth());
@@ -9,6 +9,7 @@ let handlersPromise: ReturnType<typeof loadHandlers> | undefined;
 
 function getHandlers() {
   handlersPromise ??= loadHandlersWithRetry();
+
   return handlersPromise;
 }
 

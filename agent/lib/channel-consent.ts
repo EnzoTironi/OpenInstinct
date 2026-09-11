@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+
 import { Predicate, Result, Schema } from "effect";
 import { parseInputResponse, type InputRequest } from "eve/client";
 
@@ -6,8 +7,11 @@ const identifier = Schema.NonEmptyString.check(
   Schema.isTrimmed(),
   Schema.isMaxLength(256)
 );
+
 const revision = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u));
+
 const reference = Schema.Struct({ requestId: identifier, revision });
+
 const candidateSchema = Schema.Struct({
   intent: Schema.Literals([
     "approve",
@@ -18,6 +22,7 @@ const candidateSchema = Schema.Struct({
   ]),
   references: Schema.Array(reference).check(Schema.isMaxLength(16)),
 });
+
 const decodeCandidate = Schema.decodeUnknownResult(candidateSchema, {
   onExcessProperty: "error",
 });
@@ -33,6 +38,7 @@ const sourceSchema = Schema.Struct({
   text: Schema.NonEmptyString.check(Schema.isMaxLength(16_384)),
   sourceOccurredAtMs: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
 });
+
 const decodeSource = Schema.decodeUnknownResult(sourceSchema, {
   onExcessProperty: "error",
 });
@@ -52,6 +58,7 @@ const deliverySchema = Schema.Struct({
     Schema.isMaxLength(16)
   ),
 });
+
 const decodeDelivery = Schema.decodeUnknownResult(deliverySchema);
 
 /** Confirmed delivery of ALL proposal chunks; deliveredAtMs is their latest send receipt. */
@@ -119,7 +126,141 @@ export function channelConsentRevision(request: InputRequest): string {
           )
         : value
   );
+
   return createHash("sha256").update(serialized).digest("hex");
+}
+
+function rejectedConsent(
+  reason: Extract<ChannelConsentDecision, { status: "rejected" }>["reason"]
+): ChannelConsentDecision {
+  return { status: "rejected", reason };
+}
+
+function nonActionOrReject(
+  intent: "clarify" | "conversation",
+  referenceCount: number
+): ChannelConsentDecision {
+  if (referenceCount === 0) {
+    return { status: "non_action", intent };
+  }
+
+  return rejectedConsent("invalid_candidate");
+}
+
+function findUniquePendingRequest(
+  snapshot: ChannelConsentSnapshot,
+  requestId: string
+) {
+  const matches = snapshot.pending.filter(
+    (request) => request.requestId === requestId
+  );
+
+  const [request] = matches;
+
+  if (!request) return rejectedConsent("stale_request");
+
+  if (matches.length !== 1) return rejectedConsent("ambiguous_reference");
+
+  return { request };
+}
+
+function approvalOptionId(intent: ActionIntent) {
+  return intent === "approve" ? "approve" : "cancel";
+}
+
+function hasExactApprovalOption(
+  request: ChannelConsentSnapshot["pending"][number],
+  optionId: string
+) {
+  return (
+    request.kind === "tool-approval" &&
+    request.options?.filter((option) => option.id === optionId).length === 1
+  );
+}
+
+function validatedConsentDecision(input: {
+  readonly candidate: {
+    readonly intent: ActionIntent;
+  };
+  readonly delivery: {
+    readonly providerMessageIds: readonly string[];
+    readonly receiptId: string;
+  };
+  readonly request: ChannelConsentSnapshot["pending"][number];
+  readonly source: ChannelConsentSource;
+  readonly target: {
+    readonly requestId: string;
+    readonly revision: string;
+  };
+}): ChannelConsentDecision {
+  const optionId = approvalOptionId(input.candidate.intent);
+
+  return {
+    status: "validated",
+    intent: input.candidate.intent,
+    binding: {
+      ...input.source,
+      requestId: input.request.requestId,
+      revision: input.target.revision,
+      deliveryReceiptId: input.delivery.receiptId,
+      deliveryProviderMessageIds: [...input.delivery.providerMessageIds],
+    },
+    response: parseInputResponse({
+      requestId: input.request.requestId,
+      optionId,
+    }),
+  };
+}
+
+function validateActionConsent(
+  source: ChannelConsentSource,
+  candidate: {
+    readonly intent: ActionIntent;
+    readonly references: readonly {
+      readonly requestId: string;
+      readonly revision: string;
+    }[];
+  },
+  snapshot: ChannelConsentSnapshot
+): ChannelConsentDecision {
+  const [target] = candidate.references;
+
+  if (candidate.references.length !== 1 || !target) {
+    return rejectedConsent("ambiguous_reference");
+  }
+
+  const pending = findUniquePendingRequest(snapshot, target.requestId);
+
+  if ("status" in pending) return pending;
+  const { request } = pending;
+
+  if (channelConsentRevision(request) !== target.revision) {
+    return rejectedConsent("stale_revision");
+  }
+
+  const optionId = approvalOptionId(candidate.intent);
+
+  if (!hasExactApprovalOption(request, optionId)) {
+    return rejectedConsent("unsupported_request");
+  }
+
+  const deliveryResult = resolveConsentDelivery(
+    source,
+    target,
+    snapshot.deliveries
+  );
+
+  if (Result.isFailure(deliveryResult)) {
+    return rejectedConsent(deliveryResult.failure);
+  }
+
+  return validatedConsentDecision({
+    candidate,
+    delivery: deliveryResult.success,
+    request,
+    source,
+    target,
+  });
 }
 
 /**
@@ -137,57 +278,57 @@ export function validateChannelConsent(
     interpretation,
     snapshot
   );
-  if (sourceRejection) return { status: "rejected", reason: sourceRejection };
+
+  if (sourceRejection) return rejectedConsent(sourceRejection);
   const decoded = decodeCandidate(interpretation.candidate);
-  if (Result.isFailure(decoded))
-    return { status: "rejected", reason: "invalid_candidate" };
+
+  if (Result.isFailure(decoded)) return rejectedConsent("invalid_candidate");
   const candidate = decoded.success;
+
   if (candidate.intent === "clarify" || candidate.intent === "conversation") {
-    return candidate.references.length === 0
-      ? { status: "non_action", intent: candidate.intent }
-      : { status: "rejected", reason: "invalid_candidate" };
+    return nonActionOrReject(candidate.intent, candidate.references.length);
   }
-  const [target] = candidate.references;
-  if (candidate.references.length !== 1 || !target) {
-    return { status: "rejected", reason: "ambiguous_reference" };
-  }
-  const matches = snapshot.pending.filter(
-    (request) => request.requestId === target.requestId
-  );
-  const [request] = matches;
-  if (!request) return { status: "rejected", reason: "stale_request" };
-  if (matches.length !== 1)
-    return { status: "rejected", reason: "ambiguous_reference" };
-  if (channelConsentRevision(request) !== target.revision) {
-    return { status: "rejected", reason: "stale_revision" };
-  }
-  const optionId = candidate.intent === "approve" ? "approve" : "cancel";
+
   if (
-    request.kind !== "tool-approval" ||
-    request.options?.filter((option) => option.id === optionId).length !== 1
+    candidate.intent !== "approve" &&
+    candidate.intent !== "cancel" &&
+    candidate.intent !== "correct"
   ) {
-    return { status: "rejected", reason: "unsupported_request" };
+    return rejectedConsent("invalid_candidate");
   }
-  const deliveryResult = resolveConsentDelivery(
+
+  return validateActionConsent(
     source,
-    target,
-    snapshot.deliveries
-  );
-  if (Result.isFailure(deliveryResult))
-    return { status: "rejected", reason: deliveryResult.failure };
-  const delivery = deliveryResult.success;
-  return {
-    status: "validated",
-    intent: candidate.intent,
-    binding: {
-      ...source,
-      requestId: request.requestId,
-      revision: target.revision,
-      deliveryReceiptId: delivery.receiptId,
-      deliveryProviderMessageIds: [...delivery.providerMessageIds],
+    {
+      intent: candidate.intent,
+      references: candidate.references,
     },
-    response: parseInputResponse({ requestId: request.requestId, optionId }),
-  };
+    snapshot
+  );
+}
+
+function isInvalidConsentSource(source: ChannelConsentSource) {
+  return Result.isFailure(decodeSource(source)) || !source.text.trim();
+}
+
+function isConsentSourceMismatch(
+  source: ChannelConsentSource,
+  interpretation: ChannelConsentInterpretation
+) {
+  return (
+    source.sourceMessageId !== interpretation.sourceMessageId ||
+    source.text !== interpretation.sourceText
+  );
+}
+
+function isConsentScopeMismatch(
+  source: ChannelConsentSource,
+  snapshot: ChannelConsentSnapshot
+) {
+  return (
+    source.identityId !== snapshot.identityId ||
+    source.sessionId !== snapshot.sessionId
+  );
 }
 
 function validateConsentSource(
@@ -195,24 +336,61 @@ function validateConsentSource(
   interpretation: ChannelConsentInterpretation,
   snapshot: ChannelConsentSnapshot
 ): Rejection | undefined {
-  if (Result.isFailure(decodeSource(source)) || !source.text.trim()) {
+  if (isInvalidConsentSource(source)) {
     return "invalid_source";
   }
-  if (
-    source.sourceMessageId !== interpretation.sourceMessageId ||
-    source.text !== interpretation.sourceText
-  ) {
+
+  if (isConsentSourceMismatch(source, interpretation)) {
     return "source_mismatch";
   }
-  if (
-    source.identityId !== snapshot.identityId ||
-    source.sessionId !== snapshot.sessionId
-  ) {
+
+  if (isConsentScopeMismatch(source, snapshot)) {
     return "scope_mismatch";
   }
+
   if (snapshot.consumedSourceMessageIds.includes(source.sourceMessageId)) {
     return "replayed_source";
   }
+
+  return undefined;
+}
+
+function matchesConsentDelivery(
+  delivery: ChannelConsentDelivery,
+  source: ChannelConsentSource,
+  target: typeof reference.Type
+) {
+  return (
+    delivery.requestId === target.requestId &&
+    delivery.revision === target.revision &&
+    delivery.identityId === source.identityId &&
+    delivery.sessionId === source.sessionId
+  );
+}
+
+function isValidConsentDelivery(delivery: ChannelConsentDelivery) {
+  const providerMessageIds = delivery.providerMessageIds;
+
+  return (
+    Result.isSuccess(decodeDelivery(delivery)) &&
+    Boolean(delivery.text.trim()) &&
+    new Set(providerMessageIds).size === providerMessageIds.length &&
+    providerMessageIds.includes(delivery.receiptId)
+  );
+}
+
+function validateDeliveryTiming(
+  delivery: ChannelConsentDelivery,
+  source: ChannelConsentSource
+): Rejection | undefined {
+  if (!Number.isFinite(delivery.deliveredAtMs)) {
+    return "delivery_not_before_source";
+  }
+
+  if (delivery.deliveredAtMs >= source.sourceOccurredAtMs) {
+    return "delivery_not_before_source";
+  }
+
   return undefined;
 }
 
@@ -221,30 +399,29 @@ function resolveConsentDelivery(
   target: typeof reference.Type,
   receipts: readonly ChannelConsentDelivery[]
 ): Result.Result<ChannelConsentDelivery, Rejection> {
-  const deliveries = receipts.filter(
-    (delivery) =>
-      delivery.requestId === target.requestId &&
-      delivery.revision === target.revision &&
-      delivery.identityId === source.identityId &&
-      delivery.sessionId === source.sessionId
+  const deliveries = receipts.filter((delivery) =>
+    matchesConsentDelivery(delivery, source, target)
   );
+
   const [delivery] = deliveries;
-  if (!delivery) return Result.fail("missing_delivery");
-  if (deliveries.length !== 1) return Result.fail("ambiguous_delivery");
-  if (
-    !Number.isFinite(delivery.deliveredAtMs) ||
-    delivery.deliveredAtMs >= source.sourceOccurredAtMs
-  ) {
-    return Result.fail("delivery_not_before_source");
-  }
-  if (
-    Result.isFailure(decodeDelivery(delivery)) ||
-    !delivery.text.trim() ||
-    new Set(delivery.providerMessageIds).size !==
-      delivery.providerMessageIds.length ||
-    !delivery.providerMessageIds.includes(delivery.receiptId)
-  ) {
+
+  if (!delivery) {
     return Result.fail("missing_delivery");
   }
+
+  if (deliveries.length !== 1) {
+    return Result.fail("ambiguous_delivery");
+  }
+
+  const timingRejection = validateDeliveryTiming(delivery, source);
+
+  if (timingRejection) {
+    return Result.fail(timingRejection);
+  }
+
+  if (!isValidConsentDelivery(delivery)) {
+    return Result.fail("missing_delivery");
+  }
+
   return Result.succeed(delivery);
 }

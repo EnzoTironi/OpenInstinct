@@ -4,6 +4,7 @@ import {
   MemoryDocumentConflictError,
   type MemoryDocumentBackend,
 } from "eve/memory/file";
+
 import { MemoryDocuments } from "../../server/memory/documents";
 import { serverRuntime } from "../../server/runtime";
 import type { authorizePersonalMemoryContext } from "./personal-memory-access";
@@ -16,6 +17,7 @@ export function createMemoryDocumentBackend(
       serverRuntime.runPromise(
         Effect.gen(function* () {
           const sql = yield* PgClient.PgClient;
+
           return yield* sql.withTransaction(
             Effect.andThen(
               authorize,
@@ -31,6 +33,7 @@ export function createMemoryDocumentBackend(
       serverRuntime.runPromise(
         Effect.gen(function* () {
           const sql = yield* PgClient.PgClient;
+
           return yield* sql.withTransaction(
             Effect.andThen(
               authorize,

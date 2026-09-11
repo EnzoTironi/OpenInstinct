@@ -6,6 +6,7 @@ import {
   type MessageStreamEvent,
 } from "eve/client";
 import { useEffect, useRef, useState } from "react";
+
 import {
   readLatestSessionHistory,
   readOlderSessionHistory,
@@ -34,20 +35,25 @@ export function useSessionHistory(sessionId: string) {
         setHistory(latest);
 
         const tail = latest.events.at(-1);
+
         if (!tail || isCurrentTurnBoundaryEvent(tail)) return undefined;
 
         const session = client.sessions.attach(sessionId, {
           streamIndex: latest.endIndex,
         });
+
         let nextIndex = latest.endIndex;
+
         for await (const event of session.stream({
           signal: controller.signal,
           startIndex: nextIndex,
         })) {
           nextIndex += 1;
           appendEvent(setHistory, event, nextIndex);
+
           if (isCurrentTurnBoundaryEvent(event)) break;
         }
+
         return undefined;
       })
       .catch((cause: unknown) => {
@@ -58,6 +64,7 @@ export function useSessionHistory(sessionId: string) {
               : "The task stream disconnected."
           );
         }
+
         return undefined;
       });
 
@@ -68,13 +75,16 @@ export function useSessionHistory(sessionId: string) {
 
   const loadOlder = async () => {
     const current = historyRef.current;
+
     if (!current || current.startIndex === 0 || isLoadingOlder) return;
     setIsLoadingOlder(true);
+
     try {
       const older = await readOlderSessionHistory(
         sessionId,
         current.startIndex
       );
+
       setHistory((latest) =>
         latest
           ? {
@@ -114,11 +124,13 @@ function appendEvent(
 ) {
   setHistory((current) => {
     if (!current) return current;
+
     if (
       current.events.some((candidate) => candidate.meta.id === event.meta.id)
     ) {
       return { ...current, endIndex };
     }
+
     return {
       ...current,
       endIndex,

@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { RuleTester } from "oxlint/plugins-dev";
-import { test } from "vitest";
+
 import plugin from "@tools/oxlint/next/index.ts";
 import { noRoutePrivateImportsRule } from "@tools/oxlint/next/rules/no-route-private-imports.ts";
 import { preferNearestRoutePrivateOwnerRule } from "@tools/oxlint/next/rules/prefer-nearest-route-private-owner.ts";
 import { requireGeneratedRoutePropsRule } from "@tools/oxlint/next/rules/require-generated-route-props.ts";
 import { requirePageRouteGroupRule } from "@tools/oxlint/next/rules/require-page-route-group.ts";
+import { RuleTester } from "oxlint/plugins-dev";
+import { test } from "vitest";
 
 const tester = new RuleTester();
 
@@ -24,6 +25,7 @@ test("exports the repository-owned Next architecture rules", () => {
 const privateImportRoot = fs.mkdtempSync(
   path.join(os.tmpdir(), "local-oxlint-private-")
 );
+
 const privateComponent = path.join(
   privateImportRoot,
   "app/account/_components/card.tsx"
@@ -57,6 +59,7 @@ tester.run("local-next/no-route-private-imports", noRoutePrivateImportsRule, {
 const nearestRoot = fs.mkdtempSync(
   path.join(os.tmpdir(), "local-oxlint-nearest-")
 );
+
 const broadComponent = path.join(nearestRoot, "app/_components/card.tsx");
 
 tester.run(
@@ -112,6 +115,7 @@ tester.run(
 const pageGroupRoot = fs.mkdtempSync(
   path.join(os.tmpdir(), "local-oxlint-page-group-")
 );
+
 const indexPage = path.join(pageGroupRoot, "app/settings/page.tsx");
 
 tester.run("local-next/require-page-route-group", requirePageRouteGroupRule, {

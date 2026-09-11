@@ -1,9 +1,9 @@
+import evlogHook from "@agent/hooks/evlog";
 import type { HookContext } from "eve/hooks";
 import type { DrainContext, WideEvent } from "evlog";
 import { initLogger } from "evlog";
 import { resetEvlogEveForTests, useLogger } from "evlog/eve";
 import { beforeAll, describe, expect, it } from "vitest";
-import evlogHook from "@agent/hooks/evlog";
 
 const capturedEvents: WideEvent[] = [];
 
@@ -96,6 +96,7 @@ async function emit<Name extends keyof EvlogEvents>(
   context: HookContext
 ) {
   const handler = evlogHook.events?.[name];
+
   if (!handler) throw new Error(`Evlog handler ${name} is not configured.`);
   await handler(event, context);
 }

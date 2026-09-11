@@ -1,17 +1,17 @@
-import { accessScopeForUser } from "@shared/identity/access-scope";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { HookContext } from "eve/hooks";
-import { z } from "zod";
+import traceTelemetry from "@agent/subagents/browser-agent/hooks/trace-telemetry";
+import type * as TraceDomainsModule from "@agent/subagents/browser-agent/lib/trace/domains";
+import type { harvestBrowserTraceDomains } from "@agent/subagents/browser-agent/lib/trace/domains";
+import { domainFromUrl } from "@agent/subagents/browser-agent/lib/trace/domains";
 import type {
   beginBrowserTrace,
   completeBrowserTrace,
   recordBrowserTraceEvents,
 } from "@db/services/browser-traces";
 import type { listWorkerBrowserSessions } from "@db/services/browsers";
-import type * as TraceDomainsModule from "@agent/subagents/browser-agent/lib/trace/domains";
-import type { harvestBrowserTraceDomains } from "@agent/subagents/browser-agent/lib/trace/domains";
-import { domainFromUrl } from "@agent/subagents/browser-agent/lib/trace/domains";
-import traceTelemetry from "@agent/subagents/browser-agent/hooks/trace-telemetry";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import type { HookContext } from "eve/hooks";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const mocks = vi.hoisted(() => ({
   beginBrowserTrace: vi.fn<typeof beginBrowserTrace>(),
@@ -26,9 +26,11 @@ vi.mock("@db/services/browser-traces", () => ({
   completeBrowserTrace: mocks.completeBrowserTrace,
   recordBrowserTraceEvents: mocks.recordBrowserTraceEvents,
 }));
+
 vi.mock("@db/services/browsers", () => ({
   listWorkerBrowserSessions: mocks.listWorkerBrowserSessions,
 }));
+
 vi.mock(
   "@agent/subagents/browser-agent/lib/trace/domains",
   async (importOriginal) => ({
@@ -41,6 +43,7 @@ const scope = {
   userId: "user-1",
   workspaceId: accessScopeForUser("user-1").workspaceId,
 };
+
 const context = {
   agent: { name: "test-agent" },
   channel: {},
@@ -286,9 +289,11 @@ describe("trace event persistence", () => {
     });
 
     const [, , events] = mocks.recordBrowserTraceEvents.mock.calls[0] ?? [];
+
     const detail = z
       .array(z.object({ detail: z.string(), label: z.string() }))
       .parse(events)[0];
+
     expect(detail?.label).toBe("computer_action → result");
     expect(detail?.detail.length).toBeLessThanOrEqual(601);
   });

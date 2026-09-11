@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+
 import { validateAudioDuration } from "../../server/channels/media/transcription";
 
 function silentWav(seconds: number) {
@@ -17,6 +18,7 @@ function silentWav(seconds: number) {
   bytes.writeUInt16LE(16, 34);
   bytes.write("data", 36);
   bytes.writeUInt32LE(byteLength, 40);
+
   return bytes;
 }
 

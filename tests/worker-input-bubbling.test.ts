@@ -1,8 +1,10 @@
-import type * as RuntimeSubagentConfig from "../node_modules/eve/dist/src/runtime/subagents/dynamic-agent-config.js";
-import type * as RuntimeContext from "../node_modules/eve/dist/src/context/container.js";
 import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+
 import browserAgent from "@agent/subagents/browser-agent/agent";
+import { describe, expect, it, vi } from "vitest";
+
+import type * as RuntimeContext from "../node_modules/eve/dist/src/context/container.js";
+import type * as RuntimeSubagentConfig from "../node_modules/eve/dist/src/runtime/subagents/dynamic-agent-config.js";
 
 // Use the same normalization boundary as real delegation; calling the authored
 // resolver alone does not validate which fields Eve accepts at runtime.
@@ -14,6 +16,7 @@ const { normalizeDynamicSubagentAgentConfig } = await vi.importActual<
     import.meta.resolve("eve")
   ).pathname
 );
+
 const { ContextContainer } = await vi.importActual<typeof RuntimeContext>(
   new URL("./context/container.js", import.meta.resolve("eve")).pathname
 );
@@ -40,6 +43,7 @@ describe("worker input bubbling", () => {
         },
       }
     );
+
     await expect(
       normalizeDynamicSubagentAgentConfig({
         name: "browser-agent",
@@ -54,6 +58,7 @@ describe("worker input bubbling", () => {
       "agent/instructions/content/role/interactive.md",
       "utf8"
     );
+
     const workerInstructions = readFileSync(
       "agent/subagents/browser-agent/instructions.md",
       "utf8"

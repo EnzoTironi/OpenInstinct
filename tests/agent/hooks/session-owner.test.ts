@@ -1,10 +1,10 @@
-import { accessScopeForUser } from "@shared/identity/access-scope";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { HookContext } from "eve/hooks";
+import sessionOwner from "@agent/hooks/session-owner";
 import type { saveChat } from "@db/services/chats";
 import type { ensureScope } from "@db/services/scope";
 import type { claimSession } from "@db/services/sessions";
-import sessionOwner from "@agent/hooks/session-owner";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import type { HookContext } from "eve/hooks";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   claimSession: vi.fn<typeof claimSession>(),
@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@db/services/chats", () => ({ saveChat: mocks.saveChat }));
+
 vi.mock("@db/services/scope", () => ({ ensureScope: mocks.ensureScope }));
+
 vi.mock("@db/services/sessions", () => ({
   claimSession: mocks.claimSession,
 }));
@@ -26,6 +28,7 @@ const scope = {
   userId: "user-1",
   workspaceId: accessScopeForUser("user-1").workspaceId,
 };
+
 const context = {
   agent: { name: "test-agent" },
   channel: { kind: "channel:linq" },
@@ -70,6 +73,7 @@ describe("session ownership hook", () => {
       },
       type: "message.received",
     } satisfies Parameters<MessageReceivedHandler>[0];
+
     await handler?.(event, context);
 
     expect(mocks.ensureScope).toHaveBeenCalledWith(scope);
@@ -88,6 +92,7 @@ describe("session ownership hook", () => {
 
   it("records the web channel for HTTP messages", async () => {
     const handler = sessionOwner.events?.["message.received"];
+
     const event = {
       data: { message: "hello", sequence: 0, turnId: "turn-1" },
       meta: {
@@ -96,6 +101,7 @@ describe("session ownership hook", () => {
       },
       type: "message.received",
     } satisfies Parameters<MessageReceivedHandler>[0];
+
     await handler?.(event, {
       ...context,
       channel: { kind: "http" },

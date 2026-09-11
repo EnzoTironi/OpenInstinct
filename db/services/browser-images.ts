@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
-import type { AccessScope } from "@shared/identity/access-scope";
+
+import { browserImageArtifacts, db } from "@db";
 import {
   browserImageArtifactReferenceSchema,
   browserImageArtifactUrl,
@@ -8,7 +8,8 @@ import {
   browserImageSourceKindSchema,
   type BrowserImageArtifactReference,
 } from "@shared/browser/artifact";
-import { browserImageArtifacts, db } from "@db";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { and, eq } from "drizzle-orm";
 
 type ArtifactRow = typeof browserImageArtifacts.$inferSelect;
 
@@ -39,13 +40,16 @@ export async function reserveBrowserImageArtifact(
   }
 ): Promise<ReservedBrowserImageArtifact> {
   const existing = await readByIdempotencyKey(scope, input.idempotencyKey);
+
   if (existing) return reservedResult(existing, input);
 
   const id = randomUUID();
+
   const workspaceKey = createHash("sha256")
     .update(scope.workspaceId)
     .digest("hex")
     .slice(0, 32);
+
   const rows = await db
     .insert(browserImageArtifacts)
     .values({
@@ -69,9 +73,12 @@ export async function reserveBrowserImageArtifact(
       ],
     })
     .returning();
+
   const row =
     rows[0] ?? (await readByIdempotencyKey(scope, input.idempotencyKey));
+
   if (!row) throw new Error("The browser image reservation was not stored.");
+
   return reservedResult(row, input);
 }
 
@@ -107,9 +114,12 @@ export async function finalizeBrowserImageArtifact(
       )
     )
     .returning();
+
   const row =
     rows[0] ?? (await readReadyBrowserImageArtifactRow(scope, reservation.id));
+
   if (!row) throw new Error("The browser image manifest was not finalized.");
+
   return { image: toReference(row), storagePathname: row.storagePathname };
 }
 
@@ -123,6 +133,7 @@ export async function readReadyBrowserImageArtifact(
     artifactId,
     options
   );
+
   return row ? { ...row, createdAt: row.createdAt.toISOString() } : undefined;
 }
 
@@ -137,16 +148,19 @@ async function readReadyBrowserImageArtifactRow(
     eq(browserImageArtifacts.createdByUserId, scope.userId),
     eq(browserImageArtifacts.status, "ready"),
   ];
+
   if (options.rootSessionId) {
     conditions.push(
       eq(browserImageArtifacts.rootSessionId, options.rootSessionId)
     );
   }
+
   const rows = await db
     .select()
     .from(browserImageArtifacts)
     .where(and(...conditions))
     .limit(1);
+
   return rows[0];
 }
 
@@ -166,8 +180,10 @@ function reservedResult(
   ) {
     throw new Error("The browser image idempotency key is already in use.");
   }
+
   if (row.status === "ready")
     return { image: toReference(row), status: "ready" };
+
   return {
     reservation: { id: row.id, storagePathname: row.storagePathname },
     status: "pending",
@@ -200,5 +216,6 @@ async function readByIdempotencyKey(
       )
     )
     .limit(1);
+
   return rows[0];
 }

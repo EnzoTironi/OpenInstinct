@@ -1,5 +1,6 @@
 import type { MessageStreamEvent } from "eve/client";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+
 import {
   imessageTimestamps,
   messageTimestamps,
@@ -11,255 +12,259 @@ type ToolResultOutput = Extract<
   { kind: "tool-result" }
 >["output"];
 
-describe("iMessage event projection", () => {
-  it("projects only successful send_message results", () => {
-    const events = [
-      completedMessage("Internal terminal output", "2026-09-01T12:00:00.000Z"),
-      toolResult("web_search", { answer: "Internal search result" }, 1),
-      toolResult(
-        "send_message",
-        {
-          attachments: [
-            {
-              kind: "image",
-              name: "result.png",
-              url: "https://example.com/result.png",
-            },
-          ],
-          kind: "message",
-          text: "Here is the user-visible result.",
-        },
-        2,
-        "2026-09-01T12:00:02.000Z"
-      ),
-    ];
-
-    expect(sentMessages(events).get("turn-1:assistant")).toEqual([
+it("projects only successful send_message results", () => {
+  const events = [
+    completedMessage("Internal terminal output", "2026-09-01T12:00:00.000Z"),
+    toolResult("web_search", { answer: "Internal search result" }, 1),
+    toolResult(
+      "send_message",
       {
-        id: "turn-1:assistant:call-send_message",
-        parts: [
+        attachments: [
           {
-            state: "done",
-            stepIndex: 2,
-            text: "Here is the user-visible result.",
-            type: "text",
-          },
-          {
-            filename: "result.png",
-            mediaType: "image/*",
-            stepIndex: 2,
-            type: "file",
+            kind: "image",
+            name: "result.png",
             url: "https://example.com/result.png",
           },
         ],
-        timestamp: "2026-09-01T12:00:02.000Z",
+        kind: "message",
+        text: "Here is the user-visible result.",
       },
-    ]);
-    expect(messageTimestamps(events).get("turn-1:assistant")).toBe(
-      "2026-09-01T12:00:00.000Z"
-    );
-    expect(imessageTimestamps(events).has("turn-1:assistant")).toBe(false);
-  });
+      2,
+      "2026-09-01T12:00:02.000Z"
+    ),
+  ];
 
-  it("projects a compact reaction for the Eve chat", () => {
-    const events = [
-      toolResult("react_to_message", { operation: "add", type: "heart" }),
-    ];
+  expect(sentMessages(events).get("turn-1:assistant")).toEqual([
+    {
+      id: "turn-1:assistant:call-send_message",
+      parts: [
+        {
+          state: "done",
+          stepIndex: 2,
+          text: "Here is the user-visible result.",
+          type: "text",
+        },
+        {
+          filename: "result.png",
+          mediaType: "image/*",
+          stepIndex: 2,
+          type: "file",
+          url: "https://example.com/result.png",
+        },
+      ],
+      timestamp: "2026-09-01T12:00:02.000Z",
+    },
+  ]);
+  expect(messageTimestamps(events).get("turn-1:assistant")).toBe(
+    "2026-09-01T12:00:00.000Z"
+  );
+  expect(imessageTimestamps(events).has("turn-1:assistant")).toBe(false);
+});
 
-    expect(sentMessages(events).get("turn-1:assistant")).toEqual([
-      expect.objectContaining({
-        id: "turn-1:assistant:call-react_to_message",
-        parts: [expect.objectContaining({ text: "❤️" })],
+it("projects a compact reaction for the Eve chat", () => {
+  const events = [
+    toolResult("react_to_message", { operation: "add", type: "heart" }),
+  ];
+
+  expect(sentMessages(events).get("turn-1:assistant")).toEqual([
+    expect.objectContaining({
+      id: "turn-1:assistant:call-react_to_message",
+      parts: [expect.objectContaining({ text: "❤️" })],
+    }),
+  ]);
+  expect(imessageTimestamps(events).has("turn-1:assistant")).toBe(false);
+});
+
+it("does not project a removed reaction as a new message", () => {
+  const events = [
+    toolResult("react_to_message", { operation: "remove", type: "heart" }),
+  ];
+
+  expect(sentMessages(events).has("turn-1:assistant")).toBe(false);
+});
+
+it("projects a native link-preview send as its URL", () => {
+  const events = [
+    toolResult(
+      "send_message",
+      { kind: "link", url: "https://example.com/article" },
+      1,
+      "2026-09-01T12:00:01.000Z"
+    ),
+  ];
+
+  expect(sentMessages(events).get("turn-1:assistant")).toEqual([
+    {
+      id: "turn-1:assistant:call-send_message",
+      parts: [
+        {
+          state: "done",
+          stepIndex: 1,
+          text: "https://example.com/article",
+          type: "text",
+        },
+      ],
+      timestamp: "2026-09-01T12:00:01.000Z",
+    },
+  ]);
+});
+
+it("keeps plain-text line breaks visible in the chat view", () => {
+  const events = [
+    toolResult(
+      "send_message",
+      { kind: "message", text: "line one\nline two" },
+      1,
+      "2026-09-01T12:00:01.000Z",
+      "completed",
+      "call-lines"
+    ),
+  ];
+
+  expect(sentMessages(events).get("turn-1:assistant")).toEqual([
+    expect.objectContaining({
+      parts: [expect.objectContaining({ text: "line one  \nline two" })],
+    }),
+  ]);
+});
+
+it("treats reply association as transport metadata in the Eve chat", () => {
+  const events = [
+    toolResult(
+      "send_message",
+      {
+        kind: "message",
+        replyTo: { kind: "current" },
+        text: "This is still a normal Eve message.",
+      },
+      1
+    ),
+  ];
+
+  expect(sentMessages(events).get("turn-1:assistant")).toEqual([
+    expect.objectContaining({
+      parts: [
+        expect.objectContaining({
+          text: "This is still a normal Eve message.",
+        }),
+      ],
+    }),
+  ]);
+});
+
+it("keeps consecutive sends in the same turn as separate messages", () => {
+  const events = [
+    toolResult(
+      "send_message",
+      { kind: "message", text: "The useful result." },
+      1,
+      "2026-09-01T12:00:01.000Z",
+      "completed",
+      "call-result"
+    ),
+    toolResult(
+      "send_message",
+      { kind: "message", text: "Want me to book it?" },
+      2,
+      "2026-09-01T12:00:02.000Z",
+      "completed",
+      "call-question"
+    ),
+  ];
+
+  expect(sentMessages(events).get("turn-1:assistant")).toEqual([
+    expect.objectContaining({
+      id: "turn-1:assistant:call-result",
+      parts: [expect.objectContaining({ text: "The useful result." })],
+    }),
+    expect.objectContaining({
+      id: "turn-1:assistant:call-question",
+      parts: [expect.objectContaining({ text: "Want me to book it?" })],
+    }),
+  ]);
+});
+
+it("shows a task report once across call retries and later terminal deliveries", () => {
+  const first = toolResult(
+    "send_message",
+    { kind: "message", text: "Original report", deliveryId: "report-a" },
+    1,
+    undefined,
+    "completed",
+    "call-first"
+  );
+
+  const retry = toolResult(
+    "send_message",
+    { kind: "message", text: "Reworded report", deliveryId: "report-a" },
+    2,
+    undefined,
+    "completed",
+    "call-retry"
+  );
+
+  if (retry.type !== "action.result")
+    throw new Error("Expected result fixture");
+  const later = { ...retry, data: { ...retry.data, turnId: "turn-2" } };
+
+  const next = toolResult(
+    "send_message",
+    { kind: "message", text: "Different task", deliveryId: "report-b" },
+    3,
+    undefined,
+    "completed",
+    "call-next"
+  );
+
+  const ordinary = toolResult(
+    "send_message",
+    { kind: "message", text: "An ordinary answer" },
+    4,
+    undefined,
+    "completed",
+    "call-ordinary"
+  );
+
+  const messages = [
+    ...sentMessages([first, retry, later, next, ordinary]).values(),
+  ].flat();
+
+  expect(messages).toHaveLength(3);
+  expect(messages.map((message) => message.parts)).toEqual([
+    [expect.objectContaining({ text: "Original report" })],
+    [expect.objectContaining({ text: "Different task" })],
+    [expect.objectContaining({ text: "An ordinary answer" })],
+  ]);
+});
+
+it("does not display an already-delivered task receipt as another message", () => {
+  expect(
+    sentMessages([
+      toolResult("send_message", {
+        kind: "task-report-receipt",
+        deliveryId: "report-a",
       }),
-    ]);
-    expect(imessageTimestamps(events).has("turn-1:assistant")).toBe(false);
-  });
+    ]).size
+  ).toBe(0);
+});
 
-  it("does not project a removed reaction as a new message", () => {
+it.each(["failed", "rejected"] as const)(
+  "ignores %s send_message results",
+  (status) => {
     const events = [
-      toolResult("react_to_message", { operation: "remove", type: "heart" }),
+      toolResult(
+        "send_message",
+        { kind: "message", text: "This was not delivered." },
+        0,
+        "2026-09-01T12:00:01.000Z",
+        status
+      ),
     ];
 
     expect(sentMessages(events).has("turn-1:assistant")).toBe(false);
-  });
-
-  it("projects a native link-preview send as its URL", () => {
-    const events = [
-      toolResult(
-        "send_message",
-        { kind: "link", url: "https://example.com/article" },
-        1,
-        "2026-09-01T12:00:01.000Z"
-      ),
-    ];
-
-    expect(sentMessages(events).get("turn-1:assistant")).toEqual([
-      {
-        id: "turn-1:assistant:call-send_message",
-        parts: [
-          {
-            state: "done",
-            stepIndex: 1,
-            text: "https://example.com/article",
-            type: "text",
-          },
-        ],
-        timestamp: "2026-09-01T12:00:01.000Z",
-      },
-    ]);
-  });
-
-  it("keeps plain-text line breaks visible in the chat view", () => {
-    const events = [
-      toolResult(
-        "send_message",
-        { kind: "message", text: "line one\nline two" },
-        1,
-        "2026-09-01T12:00:01.000Z",
-        "completed",
-        "call-lines"
-      ),
-    ];
-
-    expect(sentMessages(events).get("turn-1:assistant")).toEqual([
-      expect.objectContaining({
-        parts: [expect.objectContaining({ text: "line one  \nline two" })],
-      }),
-    ]);
-  });
-
-  it("treats reply association as transport metadata in the Eve chat", () => {
-    const events = [
-      toolResult(
-        "send_message",
-        {
-          kind: "message",
-          replyTo: { kind: "current" },
-          text: "This is still a normal Eve message.",
-        },
-        1
-      ),
-    ];
-
-    expect(sentMessages(events).get("turn-1:assistant")).toEqual([
-      expect.objectContaining({
-        parts: [
-          expect.objectContaining({
-            text: "This is still a normal Eve message.",
-          }),
-        ],
-      }),
-    ]);
-  });
-
-  it("keeps consecutive sends in the same turn as separate messages", () => {
-    const events = [
-      toolResult(
-        "send_message",
-        { kind: "message", text: "The useful result." },
-        1,
-        "2026-09-01T12:00:01.000Z",
-        "completed",
-        "call-result"
-      ),
-      toolResult(
-        "send_message",
-        { kind: "message", text: "Want me to book it?" },
-        2,
-        "2026-09-01T12:00:02.000Z",
-        "completed",
-        "call-question"
-      ),
-    ];
-
-    expect(sentMessages(events).get("turn-1:assistant")).toEqual([
-      expect.objectContaining({
-        id: "turn-1:assistant:call-result",
-        parts: [expect.objectContaining({ text: "The useful result." })],
-      }),
-      expect.objectContaining({
-        id: "turn-1:assistant:call-question",
-        parts: [expect.objectContaining({ text: "Want me to book it?" })],
-      }),
-    ]);
-  });
-
-  it("shows a task report once across call retries and later terminal deliveries", () => {
-    const first = toolResult(
-      "send_message",
-      { kind: "message", text: "Original report", deliveryId: "report-a" },
-      1,
-      undefined,
-      "completed",
-      "call-first"
-    );
-    const retry = toolResult(
-      "send_message",
-      { kind: "message", text: "Reworded report", deliveryId: "report-a" },
-      2,
-      undefined,
-      "completed",
-      "call-retry"
-    );
-    if (retry.type !== "action.result")
-      throw new Error("Expected result fixture");
-    const later = { ...retry, data: { ...retry.data, turnId: "turn-2" } };
-    const next = toolResult(
-      "send_message",
-      { kind: "message", text: "Different task", deliveryId: "report-b" },
-      3,
-      undefined,
-      "completed",
-      "call-next"
-    );
-    const ordinary = toolResult(
-      "send_message",
-      { kind: "message", text: "An ordinary answer" },
-      4,
-      undefined,
-      "completed",
-      "call-ordinary"
-    );
-    const messages = [
-      ...sentMessages([first, retry, later, next, ordinary]).values(),
-    ].flat();
-    expect(messages).toHaveLength(3);
-    expect(messages.map((message) => message.parts)).toEqual([
-      [expect.objectContaining({ text: "Original report" })],
-      [expect.objectContaining({ text: "Different task" })],
-      [expect.objectContaining({ text: "An ordinary answer" })],
-    ]);
-  });
-
-  it("does not display an already-delivered task receipt as another message", () => {
-    expect(
-      sentMessages([
-        toolResult("send_message", {
-          kind: "task-report-receipt",
-          deliveryId: "report-a",
-        }),
-      ]).size
-    ).toBe(0);
-  });
-
-  it.each(["failed", "rejected"] as const)(
-    "ignores %s send_message results",
-    (status) => {
-      const events = [
-        toolResult(
-          "send_message",
-          { kind: "message", text: "This was not delivered." },
-          0,
-          "2026-09-01T12:00:01.000Z",
-          status
-        ),
-      ];
-
-      expect(sentMessages(events).has("turn-1:assistant")).toBe(false);
-      expect(imessageTimestamps(events).has("turn-1:assistant")).toBe(false);
-    }
-  );
-});
+    expect(imessageTimestamps(events).has("turn-1:assistant")).toBe(false);
+  }
+);
 
 function toolResult(
   toolName: string,

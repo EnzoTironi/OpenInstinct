@@ -1,11 +1,12 @@
-import type { MessageStreamEvent } from "eve/client";
-import { describe, expect, it } from "vitest";
 import {
   didCompleteWorker,
   didFinishWorker,
 } from "@evals/browser/worker-events";
+import type { MessageStreamEvent } from "eve/client";
+import { describe, expect, it } from "vitest";
 
 type ActionResultEvent = Extract<MessageStreamEvent, { type: "action.result" }>;
+
 type SubagentResult = Extract<
   ActionResultEvent["data"]["result"],
   { kind: "subagent-result"; origin: "child" }
@@ -108,7 +109,9 @@ describe("browser benchmark event detection", () => {
       { agentId: "agent_worker", status: "working", taskId: "task_worker" },
       { status: "working", taskId: "task_worker" }
     );
+
     const initialTurn = [receipt];
+
     const terminalTurn = [
       completedWorkerNotification({
         message: "Browser assignment completed.",
@@ -125,6 +128,7 @@ describe("browser benchmark event detection", () => {
       { agentId: "agent_worker", status: "working", taskId: "task_worker" },
       { status: "working", taskId: "task_worker" }
     );
+
     const events = [
       receipt,
       completedWorkerNotification({
@@ -144,6 +148,7 @@ describe("browser benchmark event detection", () => {
         { agentId: "agent_worker", status: "working", taskId: "task_worker" },
         { status: "working", taskId: "task_worker" }
       );
+
       const initialTurn = [receipt];
       const terminalTurn = [terminalWorkerNotification(notification)];
       const events = [...initialTurn, ...terminalTurn];

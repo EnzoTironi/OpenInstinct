@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as WorkerAccess from "@agent/subagents/browser-agent/lib/access";
-import * as OwnedBrowser from "@agent/subagents/browser-agent/lib/owned-browser";
 import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
-import { toolContextFor } from "@tests/helpers/tool-context";
+import * as OwnedBrowser from "@agent/subagents/browser-agent/lib/owned-browser";
 import computerAction from "@agent/subagents/browser-agent/tools/computer_action";
+import { toolContextFor } from "@tests/helpers/tool-context";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = {
   batch: vi.spyOn(getKernel().browsers.computer, "batch"),
@@ -36,6 +36,7 @@ describe("worker browser tools", () => {
   it("sends contiguous computer actions through Kernel batch while preserving read order", async () => {
     const execute = computerAction.execute;
     const context = toolContextFor();
+
     const result = await execute(
       {
         actions: [

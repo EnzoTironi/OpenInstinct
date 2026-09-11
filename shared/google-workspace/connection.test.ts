@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { googleWorkspaceReturnTo } from "./connection";
 
 describe("Google connection return destination", () => {
@@ -8,10 +9,12 @@ describe("Google connection return destination", () => {
     "/chat/" + "a".repeat(256),
   ])("preserves the original concrete chat %s", (path) => {
     expect(googleWorkspaceReturnTo(path)).toBe(path);
+
     const callback = new URL(
       googleWorkspaceReturnTo(path),
       "https://companion.example"
     );
+
     callback.searchParams.set("google", "connected");
     expect(callback.origin).toBe("https://companion.example");
     expect(callback.pathname).toBe(path);

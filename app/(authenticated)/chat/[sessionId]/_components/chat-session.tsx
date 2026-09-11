@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import type { ChatUsage } from "@shared/chat/schema";
+import { useState } from "react";
+
 import type { TraceView } from "../_lib/trace-view";
 import { SubagentPanel } from "./activity";
 import { ChatConversation } from "./conversation";

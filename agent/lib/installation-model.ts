@@ -7,7 +7,9 @@ export const installationModel = Effect.gen(function* () {
     ["gateway", "openrouter-free", "codex-local"],
     "COMPANION_MODEL_PROVIDER"
   ).pipe(Config.withDefault("gateway"));
+
   if (provider === "gateway") return null;
+
   if (provider === "codex-local")
     return {
       model: chatgpt("gpt-5.3-codex-spark"),
@@ -18,9 +20,10 @@ export const installationModel = Effect.gen(function* () {
     };
 
   const key = yield* Config.schema(
-    Schema.Redacted(Schema.NonEmptyString.check(Schema.isTrimmed())),
+    Schema.RedactedFromValue(Schema.NonEmptyString.check(Schema.isTrimmed())),
     "OPENROUTER_API_KEY"
   );
+
   const openrouter = createOpenRouter({
     apiKey: Redacted.value(key),
     compatibility: "strict",
@@ -31,6 +34,7 @@ export const installationModel = Effect.gen(function* () {
       },
     },
   });
+
   return {
     model: openrouter("nvidia/nemotron-3.5-lightning:free"),
     modelContextWindowTokens: 1_000_000,

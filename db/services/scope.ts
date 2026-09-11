@@ -1,7 +1,7 @@
+import { db, workspaceMemberships, workspaces } from "@db";
+import type { AccessScope } from "@shared/identity/access-scope";
 import { and, eq } from "drizzle-orm";
 import { Schema } from "effect";
-import type { AccessScope } from "@shared/identity/access-scope";
-import { db, workspaceMemberships, workspaces } from "@db";
 
 class ScopeAccessDenied extends Schema.TaggedError<ScopeAccessDenied>()(
   "ScopeAccessDenied",
@@ -17,6 +17,7 @@ export async function ensureScope(scope: AccessScope) {
       .values({ createdAt, id: scope.workspaceId })
       .onConflictDoNothing({ target: workspaces.id })
       .returning({ id: workspaces.id });
+
     if (created.length === 1) {
       await transaction.insert(workspaceMemberships).values({
         createdAt,
@@ -24,8 +25,10 @@ export async function ensureScope(scope: AccessScope) {
         userId: scope.userId,
         workspaceId: scope.workspaceId,
       });
+
       return;
     }
+
     const membership = await transaction
       .select({ userId: workspaceMemberships.userId })
       .from(workspaceMemberships)
@@ -36,6 +39,7 @@ export async function ensureScope(scope: AccessScope) {
         )
       )
       .limit(1);
+
     if (!membership[0]) throw new ScopeAccessDenied();
   });
 }

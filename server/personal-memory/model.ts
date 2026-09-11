@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import type { UserProfile } from "@shared/user-profile/schema";
+import { Schema } from "effect";
 
 export const storedNoteSchema = Schema.Struct({
   content: Schema.String,

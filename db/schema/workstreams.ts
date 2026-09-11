@@ -1,3 +1,4 @@
+import type { WorkstreamContent } from "@shared/workstreams/schema";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -9,7 +10,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import type { WorkstreamContent } from "@shared/workstreams/schema";
+
 import { workspaces } from "./workspaces";
 
 export const workstreams = pgTable(

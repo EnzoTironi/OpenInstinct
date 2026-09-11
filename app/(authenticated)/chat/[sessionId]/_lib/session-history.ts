@@ -2,9 +2,13 @@ import { Client, type MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 
 const eventsPerRead = 128;
+
 const messagesPerPage = 4;
+
 const tailIndexHeader = "x-eve-stream-tail-index";
+
 const client = new Client({ host: "" });
+
 const messageStreamEventSchema = z.custom<MessageStreamEvent>(
   (value) =>
     z
@@ -34,6 +38,7 @@ export async function readLatestSessionHistory(
     }),
     { cache: "no-store", signal }
   );
+
   if (!response.ok) throw await streamResponseError(response);
 
   const tailIndex = readTailIndex(response);
@@ -83,7 +88,9 @@ async function extendToMessageBoundary(
   const messageIndexes = page.events.flatMap((event, index) =>
     event.type === "message.received" ? [index] : []
   );
+
   const firstMessage = messageIndexes.at(-messagesPerPage);
+
   if (firstMessage === undefined || firstMessage === 0) return page;
 
   return {
@@ -100,9 +107,11 @@ async function readEventChunk(
 ): Promise<SessionHistoryPage> {
   const startIndex = Math.max(0, before - eventsPerRead);
   const eventLimit = before - startIndex;
+
   const session = client.sessions.attach(sessionId, {
     streamIndex: startIndex,
   });
+
   const events: MessageStreamEvent[] = [];
 
   for await (const event of session.stream({
@@ -111,6 +120,7 @@ async function readEventChunk(
     startIndex,
   })) {
     events.push(event);
+
     if (events.length === eventLimit) break;
   }
 
@@ -131,31 +141,38 @@ function sessionStreamUrl(
   const search = new URLSearchParams({
     startIndex: options.startIndex.toString(),
   });
+
   if (options.includeTailIndex) search.set("includeTailIndex", "1");
+
   return `/eve/v1/session/${encodeURIComponent(sessionId)}/stream?${search}`;
 }
 
 function readTailIndex(response: Response) {
   const value = response.headers.get(tailIndexHeader);
   const index = value === null ? Number.NaN : Number(value);
+
   if (!Number.isSafeInteger(index) || index < -1) {
     throw new Error("The session stream did not report a valid tail index.");
   }
+
   return index;
 }
 
 async function readNdjsonEvents(response: Response) {
   const body = await response.text();
   const events: MessageStreamEvent[] = [];
+
   for (const line of body.split("\n")) {
     if (!line.trim()) continue;
     events.push(messageStreamEventSchema.parse(JSON.parse(line)));
   }
+
   return events;
 }
 
 async function streamResponseError(response: Response) {
   const body = await response.text();
+
   return new Error(
     body.trim() ||
       `Unable to read the session stream (${String(response.status)}).`

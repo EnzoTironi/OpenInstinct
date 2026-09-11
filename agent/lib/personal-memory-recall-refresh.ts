@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import type {
   MemoryRecallMessage,
   MemoryRecallResult,
@@ -31,27 +31,24 @@ export type RecallRefreshPhase =
   | { readonly kind: "dirty"; readonly reason: "mutation-pending-refresh" }
   | { readonly kind: "absent" };
 
-export class RecallRefreshError extends Error {
-  readonly reason:
-    | "refresh-failed"
-    | "stale-projection"
-    | "missing-recall"
-    | "mutation-tool-unavailable";
-
-  constructor(
-    reason: RecallRefreshError["reason"],
-    message = "Personal memory recall refresh failed closed."
-  ) {
-    super(message);
-    this.name = "RecallRefreshError";
-    this.reason = reason;
+export class RecallRefreshError extends Schema.TaggedError<RecallRefreshError>()(
+  "RecallRefreshError",
+  {
+    reason: Schema.Literals([
+      "refresh-failed",
+      "stale-projection",
+      "missing-recall",
+      "mutation-tool-unavailable",
+    ]),
+    message: Schema.optional(Schema.String),
   }
-}
+) {}
 
 const MUTATING_MEMORY_TOOLS = new Set(["save_memory", "remove_memory"]);
 
 export function isMutatingMemoryTool(name: string): boolean {
   const bare = name.includes("__") ? (name.split("__").at(-1) ?? name) : name;
+
   return MUTATING_MEMORY_TOOLS.has(bare);
 }
 
@@ -59,6 +56,7 @@ export function recalledProjectionFrom(
   result: MemoryRecallResult
 ): RecalledProjection {
   if (result == null) return { messages: [] };
+
   return { messages: result.messages };
 }
 
@@ -69,31 +67,58 @@ export function recalledProjectionFrom(
  * refresh are dropped (forgotten). Prior unkeyed fragments are never kept —
  * they would resurrect unstructured notes from an older projection.
  */
-export function projectNotesForNextModelStep(
+function refreshedMessageIds(refreshed: RecalledProjection) {
+  const ids = new Set<string>();
+
+  for (const message of refreshed.messages) {
+    if (message.id === undefined) continue;
+    ids.add(message.id);
+  }
+
+  return ids;
+}
+
+function seedPriorKeyedMessages(
   prior: RecalledProjection,
-  refreshed: RecalledProjection
-): RecalledProjection {
-  const refreshedIds = new Set(
-    refreshed.messages.flatMap((message) =>
-      message.id === undefined ? [] : [message.id]
-    )
-  );
+  refreshedIds: ReadonlySet<string>
+) {
   const byId = new Map<string, MemoryRecallMessage>();
-  const unkeyed: MemoryRecallMessage[] = [];
 
   for (const message of prior.messages) {
     if (message.id === undefined) continue;
+
     if (!refreshedIds.has(message.id)) continue;
     byId.set(message.id, message);
   }
+
+  return byId;
+}
+
+function mergeRefreshedMessages(
+  byId: Map<string, MemoryRecallMessage>,
+  refreshed: RecalledProjection
+) {
+  const unkeyed: MemoryRecallMessage[] = [];
 
   for (const message of refreshed.messages) {
     if (message.id === undefined) {
       unkeyed.push(message);
       continue;
     }
+
     byId.set(message.id, message);
   }
+
+  return unkeyed;
+}
+
+export function projectNotesForNextModelStep(
+  prior: RecalledProjection,
+  refreshed: RecalledProjection
+): RecalledProjection {
+  const refreshedIds = refreshedMessageIds(refreshed);
+  const byId = seedPriorKeyedMessages(prior, refreshedIds);
+  const unkeyed = mergeRefreshedMessages(byId, refreshed);
 
   return { messages: [...byId.values(), ...unkeyed] };
 }
@@ -115,11 +140,12 @@ const refreshRecalledProjection = Effect.fn("refreshRecalledProjection")(
     const result = yield* Effect.tryPromise({
       try: () => Promise.resolve(input.recall(input.context)),
       catch: (cause) =>
-        new RecallRefreshError(
-          "refresh-failed",
-          cause instanceof Error ? cause.message : String(cause)
-        ),
+        new RecallRefreshError({
+          reason: "refresh-failed",
+          message: cause instanceof Error ? cause.message : String(cause),
+        }),
     });
+
     return recalledProjectionFrom(result);
   }
 );
@@ -155,6 +181,7 @@ export const executeMemoryMutationWithRecallRefresh = Effect.fn(
     input.priorProjection ?? { messages: [] },
     refreshed
   );
+
   const phase: RecallRefreshPhase = { kind: "clean", projection };
 
   return { mutationResult, projection, phase };
@@ -164,21 +191,20 @@ export const requireCleanProjectionForNextModelStep = Effect.fn(
   "requireCleanProjectionForNextModelStep"
 )(function* (phase: RecallRefreshPhase) {
   if (phase.kind === "dirty") {
-    return yield* Effect.fail(
-      new RecallRefreshError(
-        "stale-projection",
-        "Refusing next model step with a dirty recalled projection after memory mutation."
-      )
-    );
+    return yield* new RecallRefreshError({
+      reason: "stale-projection",
+      message:
+        "Refusing next model step with a dirty recalled projection after memory mutation.",
+    });
   }
+
   if (phase.kind === "absent") {
-    return yield* Effect.fail(
-      new RecallRefreshError(
-        "missing-recall",
-        "No recalled projection is available for the next model step."
-      )
-    );
+    return yield* new RecallRefreshError({
+      reason: "missing-recall",
+      message: "No recalled projection is available for the next model step.",
+    });
   }
+
   return phase.projection;
 });
 

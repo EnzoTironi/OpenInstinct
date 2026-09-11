@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import {
   defineMemoryProvider,
   type MemoryOperationContext,
@@ -6,17 +7,17 @@ import {
   type MemoryTurnStartedContext,
 } from "eve/memory";
 import { fileMemory } from "eve/memory/file";
-import { Effect } from "effect";
+
 import { serverRuntime } from "../../server/runtime";
 import { createMemoryDocumentBackend } from "./memory-document-backend";
 import { authorizePersonalMemoryContext } from "./personal-memory-access";
-import { preserveProfileMemoryCancellation } from "./profile-memory";
 import {
   executeMemoryMutationWithRecallRefresh,
   isMutatingMemoryTool,
   recallContextFromTools,
   type RecalledProjection,
 } from "./personal-memory-recall-refresh";
+import { preserveProfileMemoryCancellation } from "./profile-memory";
 
 const fileFor = (context: MemoryOperationContext | MemoryToolsContext) =>
   fileMemory({
@@ -29,6 +30,7 @@ async function recallProjection(
   context: MemoryTurnStartedContext
 ): Promise<RecalledProjection> {
   const recalled = await fileFor(context).recall["turn.started"](context);
+
   return { messages: recalled?.messages ?? [] };
 }
 
@@ -43,7 +45,9 @@ export const personalMemoryProvider = preserveProfileMemoryCancellation(
     async tools(context) {
       await serverRuntime.runPromise(authorizePersonalMemoryContext(context));
       const tools = await fileFor(context).tools?.(context);
+
       if (!tools) return null;
+
       return Object.fromEntries(
         Object.entries(tools).map(([name, tool]) => [
           name,
@@ -55,8 +59,10 @@ export const personalMemoryProvider = preserveProfileMemoryCancellation(
                 session: executionContext.session,
                 abortSignal: executionContext.abortSignal,
               };
+
               const rebound = await fileFor(current).tools?.(current);
               const target = rebound?.[name];
+
               if (!target)
                 throw new Error("Native memory tool is unavailable.");
 
@@ -68,6 +74,7 @@ export const personalMemoryProvider = preserveProfileMemoryCancellation(
                 current,
                 executionContext
               );
+
               const prior = await recallProjection(recallContext);
 
               // Order: Eve fileMemory mutate → refresh recalled projection →
@@ -80,6 +87,7 @@ export const personalMemoryProvider = preserveProfileMemoryCancellation(
                   priorProjection: prior,
                 })
               );
+
               return mutationResult;
             },
           } satisfies MemoryToolSet[string],

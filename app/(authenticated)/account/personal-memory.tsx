@@ -1,30 +1,95 @@
-import { Effect, Result } from "effect";
-import Link from "next/link";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { inspectPersonalMemory } from "../../../server/personal-memory/export";
-import { serverRuntime } from "../../../server/runtime";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { buttonVariants } from "@web/components/ui/button";
+import { Effect, Result } from "effect";
+import { headers } from "next/headers";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export async function PersonalMemorySection() {
-  const result = await serverRuntime.runPromise(
-    inspectPersonalMemory(await headers()).pipe(Effect.result)
-  );
-  if (Result.isFailure(result)) {
-    if (result.failure.reason === "unauthenticated")
-      redirect("/sign-in?callbackUrl=%2Faccount");
+import { inspectPersonalMemory } from "../../../server/personal-memory/export";
+import { serverRuntime } from "../../../server/runtime";
+
+type MemorySnapshot = Effect.Success<ReturnType<typeof inspectPersonalMemory>>;
+
+function ProfileEntries({
+  profile,
+}: {
+  readonly profile: readonly (readonly [string, string])[];
+}) {
+  if (profile.length === 0) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>Couldn&apos;t load personal memory</AlertTitle>
-        <AlertDescription>Reload this page to try again.</AlertDescription>
-      </Alert>
+      <p className="type-supporting-body text-muted-foreground">
+        No profile details saved.
+      </p>
     );
   }
-  const snapshot = result.success;
-  const profile = Object.entries(snapshot.profile).filter(
-    ([, value]) => value !== null
+
+  return (
+    <dl className="type-supporting-body grid gap-2">
+      {profile.map(([field, value]) => (
+        <div key={field} className="grid gap-1 sm:grid-cols-2">
+          <dt className="text-muted-foreground capitalize">
+            {field.replaceAll(/([A-Z])/g, " $1")}
+          </dt>
+          <dd className="wrap-break-word">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
+}
+
+function noteDocumentContent(content: string): string {
+  return (
+    content.replace(/^<!--[^\n]*-->\r?\n/u, "") ||
+    "No notes saved in this document."
+  );
+}
+
+function AssistantNotes({
+  notes,
+}: {
+  readonly notes: MemorySnapshot["notes"];
+}) {
+  if (notes.status === "unresolved") {
+    return (
+      <p className="type-supporting-body text-muted-foreground">
+        Notes have not been located for this account yet. Continue a
+        conversation with your assistant, then reload. This does not mean no
+        notes are stored.
+      </p>
+    );
+  }
+
+  if (notes.documents.length === 0) {
+    return (
+      <p className="type-supporting-body text-muted-foreground">
+        No notes saved in the located memory.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {notes.documents.map((document) => (
+        <pre
+          key={document.version}
+          className="type-supporting-body rounded-lg bg-muted p-3 wrap-break-word whitespace-pre-wrap"
+        >
+          {noteDocumentContent(document.content)}
+        </pre>
+      ))}
+    </>
+  );
+}
+
+function PersonalMemoryBody({
+  snapshot,
+}: {
+  readonly snapshot: MemorySnapshot;
+}) {
+  const profile = Object.entries(snapshot.profile).filter(
+    (entry): entry is [string, string] => entry[1] !== null
+  );
+
   return (
     <section
       aria-labelledby="personal-memory-heading"
@@ -41,22 +106,7 @@ export async function PersonalMemorySection() {
         </p>
       </div>
       <h3 className="type-supporting-body font-medium">Saved profile</h3>
-      {profile.length ? (
-        <dl className="type-supporting-body grid gap-2">
-          {profile.map(([field, value]) => (
-            <div key={field} className="grid gap-1 sm:grid-cols-2">
-              <dt className="text-muted-foreground capitalize">
-                {field.replaceAll(/([A-Z])/g, " $1")}
-              </dt>
-              <dd className="wrap-break-word">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="type-supporting-body text-muted-foreground">
-          No profile details saved.
-        </p>
-      )}
+      <ProfileEntries profile={profile} />
       <Link
         href="/personal-info"
         className={buttonVariants({ variant: "outline" })}
@@ -70,27 +120,7 @@ export async function PersonalMemorySection() {
         assistant can update both profile details and notes. Earlier
         conversations and downloaded copies remain separate.
       </p>
-      {snapshot.notes.status === "unresolved" ? (
-        <p className="type-supporting-body text-muted-foreground">
-          Notes have not been located for this account yet. Continue a
-          conversation with your assistant, then reload. This does not mean no
-          notes are stored.
-        </p>
-      ) : snapshot.notes.documents.length ? (
-        snapshot.notes.documents.map((document) => (
-          <pre
-            key={document.version}
-            className="type-supporting-body rounded-lg bg-muted p-3 wrap-break-word whitespace-pre-wrap"
-          >
-            {document.content.replace(/^<!--[^\n]*-->\r?\n/u, "") ||
-              "No notes saved in this document."}
-          </pre>
-        ))
-      ) : (
-        <p className="type-supporting-body text-muted-foreground">
-          No notes saved in the located memory.
-        </p>
-      )}
+      <AssistantNotes notes={snapshot.notes} />
       <a
         href="/api/account/personal-memory/export"
         download
@@ -100,4 +130,25 @@ export async function PersonalMemorySection() {
       </a>
     </section>
   );
+}
+
+export async function PersonalMemorySection() {
+  const result = await serverRuntime.runPromise(
+    inspectPersonalMemory(await headers()).pipe(Effect.result)
+  );
+
+  if (Result.isFailure(result)) {
+    if (result.failure.reason === "unauthenticated") {
+      redirect("/sign-in?callbackUrl=%2Faccount");
+    }
+
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Couldn&apos;t load personal memory</AlertTitle>
+        <AlertDescription>Reload this page to try again.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  return <PersonalMemoryBody snapshot={result.success} />;
 }

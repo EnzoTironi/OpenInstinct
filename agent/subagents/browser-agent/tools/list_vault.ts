@@ -1,7 +1,7 @@
-import { defineTool } from "eve/tools";
-import { z } from "zod";
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
 import { readVaultItems } from "@db/services/vault";
+import { defineTool } from "eve/tools";
+import { z } from "zod";
 
 export default defineTool({
   description:
@@ -9,6 +9,7 @@ export default defineTool({
   inputSchema: z.object({}),
   async execute(_input, ctx) {
     const items = await readVaultItems(await requireWorkerScope(ctx));
+
     return items.map(({ account, hasSecret, id, kind, label }) => ({
       account,
       available: hasSecret,

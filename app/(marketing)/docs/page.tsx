@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+
 import { DocsPanel } from "./_components/docs-panel";
 
 export const metadata: Metadata = {

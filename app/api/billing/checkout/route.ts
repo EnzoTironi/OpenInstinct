@@ -1,5 +1,6 @@
-import { Effect, Schema } from "effect";
 import { getAuthSession } from "@db/services/auth/session";
+import { Effect, Schema } from "effect";
+
 import {
   BillingCheckoutError,
   createCheckoutSession,
@@ -11,49 +12,79 @@ const bodySchema = Schema.Struct({
   seatCount: Schema.optionalKey(Schema.Number),
 });
 
+const decodeBodySchema = Schema.decodeUnknownEffect(bodySchema);
+
+function checkoutErrorStatus(reason: BillingCheckoutError["reason"]): number {
+  if (reason === "stripe_not_configured") {
+    return 503;
+  }
+
+  if (reason === "org_forbidden" || reason === "org_required") {
+    return 403;
+  }
+
+  return 400;
+}
+
 function checkoutErrorResponse(error: BillingCheckoutError) {
-  const status =
-    error.reason === "stripe_not_configured"
-      ? 503
-      : error.reason === "org_forbidden" || error.reason === "org_required"
-        ? 403
-        : 400;
   return Response.json(
     { error: error.message, reason: error.reason },
-    { status }
+    { status: checkoutErrorStatus(error.reason) }
   );
+}
+
+function invalidCheckoutPayloadError() {
+  return new BillingCheckoutError({
+    reason: "invalid_plan",
+    message: "Invalid checkout payload.",
+  });
+}
+
+function mapCheckoutBody(
+  body: typeof bodySchema.Type,
+  sessionUser: {
+    readonly id: string;
+    readonly email: string;
+  }
+) {
+  return createCheckoutSession({
+    userId: sessionUser.id,
+    email: sessionUser.email,
+    plan: body.plan,
+    organizationId: body.organizationId,
+    seatCount: body.seatCount,
+  });
+}
+
+function checkoutSuccessResponse(result: { readonly url: string }) {
+  return Response.json({ url: result.url });
+}
+
+function catchCheckoutError(error: BillingCheckoutError) {
+  return Effect.succeed(checkoutErrorResponse(error));
 }
 
 export async function POST(request: Request) {
   const session = await getAuthSession(request.headers);
+
   if (!session?.user) {
     return Response.json({ error: "Sign in to upgrade." }, { status: 401 });
   }
 
-  const rawBody: unknown = await request.json().catch(() => null);
+  const rawBody: unknown = await request.json().catch(nullBody);
+  const user = session.user;
+
   return Effect.runPromise(
-    Schema.decodeUnknownEffect(bodySchema)(rawBody ?? {}).pipe(
-      Effect.mapError(
-        () =>
-          new BillingCheckoutError({
-            reason: "invalid_plan",
-            message: "Invalid checkout payload.",
-          })
-      ),
-      Effect.flatMap((body) =>
-        createCheckoutSession({
-          userId: session.user.id,
-          email: session.user.email,
-          plan: body.plan,
-          organizationId: body.organizationId,
-          seatCount: body.seatCount,
-        })
-      ),
-      Effect.map((result) => Response.json({ url: result.url })),
-      Effect.catchTag("BillingCheckoutError", (error) =>
-        Effect.succeed(checkoutErrorResponse(error))
-      )
+    decodeBodySchema(rawBody ?? {}).pipe(
+      Effect.mapError(invalidCheckoutPayloadError),
+      Effect.flatMap((body) => mapCheckoutBody(body, user)),
+      Effect.map(checkoutSuccessResponse),
+      Effect.catchTag("BillingCheckoutError", catchCheckoutError)
     ),
     { signal: request.signal }
   );
+}
+
+function nullBody() {
+  return null;
 }

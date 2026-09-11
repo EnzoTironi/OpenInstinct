@@ -23,6 +23,7 @@ export function toolContextFor({
         turn: { id: "parent-turn", sequence: 0 },
       }
     : undefined;
+
   return {
     abortSignal,
     callId,

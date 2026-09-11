@@ -1,8 +1,10 @@
 "use client";
 
-import { type SubmitEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { z } from "zod";
+import {
+  paymentCardBrand,
+  paymentCardType,
+  serializePaymentCard,
+} from "@shared/vault/schema";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import { DialogFooter } from "@web/components/ui/dialog";
@@ -14,11 +16,19 @@ import {
 } from "@web/components/ui/field";
 import { Input } from "@web/components/ui/input";
 import {
-  paymentCardBrand,
-  paymentCardType,
-  serializePaymentCard,
-} from "@shared/vault/schema";
-import { api } from "@web/trpc/client";
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useState,
+} from "react";
+import { z } from "zod";
+
+import {
+  patchVaultForm,
+  useVaultFormSubmit,
+  useVaultItemCreate,
+  vaultFormErrors,
+} from "../use-vault-form";
 
 const paymentCardFormSchema = z.object({
   billingPostalCode: z.string().trim().min(1, "Enter the billing postal code."),
@@ -39,22 +49,107 @@ const paymentCardFormSchema = z.object({
   nickname: z.string().trim().max(120),
 });
 
-export function CardForm({
-  initialLabel = "",
-  onSaved,
-}: {
-  readonly initialLabel?: string;
-  readonly onSaved: () => void;
-}) {
-  const router = useRouter();
-  const create = api.vault.create.useMutation({
-    onSuccess: () => {
-      router.refresh();
-      onSaved();
+interface CardFormState {
+  billingPostalCode: string;
+  cardNumber: string;
+  cardholderName: string;
+  cvc: string;
+  expiration: string;
+  nickname: string;
+}
+
+function createCardPayload(data: z.output<typeof paymentCardFormSchema>) {
+  const [month, shortYear] = data.expiration.split(" / ");
+
+  if (month === undefined || shortYear === undefined) return undefined;
+
+  const brand = paymentCardBrand(data.cardNumber);
+  const lastFour = data.cardNumber.slice(-4);
+
+  return {
+    account: `${brand} · •••• ${lastFour}`,
+    kind: "payment" as const,
+    label: data.nickname || `${brand} ${lastFour}`,
+    secret: serializePaymentCard({
+      billingPostalCode: data.billingPostalCode,
+      cardholderName: data.cardholderName,
+      expirationMonth: Number(month),
+      expirationYear: 2000 + Number(shortYear),
+      kind: "payment-card",
+      number: data.cardNumber,
+      securityCode: data.cvc,
+      version: 1,
+    }),
+  };
+}
+
+function useCardIdentityHandlers(
+  setForm: Dispatch<SetStateAction<CardFormState>>
+) {
+  const onCardholderNameChange = useCallback(
+    (cardholderName: string) => {
+      patchVaultForm(setForm, "cardholderName", cardholderName);
     },
-  });
+    [setForm]
+  );
+
+  const onNicknameChange = useCallback(
+    (nickname: string) => {
+      patchVaultForm(setForm, "nickname", nickname);
+    },
+    [setForm]
+  );
+
+  const onCardNumberChange = useCallback(
+    (value: string) => {
+      patchVaultForm(setForm, "cardNumber", formatCardNumber(value));
+    },
+    [setForm]
+  );
+
+  return {
+    onCardNumberChange,
+    onCardholderNameChange,
+    onNicknameChange,
+  };
+}
+
+function useCardSecurityHandlers(
+  setForm: Dispatch<SetStateAction<CardFormState>>
+) {
+  const onExpirationChange = useCallback(
+    (value: string) => {
+      patchVaultForm(setForm, "expiration", formatExpiration(value));
+    },
+    [setForm]
+  );
+
+  const onCvcChange = useCallback(
+    (value: string) => {
+      patchVaultForm(setForm, "cvc", value.replaceAll(/\D/gu, "").slice(0, 4));
+    },
+    [setForm]
+  );
+
+  const onBillingPostalCodeChange = useCallback(
+    (billingPostalCode: string) => {
+      patchVaultForm(setForm, "billingPostalCode", billingPostalCode);
+    },
+    [setForm]
+  );
+
+  return {
+    onBillingPostalCodeChange,
+    onCvcChange,
+    onExpirationChange,
+  };
+}
+
+function useCardForm(initialLabel: string, onSaved: () => void) {
+  const create = useVaultItemCreate(onSaved);
   const [attempted, setAttempted] = useState(false);
-  const [form, setForm] = useState({
+
+  const [form, setForm] = useState<CardFormState>({
     billingPostalCode: "",
     cardNumber: "",
     cardholderName: "",
@@ -62,39 +157,51 @@ export function CardForm({
     expiration: "",
     nickname: initialLabel,
   });
+
   const cardType = paymentCardType(form.cardNumber);
   const result = paymentCardFormSchema.safeParse(form);
-  const errors =
-    attempted && !result.success
-      ? z.flattenError(result.error).fieldErrors
-      : {};
+  const errors = vaultFormErrors(attempted, result);
+  const identity = useCardIdentityHandlers(setForm);
+  const security = useCardSecurityHandlers(setForm);
 
-  const submit = (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAttempted(true);
-    if (!result.success) return;
+  const submit = useVaultFormSubmit(
+    setAttempted,
+    result,
+    create.mutate,
+    createCardPayload
+  );
 
-    const [month, shortYear] = result.data.expiration.split(" / ");
-    if (month === undefined || shortYear === undefined) return;
-
-    const brand = paymentCardBrand(result.data.cardNumber);
-    const lastFour = result.data.cardNumber.slice(-4);
-    create.mutate({
-      account: `${brand} · •••• ${lastFour}`,
-      kind: "payment",
-      label: result.data.nickname || `${brand} ${lastFour}`,
-      secret: serializePaymentCard({
-        billingPostalCode: result.data.billingPostalCode,
-        cardholderName: result.data.cardholderName,
-        expirationMonth: Number(month),
-        expirationYear: 2000 + Number(shortYear),
-        kind: "payment-card",
-        number: result.data.cardNumber,
-        securityCode: result.data.cvc,
-        version: 1,
-      }),
-    });
+  return {
+    cardType,
+    create,
+    errors,
+    form,
+    submit,
+    ...identity,
+    ...security,
   };
+}
+
+export function CardForm({
+  initialLabel = "",
+  onSaved,
+}: {
+  readonly initialLabel?: string;
+  readonly onSaved: () => void;
+}) {
+  const {
+    cardType,
+    create,
+    errors,
+    form,
+    onBillingPostalCodeChange,
+    onCardNumberChange,
+    onCardholderNameChange,
+    onCvcChange,
+    onExpirationChange,
+    onNicknameChange,
+    submit,
+  } = useCardForm(initialLabel, onSaved);
 
   return (
     <form noValidate onSubmit={submit}>
@@ -106,9 +213,7 @@ export function CardForm({
             id="vault-payment-cardholder"
             label="Name on card"
             name="cc-name"
-            onChange={(cardholderName) => {
-              setForm((current) => ({ ...current, cardholderName }));
-            }}
+            onChange={onCardholderNameChange}
             value={form.cardholderName}
           />
           <CardField
@@ -117,9 +222,7 @@ export function CardForm({
             id="vault-payment-nickname"
             label="Nickname (optional)"
             name="card-nickname"
-            onChange={(nickname) => {
-              setForm((current) => ({ ...current, nickname }));
-            }}
+            onChange={onNicknameChange}
             placeholder="Personal"
             value={form.nickname}
           />
@@ -133,12 +236,7 @@ export function CardForm({
           label="Card number"
           maxLength={23}
           name="cc-number"
-          onChange={(value) => {
-            setForm((current) => ({
-              ...current,
-              cardNumber: formatCardNumber(value),
-            }));
-          }}
+          onChange={onCardNumberChange}
           placeholder="1234 5678 9012 3456"
           trailingLabel={cardType?.niceType}
           value={form.cardNumber}
@@ -153,12 +251,7 @@ export function CardForm({
             label="Expiration"
             maxLength={7}
             name="cc-exp"
-            onChange={(value) => {
-              setForm((current) => ({
-                ...current,
-                expiration: formatExpiration(value),
-              }));
-            }}
+            onChange={onExpirationChange}
             placeholder="MM / YY"
             value={form.expiration}
           />
@@ -170,12 +263,7 @@ export function CardForm({
             label="CVC"
             maxLength={4}
             name="cc-csc"
-            onChange={(value) => {
-              setForm((current) => ({
-                ...current,
-                cvc: value.replaceAll(/\D/gu, "").slice(0, 4),
-              }));
-            }}
+            onChange={onCvcChange}
             placeholder="123"
             value={form.cvc}
           />
@@ -187,9 +275,7 @@ export function CardForm({
             label="Billing ZIP / postal"
             maxLength={20}
             name="postal-code"
-            onChange={(billingPostalCode) => {
-              setForm((current) => ({ ...current, billingPostalCode }));
-            }}
+            onChange={onBillingPostalCodeChange}
             value={form.billingPostalCode}
           />
         </div>
@@ -218,26 +304,37 @@ function CardField({
   readonly onChange: (value: string) => void;
   readonly trailingLabel?: string;
 }) {
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(event.target.value);
+    },
+    [onChange]
+  );
+
   return (
     <Field className={className} data-invalid={error ? true : undefined}>
       <div className="flex items-center justify-between gap-2">
         <FieldLabel htmlFor={id}>{label}</FieldLabel>
-        {trailingLabel ? (
-          <Badge aria-live="polite" variant="outline">
-            {trailingLabel}
-          </Badge>
-        ) : null}
+        <TrailingBadge label={trailingLabel} />
       </div>
       <Input
         {...inputProps}
         aria-invalid={error ? true : undefined}
         id={id}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
+        onChange={handleChange}
       />
       <FieldError errors={error ? [{ message: error }] : undefined} />
     </Field>
+  );
+}
+
+function TrailingBadge({ label }: { readonly label?: string }) {
+  if (!label) return null;
+
+  return (
+    <Badge aria-live="polite" variant="outline">
+      {label}
+    </Badge>
   );
 }
 
@@ -253,9 +350,10 @@ function formatCardNumber(value: string) {
 
 function formatExpiration(value: string) {
   const digits = value.replaceAll(/\D/gu, "").slice(0, 4);
-  return digits.length <= 2
-    ? digits
-    : `${digits.slice(0, 2)} / ${digits.slice(2)}`;
+
+  if (digits.length <= 2) return digits;
+
+  return `${digits.slice(0, 2)} / ${digits.slice(2)}`;
 }
 
 function passesLuhnCheck(number: string) {
@@ -264,10 +362,13 @@ function passesLuhnCheck(number: string) {
 
   for (const character of number.split("").toReversed()) {
     let digit = Number(character);
+
     if (doubleDigit) {
       digit *= 2;
+
       if (digit > 9) digit -= 9;
     }
+
     sum += digit;
     doubleDigit = !doubleDigit;
   }
@@ -277,13 +378,15 @@ function passesLuhnCheck(number: string) {
 
 function isCurrentExpiration(value: string) {
   const [month, shortYear] = value.split(" / ");
+
   if (month === undefined || shortYear === undefined) return false;
 
   const expirationYear = 2000 + Number(shortYear);
   const today = new Date();
-  return (
-    expirationYear > today.getFullYear() ||
-    (expirationYear === today.getFullYear() &&
-      Number(month) >= today.getMonth() + 1)
-  );
+
+  if (expirationYear > today.getFullYear()) return true;
+
+  if (expirationYear !== today.getFullYear()) return false;
+
+  return Number(month) >= today.getMonth() + 1;
 }

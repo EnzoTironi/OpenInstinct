@@ -32,6 +32,7 @@ const mocks = vi.hoisted<Mocks>(() => ({
 vi.mock("./use-session-agent", () => ({
   useSessionAgent: (sessionId: string) => {
     mocks.sessionId = sessionId;
+
     return mocks.agent;
   },
 }));
@@ -39,6 +40,7 @@ vi.mock("./use-session-agent", () => ({
 vi.mock("./conversation", () => ({
   ChatConversation: ({ agent }: { agent: unknown }) => {
     mocks.conversationAgent = agent;
+
     return <div>Conversation</div>;
   },
 }));
@@ -46,6 +48,7 @@ vi.mock("./conversation", () => ({
 vi.mock("./input", () => ({
   ChatInput: ({ agent }: { agent: unknown }) => {
     mocks.inputAgent = agent;
+
     return <div>Input</div>;
   },
 }));
@@ -53,6 +56,7 @@ vi.mock("./input", () => ({
 vi.mock("./activity", () => ({
   SubagentPanel: ({ events }: { events: readonly unknown[] }) => {
     mocks.activityEvents = events;
+
     return <aside>Activity</aside>;
   },
 }));

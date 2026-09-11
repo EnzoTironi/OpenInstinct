@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
-import type { AccessScope } from "@shared/identity/access-scope";
 import { db, encryptedSecrets } from "@db";
+import type { AccessScope } from "@shared/identity/access-scope";
+import { and, eq } from "drizzle-orm";
 
 export async function writeEncryptedSecret(
   scope: AccessScope,
@@ -39,6 +39,7 @@ export async function readEncryptedSecret(scope: AccessScope, id: string) {
       )
     )
     .limit(1);
+
   return rows[0]?.encryptedValue;
 }
 

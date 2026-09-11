@@ -1,13 +1,14 @@
-import { JsonSchema, Schema } from "effect";
-import { defineDynamic, defineTool, toolOutput } from "eve/tools";
-import { resolveModeValue } from "../lib/mode";
-import { deliverWebTaskReport } from "../lib/task-report";
+import { privateMessageTool } from "@agent/lib/private-message-tool";
+import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
 import {
   addReactionToMessageOutputSchema,
   reactToMessageOutputSchema,
 } from "@shared/chat/reaction";
-import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
-import { privateMessageTool } from "@agent/lib/private-message-tool";
+import { JsonSchema, Schema } from "effect";
+import { defineDynamic, defineTool, toolOutput } from "eve/tools";
+
+import { resolveModeValue } from "../lib/mode";
+import { deliverWebTaskReport } from "../lib/task-report";
 
 function defineSendMessage() {
   const standard = Schema.toStandardJSONSchemaV1(
@@ -30,7 +31,9 @@ function defineSendMessage() {
                 includeAnnotationKey: (key) => key === "additionalProperties",
               }
             );
+
             if (options.target === "draft-2020-12") return document.schema;
+
             if (options.target === "draft-07")
               return JsonSchema.toDocumentDraft07(document).schema;
             throw new Error(
@@ -45,6 +48,7 @@ function defineSendMessage() {
         throw new Error(
           "Return the result to the parent conversation instead of sending a message."
         );
+
       return deliverWebTaskReport(message, context);
     },
     toModelOutput() {
@@ -55,6 +59,34 @@ function defineSendMessage() {
   });
 }
 
+function reactionJsonSchemaInput(
+  reactionSchema:
+    | typeof reactToMessageOutputSchema
+    | typeof addReactionToMessageOutputSchema
+) {
+  return (options: { readonly target: string }) => {
+    const document = Schema.toJsonSchemaDocument(reactionSchema, {
+      includeAnnotationKey: (key) => key === "additionalProperties",
+    });
+
+    if (options.target === "draft-2020-12") return document.schema;
+
+    if (options.target === "draft-07") {
+      return JsonSchema.toDocumentDraft07(document).schema;
+    }
+
+    throw new Error(`Unsupported JSON Schema target: ${options.target}`);
+  };
+}
+
+function reactionToolDescription(isLinq: boolean) {
+  if (isLinq) {
+    return "Add or remove a native iMessage Tapback on the user's current message. Use this instead of send_message when a reaction fully communicates a lightweight acknowledgement and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question.";
+  }
+
+  return "Acknowledge the user's current message with one compact reaction displayed in the conversation. Use this instead of send_message when the reaction fully communicates the response and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question.";
+}
+
 export default defineDynamic({
   // This resolver only selects tool definitions; cold recovery can safely rebuild them.
   rebindMissingCallbacks: true,
@@ -62,43 +94,37 @@ export default defineDynamic({
     "turn.started": (_event, context) => {
       const principal =
         context.session.auth.current ?? context.session.auth.initiator;
+
       const channel = principal?.attributes.conversationChannel;
+
       if (channel === "telegram" || channel === "kapso") {
         const tools = { send_message: privateMessageTool(channel) };
+
         return resolveModeValue(context, {
           interactive: tools,
           "scheduled-report": tools,
         });
       }
+
       const isLinq = context.channel.kind === "channel:linq";
       const send_message = defineSendMessage();
 
       const reactionSchema = isLinq
         ? reactToMessageOutputSchema
         : addReactionToMessageOutputSchema;
+
       const reactionStandard = Schema.toStandardJSONSchemaV1(
         Schema.toStandardSchemaV1(reactionSchema)
       )["~standard"];
+
       const react_to_message = defineTool({
-        description: isLinq
-          ? "Add or remove a native iMessage Tapback on the user's current message. Use this instead of send_message when a reaction fully communicates a lightweight acknowledgement and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question."
-          : "Acknowledge the user's current message with one compact reaction displayed in the conversation. Use this instead of send_message when the reaction fully communicates the response and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question.",
+        description: reactionToolDescription(isLinq),
         inputSchema: {
           "~standard": {
             ...reactionStandard,
             jsonSchema: {
               ...reactionStandard.jsonSchema,
-              input(options) {
-                const document = Schema.toJsonSchemaDocument(reactionSchema, {
-                  includeAnnotationKey: (key) => key === "additionalProperties",
-                });
-                if (options.target === "draft-2020-12") return document.schema;
-                if (options.target === "draft-07")
-                  return JsonSchema.toDocumentDraft07(document).schema;
-                throw new Error(
-                  `Unsupported JSON Schema target: ${options.target}`
-                );
-              },
+              input: reactionJsonSchemaInput(reactionSchema),
             },
           },
         },
@@ -107,6 +133,7 @@ export default defineDynamic({
             throw new Error(
               "Return the result to the parent conversation instead of reacting to a message."
             );
+
           return reaction;
         },
         toModelOutput() {

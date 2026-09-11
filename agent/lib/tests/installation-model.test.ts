@@ -1,5 +1,6 @@
 import { Config, ConfigProvider, Effect } from "effect";
 import { describe, expect, it } from "vitest";
+
 import { installationModel } from "../installation-model";
 
 const selectModel = (configuration: Record<string, string>) =>
@@ -26,6 +27,7 @@ describe("installation model configuration", () => {
       COMPANION_MODEL_PROVIDER: "openrouter-free",
       OPENROUTER_API_KEY: "synthetic-constructor-only-key",
     });
+
     expect(selected).toMatchObject({
       model: {
         modelId: "nvidia/nemotron-3.5-lightning:free",
@@ -40,6 +42,7 @@ describe("installation model configuration", () => {
     const selected = await selectModel({
       COMPANION_MODEL_PROVIDER: "codex-local",
     });
+
     expect(selected).toMatchObject({
       model: { modelId: "gpt-5.3-codex-spark", specificationVersion: "v4" },
       modelContextWindowTokens: 128_000,

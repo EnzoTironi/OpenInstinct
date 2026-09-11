@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
+
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import {
   account,
   agentSessions,
@@ -121,9 +123,11 @@ describe("database schema", () => {
       expect(foreignKeys.map((foreignKey) => foreignKey.getName())).toContain(
         `${getTableConfig(table).name}_membership_fkey`
       );
+
       const membership = foreignKeys.find((foreignKey) =>
         foreignKey.getName().endsWith("_membership_fkey")
       );
+
       const reference = membership?.reference();
       expect(reference?.columns.map((column) => column.name)).toEqual([
         "workspace_id",
@@ -233,6 +237,7 @@ describe("migration deployment policy", () => {
           await readFile(new URL("../../package.json", import.meta.url), "utf8")
         )
       );
+
     const turbo = z
       .object({
         tasks: z.object({
@@ -248,6 +253,7 @@ describe("migration deployment policy", () => {
           await readFile(new URL("../../turbo.json", import.meta.url), "utf8")
         )
       );
+
     const vercel = z
       .object({ buildCommand: z.string() })
       .parse(
@@ -279,6 +285,7 @@ describe("migration deployment policy", () => {
       new URL("../migrations/0000_fluffy_the_spike.sql", import.meta.url),
       "utf8"
     );
+
     const services = await Promise.all(
       [
         "browser-traces",
@@ -297,10 +304,12 @@ describe("migration deployment policy", () => {
           )
       )
     );
+
     const authSource = await readFile(
       new URL("../../db/services/auth/index.ts", import.meta.url),
       "utf8"
     );
+
     const authMigration = await readFile(
       new URL("../migrations/0001_better-auth.sql", import.meta.url),
       "utf8"

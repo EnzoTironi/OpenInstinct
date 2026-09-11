@@ -1,9 +1,10 @@
 "use client";
 
-import type { EveMessage } from "eve/react";
-import { useState } from "react";
 import { Message, MessageContent } from "@web/components/ai-elements/message";
 import { cn } from "@web/components/class-names";
+import type { EveMessage, EveMessagePart } from "eve/react";
+import { useState } from "react";
+
 import { AgentMessagePart, partKey } from "./parts";
 import type { RespondToAgentInput } from "./types";
 
@@ -24,19 +25,21 @@ export function AgentMessage({
   readonly timestamp?: string;
   readonly userVisibleOnly?: boolean;
 }) {
-  const [optimisticTimestamp] = useState(() => new Date().toISOString());
-  const displayedTimestamp =
-    timestamp ?? (message.role === "user" ? optimisticTimestamp : undefined);
+  const [optimisticTimestamp] = useState(createOptimisticTimestamp);
+
+  const displayedTimestamp = resolveDisplayedTimestamp(
+    timestamp,
+    message.role,
+    optimisticTimestamp
+  );
+
   const visibleParts = userVisibleOnly
     ? userVisibleParts(message, sentMessageParts)
     : message.parts;
-  const lastTextIndex = visibleParts.reduce(
-    (last, part, index) => (part.type === "text" ? index : last),
-    -1
-  );
-  const hasAssistantText =
-    message.role === "assistant" &&
-    visibleParts.some((part) => part.type === "text" && part.text.length > 0);
+
+  const lastTextIndex = findLastTextIndex(visibleParts);
+
+  const hasAssistantText = assistantHasText(message.role, visibleParts);
 
   if (visibleParts.length === 0) return null;
 
@@ -46,38 +49,154 @@ export function AgentMessage({
       from={message.role}
     >
       <MessageContent>
-        {visibleParts.map((part, index) =>
-          hasAssistantText && part.type === "reasoning" ? null : (
-            <AgentMessagePart
-              canRespond={canRespond}
-              key={partKey(part, index)}
-              onInputResponses={onInputResponses}
-              part={part}
-              showCaret={
-                isStreaming &&
-                message.role === "assistant" &&
-                index === lastTextIndex
-              }
-              userVisibleOnly={userVisibleOnly}
-            />
-          )
-        )}
+        {visibleParts.map((part, index) => (
+          <AgentMessagePartSlot
+            canRespond={canRespond}
+            hasAssistantText={hasAssistantText}
+            index={index}
+            isStreaming={isStreaming}
+            key={partKey(part, index)}
+            lastTextIndex={lastTextIndex}
+            messageRole={message.role}
+            onInputResponses={onInputResponses}
+            part={part}
+            userVisibleOnly={userVisibleOnly}
+          />
+        ))}
       </MessageContent>
-      {displayedTimestamp ? (
-        <time
-          className={cn(
-            "text-muted-foreground",
-            message.role === "user" ? "ml-auto pr-1" : "mr-auto"
-          )}
-          dateTime={displayedTimestamp}
-          title={fullTimestampFormatter.format(new Date(displayedTimestamp))}
-        >
-          <span className="type-caption" suppressHydrationWarning>
-            {timestampFormatter.format(new Date(displayedTimestamp))}
-          </span>
-        </time>
-      ) : null}
+      <AgentMessageTimestamp
+        displayedTimestamp={displayedTimestamp}
+        role={message.role}
+      />
     </Message>
+  );
+}
+
+function createOptimisticTimestamp() {
+  return new Date().toISOString();
+}
+
+function resolveDisplayedTimestamp(
+  timestamp: string | undefined,
+  role: EveMessage["role"],
+  optimisticTimestamp: string
+): string | undefined {
+  if (timestamp !== undefined) {
+    return timestamp;
+  }
+
+  if (role === "user") {
+    return optimisticTimestamp;
+  }
+
+  return undefined;
+}
+
+function findLastTextIndex(parts: readonly EveMessagePart[]): number {
+  return parts.reduce(updateLastTextIndex, -1);
+}
+
+function updateLastTextIndex(
+  last: number,
+  part: EveMessagePart,
+  index: number
+): number {
+  if (part.type === "text") {
+    return index;
+  }
+
+  return last;
+}
+
+function assistantHasText(
+  role: EveMessage["role"],
+  parts: readonly EveMessagePart[]
+): boolean {
+  if (role !== "assistant") {
+    return false;
+  }
+
+  return parts.some(isNonEmptyTextPart);
+}
+
+function isNonEmptyTextPart(part: EveMessagePart): boolean {
+  return part.type === "text" && part.text.length > 0;
+}
+
+function AgentMessagePartSlot({
+  canRespond,
+  hasAssistantText,
+  index,
+  isStreaming,
+  lastTextIndex,
+  messageRole,
+  onInputResponses,
+  part,
+  userVisibleOnly,
+}: {
+  readonly canRespond: boolean;
+  readonly hasAssistantText: boolean;
+  readonly index: number;
+  readonly isStreaming: boolean;
+  readonly lastTextIndex: number;
+  readonly messageRole: EveMessage["role"];
+  readonly onInputResponses: RespondToAgentInput;
+  readonly part: EveMessagePart;
+  readonly userVisibleOnly: boolean;
+}) {
+  if (hasAssistantText && part.type === "reasoning") {
+    return null;
+  }
+
+  return (
+    <AgentMessagePart
+      canRespond={canRespond}
+      onInputResponses={onInputResponses}
+      part={part}
+      showCaret={shouldShowCaret(
+        isStreaming,
+        messageRole,
+        index,
+        lastTextIndex
+      )}
+      userVisibleOnly={userVisibleOnly}
+    />
+  );
+}
+
+function shouldShowCaret(
+  isStreaming: boolean,
+  role: EveMessage["role"],
+  index: number,
+  lastTextIndex: number
+): boolean {
+  return isStreaming && role === "assistant" && index === lastTextIndex;
+}
+
+function AgentMessageTimestamp({
+  displayedTimestamp,
+  role,
+}: {
+  readonly displayedTimestamp: string | undefined;
+  readonly role: EveMessage["role"];
+}) {
+  if (!displayedTimestamp) {
+    return null;
+  }
+
+  return (
+    <time
+      className={cn(
+        "text-muted-foreground",
+        role === "user" ? "ml-auto pr-1" : "mr-auto"
+      )}
+      dateTime={displayedTimestamp}
+      title={fullTimestampFormatter.format(new Date(displayedTimestamp))}
+    >
+      <span className="type-caption" suppressHydrationWarning>
+        {timestampFormatter.format(new Date(displayedTimestamp))}
+      </span>
+    </time>
   );
 }
 
@@ -86,29 +205,48 @@ function userVisibleParts(
   sentMessageParts?: readonly EveMessage["parts"][number][]
 ) {
   if (message.role === "user") {
-    return message.parts.filter(
-      (part) => part.type === "text" || part.type === "file"
-    );
+    return message.parts.filter(isUserVisibleUserPart);
   }
 
-  const controls = message.parts.filter((part) =>
-    part.type === "authorization"
-      ? part.state === "required"
-      : part.type === "dynamic-tool" &&
-        part.toolMetadata?.eve?.inputRequest !== undefined &&
-        part.toolMetadata.eve.inputResponse === undefined &&
-        (part.state === "input-available" ||
-          part.state === "approval-requested")
-  );
+  const controls = message.parts.filter(isUserVisibleControlPart);
+
   return [...(sentMessageParts ?? []), ...controls];
 }
 
-const timestampFormatter = new Intl.DateTimeFormat(undefined, {
+function isUserVisibleUserPart(part: EveMessagePart): boolean {
+  return part.type === "text" || part.type === "file";
+}
+
+function isUserVisibleControlPart(part: EveMessagePart): boolean {
+  if (part.type === "authorization") {
+    return part.state === "required";
+  }
+
+  if (part.type !== "dynamic-tool") {
+    return false;
+  }
+
+  const eve = part.toolMetadata?.eve;
+
+  if (eve?.inputRequest === undefined) {
+    return false;
+  }
+
+  if (eve.inputResponse !== undefined) {
+    return false;
+  }
+
+  return (
+    part.state === "input-available" || part.state === "approval-requested"
+  );
+}
+
+const timestampFormatter = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
 });
 
-const fullTimestampFormatter = new Intl.DateTimeFormat(undefined, {
+const fullTimestampFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
 });

@@ -1,11 +1,11 @@
-import { defineDynamic, defineTool } from "eve/tools";
-import { z } from "zod";
 import { resolveModeValue } from "@agent/lib/mode";
 import { applicationOrigin } from "@shared/environment/origin";
 import {
   createVaultSetupUrl,
   vaultSetupRequestSchema,
 } from "@shared/vault/schema";
+import { defineDynamic, defineTool } from "eve/tools";
+import { z } from "zod";
 
 export const requestVaultImport = defineTool({
   description:

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { withVaultScreenshotMask } from "../vault-screenshot-mask";
 
 const mocks = vi.hoisted(() => ({
@@ -48,11 +49,13 @@ describe("Vault screenshot masking", () => {
     mocks.execute.mockImplementation(
       async (_sessionId: string, body: { code: string }) => {
         maskReferences += body.code.includes("remainingRefs") ? -1 : 1;
+
         return { success: true };
       }
     );
     let finishFirst: (() => void) | undefined;
     let finishSecond: (() => void) | undefined;
+
     const first = withVaultScreenshotMask(
       "browser-1",
       undefined,
@@ -61,9 +64,11 @@ describe("Vault screenshot masking", () => {
           finishFirst = resolve;
         })
     );
+
     await vi.waitFor(() => {
       expect(maskReferences).toBe(1);
     });
+
     const second = withVaultScreenshotMask(
       "browser-1",
       undefined,
@@ -72,6 +77,7 @@ describe("Vault screenshot masking", () => {
           finishSecond = resolve;
         })
     );
+
     await vi.waitFor(() => {
       expect(maskReferences).toBe(2);
     });

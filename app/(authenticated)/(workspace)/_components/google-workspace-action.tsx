@@ -1,39 +1,65 @@
 "use client";
 
+import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import { api } from "@web/trpc/client";
-import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 
-export function GoogleWorkspaceAction({
+function redirectWithGoogleUnavailable(returnPath: string) {
+  const query = new URLSearchParams({
+    google: "unavailable",
+    returnTo: returnPath,
+  });
+
+  window.location.assign(`/?${query}`);
+}
+
+function redirectTo(redirectTo: string) {
+  window.location.assign(redirectTo);
+}
+
+function workspaceActionLabel(state: "connected" | "disconnected") {
+  if (state === "connected") {
+    return "Disconnect";
+  }
+
+  return "Connect";
+}
+
+function workspaceAction(state: "connected" | "disconnected") {
+  if (state === "connected") {
+    return "disconnect";
+  }
+
+  return "connect";
+}
+
+function GoogleWorkspaceLoadingBadge() {
+  return <Badge variant="secondary">Loading…</Badge>;
+}
+
+function GoogleWorkspaceUnavailableBadge() {
+  return <Badge variant="secondary">Setup required</Badge>;
+}
+
+function GoogleWorkspaceConnectButton({
   state,
-  returnTo,
+  returnPath,
 }: {
-  readonly state?: "connected" | "disconnected" | "unavailable";
-  readonly returnTo?: string;
+  readonly returnPath: string;
+  readonly state: "connected" | "disconnected";
 }) {
-  const returnPath = googleWorkspaceReturnTo(returnTo);
   const update = api.googleWorkspace.update.useMutation({
     onError: () => {
-      const query = new URLSearchParams({
-        google: "unavailable",
-        returnTo: returnPath,
-      });
-      window.location.assign(`/?${query}`);
+      redirectWithGoogleUnavailable(returnPath);
     },
-    onSuccess: ({ redirectTo }) => {
-      window.location.assign(redirectTo);
+    onSuccess: ({ redirectTo: next }) => {
+      redirectTo(next);
     },
   });
 
-  if (!state) {
-    return <Badge variant="secondary">Loading…</Badge>;
-  }
-  if (state === "unavailable") {
-    return <Badge variant="secondary">Setup required</Badge>;
-  }
+  const action = workspaceAction(state);
 
-  const action = state === "connected" ? "disconnect" : "connect";
   return (
     <Button
       disabled={update.isPending}
@@ -44,7 +70,27 @@ export function GoogleWorkspaceAction({
       type="button"
       variant="outline"
     >
-      {state === "connected" ? "Disconnect" : "Connect"}
+      {workspaceActionLabel(state)}
     </Button>
   );
+}
+
+export function GoogleWorkspaceAction({
+  state,
+  returnTo,
+}: {
+  readonly state?: "connected" | "disconnected" | "unavailable";
+  readonly returnTo?: string;
+}) {
+  const returnPath = googleWorkspaceReturnTo(returnTo);
+
+  if (!state) {
+    return <GoogleWorkspaceLoadingBadge />;
+  }
+
+  if (state === "unavailable") {
+    return <GoogleWorkspaceUnavailableBadge />;
+  }
+
+  return <GoogleWorkspaceConnectButton returnPath={returnPath} state={state} />;
 }

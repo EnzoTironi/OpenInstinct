@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { expect, test } from "vitest";
+
 import {
   bindGroupChannelIdentity,
   detectKapsoChatKind,
@@ -67,6 +68,7 @@ test("bindGroupChannelIdentity scopes conversation to group chat", async () => {
       chatId: "-100123",
     })
   );
+
   expect(binding).toEqual({
     identityId: "11111111-1111-4111-8111-111111111111",
     channel: "telegram",

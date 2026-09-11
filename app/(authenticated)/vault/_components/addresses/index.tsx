@@ -1,6 +1,5 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
 import type { VaultItem } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
 import {
@@ -8,7 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@web/components/ui/dialog";
-import { AddressForm } from "./form";
+import { PlusIcon } from "lucide-react";
+import type { ReactNode } from "react";
+
 import {
   useVaultSection,
   VaultItemBrowser,
@@ -18,6 +19,93 @@ import {
   VaultSectionTrigger,
 } from "../section";
 import { useVaultSetup } from "../setup";
+import { AddressForm } from "./form";
+
+type VaultView = "add" | "import" | "list";
+
+function setVaultView(setView: (view: VaultView) => void, view: VaultView) {
+  return () => {
+    setView(view);
+  };
+}
+
+function addressesDescription(count: number) {
+  if (count > 0) {
+    return `Search and manage ${count.toLocaleString()} saved addresses.`;
+  }
+
+  return "Add your first saved address.";
+}
+
+function AddressesListView({
+  items,
+  onAdd,
+}: {
+  readonly items: readonly VaultItem[];
+  readonly onAdd: () => void;
+}) {
+  return (
+    <>
+      <DialogHeader className="pr-10 sm:pr-6">
+        <DialogTitle>Addresses</DialogTitle>
+        <DialogDescription>
+          {addressesDescription(items.length)}
+        </DialogDescription>
+      </DialogHeader>
+      <VaultItemBrowser
+        items={items}
+        searchId="vault-search-addresses"
+        title="Addresses"
+      />
+      <div className="flex justify-end gap-2">
+        <Button onClick={onAdd} type="button">
+          <PlusIcon />
+          Add address
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function AddressesAddView({
+  initialLabel,
+  onBack,
+  onSaved,
+}: {
+  readonly initialLabel?: string;
+  readonly onBack: () => void;
+  readonly onSaved: () => void;
+}) {
+  return (
+    <>
+      <VaultSectionBackButton onClick={onBack} title="Addresses" />
+      <DialogHeader className="pr-10 sm:pr-6">
+        <DialogTitle>Add address</DialogTitle>
+        <DialogDescription>
+          Sensitive values are encrypted before database storage and are never
+          returned after saving.
+        </DialogDescription>
+      </DialogHeader>
+      <AddressForm initialLabel={initialLabel} onSaved={onSaved} />
+    </>
+  );
+}
+
+function addressesPanel(
+  view: VaultView,
+  list: ReactNode,
+  add: ReactNode
+): ReactNode {
+  if (view === "list") return list;
+
+  return add;
+}
+
+function addressesInitialView(isAddressSetup: boolean): VaultView {
+  if (isAddressSetup) return "add";
+
+  return "list";
+}
 
 export function VaultAddresses({
   items,
@@ -25,8 +113,9 @@ export function VaultAddresses({
   readonly items: readonly VaultItem[];
 }) {
   const setup = useVaultSetup();
-  const initialAdd = setup?.kind === "address";
-  const section = useVaultSection(initialAdd ? "add" : "list");
+  const isAddressSetup = setup?.kind === "address";
+  const section = useVaultSection(addressesInitialView(isAddressSetup));
+  const goList = setVaultView(section.setView, "list");
 
   return (
     <VaultSection
@@ -36,55 +125,17 @@ export function VaultAddresses({
     >
       <VaultSectionTrigger items={items} title="Addresses" />
       <VaultSectionContent view={section.view}>
-        {section.view === "list" ? (
-          <>
-            <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Addresses</DialogTitle>
-              <DialogDescription>
-                {items.length > 0
-                  ? `Search and manage ${items.length.toLocaleString()} saved addresses.`
-                  : "Add your first saved address."}
-              </DialogDescription>
-            </DialogHeader>
-            <VaultItemBrowser
-              items={items}
-              searchId="vault-search-addresses"
-              title="Addresses"
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                onClick={() => {
-                  section.setView("add");
-                }}
-                type="button"
-              >
-                <PlusIcon />
-                Add address
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <VaultSectionBackButton
-              onClick={() => {
-                section.setView("list");
-              }}
-              title="Addresses"
-            />
-            <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Add address</DialogTitle>
-              <DialogDescription>
-                Sensitive values are encrypted before database storage and are
-                never returned after saving.
-              </DialogDescription>
-            </DialogHeader>
-            <AddressForm
-              initialLabel={initialAdd ? setup.label : undefined}
-              onSaved={() => {
-                section.setView("list");
-              }}
-            />
-          </>
+        {addressesPanel(
+          section.view,
+          <AddressesListView
+            items={items}
+            onAdd={setVaultView(section.setView, "add")}
+          />,
+          <AddressesAddView
+            initialLabel={isAddressSetup ? setup.label : undefined}
+            onBack={goList}
+            onSaved={goList}
+          />
         )}
       </VaultSectionContent>
     </VaultSection>

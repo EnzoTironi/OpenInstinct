@@ -1,7 +1,7 @@
+import { Button } from "@web/components/ui/button";
+import { Logo } from "@web/components/ui/logo";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Logo } from "@web/components/ui/logo";
-import { Button } from "@web/components/ui/button";
 
 const nav = [
   { href: "/welcome", label: "Product" },
@@ -33,6 +33,7 @@ export function MarketingShell({
                 (active === "product" && item.href === "/welcome") ||
                 (active === "pricing" && item.href === "/pricing") ||
                 (active === "docs" && item.href === "/docs");
+
               return (
                 <Button
                   key={item.href}

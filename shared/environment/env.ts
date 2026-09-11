@@ -1,8 +1,8 @@
+import { databaseUrlSchema } from "@shared/environment/database-url";
+import { isE164PhoneNumber } from "@shared/identity/phone-number";
 import { createEnv } from "@t3-oss/env-nextjs";
 import { Schema } from "effect";
 import { z } from "zod";
-import { isE164PhoneNumber } from "@shared/identity/phone-number";
-import { databaseUrlSchema } from "@shared/environment/database-url";
 
 export const betterAuthSecretSchema = z
   .string()
@@ -21,7 +21,9 @@ export const secretEncryptionKeySchema = z
 const localDevelopment =
   process.env.NODE_ENV === "development" &&
   process.env.VERCEL_ENV === undefined;
+
 const explicitBetterAuthSecret = hasValue(process.env.BETTER_AUTH_SECRET);
+
 const explicitSecretEncryptionKey = hasValue(process.env.SECRET_ENCRYPTION_KEY);
 
 if (

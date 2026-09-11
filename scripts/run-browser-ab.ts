@@ -11,8 +11,10 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import nextEnvironment from "@next/env";
 import { z } from "zod";
+
 import {
   type BrowserBenchmarkLiveStatus,
   readBrowserBenchmarkLiveStatus,
@@ -21,24 +23,37 @@ import {
 } from "../evals/browser/live-status.ts";
 
 const { loadEnvConfig } = nextEnvironment;
+
 const nodeErrorSchema = z.object({ code: z.string() });
+
 const errorMessageSchema = z.preprocess(
   (value) => (value instanceof Error ? value.message : String(value)),
   z.string()
 );
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+
 // oxlint-disable-next-line eslint/no-restricted-properties -- the benchmark supervisor must forward credentials and provider configuration to isolated child revisions
 let inheritedEnvironment = { ...process.env };
+
 const options = parseArguments(process.argv.slice(2));
+
 const timestamp = new Date().toISOString().replaceAll(":", "-");
+
 const outputDirectory = join(repositoryRoot, ".eve", "browser-ab", timestamp);
+
 const liveStatusPath = join(repositoryRoot, ".eve", "browser-ab", "live.json");
+
 const temporaryRoot = await mkdtemp(join(tmpdir(), "eve-browser-ab-"));
+
 const processes: ChildProcess[] = [];
+
 const composeProjects: { cwd: string; name: string }[] = [];
+
 const localDatabases: { maintenanceUrl: string; name: string }[] = [];
+
 let keepResources = options.keep;
+
 let liveStatusInitialized = false;
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -51,14 +66,17 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 try {
   inheritedEnvironment = await refreshGatewayEnvironment();
   await mkdir(outputDirectory, { recursive: true });
+
   const [baselineSha, candidateSha] = await Promise.all([
     resolveCommit(options.baselineRef),
     resolveCommit(options.candidateRef),
   ]);
+
   const variants = [
     variant("baseline", baselineSha),
     variant("candidate", candidateSha),
   ] as const;
+
   await archivePreviousLiveStatus();
   await writeBrowserBenchmarkLiveStatus(
     liveStatusPath,
@@ -69,6 +87,7 @@ try {
   console.log(
     `Preparing browser A/B: ${shortSha(baselineSha)} → ${shortSha(candidateSha)}`
   );
+
   for (const current of variants) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- each worktree is prepared sequentially to keep setup output and status transitions deterministic
     await updateVariant(current.kind, (status) => ({
@@ -119,6 +138,7 @@ try {
     baseline: "",
     candidate: "",
   };
+
   const results = await Promise.allSettled(
     variants.map(async (current) => {
       try {
@@ -134,12 +154,15 @@ try {
       }
     })
   );
+
   const failureMessages: string[] = [];
+
   for (const result of results) {
     if (result.status === "rejected") {
       failureMessages.push(errorMessageSchema.parse(result.reason));
     }
   }
+
   if (failureMessages.length > 0) {
     throw new Error(
       `One or more benchmark variants failed: ${failureMessages.join("; ")}`
@@ -156,6 +179,7 @@ try {
     taskTimeoutMs: options.taskTimeoutMs,
     version: 1,
   };
+
   await writeFile(
     join(outputDirectory, "manifest.json"),
     `${JSON.stringify(manifest, null, 2)}\n`,
@@ -181,6 +205,7 @@ try {
   await copyFile(liveStatusPath, join(outputDirectory, "status.json"));
 
   console.log(`A/B artifacts: ${outputDirectory}`);
+
   if (options.keep) {
     console.log(`Baseline: ${variants[0].url}`);
     console.log(`Candidate: ${variants[1].url}`);
@@ -197,6 +222,7 @@ try {
       () => undefined
     );
   }
+
   throw error;
 } finally {
   await cleanup();
@@ -205,6 +231,7 @@ try {
 function variant(kind: "baseline" | "candidate", sha: string) {
   const suffix = `${shortSha(sha)}-${String(process.pid)}`;
   const name = `eve-browser-${kind}-${suffix}`;
+
   return {
     databaseUrl: "",
     kind,
@@ -237,11 +264,13 @@ async function refreshGatewayEnvironment() {
       { cwd: repositoryRoot }
     )
   ).trim();
+
   const projectFile = join(
     dirname(commonGitDirectory),
     ".vercel",
     "project.json"
   );
+
   const project = z
     .object({ orgId: z.string().min(1), projectId: z.string().min(1) })
     .parse(JSON.parse(await readFile(projectFile, "utf8")));
@@ -267,6 +296,7 @@ async function refreshGatewayEnvironment() {
 
 async function startDatabase(current: ReturnType<typeof variant>) {
   const maintenanceUrl = inheritedEnvironment.BROWSER_AB_DATABASE_BASE_URL;
+
   if (maintenanceUrl) {
     const name = `eve_browser_ab_${current.kind}_${hash(current.path).slice(0, 10)}`;
     await run(
@@ -280,6 +310,7 @@ async function startDatabase(current: ReturnType<typeof variant>) {
     localDatabases.push({ maintenanceUrl, name });
     const databaseUrl = new URL(maintenanceUrl);
     databaseUrl.pathname = `/${name}`;
+
     return databaseUrl.toString();
   }
 
@@ -290,14 +321,18 @@ async function startDatabase(current: ReturnType<typeof variant>) {
     ["compose", "--project-name", name, "up", "--detach", "--wait", "postgres"],
     { cwd: current.path }
   );
+
   const address = await output(
     "docker",
     ["compose", "--project-name", name, "port", "postgres", "5432"],
     { cwd: current.path }
   );
+
   const port = /:(\d+)\s*$/u.exec(address)?.[1];
+
   if (!port)
     throw new Error(`Could not resolve PostgreSQL port for ${current.kind}.`);
+
   return `postgresql://postgres:postgres@127.0.0.1:${port}/open_instinct`;
 }
 
@@ -315,6 +350,7 @@ async function startAgent(current: ReturnType<typeof variant>) {
       },
     }
   );
+
   processes.push(child);
   await waitForUrl(`${current.url}/eve/v1/health`, child);
 }
@@ -328,6 +364,7 @@ async function runBenchmark(current: ReturnType<typeof variant>) {
   ]
     .filter(Boolean)
     .join("-");
+
   const artifact = join(outputDirectory, `${current.kind}.json`);
   await run(
     "node_modules/eve/bin/eve.js",
@@ -360,14 +397,18 @@ async function runBenchmark(current: ReturnType<typeof variant>) {
       validExitCodes: [0, 1],
     }
   );
+
   return artifact;
 }
 
 async function archivePreviousLiveStatus() {
   const previous = await readBrowserBenchmarkLiveStatus(liveStatusPath);
+
   if (!previous) return;
+
   const active =
     previous.status === "preparing" || previous.status === "running";
+
   await writeBrowserBenchmarkLiveStatus(
     join(previous.outputDirectory, "status.json"),
     active
@@ -388,6 +429,7 @@ function initialLiveStatus(
   const startedAt = new Date().toISOString();
   const baseline = variants.find((current) => current.kind === "baseline");
   const candidate = variants.find((current) => current.kind === "candidate");
+
   if (!baseline || !candidate) throw new Error("A/B variants are incomplete.");
 
   const liveVariant = (current: ReturnType<typeof variant>) => ({
@@ -421,7 +463,9 @@ function initialLiveStatus(
     },
     version: 1,
   };
+
   if (options.label) status.label = options.label;
+
   return status;
 }
 
@@ -453,17 +497,20 @@ async function waitForUrl(url: string, child: ChildProcess) {
         `${basename(child.spawnfile)} exited before ${url} was ready.`
       );
     }
+
     try {
       // oxlint-disable-next-line eslint/no-await-in-loop -- readiness retries must wait for the current probe to finish before backoff
       await run("curl", ["--fail", "--silent", "--show-error", url], {
         cwd: repositoryRoot,
       });
+
       return;
     } catch {
       // oxlint-disable-next-line eslint/no-await-in-loop -- bounded backoff intentionally serializes readiness probes
       await delay(1_000);
     }
   }
+
   throw new Error(`Timed out waiting for ${url}.`);
 }
 
@@ -486,7 +533,9 @@ function start(
     env: { ...inheritedEnvironment, ...execution.env },
     stdio: "inherit",
   });
+
   child.unref();
+
   return child;
 }
 
@@ -504,10 +553,12 @@ async function run(
     env: { ...inheritedEnvironment, ...execution.env },
     stdio: "inherit",
   });
+
   const code = await new Promise<number | null>((resolveExit, reject) => {
     child.once("error", reject);
     child.once("exit", resolveExit);
   });
+
   if (!(execution.validExitCodes ?? [0]).includes(code ?? -1)) {
     throw new Error(
       `${command} ${args.join(" ")} exited with ${String(code)}.`
@@ -525,16 +576,20 @@ async function output(
     env: inheritedEnvironment,
     stdio: ["ignore", "pipe", "inherit"],
   });
+
   child.stdout.setEncoding("utf8");
   let value = "";
   child.stdout.on("data", (chunk: string) => {
     value += chunk;
   });
+
   const code = await new Promise<number | null>((resolveExit, reject) => {
     child.once("error", reject);
     child.once("exit", resolveExit);
   });
+
   if (code !== 0) throw new Error(`${command} exited with ${String(code)}.`);
+
   return value;
 }
 
@@ -546,18 +601,27 @@ async function resolveCommit(reference: string) {
   ).trim();
 }
 
-async function cleanup() {
-  if (keepResources) return;
-  for (const child of processes.toReversed()) {
-    if (child.pid && child.exitCode === null) {
-      try {
-        process.kill(-child.pid, "SIGTERM");
-      } catch (error) {
-        const parsed = nodeErrorSchema.safeParse(error);
-        if (!parsed.success || parsed.data.code !== "ESRCH") throw error;
-      }
-    }
+function terminateChildProcess(child: ChildProcess) {
+  if (!child.pid) return;
+
+  if (child.exitCode !== null) return;
+
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch (error) {
+    ignoreMissingProcessError(error);
   }
+}
+
+function ignoreMissingProcessError(cause: unknown) {
+  const parsed = nodeErrorSchema.safeParse(cause);
+
+  if (parsed.success && parsed.data.code === "ESRCH") return;
+
+  throw cause;
+}
+
+async function stopComposeProjects() {
   for (const project of composeProjects.toReversed()) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- teardown is deliberately ordered to avoid interleaved Docker cleanup
     await run(
@@ -566,6 +630,9 @@ async function cleanup() {
       { cwd: project.cwd }
     ).catch(() => undefined);
   }
+}
+
+async function dropLocalDatabases() {
   for (const database of localDatabases.toReversed()) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- teardown is deliberately ordered to avoid interleaved database cleanup
     await run(
@@ -579,6 +646,9 @@ async function cleanup() {
       { cwd: repositoryRoot }
     ).catch(() => undefined);
   }
+}
+
+async function removeWorktrees() {
   for (const name of ["candidate", "baseline"]) {
     const path = join(temporaryRoot, name);
     // oxlint-disable-next-line eslint/no-await-in-loop -- git worktree removals share repository metadata and must be serialized
@@ -586,79 +656,191 @@ async function cleanup() {
       cwd: repositoryRoot,
     }).catch(() => undefined);
   }
+}
+
+async function cleanup() {
+  if (keepResources) return;
+
+  for (const child of processes.toReversed()) {
+    terminateChildProcess(child);
+  }
+
+  await stopComposeProjects();
+  await dropLocalDatabases();
+  await removeWorktrees();
   await rm(temporaryRoot, { force: true, recursive: true });
 }
 
-function parseArguments(args: string[]) {
-  const positional: string[] = [];
-  let suite: "all" | "live" | "smoke" = "smoke";
-  let repetitions = 1;
-  let maxConcurrency = 9;
-  let taskTimeoutMs = 15 * 60_000;
-  let keep = false;
-  let label: string | undefined;
+interface ParsedBrowserAbArguments {
+  baselineRef: string;
+  candidateRef: string;
+  keep: boolean;
+  label: string | undefined;
+  maxConcurrency: number;
+  repetitions: number;
+  suite: "all" | "live" | "smoke";
+  taskTimeoutMs: number;
+}
 
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-    if (argument === "--keep") {
-      keep = true;
-      continue;
-    }
-    if (argument === "--suite") {
-      const value = args[++index];
-      if (value !== "all" && value !== "live" && value !== "smoke") {
-        throw new Error("--suite must be smoke, live, or all.");
-      }
-      suite = value;
-      continue;
-    }
-    if (argument === "--label") {
-      const value = args[++index]?.trim();
-      if (!value) throw new Error("--label requires a non-empty value.");
-      label = value;
-      continue;
-    }
-    if (argument === "--repetitions" || argument === "--max-concurrency") {
-      const value = Number(args[++index]);
-      if (!Number.isInteger(value) || value < 1 || value > 20) {
-        throw new Error(`${argument} must be an integer from 1 to 20.`);
-      }
-      if (argument === "--repetitions") repetitions = value;
-      else maxConcurrency = value;
-      continue;
-    }
-    if (argument === "--task-timeout-minutes") {
-      const value = Number(args[++index]);
-      if (!Number.isInteger(value) || value < 1 || value > 60) {
-        throw new Error(
-          "--task-timeout-minutes must be an integer from 1 to 60."
-        );
-      }
-      taskTimeoutMs = value * 60_000;
-      continue;
-    }
-    if (argument?.startsWith("--")) {
-      throw new Error(`Unknown option: ${argument}`);
-    }
-    if (argument) positional.push(argument);
+interface ParseState {
+  positional: string[];
+  suite: "all" | "live" | "smoke";
+  repetitions: number;
+  maxConcurrency: number;
+  taskTimeoutMs: number;
+  keep: boolean;
+  label: string | undefined;
+  index: number;
+  args: string[];
+}
+
+function requireSuiteValue(
+  value: string | undefined
+): "all" | "live" | "smoke" {
+  if (value === "all" || value === "live" || value === "smoke") return value;
+
+  throw new Error("--suite must be smoke, live, or all.");
+}
+
+function requireLabelValue(value: string | undefined) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) throw new Error("--label requires a non-empty value.");
+
+  return trimmed;
+}
+
+function requireBoundedInteger(
+  argument: string,
+  value: number,
+  minimum: number,
+  maximum: number
+) {
+  if (Number.isInteger(value) && value >= minimum && value <= maximum) {
+    return value;
   }
 
-  const [baselineRef, candidateRef] = positional;
-  if (positional.length !== 2 || !baselineRef || !candidateRef) {
+  throw new Error(
+    `${argument} must be an integer from ${String(minimum)} to ${String(maximum)}.`
+  );
+}
+
+function applyFlag(state: ParseState, argument: string): boolean {
+  if (argument === "--keep") {
+    state.keep = true;
+
+    return true;
+  }
+
+  if (argument === "--suite") {
+    state.suite = requireSuiteValue(state.args[++state.index]);
+
+    return true;
+  }
+
+  if (argument === "--label") {
+    state.label = requireLabelValue(state.args[++state.index]);
+
+    return true;
+  }
+
+  if (argument === "--repetitions") {
+    state.repetitions = requireBoundedInteger(
+      argument,
+      Number(state.args[++state.index]),
+      1,
+      20
+    );
+
+    return true;
+  }
+
+  if (argument === "--max-concurrency") {
+    state.maxConcurrency = requireBoundedInteger(
+      argument,
+      Number(state.args[++state.index]),
+      1,
+      20
+    );
+
+    return true;
+  }
+
+  if (argument === "--task-timeout-minutes") {
+    const minutes = requireBoundedInteger(
+      argument,
+      Number(state.args[++state.index]),
+      1,
+      60
+    );
+
+    state.taskTimeoutMs = minutes * 60_000;
+
+    return true;
+  }
+
+  return false;
+}
+
+function consumeBrowserAbArgument(state: ParseState) {
+  const argument = state.args[state.index];
+
+  if (applyFlag(state, argument ?? "")) return;
+
+  if (argument?.startsWith("--")) {
+    throw new Error(`Unknown option: ${argument}`);
+  }
+
+  if (argument) state.positional.push(argument);
+}
+
+function finalizeBrowserAbArguments(
+  state: ParseState
+): ParsedBrowserAbArguments {
+  const [baselineRef, candidateRef] = state.positional;
+
+  if (state.positional.length !== 2) {
     throw new Error(
       'Usage: pnpm bench:ab <baseline-ref> <candidate-ref> [--label "description"] [--suite smoke|live|all] [--repetitions n] [--max-concurrency n] [--task-timeout-minutes n] [--keep]'
     );
   }
+
+  if (!baselineRef || !candidateRef) {
+    throw new Error(
+      'Usage: pnpm bench:ab <baseline-ref> <candidate-ref> [--label "description"] [--suite smoke|live|all] [--repetitions n] [--max-concurrency n] [--task-timeout-minutes n] [--keep]'
+    );
+  }
+
   return {
     baselineRef,
     candidateRef,
-    keep,
-    label,
-    maxConcurrency,
-    repetitions,
-    suite,
-    taskTimeoutMs,
+    keep: state.keep,
+    label: state.label,
+    maxConcurrency: state.maxConcurrency,
+    repetitions: state.repetitions,
+    suite: state.suite,
+    taskTimeoutMs: state.taskTimeoutMs,
   };
+}
+
+function parseArguments(args: string[]): ParsedBrowserAbArguments {
+  const state: ParseState = {
+    positional: [],
+    suite: "smoke",
+    repetitions: 1,
+    maxConcurrency: 9,
+    taskTimeoutMs: 15 * 60_000,
+    keep: false,
+    label: undefined,
+    index: 0,
+    args,
+  };
+
+  for (; state.index < args.length; state.index += 1) {
+    consumeBrowserAbArgument(state);
+  }
+
+  return finalizeBrowserAbArguments(state);
 }
 
 function shortSha(sha: string) {

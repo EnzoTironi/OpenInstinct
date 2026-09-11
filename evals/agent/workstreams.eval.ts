@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { defineEval } from "eve/evals";
-import { includes } from "eve/evals/expect";
+
 import { agentEvalTags, requireDeliveredText } from "@evals/agent/shared";
 import { saveWorkstreamSchema } from "@shared/workstreams/schema";
+import { defineEval } from "eve/evals";
+import { includes } from "eve/evals/expect";
 
 export default [
   defineEval({
@@ -12,10 +13,12 @@ export default [
     async test(t) {
       const title = `Test trip ${randomUUID()}`;
       let id: string | undefined;
+
       try {
         const first = await t.send(
           `Help me keep track of ${title} across conversations. This is a fictional train trip; do not search or book anything. We have two options, 09:00 and 11:00. I want a window seat. I still need to decide the departure. Remember this as ongoing work, not a general preference.`
         );
+
         first.expectOk();
         first.succeeded();
         id = saveWorkstreamSchema.parse(
@@ -27,6 +30,7 @@ export default [
         const correction = await t.send(
           `For ${title}, change my seat requirement to aisle. Keep both departure options and the pending decision. This correction applies only to this trip.`
         );
+
         correction.expectOk();
         correction.succeeded();
         correction.calledTool("workstreams__save");
@@ -36,6 +40,7 @@ export default [
           .send(
             `Let's continue ${title}. Which departures were we considering, what seat do I want, and what remains undecided? Do not search or book.`
           );
+
         later.expectOk();
         later.succeeded();
         later.calledTool("workstreams__read");
@@ -52,6 +57,7 @@ export default [
             .send(
               `Forget the workstream with id ${id}. Read its current revision and remove it from workstream memory.`
             );
+
           cleanup.expectOk();
           cleanup.calledTool("workstreams__forget", { count: 1 });
         }
@@ -65,6 +71,7 @@ export default [
       const turn = await t.send(
         "What is 19 plus 23? Please do not save this conversation as a workstream."
       );
+
       turn.expectOk();
       turn.succeeded();
       turn.notCalledTool("workstreams__save");

@@ -1,6 +1,6 @@
 import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { z } from "zod";
-import type { AutofillClaim } from "./protocol";
+
 import {
   classifyNativeLoginControl,
   frameOriginExpression,
@@ -10,6 +10,7 @@ import {
   selectNativeLoginFills,
   type ClassifiedNativeLoginControl,
 } from "./login";
+import type { AutofillClaim } from "./protocol";
 
 const targetListSchema = z.object({
   targetInfos: z.array(
@@ -35,6 +36,7 @@ type CdpCommandValue =
 const frameTreeSchema = z.object({
   frameTree: z.lazy(() => frameTreeNodeSchema),
 });
+
 const frameTreeNodeSchema: z.ZodType<{
   childFrames?: z.infer<typeof frameTreeNodeSchema>[];
   frame: { id: string; url: string };
@@ -44,25 +46,33 @@ const frameTreeNodeSchema: z.ZodType<{
 });
 
 const isolatedWorldSchema = z.object({ executionContextId: z.number() });
+
 const cdpValueSchema = z.json();
+
 const evaluatedValueSchema = z.object({
   result: z.object({ value: cdpValueSchema }),
 });
+
 const evaluatedBooleanSchema = z.object({
   result: z.object({ value: z.boolean() }),
 });
+
 const evaluatedStringSchema = z.object({
   result: z.object({ value: z.string() }),
 });
+
 const evaluatedNumberSchema = z.object({
   result: z.object({ value: z.number().int().nonnegative() }),
 });
+
 const evaluatedObjectSchema = z.object({
   result: z.object({ objectId: z.string().optional() }),
 });
+
 const describedNodeSchema = z.object({
   node: z.object({ backendNodeId: z.number().int().positive() }),
 });
+
 const controlDescriptorsSchema = z.array(
   z.object({
     autocomplete: z.string(),
@@ -70,6 +80,7 @@ const controlDescriptorsSchema = z.array(
     index: z.number().int().nonnegative(),
   })
 );
+
 const loginControlDescriptorsSchema = z.array(
   z.object({
     autocomplete: z.string(),
@@ -162,6 +173,7 @@ export async function fillWithKernelNativeAutofill({
           claims,
           expectedOrigin
         );
+
         return { filledClaims, origin };
       }
 
@@ -171,11 +183,13 @@ export async function fillWithKernelNativeAutofill({
         kind,
         expectedOrigin
       );
+
       if (controls.length === 0) {
         throw new Error("No visible form control is available for autofill.");
       }
 
       let lastError: unknown;
+
       /* oxlint-disable eslint/no-await-in-loop -- Autofill tries controls in priority order and stops after the first accepted target. */
       for (const control of controls) {
         try {
@@ -193,6 +207,7 @@ export async function fillWithKernelNativeAutofill({
           lastError = error;
           continue;
         }
+
         return { filledClaims: claims.length, origin };
       }
       /* oxlint-enable eslint/no-await-in-loop */
@@ -203,6 +218,45 @@ export async function fillWithKernelNativeAutofill({
       );
     }
   );
+}
+
+const controlIsFocused = (control: { readonly focused: boolean }) =>
+  control.focused;
+
+const sameFrameAsFocused = <
+  T extends { readonly frameId: string; readonly sessionId: string },
+>(
+  focused: T
+) => {
+  return (control: T) =>
+    control.frameId === focused.frameId &&
+    control.sessionId === focused.sessionId;
+};
+
+async function applyNativeLoginFills(
+  connection: CdpConnection,
+  fills: readonly {
+    readonly control: Parameters<typeof fillNativeLoginControl>[1];
+    readonly value: string;
+  }[],
+  expectedOrigin: string
+) {
+  /* oxlint-disable eslint/no-await-in-loop -- Login fields must be filled in DOM order so page validation sees coherent intermediate state. */
+  for (const { control, value } of fills) {
+    const accepted = await fillNativeLoginControl(
+      connection,
+      control,
+      value,
+      expectedOrigin
+    );
+
+    if (!accepted) {
+      throw new Error(
+        "The login form rejected secure credential autofill or is not served from the saved origin."
+      );
+    }
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
 }
 
 async function fillNativeLoginControls(
@@ -216,39 +270,26 @@ async function fillNativeLoginControls(
     sessionIds,
     expectedOrigin
   );
-  const focused = controls.find((control) => control.focused);
+
+  const focused = controls.find(controlIsFocused);
+
   if (!focused) {
     throw new Error(
       "Focus a visible username, email, phone, or current-password field and retry."
     );
   }
-  const sameFrame = controls.filter(
-    (control) =>
-      control.frameId === focused.frameId &&
-      control.sessionId === focused.sessionId
-  );
+
+  const sameFrame = controls.filter(sameFrameAsFocused(focused));
   const fills = selectNativeLoginFills(sameFrame, claims);
+
   if (fills.length === 0) {
     throw new Error(
       "The focused login form does not accept a field available in this saved login."
     );
   }
 
-  /* oxlint-disable eslint/no-await-in-loop -- Login fields must be filled in DOM order so page validation sees coherent intermediate state. */
-  for (const { control, value } of fills) {
-    const accepted = await fillNativeLoginControl(
-      connection,
-      control,
-      value,
-      expectedOrigin
-    );
-    if (!accepted) {
-      throw new Error(
-        "The login form rejected secure credential autofill or is not served from the saved origin."
-      );
-    }
-  }
-  /* oxlint-enable eslint/no-await-in-loop */
+  await applyNativeLoginFills(connection, fills, expectedOrigin);
+
   return fills.length;
 }
 
@@ -262,9 +303,11 @@ async function inspectNativeLoginControls(
       sessionIds.map(async (sessionId) => {
         try {
           await connection.send("Page.enable", undefined, sessionId);
+
           const { frameTree } = frameTreeSchema.parse(
             await connection.send("Page.getFrameTree", undefined, sessionId)
           );
+
           return (
             await Promise.all(
               flattenFrames(frameTree).map(({ id: frameId }) =>
@@ -298,6 +341,7 @@ async function inspectNativeLoginFrame(
       sessionId
     )
   );
+
   if (
     !(await isFrameAtOrigin(
       connection,
@@ -308,6 +352,7 @@ async function inspectNativeLoginFrame(
   ) {
     return [];
   }
+
   const response = evaluatedValueSchema.parse(
     await connection.send(
       "Runtime.evaluate",
@@ -319,11 +364,14 @@ async function inspectNativeLoginFrame(
       sessionId
     )
   );
+
   const descriptors = loginControlDescriptorsSchema.parse(
     response.result.value
   );
+
   return descriptors.flatMap((descriptor) => {
     const classified = classifyNativeLoginControl(descriptor);
+
     return classified
       ? [{ ...classified, executionContextId, frameId, sessionId }]
       : [];
@@ -350,7 +398,9 @@ async function fillNativeLoginControl(
       control.sessionId
     )
   );
+
   const objectId = evaluated.result.objectId;
+
   if (!objectId) return false;
 
   try {
@@ -367,6 +417,7 @@ async function fillNativeLoginControl(
         control.sessionId
       )
     );
+
     return response.result.value;
   } finally {
     await connection
@@ -397,13 +448,17 @@ export function buildNativeAutofillPayload(
     kind === "address"
       ? addressTokenToChromiumField
       : contactTokenToChromiumField;
+
   const fields = Object.entries(tokenMap).flatMap(([token, name]) => {
     const value = values.get(token);
+
     return value ? [{ name, value }] : [];
   });
+
   if (fields.length === 0) {
     throw new Error(`The saved ${kind} is incomplete or invalid.`);
   }
+
   return { address: { fields } };
 }
 
@@ -418,9 +473,11 @@ async function inspectControls(
       sessionIds.map(async (sessionId) => {
         try {
           await connection.send("Page.enable", undefined, sessionId);
+
           const { frameTree } = frameTreeSchema.parse(
             await connection.send("Page.getFrameTree", undefined, sessionId)
           );
+
           return (
             await Promise.all(
               flattenFrames(frameTree).map(({ id: frameId }) =>
@@ -443,7 +500,9 @@ async function inspectControls(
 
   return controls.toSorted((left, right) => {
     if (left.focused !== right.focused) return left.focused ? -1 : 1;
+
     if (left.standard !== right.standard) return left.standard ? -1 : 1;
+
     return left.order - right.order;
   });
 }
@@ -462,6 +521,7 @@ async function inspectFrameControls(
       sessionId
     )
   );
+
   // Chromium's Autofill.trigger writes into whichever frame owns the control,
   // so only controls in documents served from the saved origin are eligible.
   if (
@@ -474,6 +534,7 @@ async function inspectFrameControls(
   ) {
     return [];
   }
+
   const response = evaluatedValueSchema.parse(
     await connection.send(
       "Runtime.evaluate",
@@ -485,6 +546,7 @@ async function inspectFrameControls(
       sessionId
     )
   );
+
   const descriptors = controlDescriptorsSchema.parse(response.result.value);
 
   return (
@@ -500,13 +562,16 @@ async function inspectFrameControls(
             sessionId
           )
         );
+
         const objectId = evaluated.result.objectId;
+
         if (!objectId) return null;
 
         try {
           const described = describedNodeSchema.parse(
             await connection.send("DOM.describeNode", { objectId }, sessionId)
           );
+
           return {
             backendNodeId: described.node.backendNodeId,
             executionContextId,
@@ -544,6 +609,7 @@ async function isFrameAtOrigin(
       sessionId
     )
   );
+
   return response.result.value === expectedOrigin;
 }
 
@@ -594,10 +660,102 @@ async function markNativeAutofilledControls(
       control.sessionId
     )
   );
+
   if (response.result.value === 0) {
     throw new Error(
       "Vault-filled controls could not be marked for screenshot masking."
     );
+  }
+}
+
+const isActivePageTarget = (target: {
+  readonly type: string;
+  readonly url: string;
+}) => target.type === "page" && isWebUrl(target.url);
+
+const frameIdOf = (frame: { readonly id: string }) => frame.id;
+
+const isIframeInFrames = (frameIds: ReadonlySet<string>) => {
+  return (target: { readonly targetId: string; readonly type: string }) =>
+    target.type === "iframe" && frameIds.has(target.targetId);
+};
+
+const ignoreDetachError = () => undefined;
+
+async function attachIframeSessions(
+  connection: CdpConnection,
+  iframeTargets: readonly { readonly targetId: string }[],
+  sessionIds: string[]
+) {
+  /* oxlint-disable eslint/no-await-in-loop -- CDP target attachment mutates one connection and session IDs are collected in target order. */
+  for (const iframeTarget of iframeTargets) {
+    const attached = attachedTargetSchema.safeParse(
+      await connection
+        .send("Target.attachToTarget", {
+          flatten: true,
+          targetId: iframeTarget.targetId,
+        })
+        .catch(ignoreDetachError)
+    );
+
+    if (attached.success) sessionIds.push(attached.data.sessionId);
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
+}
+
+async function detachSessions(
+  connection: CdpConnection,
+  sessionIds: readonly string[]
+) {
+  await Promise.all(
+    sessionIds.map((sessionId) =>
+      connection
+        .send("Target.detachFromTarget", { sessionId })
+        .catch(ignoreDetachError)
+    )
+  );
+}
+
+async function runOnAttachedPage<T>(
+  connection: CdpConnection,
+  target: { readonly targetId: string; readonly url: string },
+  targetInfos: readonly {
+    readonly targetId: string;
+    readonly type: string;
+  }[],
+  operation: (page: {
+    readonly connection: CdpConnection;
+    readonly origin: string;
+    readonly sessionId: readonly string[];
+  }) => Promise<T>
+) {
+  const { sessionId: pageSessionId } = attachedTargetSchema.parse(
+    await connection.send("Target.attachToTarget", {
+      flatten: true,
+      targetId: target.targetId,
+    })
+  );
+
+  const sessionIds = [pageSessionId];
+
+  try {
+    await connection.send("Page.enable", undefined, pageSessionId);
+
+    const { frameTree } = frameTreeSchema.parse(
+      await connection.send("Page.getFrameTree", undefined, pageSessionId)
+    );
+
+    const frameIds = new Set(flattenFrames(frameTree).map(frameIdOf));
+    const iframeTargets = targetInfos.filter(isIframeInFrames(frameIds));
+    await attachIframeSessions(connection, iframeTargets, sessionIds);
+
+    return await operation({
+      connection,
+      origin: new URL(target.url).origin,
+      sessionId: sessionIds,
+    });
+  } finally {
+    await detachSessions(connection, sessionIds);
   }
 }
 
@@ -615,61 +773,19 @@ async function withKernelPage<T>(
     {},
     { signal }
   );
+
   const connection = await CdpConnection.connect(browser.cdp_ws_url, signal);
 
   try {
     const { targetInfos } = targetListSchema.parse(
       await connection.send("Target.getTargets")
     );
-    const target = targetInfos.findLast(
-      ({ type, url }) => type === "page" && isWebUrl(url)
-    );
+
+    const target = targetInfos.findLast(isActivePageTarget);
+
     if (!target) throw new Error("No active browser tab was found.");
 
-    const { sessionId: pageSessionId } = attachedTargetSchema.parse(
-      await connection.send("Target.attachToTarget", {
-        flatten: true,
-        targetId: target.targetId,
-      })
-    );
-    const sessionIds = [pageSessionId];
-    try {
-      await connection.send("Page.enable", undefined, pageSessionId);
-      const { frameTree } = frameTreeSchema.parse(
-        await connection.send("Page.getFrameTree", undefined, pageSessionId)
-      );
-      const frameIds = new Set(flattenFrames(frameTree).map(({ id }) => id));
-      const iframeTargets = targetInfos.filter(
-        ({ targetId, type }) => type === "iframe" && frameIds.has(targetId)
-      );
-      /* oxlint-disable eslint/no-await-in-loop -- CDP target attachment mutates one connection and session IDs are collected in target order. */
-      for (const iframeTarget of iframeTargets) {
-        const attached = attachedTargetSchema.safeParse(
-          await connection
-            .send("Target.attachToTarget", {
-              flatten: true,
-              targetId: iframeTarget.targetId,
-            })
-            .catch(() => undefined)
-        );
-        if (attached.success) sessionIds.push(attached.data.sessionId);
-      }
-      /* oxlint-enable eslint/no-await-in-loop */
-
-      return await operation({
-        connection,
-        origin: new URL(target.url).origin,
-        sessionId: sessionIds,
-      });
-    } finally {
-      await Promise.all(
-        sessionIds.map((sessionId) =>
-          connection
-            .send("Target.detachFromTarget", { sessionId })
-            .catch(() => undefined)
-        )
-      );
-    }
+    return await runOnAttachedPage(connection, target, targetInfos, operation);
   } finally {
     connection.close();
   }
@@ -714,14 +830,17 @@ class CdpConnection {
         socket.removeEventListener("error", onError);
         signal?.removeEventListener("abort", onAbort);
       };
+
       const onOpen = () => {
         cleanup();
         resolve();
       };
+
       const onError = () => {
         cleanup();
         reject(new Error("Could not connect to the Kernel browser over CDP."));
       };
+
       const onAbort = () => {
         cleanup();
         socket.close();
@@ -731,21 +850,25 @@ class CdpConnection {
             : new Error("The CDP connection was aborted.")
         );
       };
+
       socket.addEventListener("open", onOpen, { once: true });
       socket.addEventListener("error", onError, { once: true });
       signal?.addEventListener("abort", onAbort, { once: true });
     });
+
     return new CdpConnection(socket, signal);
   }
 
   send(method: string, params?: CdpCommandValue, sessionId?: string) {
     const id = this.#nextId++;
+
     return new Promise<z.infer<typeof cdpValueSchema> | undefined>(
       (resolve, reject) => {
         const timeout = setTimeout(() => {
           this.#pending.delete(id);
           reject(new Error(`Chromium did not respond to ${method}.`));
         }, 15_000);
+
         this.#pending.set(id, {
           reject(cause) {
             clearTimeout(timeout);
@@ -769,27 +892,53 @@ class CdpConnection {
     this.socket.close();
   }
 
-  #onMessage(event: MessageEvent) {
-    const eventData = z.string().safeParse(event.data);
-    if (!eventData.success) return;
-    let rawMessage: z.infer<typeof cdpValueSchema>;
+  #parseCdpRawMessage(data: string) {
     try {
-      const parsed = cdpValueSchema.safeParse(JSON.parse(eventData.data));
-      if (!parsed.success) return;
-      rawMessage = parsed.data;
+      const parsed = cdpValueSchema.safeParse(JSON.parse(data));
+
+      if (!parsed.success) return undefined;
+
+      return parsed.data;
     } catch {
+      return undefined;
+    }
+  }
+
+  #settlePendingResponse(
+    pending: {
+      readonly reject: (cause?: unknown) => void;
+      readonly resolve: (
+        value: z.infer<typeof cdpValueSchema> | undefined
+      ) => void;
+    },
+    message: z.infer<typeof cdpResponseSchema>
+  ) {
+    if (message.error) {
+      pending.reject(new Error(message.error.message));
+
       return;
     }
+
+    pending.resolve(message.result);
+  }
+
+  #onMessage(event: MessageEvent) {
+    const eventData = z.string().safeParse(event.data);
+
+    if (!eventData.success) return;
+    const rawMessage = this.#parseCdpRawMessage(eventData.data);
+
+    if (!rawMessage) return;
     const message = cdpResponseSchema.safeParse(rawMessage);
-    if (!message.success || message.data.id === undefined) return;
+
+    if (!message.success) return;
+
+    if (message.data.id === undefined) return;
     const pending = this.#pending.get(message.data.id);
+
     if (!pending) return;
     this.#pending.delete(message.data.id);
-    if (message.data.error) {
-      pending.reject(new Error(message.data.error.message));
-    } else {
-      pending.resolve(message.data.result);
-    }
+    this.#settlePendingResponse(pending, message.data);
   }
 
   #rejectPending(error: Error) {
@@ -821,11 +970,15 @@ function standardAutocomplete(
     .toLowerCase()
     .split(/\s+/u)
     .findLast((value) => Boolean(value));
+
   if (!token) return false;
+
   if (kind === "payment") return token.startsWith("cc-");
+
   if (kind === "contact") {
     return Object.keys(contactTokenToChromiumField).includes(token);
   }
+
   return [
     "name",
     "street-address",
@@ -842,8 +995,10 @@ function standardAutocomplete(
 
 function requiredClaim(values: ReadonlyMap<string, string>, token: string) {
   const value = values.get(token);
+
   if (!value)
     throw new Error("The saved payment card is incomplete or invalid.");
+
   return value;
 }
 

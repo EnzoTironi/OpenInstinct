@@ -1,13 +1,62 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+
 import { NextResponse } from "next/server";
 import { z } from "zod";
+
 import { browserBenchmarkLiveStatusSchema } from "../../../../live-status-schema";
 import { dashboardEnv } from "../../../env";
 
 export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
+
 const nodeErrorSchema = z.object({ code: z.string() });
+
+function isDirectoryEntry(entry: { isDirectory(): boolean }) {
+  return entry.isDirectory();
+}
+
+function statusPathForEntry(root: string, entry: { name: string }) {
+  return join(root, entry.name, "status.json");
+}
+
+function collectStatusPaths(
+  root: string,
+  entries: Awaited<ReturnType<typeof readdir>>
+) {
+  return [
+    dashboardEnv.BROWSER_BENCH_STATUS_PATH ?? join(root, "live.json"),
+    ...entries
+      .filter(isDirectoryEntry)
+      .map((entry) => statusPathForEntry(root, entry)),
+  ];
+}
+
+function statusEntry(
+  status: Awaited<ReturnType<typeof readStatus>>
+): [string, NonNullable<typeof status>][] {
+  if (!status) return [];
+
+  return [[status.runId, status]];
+}
+
+function sortByStartedAtDesc(
+  left: { startedAt: string },
+  right: { startedAt: string }
+) {
+  return right.startedAt.localeCompare(left.startedAt);
+}
+
+function emptyRunsResponse() {
+  return NextResponse.json({ runs: [] });
+}
+
+function isMissingDirectory(
+  parsed: ReturnType<typeof nodeErrorSchema.safeParse>
+) {
+  return parsed.success && parsed.data.code === "ENOENT";
+}
 
 export async function GET() {
   const root = join(
@@ -15,31 +64,25 @@ export async function GET() {
     ".eve",
     "browser-ab"
   );
+
   try {
     const entries = await readdir(/* turbopackIgnore: true */ root, {
       withFileTypes: true,
     });
-    const paths = [
-      dashboardEnv.BROWSER_BENCH_STATUS_PATH ?? join(root, "live.json"),
-      ...entries
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => join(root, entry.name, "status.json")),
-    ];
+
+    const paths = collectStatusPaths(root, entries);
     const parsed = await Promise.all(paths.map(readStatus));
-    const runs = new Map(
-      parsed.flatMap((status) => (status ? [[status.runId, status]] : []))
-    );
+    const runs = new Map(parsed.flatMap(statusEntry));
+
     return NextResponse.json({
-      runs: [...runs.values()].toSorted((left, right) =>
-        right.startedAt.localeCompare(left.startedAt)
-      ),
+      runs: [...runs.values()].toSorted(sortByStartedAtDesc),
     });
   } catch (error) {
-    const parsed = nodeErrorSchema.safeParse(error);
-    if (parsed.success && parsed.data.code === "ENOENT") {
-      return NextResponse.json({ runs: [] });
-    }
+    if (isMissingDirectory(nodeErrorSchema.safeParse(error)))
+      return emptyRunsResponse();
+
     console.error("Unable to list browser benchmark runs", error);
+
     return NextResponse.json(
       { error: "Unable to list benchmark runs." },
       { status: 500 }
@@ -53,8 +96,7 @@ async function readStatus(path: string) {
       JSON.parse(await readFile(/* turbopackIgnore: true */ path, "utf8"))
     );
   } catch (error) {
-    const parsed = nodeErrorSchema.safeParse(error);
-    if (parsed.success && parsed.data.code === "ENOENT") return null;
+    if (isMissingDirectory(nodeErrorSchema.safeParse(error))) return null;
     throw error;
   }
 }

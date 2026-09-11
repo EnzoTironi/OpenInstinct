@@ -1,5 +1,4 @@
 import type { channelProviderSchema } from "@shared/identity/channel-auth";
-import { Effect, Result, Schema } from "effect";
 import {
   channelStartResultSchema,
   deviceBindingSchema,
@@ -10,11 +9,47 @@ import {
   channelChallengeIdSchema,
   channelChallengeRequestSchema,
 } from "@shared/identity/channel-auth";
+import { Effect, Option, Result, Schema } from "effect";
+import {
+  FetchHttpClient,
+  Headers as HttpHeaders,
+  HttpClient,
+  HttpClientRequest,
+} from "effect/unstable/http";
+
+const decodeChannelChallengeRequestSchema = Schema.decodeEffect(
+  channelChallengeRequestSchema
+);
+
+const decodeChannelChallengeIdSchema = Schema.decodeEffect(
+  channelChallengeIdSchema
+);
+
+const decodeDeviceBindingSchema = Schema.decodeEffect(deviceBindingSchema);
+
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+
+const decodeChannelStartResultJson = Schema.decodeEffect(
+  Schema.fromJsonString(channelStartResultSchema)
+);
+
+const decodeChannelChallengeStatusJson = Schema.decodeEffect(
+  Schema.fromJsonString(channelChallengeStatusSchema)
+);
+
+const decodeChannelChallengeCompletionJson = Schema.decodeEffect(
+  Schema.fromJsonString(channelChallengeCompletionSchema)
+);
+
+const decodeDeviceBoundJson = Schema.decodeEffect(
+  Schema.fromJsonString(deviceBoundSchema)
+);
 
 const localCallbackSchema = Schema.String.check(
   Schema.makeFilter((value) => {
     try {
       const decoded = decodeURIComponent(value);
+
       return (
         value.startsWith("/") &&
         !value.startsWith("//") &&
@@ -35,11 +70,11 @@ const localCallbackSchema = Schema.String.check(
   })
 );
 
+const decodeResult_localCallbackSchema =
+  Schema.decodeUnknownResult(localCallbackSchema);
+
 export function safeCallbackUrl(value: string | undefined) {
-  return Result.getOrElse(
-    Schema.decodeUnknownResult(localCallbackSchema)(value),
-    () => "/"
-  );
+  return Result.getOrElse(decodeResult_localCallbackSchema(value), () => "/");
 }
 
 interface SignOutResult {
@@ -60,6 +95,7 @@ export function reauthenticationDestination(
     outcome.value.data?.success !== true
   )
     return undefined;
+
   return `/sign-in?callbackUrl=${encodeURIComponent(safeCallbackUrl(callbackUrl))}`;
 }
 
@@ -73,27 +109,48 @@ export class ChannelAuthorizationError extends Schema.TaggedError<ChannelAuthori
   }
 ) {}
 
+const TERMINAL_CHANNEL_STATUSES = new Set([400, 401, 403, 404, 409, 410]);
+
 export function channelHttpError(
   status: number,
   retryAfter: string | null = null
 ) {
-  const terminal = [400, 401, 403, 404, 409, 410].includes(status);
   return new ChannelAuthorizationError({
     status,
     retryAfter,
-    category: terminal
-      ? "terminal"
-      : status === 429
-        ? "rate-limit"
-        : "transient",
-    message: terminal
-      ? "This sign-in could not be verified in this browser. Start again and confirm the new request in chat."
-      : status === 429
-        ? "Too many attempts. Wait before trying again."
-        : status === 503
-          ? "Sign-in through this messenger is unavailable. Try the other messenger, or try again later."
-          : "Unable to check sign-in. Check your connection and try again.",
+    category: channelErrorCategory(status),
+    message: channelErrorMessage(status),
   });
+}
+
+function channelErrorCategory(
+  status: number
+): ChannelAuthorizationError["category"] {
+  if (TERMINAL_CHANNEL_STATUSES.has(status)) {
+    return "terminal";
+  }
+
+  if (status === 429) {
+    return "rate-limit";
+  }
+
+  return "transient";
+}
+
+function channelErrorMessage(status: number): string {
+  if (TERMINAL_CHANNEL_STATUSES.has(status)) {
+    return "This sign-in could not be verified in this browser. Start again and confirm the new request in chat.";
+  }
+
+  if (status === 429) {
+    return "Too many attempts. Wait before trying again.";
+  }
+
+  if (status === 503) {
+    return "Sign-in through this messenger is unavailable. Try the other messenger, or try again later.";
+  }
+
+  return "Unable to check sign-in. Check your connection and try again.";
 }
 
 export function invalidChannelChallenge(status: number) {
@@ -110,6 +167,7 @@ export type ChannelAuthorizationStatus =
   | "invalid";
 
 const retrySecondsSchema = Schema.String.check(Schema.isPattern(/^\d+$/u));
+
 const retryDateSchema = Schema.String.check(
   Schema.isPattern(
     /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/u
@@ -122,71 +180,177 @@ export function channelPollFailure(
   now: number,
   expiresAt: number
 ) {
-  if (now >= expiresAt)
+  if (now >= expiresAt) {
     return { status: "expired" as const, failures, delay: 0 };
-  if (failure.category === "terminal")
+  }
+
+  if (failure.category === "terminal") {
     return { status: "invalid" as const, failures, delay: 0 };
-  const nextFailures =
-    failure.category === "transient" ? failures + 1 : failures;
-  if (nextFailures >= 5)
+  }
+
+  const nextFailures = nextPollFailures(failure.category, failures);
+
+  if (nextFailures >= 5) {
     return { status: "invalid" as const, failures: nextFailures, delay: 0 };
-  const header = failure.retryAfter;
-  const retryAfter =
-    header === null
-      ? Number.NaN
-      : Schema.is(retrySecondsSchema)(header)
-        ? Math.min(Number(header) * 1000, expiresAt - now)
-        : Schema.is(retryDateSchema)(header)
-          ? Date.parse(header) - now
-          : Number.NaN;
-  const fallback =
-    failure.category === "rate-limit"
-      ? 30_000
-      : Math.min(2000 * 2 ** nextFailures, 30_000);
+  }
+
+  return {
+    status: "pending" as const,
+    failures: nextFailures,
+    delay: pollRetryDelay(failure, nextFailures, now, expiresAt),
+  };
+}
+
+function nextPollFailures(
+  category: ChannelAuthorizationError["category"],
+  failures: number
+): number {
+  if (category === "transient") {
+    return failures + 1;
+  }
+
+  return failures;
+}
+
+function pollRetryDelay(
+  failure: ChannelAuthorizationError,
+  nextFailures: number,
+  now: number,
+  expiresAt: number
+): number {
+  const retryAfter = parseRetryAfter(failure.retryAfter, now, expiresAt);
+  const fallback = pollFallbackDelay(failure.category, nextFailures);
+
   const delay = Math.max(
     2000,
     Number.isFinite(retryAfter) ? retryAfter : fallback
   );
-  return {
-    status: "pending" as const,
-    failures: nextFailures,
-    delay: Math.min(delay, expiresAt - now),
-  };
+
+  return Math.min(delay, expiresAt - now);
 }
 
-const requestJson = Effect.fn("channelAuthorization.request")(
-  function* <A>(
-    path: string,
-    init: RequestInit,
-    responseSchema: Schema.Codec<A, unknown>
-  ) {
-    const response = yield* Effect.tryPromise({
-      try: (signal) =>
-        fetch(`/api/auth/channel-auth/${path}`, {
-          ...init,
-          cache: "no-store",
-          credentials: "same-origin",
-          redirect: "error",
-          signal,
-        }),
-      catch: () => channelHttpError(0),
-    });
-    if (!response.ok)
-      return yield* channelHttpError(
-        response.status,
-        response.headers.get("Retry-After")
-      );
-    const body = yield* Effect.tryPromise({
-      try: () => response.text(),
-      catch: () => channelHttpError(0),
-    });
-    return yield* Schema.decodeEffect(Schema.fromJsonString(responseSchema))(
-      body
-    ).pipe(Effect.mapError(() => invalidChannelChallenge(response.status)));
-  },
-  Effect.timeout("10 seconds"),
-  Effect.catchTag("TimeoutError", () => Effect.fail(channelHttpError(0)))
-);
+function parseRetryAfter(
+  header: string | null,
+  now: number,
+  expiresAt: number
+): number {
+  if (header === null) {
+    return Number.NaN;
+  }
+
+  if (Schema.is(retrySecondsSchema)(header)) {
+    return Math.min(Number(header) * 1000, expiresAt - now);
+  }
+
+  if (Schema.is(retryDateSchema)(header)) {
+    return Date.parse(header) - now;
+  }
+
+  return Number.NaN;
+}
+
+function pollFallbackDelay(
+  category: ChannelAuthorizationError["category"],
+  nextFailures: number
+): number {
+  if (category === "rate-limit") {
+    return 30_000;
+  }
+
+  return Math.min(2000 * 2 ** nextFailures, 30_000);
+}
+
+interface ChannelHttpInit {
+  readonly method?: string;
+  readonly headers?: HeadersInit;
+  readonly body?: string;
+}
+
+function channelHttpMethod(init: ChannelHttpInit): string {
+  return (init.method ?? "GET").toUpperCase();
+}
+
+function buildChannelRequest(path: string, init: ChannelHttpInit) {
+  const url = `/api/auth/channel-auth/${path}`;
+  const method = channelHttpMethod(init);
+
+  let request =
+    method === "POST"
+      ? HttpClientRequest.post(url)
+      : HttpClientRequest.get(url);
+
+  const headers = new Headers(init.headers);
+
+  if ([...headers.keys()].length > 0) {
+    request = request.pipe(
+      HttpClientRequest.setHeaders(Object.fromEntries(headers.entries()))
+    );
+  }
+
+  if (init.body !== undefined) {
+    request = request.pipe(
+      HttpClientRequest.bodyText(
+        init.body,
+        headers.get("content-type") ?? "application/json"
+      )
+    );
+  }
+
+  return request;
+}
+
+function mapChannelTransportError() {
+  return channelHttpError(0);
+}
+
+function mapChannelDecodeError(status: number) {
+  return () => invalidChannelChallenge(status);
+}
+
+function failOnTimeout() {
+  return Effect.fail(channelHttpError(0));
+}
+
+function withChannelRequestDefaults<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  return effect.pipe(
+    Effect.timeout("10 seconds"),
+    Effect.catchTag("TimeoutError", failOnTimeout),
+    Effect.provide(FetchHttpClient.layer)
+  );
+}
+
+const requestJson = Effect.fn("channelAuthorization.request")(function* <A>(
+  path: string,
+  init: ChannelHttpInit,
+  decodeResponse: (body: string) => Effect.Effect<A, Schema.SchemaError>
+) {
+  const http = yield* HttpClient.HttpClient;
+  const request = buildChannelRequest(path, init);
+
+  const response = yield* http.execute(request).pipe(
+    Effect.mapError(mapChannelTransportError),
+    Effect.provideService(FetchHttpClient.RequestInit, {
+      cache: "no-store",
+      credentials: "same-origin",
+      redirect: "error",
+    })
+  );
+
+  if (response.status < 200 || response.status >= 300) {
+    return yield* channelHttpError(
+      response.status,
+      Option.getOrNull(HttpHeaders.get(response.headers, "retry-after"))
+    );
+  }
+
+  const body = yield* response.text.pipe(
+    Effect.mapError(mapChannelTransportError)
+  );
+
+  return yield* decodeResponse(body).pipe(
+    Effect.mapError(mapChannelDecodeError(response.status))
+  );
+}, withChannelRequestDefaults);
 
 export const startChannelAuthorization = Effect.fn(
   "channelAuthorization.start"
@@ -194,50 +358,55 @@ export const startChannelAuthorization = Effect.fn(
   channel: typeof channelProviderSchema.Type,
   purpose: typeof channelChallengeRequestSchema.Type.purpose
 ) {
-  const intent = yield* Schema.decodeEffect(channelChallengeRequestSchema)({
+  const intent = yield* decodeChannelChallengeRequestSchema({
     channel,
     purpose,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
+
   const challenge = yield* requestJson(
     "start",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(intent),
+      body: encodeJson(intent),
     },
-    channelStartResultSchema
+    decodeChannelStartResultJson
   );
+
   if (challenge.channel !== channel) return yield* invalidChannelChallenge(200);
+
   return challenge;
 });
 
 export const checkChannelAuthorization = Effect.fn(
   "channelAuthorization.status"
 )(function* (id: string) {
-  const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
+  const input = yield* decodeChannelChallengeIdSchema({
     id,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
+
   return yield* requestJson(
     `status?id=${encodeURIComponent(input.id)}`,
     { method: "GET" },
-    channelChallengeStatusSchema
+    decodeChannelChallengeStatusJson
   );
 });
 
 export const completeChannelAuthorization = Effect.fn(
   "channelAuthorization.complete"
 )(function* (id: string) {
-  const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
+  const input = yield* decodeChannelChallengeIdSchema({
     id,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
+
   yield* requestJson(
     "complete",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: encodeJson(input),
     },
-    channelChallengeCompletionSchema
+    decodeChannelChallengeCompletionJson
   );
 });
 
@@ -246,28 +415,33 @@ export function channelFailureMessage(
   purpose: typeof channelChallengeRequestSchema.Type.purpose
 ) {
   if (purpose === "login") return failure.message;
+
   if (failure.status === 401)
     return "Sign in again before linking another channel, then return to Account to start a new request.";
+
   if (failure.status === 409)
     return "This messenger is already associated with another Companion account. Accounts cannot be combined here. Sign in to its existing account instead.";
+
   if (failure.category === "terminal")
     return "This account-linking request could not be verified. Start a new request and confirm it in the messenger account you want to link.";
+
   return failure.message;
 }
 
 export const bindNativeBrowser = Effect.fn("channelAuthorization.bind")(
   function* (input: typeof deviceBindingSchema.Type) {
-    const body = yield* Schema.decodeEffect(deviceBindingSchema)(input).pipe(
+    const body = yield* decodeDeviceBindingSchema(input).pipe(
       Effect.mapError(() => channelHttpError(400))
     );
+
     return yield* requestJson(
       "device-bind",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: encodeJson(body),
       },
-      deviceBoundSchema
+      decodeDeviceBoundJson
     );
   }
 );
@@ -276,5 +450,5 @@ export const resumeNativeBrowser = (input: typeof deviceRequestSchema.Type) =>
   requestJson(
     `device?id=${encodeURIComponent(input.id)}&purpose=${input.purpose}`,
     { method: "GET" },
-    deviceBoundSchema
+    decodeDeviceBoundJson
   );

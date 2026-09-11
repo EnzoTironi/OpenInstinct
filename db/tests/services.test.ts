@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
+
+import * as Database from "@db";
 import { PGlite } from "@electric-sql/pglite";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as Database from "@db";
+
 import * as schema from "../schema";
 import {
   browserTraceDomains as browserTraceDomainsTable,
@@ -59,6 +61,7 @@ describe("database services", () => {
       import("@db/services/scope"),
       import("@db/services/vault"),
     ]);
+
     const alice = { userId: "alice", workspaceId: "workspace:alice" };
     const bob = { userId: "bob", workspaceId: "workspace:bob" };
 
@@ -73,19 +76,24 @@ describe("database services", () => {
       sourceKind: "viewport",
       workerSessionId: "worker-alice",
     };
+
     const firstReservation = await browserImages.reserveBrowserImageArtifact(
       alice,
       imageInput
     );
+
     const retryReservation = await browserImages.reserveBrowserImageArtifact(
       alice,
       imageInput
     );
+
     expect(firstReservation.status).toBe("pending");
     expect(retryReservation).toEqual(firstReservation);
+
     if (firstReservation.status !== "pending") {
       throw new Error("Expected a pending browser image reservation.");
     }
+
     const finalized = await browserImages.finalizeBrowserImageArtifact(
       alice,
       firstReservation.reservation,
@@ -98,6 +106,7 @@ describe("database services", () => {
         storagePathname: `${firstReservation.reservation.storagePathname}/content-hash`,
       }
     );
+
     const image = finalized.image;
     expect(image).toMatchObject({
       byteSize: 8,
@@ -118,11 +127,13 @@ describe("database services", () => {
         }
       )
     ).resolves.toEqual(finalized);
+
     const storedImage = await browserImages.readReadyBrowserImageArtifact(
       alice,
       image.id,
       { rootSessionId: "session-alice" }
     );
+
     expect(storedImage?.createdAt).toMatch(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u
     );
@@ -235,19 +246,23 @@ describe("database services", () => {
       resultMessage: "Ordered.",
       status: "success",
     });
+
     const [trace] = await pgliteDatabase
       .select()
       .from(browserTracesTable)
       .where(eq(browserTracesTable.sessionId, "worker-alice"));
+
     expect(trace).toMatchObject({
       durationMs: 12_500,
       resultMessage: "Ordered.",
       status: "success",
       task: "Order the blue mug",
     });
+
     const traceDomains = await pgliteDatabase
       .select()
       .from(browserTraceDomainsTable);
+
     expect(traceDomains).toHaveLength(1);
     expect(traceDomains[0]).toMatchObject({
       domain: "shop.example.com",
@@ -272,10 +287,12 @@ describe("database services", () => {
         type: "message.received",
       },
     ]);
+
     const events = await browserTraces.listBrowserTraceEvents(
       alice,
       "worker-alice"
     );
+
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ id: "evt_01", label: "Task received" });
     expect(
@@ -350,6 +367,7 @@ async function applyInitialMigration(database: PGlite) {
     new URL("../migrations/0000_fluffy_the_spike.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -362,6 +380,7 @@ async function applyBrowserImageMigration(database: PGlite) {
     new URL("../migrations/0003_unusual_fabian_cortez.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -374,6 +393,7 @@ async function applyBrowserTraceMigration(database: PGlite) {
     new URL("../migrations/0004_kind_manta.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -386,6 +406,7 @@ async function applyBrowserTraceEventMigration(database: PGlite) {
     new URL("../migrations/0005_brave_kang.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -398,6 +419,7 @@ async function applySchemaAdoptionMigration(database: PGlite) {
     new URL("../migrations/0006_illegal_tattoo.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -410,6 +432,7 @@ async function applyNativeTypesMigration(database: PGlite) {
     new URL("../migrations/0008_black_sandman.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -422,6 +445,7 @@ async function applyChatChannelMigration(database: PGlite) {
     new URL("../migrations/0011_faulty_unicorn.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -434,6 +458,7 @@ async function applyOrgWorkspaceRbacMigration(database: PGlite) {
     new URL("../migrations/0029_org-workspace-rbac.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);
@@ -446,6 +471,7 @@ async function applyOrgSsoAuditErasureMigration(database: PGlite) {
     new URL("../migrations/0030_org-sso-audit-erasure.sql", import.meta.url),
     "utf8"
   );
+
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim()) await database.exec(statement);

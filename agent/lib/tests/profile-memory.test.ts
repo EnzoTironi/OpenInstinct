@@ -1,132 +1,136 @@
 import {
+  preserveProfileMemoryCancellation,
+  resolveProfileMemoryScope,
+} from "@agent/lib/profile-memory";
+import personalInfoMemory from "@agent/memory/personal_info";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import {
   defineMemoryProvider,
   type MemoryScopeContext,
   type MemoryTurnStartedContext,
   type MemoryToolsContext,
 } from "eve/memory";
-import { describe, expect, it } from "vitest";
-import personalInfoMemory from "@agent/memory/personal_info";
-import {
-  preserveProfileMemoryCancellation,
-  resolveProfileMemoryScope,
-} from "@agent/lib/profile-memory";
-import { accessScopeForUser } from "@shared/identity/access-scope";
+import { expect, it } from "vitest";
 
 const derivedWorkspaceId = accessScopeForUser("better-auth:user").workspaceId;
 
-describe("profile memory", () => {
-  it("shares the canonical workspace across verified authenticators", () => {
-    const workspaceId = derivedWorkspaceId;
-    expect(
-      resolveProfileMemoryScope(
-        memoryContext(userPrincipal("authjs", workspaceId))
-      )
-    ).toBe(workspaceId);
-    expect(
-      resolveProfileMemoryScope(
-        memoryContext(userPrincipal("linq-message", workspaceId))
-      )
-    ).toBe(workspaceId);
-  });
+it("shares the canonical workspace across verified authenticators", () => {
+  const workspaceId = derivedWorkspaceId;
+  expect(
+    resolveProfileMemoryScope(
+      memoryContext(userPrincipal("authjs", workspaceId))
+    )
+  ).toBe(workspaceId);
+  expect(
+    resolveProfileMemoryScope(
+      memoryContext(userPrincipal("linq-message", workspaceId))
+    )
+  ).toBe(workspaceId);
+});
 
-  it("disables memory without an authenticated workspace user", () => {
-    expect(resolveProfileMemoryScope(memoryContext(null))).toBeNull();
-    expect(
-      resolveProfileMemoryScope(
-        memoryContext({
-          ...userPrincipal("runtime", derivedWorkspaceId),
+it("disables memory without an authenticated workspace user", () => {
+  expect(resolveProfileMemoryScope(memoryContext(null))).toBeNull();
+  expect(
+    resolveProfileMemoryScope(
+      memoryContext({
+        ...userPrincipal("runtime", derivedWorkspaceId),
+        principalType: "runtime",
+      })
+    )
+  ).toBeNull();
+  expect(
+    resolveProfileMemoryScope(memoryContext(userPrincipal("authjs")))
+  ).toBeNull();
+});
+
+it("shares personal information with a worker acting for the user", () => {
+  expect(
+    personalInfoMemory.scope(
+      memoryContext(
+        {
+          attributes: {},
+          authenticator: "runtime",
+          principalId: "worker",
           principalType: "runtime",
-        })
-      )
-    ).toBeNull();
-    expect(
-      resolveProfileMemoryScope(memoryContext(userPrincipal("authjs")))
-    ).toBeNull();
-  });
-
-  it("shares personal information with a worker acting for the user", () => {
-    expect(
-      personalInfoMemory.scope(
-        memoryContext(
-          {
-            attributes: {},
-            authenticator: "runtime",
-            principalId: "worker",
-            principalType: "runtime",
-          },
-          userPrincipal("authjs", derivedWorkspaceId)
-        )
-      )
-    ).toBe(derivedWorkspaceId);
-  });
-
-  it("omits user memory from scheduled reporting turns", () => {
-    const context = memoryContext(
-      userPrincipal("scheduled-result", derivedWorkspaceId)
-    );
-
-    expect(resolveProfileMemoryScope(context)).toBeNull();
-    expect(personalInfoMemory.scope(context)).toBeNull();
-  });
-
-  it("offers profile updates only during interactive turns", async () => {
-    const interactiveTools = await personalInfoMemory.provider.tools(
-      memoryToolsContext(userPrincipal("authjs", derivedWorkspaceId))
-    );
-    expect(Object.keys(interactiveTools ?? {})).toEqual(["update"]);
-
-    const scheduledTools = await personalInfoMemory.provider.tools(
-      memoryToolsContext(userPrincipal("scheduled-worker", derivedWorkspaceId))
-    );
-    expect(scheduledTools).toBeNull();
-  });
-
-  it("preserves the turn cancellation reason when recall loses it", async () => {
-    const blobAbort = new DOMException(
-      "This operation was aborted",
-      "AbortError"
-    );
-    const cancellation = Object.assign(new Error("The turn was cancelled."), {
-      name: "TurnCancelledError",
-    });
-    const controller = new AbortController();
-    controller.abort(cancellation);
-    const provider = preserveProfileMemoryCancellation(
-      defineMemoryProvider({
-        recall: {
-          async "turn.started"() {
-            throw blobAbort;
-          },
         },
-      })
-    );
-
-    await expect(
-      provider.recall["turn.started"](memoryOperationContext(controller.signal))
-    ).rejects.toBe(cancellation);
-  });
-
-  it("does not hide a recall failure while the turn remains active", async () => {
-    const blobAbort = new DOMException(
-      "This operation was aborted",
-      "AbortError"
-    );
-    const provider = preserveProfileMemoryCancellation(
-      defineMemoryProvider({
-        recall: {
-          async "turn.started"() {
-            throw blobAbort;
-          },
-        },
-      })
-    );
-
-    await expect(
-      provider.recall["turn.started"](
-        memoryOperationContext(new AbortController().signal)
+        userPrincipal("authjs", derivedWorkspaceId)
       )
-    ).rejects.toBe(blobAbort);
+    )
+  ).toBe(derivedWorkspaceId);
+});
+
+it("omits user memory from scheduled reporting turns", () => {
+  const context = memoryContext(
+    userPrincipal("scheduled-result", derivedWorkspaceId)
+  );
+
+  expect(resolveProfileMemoryScope(context)).toBeNull();
+  expect(personalInfoMemory.scope(context)).toBeNull();
+});
+
+it("offers profile updates only during interactive turns", async () => {
+  const interactiveTools = await personalInfoMemory.provider.tools(
+    memoryToolsContext(userPrincipal("authjs", derivedWorkspaceId))
+  );
+
+  expect(Object.keys(interactiveTools ?? {})).toEqual(["update"]);
+
+  const scheduledTools = await personalInfoMemory.provider.tools(
+    memoryToolsContext(userPrincipal("scheduled-worker", derivedWorkspaceId))
+  );
+
+  expect(scheduledTools).toBeNull();
+});
+
+it("preserves the turn cancellation reason when recall loses it", async () => {
+  const blobAbort = new DOMException(
+    "This operation was aborted",
+    "AbortError"
+  );
+
+  const cancellation = Object.assign(new Error("The turn was cancelled."), {
+    name: "TurnCancelledError",
   });
+
+  const controller = new AbortController();
+  controller.abort(cancellation);
+
+  const provider = preserveProfileMemoryCancellation(
+    defineMemoryProvider({
+      recall: {
+        async "turn.started"() {
+          throw blobAbort;
+        },
+      },
+    })
+  );
+
+  await expect(
+    provider.recall["turn.started"](memoryOperationContext(controller.signal))
+  ).rejects.toBe(cancellation);
+});
+
+it("does not hide a recall failure while the turn remains active", async () => {
+  const blobAbort = new DOMException(
+    "This operation was aborted",
+    "AbortError"
+  );
+
+  const provider = preserveProfileMemoryCancellation(
+    defineMemoryProvider({
+      recall: {
+        async "turn.started"() {
+          throw blobAbort;
+        },
+      },
+    })
+  );
+
+  await expect(
+    provider.recall["turn.started"](
+      memoryOperationContext(new AbortController().signal)
+    )
+  ).rejects.toBe(blobAbort);
 });
 
 function memoryOperationContext(

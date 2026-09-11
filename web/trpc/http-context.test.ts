@@ -1,6 +1,7 @@
 import type { TRPCError } from "@trpc/server";
-import { describe, expect, it, vi } from "vitest";
 import { UnauthenticatedError } from "@web/auth/request-scope";
+import { describe, expect, it, vi } from "vitest";
+
 import { createHTTPContext } from "./http-context";
 
 describe("createHTTPContext", () => {

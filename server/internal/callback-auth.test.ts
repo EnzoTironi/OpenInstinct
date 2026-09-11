@@ -1,7 +1,9 @@
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
-import { ConfigProvider, Effect, Schema } from "effect";
+import { ConfigProvider, Effect, Result, Schema } from "effect";
 import { expect, test } from "vitest";
+
 import {
   readVerifiedInternalCallback,
   internalCallbackBodies,
@@ -13,14 +15,25 @@ const configuration = {
   BETTER_AUTH_URL: "http://127.0.0.1:3000",
   SECRET_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
 };
+
 const unusedBetterAuthSecret = randomBytes(32).toString("base64");
+
 const route = "/internal/scheduled-run/report";
+
+const decodeSchema_fromJsonString_internalCallbackBodies_route =
+  Schema.decodeUnknownEffect(
+    Schema.fromJsonString(internalCallbackBodies[route]),
+    { onExcessProperty: "error" }
+  );
+
 const body = JSON.stringify({ runId: randomUUID() });
+
 const secretsLayer = (secretEncryptionKey: string) =>
   ResolvedInstallationSecrets.layerFromResolved({
     betterAuthSecret: unusedBetterAuthSecret,
     secretEncryptionKey,
   });
+
 const run = <A, E>(
   effect: Effect.Effect<A, E, ResolvedInstallationSecrets>,
   config: Record<string, string> = configuration,
@@ -71,6 +84,7 @@ test("rejects absent, malformed and changed signatures and changed body/method/p
   malformed.set("x-internal-callback-signature", "x");
   const wrong = new Headers(headers);
   wrong.set("x-internal-callback-signature", "00".repeat(32));
+
   const inputs = [
     request(absent),
     request(malformed),
@@ -80,11 +94,13 @@ test("rejects absent, malformed and changed signatures and changed body/method/p
     request(headers, body, `${route}?extra=1`),
     request(headers, body, "/internal/scheduled-run/respond"),
   ];
+
   const results = await Promise.all(
     inputs.map((input) =>
       run(readVerifiedInternalCallback(input, route).pipe(Effect.flip))
     )
   );
+
   for (const result of results) expect(result.status).toBe(401);
 });
 
@@ -124,9 +140,11 @@ test("rejects correctly signed expired and far-future requests", async () => {
   )
     .update("companion/internal-callback/v1")
     .digest();
+
   await Promise.all(
     [-120, 120].map(async (offset) => {
       const timestamp = String(Math.floor(Date.now() / 1000) + offset);
+
       const signature = createHmac("sha256", derivedKey)
         .update(
           JSON.stringify([
@@ -139,10 +157,12 @@ test("rejects correctly signed expired and far-future requests", async () => {
           ])
         )
         .digest("hex");
+
       const headers = new Headers({
         "x-internal-callback-time": timestamp,
         "x-internal-callback-signature": signature,
       });
+
       expect(
         await run(
           readVerifiedInternalCallback(request(headers), route).pipe(
@@ -162,10 +182,12 @@ test("requires explicit valid secret and restricts cleartext destinations to loo
       secretsLayer("bad-key")
     )
   ).toMatchObject({ status: 503 });
+
   const remoteConfigs = [
     { ...configuration, BETTER_AUTH_URL: "http://remote.invalid" },
     { ...configuration, BETTER_AUTH_URL: "https://user:password@host.invalid" },
   ];
+
   await Promise.all(
     remoteConfigs.map(async (config) => {
       expect(
@@ -202,16 +224,18 @@ test("signed malformed JSON and extra authority fields fail the boundary schema"
     ["{", JSON.stringify({ runId: randomUUID(), userId: "other-user" })].map(
       async (payload) => {
         const headers = await run(internalCallbackHeaders(route, payload));
+
         const raw = await run(
           readVerifiedInternalCallback(request(headers, payload), route)
         );
+
         const result = await run(
-          Schema.decodeUnknownEffect(
-            Schema.fromJsonString(internalCallbackBodies[route]),
-            { onExcessProperty: "error" }
-          )(raw.toString()).pipe(Effect.result)
+          decodeSchema_fromJsonString_internalCallbackBodies_route(
+            raw.toString()
+          ).pipe(Effect.result)
         );
-        expect(result).toMatchObject({ _tag: "Failure" });
+
+        expect(Result.isFailure(result)).toBe(true);
       }
     )
   );
@@ -219,8 +243,10 @@ test("signed malformed JSON and extra authority fields fail the boundary schema"
 
 test("a valid retry remains authentic and must still pass the database claim", async () => {
   const headers = await run(internalCallbackHeaders(route, body));
+
   const results = await Promise.all(
     [1, 2].map(() => run(readVerifiedInternalCallback(request(headers), route)))
   );
+
   for (const result of results) expect(result.toString()).toBe(body);
 });

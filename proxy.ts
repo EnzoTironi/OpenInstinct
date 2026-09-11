@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
 import { getAuthSession } from "@db/services/auth/session";
+import { NextResponse, type NextRequest } from "next/server";
 
 const publicExact = new Set([
   "/sign-in",
@@ -16,8 +16,11 @@ const publicExact = new Set([
 
 function isPublicPath(pathname: string) {
   if (publicExact.has(pathname)) return true;
+
   if (pathname.startsWith("/api/auth/")) return true;
+
   if (pathname.startsWith("/internal/scheduled-run/")) return true;
+
   return false;
 }
 
@@ -42,6 +45,7 @@ export async function proxy(request: NextRequest) {
     "callbackUrl",
     `${request.nextUrl.pathname}${request.nextUrl.search}`
   );
+
   return NextResponse.redirect(signInUrl);
 }
 

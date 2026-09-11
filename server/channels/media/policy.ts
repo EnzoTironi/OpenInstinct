@@ -1,7 +1,21 @@
 import { Effect, Schema } from "effect";
+
+import { sniffBrowserImageMediaType } from "../../../shared/browser/artifact";
 import { artifactLimits } from "../../artifacts/model";
 import type { MessagePayload } from "../../messaging/model";
-import { sniffBrowserImageMediaType } from "../../../shared/browser/artifact";
+
+const decodePlainTextMedia = Schema.decodeUnknownEffect(
+  Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.makeFilter((value) =>
+      value.split("").every((character) => {
+        const code = character.charCodeAt(0);
+
+        return code >= 32 || code === 9 || code === 10 || code === 13;
+      })
+    )
+  )
+);
 
 export type MediaReference = NonNullable<MessagePayload["attachments"]>[number];
 
@@ -54,50 +68,98 @@ const textType = Schema.Literals([
   "application/json",
 ]);
 
+const headAscii = (head: Buffer, start: number, end: number) =>
+  head.subarray(start, end).toString("ascii");
+
+function sniffedImageOrPdf(
+  head: Buffer,
+  imageType: ReturnType<typeof sniffBrowserImageMediaType>
+): string | undefined {
+  if (imageType === "image/png") return imageType;
+
+  if (imageType === "image/jpeg") return imageType;
+
+  if (headAscii(head, 0, 5) === "%PDF-") return "application/pdf";
+
+  return undefined;
+}
+
+function sniffedAudioType(head: Buffer): string | undefined {
+  if (headAscii(head, 0, 4) === "OggS") return "audio/ogg";
+
+  if (headAscii(head, 0, 4) === "RIFF" && headAscii(head, 8, 12) === "WAVE") {
+    return "audio/wav";
+  }
+
+  return undefined;
+}
+
+function sniffedMediaTypeFrom(
+  head: Buffer,
+  imageType: ReturnType<typeof sniffBrowserImageMediaType>,
+  claimed: string | undefined
+): string | undefined {
+  const imageOrPdf = sniffedImageOrPdf(head, imageType);
+
+  if (imageOrPdf) return imageOrPdf;
+
+  const audio = sniffedAudioType(head);
+
+  if (audio) return audio;
+
+  if (Schema.is(textType)(claimed)) return claimed;
+
+  return undefined;
+}
+
+function claimMatchesMediaType(claimed: string | undefined, mediaType: string) {
+  if (claimed === "application/octet-stream") return true;
+
+  if (claimed === mediaType) return true;
+
+  if (mediaType === "audio/ogg" && claimed === "application/ogg") return true;
+
+  if (mediaType === "audio/wav" && claimed === "audio/x-wav") return true;
+
+  return false;
+}
+
+function byteLimitForMediaType(mediaType: string) {
+  if (mediaType.startsWith("image/")) return mediaLimits.imageBytes;
+
+  if (mediaType.startsWith("audio/")) return mediaLimits.audioBytes;
+
+  if (Schema.is(textType)(mediaType)) return mediaLimits.textBytes;
+
+  return mediaLimits.totalBytes;
+}
+
 export const identifyMedia = Effect.fn("identifyMedia")(function* (
   bytes: Uint8Array,
   reference: MediaReference
 ) {
   if (bytes.length === 0)
     return yield* new ChannelMediaError({ reason: "invalid_media" });
+
   const head = Buffer.from(
     bytes.buffer,
     bytes.byteOffset,
     Math.min(bytes.length, 64)
   );
+
   const claimed = reference.mediaType.split(";")[0]?.trim().toLowerCase();
   const imageType = sniffBrowserImageMediaType(bytes);
-  const mediaType =
-    imageType === "image/png" || imageType === "image/jpeg"
-      ? imageType
-      : head.subarray(0, 5).toString("ascii") === "%PDF-"
-        ? "application/pdf"
-        : head.subarray(0, 4).toString("ascii") === "OggS"
-          ? "audio/ogg"
-          : head.subarray(0, 4).toString("ascii") === "RIFF" &&
-              head.subarray(8, 12).toString("ascii") === "WAVE"
-            ? "audio/wav"
-            : Schema.is(textType)(claimed)
-              ? claimed
-              : undefined;
+  const mediaType = sniffedMediaTypeFrom(head, imageType, claimed);
+
   if (!mediaType)
     return yield* new ChannelMediaError({ reason: "unsupported_type" });
-  const allowedClaim =
-    claimed === "application/octet-stream" ||
-    claimed === mediaType ||
-    (mediaType === "audio/ogg" && claimed === "application/ogg") ||
-    (mediaType === "audio/wav" && claimed === "audio/x-wav");
-  if (!allowedClaim)
+
+  if (!claimMatchesMediaType(claimed, mediaType))
     return yield* new ChannelMediaError({ reason: "invalid_media" });
-  const limit = mediaType.startsWith("image/")
-    ? mediaLimits.imageBytes
-    : mediaType.startsWith("audio/")
-      ? mediaLimits.audioBytes
-      : Schema.is(textType)(mediaType)
-        ? mediaLimits.textBytes
-        : mediaLimits.totalBytes;
-  if (bytes.length > limit)
+
+  if (bytes.length > byteLimitForMediaType(mediaType))
     return yield* new ChannelMediaError({ reason: "too_large" });
+
   return mediaType;
 });
 
@@ -108,17 +170,8 @@ export const decodeMediaText = Effect.fn("decodeMediaText")(function* (
     try: () => new TextDecoder("utf-8", { fatal: true }).decode(bytes),
     catch: () => new ChannelMediaError({ reason: "invalid_media" }),
   });
-  return yield* Schema.decodeUnknownEffect(
-    Schema.String.check(
-      Schema.isMinLength(1),
-      Schema.makeFilter((value) =>
-        value.split("").every((character) => {
-          const code = character.charCodeAt(0);
-          return code >= 32 || code === 9 || code === 10 || code === 13;
-        })
-      )
-    )
-  )(text).pipe(
+
+  return yield* decodePlainTextMedia(text).pipe(
     Effect.mapError(() => new ChannelMediaError({ reason: "invalid_media" }))
   );
 });

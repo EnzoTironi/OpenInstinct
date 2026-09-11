@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
 import type { ToolContext } from "eve/tools";
-import { privateMessageTool } from "../private-message-tool";
+import { describe, expect, it } from "vitest";
+
 import { privateChannelEvents } from "../private-channel-events";
+import { privateMessageTool } from "../private-message-tool";
 
 const child: ToolContext = {
   callId: "child-call",

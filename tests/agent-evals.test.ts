@@ -2,7 +2,9 @@ import { spawn } from "node:child_process";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import {
   SUPERVISOR_TEST_TIMEOUT_MS,
   waitForSupervisorClose,
@@ -10,6 +12,7 @@ import {
 } from "./helpers/supervisor-process";
 
 const temporaryDirectories: string[] = [];
+
 const supervisorTestOptions = { timeout: SUPERVISOR_TEST_TIMEOUT_MS };
 
 afterEach(async () => {
@@ -114,9 +117,11 @@ function projectFromComposeCommand(command: string | undefined) {
   const project = command?.match(
     /^compose --project-name (open-instinct-evals-[a-f0-9]{8}-[a-f0-9]{8}) /u
   )?.[1];
+
   if (!project) {
     throw new Error(`Missing Compose project in: ${String(command)}`);
   }
+
   return project;
 }
 
@@ -175,12 +180,14 @@ fi
       stdio: ["ignore", "ignore", "pipe"],
     }
   );
+
   supervisor.stderr.setEncoding("utf8");
   let stderr = "";
   supervisor.stderr.on("data", (chunk: string) => {
     stderr += chunk;
   });
   const exitCode = waitForSupervisorClose(supervisor);
+
   if (environment.EVAL_BLOCK_ACTION) {
     await waitForSupervisorLogEntry(
       logPath,

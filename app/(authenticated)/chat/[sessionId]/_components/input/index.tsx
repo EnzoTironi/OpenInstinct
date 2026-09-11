@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useRef } from "react";
 import {
   PromptInput,
   PromptInputBody,
@@ -8,46 +7,98 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@web/components/ai-elements/prompt-input";
+import { api } from "@web/trpc/client";
+import { useEffect, useMemo, useRef } from "react";
+
 import { messageContent } from "../../../_lib/message-input";
 import { hasPendingBackgroundWorker } from "../../_lib/trace-view";
-import { api } from "@web/trpc/client";
 import type { ChatAgent } from "../chat-agent";
+
+type SessionAgent = Pick<
+  ChatAgent,
+  "cancel" | "data" | "events" | "resume" | "send" | "status"
+>;
+
+function isAgentBusy(status: SessionAgent["status"]) {
+  return status === "submitted" || status === "streaming";
+}
+
+function isAgentRestoring(
+  status: SessionAgent["status"],
+  messageCount: number
+) {
+  return status === "resuming" && messageCount === 0;
+}
+
+function shouldIgnoreSubmit(
+  message: PromptInputMessage,
+  status: SessionAgent["status"],
+  restoring: boolean
+) {
+  const empty = message.text.trim().length === 0 && message.files.length === 0;
+
+  return empty || status === "submitted" || restoring;
+}
+
+async function waitForBackgroundCatchUp(
+  agent: SessionAgent,
+  catchUp: Promise<void>
+) {
+  await Promise.all([agent.cancel().catch(() => undefined), catchUp]);
+}
+
+function clearCatchUpRef(
+  ref: { current: Promise<void> | undefined },
+  catchUp: Promise<void>
+) {
+  if (ref.current === catchUp) {
+    ref.current = undefined;
+  }
+}
+
+function startBackgroundCatchUp(
+  agent: SessionAgent,
+  ref: { current: Promise<void> | undefined }
+) {
+  if (agent.status !== "ready" || ref.current !== undefined) {
+    return;
+  }
+
+  const catchUp = agent.resume().catch(() => undefined);
+  ref.current = catchUp;
+  void catchUp.finally(() => {
+    clearCatchUpRef(ref, catchUp);
+  });
+}
 
 export function ChatInput({
   agent,
   sessionId,
 }: {
-  readonly agent: Pick<
-    ChatAgent,
-    "cancel" | "data" | "events" | "resume" | "send" | "status"
-  >;
+  readonly agent: SessionAgent;
   readonly sessionId?: string;
 }) {
   const { mutate: saveChat } = api.chats.save.useMutation();
   const backgroundCatchUp = useRef<Promise<void> | undefined>(undefined);
-  const isBusy = agent.status === "submitted" || agent.status === "streaming";
-  const isRestoring =
-    agent.status === "resuming" && agent.data.messages.length === 0;
+  const isBusy = isAgentBusy(agent.status);
+
+  const isRestoring = isAgentRestoring(
+    agent.status,
+    agent.data.messages.length
+  );
+
   const hasPendingWorker = useMemo(
     () => hasPendingBackgroundWorker(agent.events),
     [agent.events]
   );
 
   useEffect(() => {
-    if (sessionId === undefined || !hasPendingWorker) return undefined;
+    if (sessionId === undefined || !hasPendingWorker) {
+      return undefined;
+    }
 
     const interval = window.setInterval(() => {
-      if (agent.status !== "ready" || backgroundCatchUp.current !== undefined) {
-        return;
-      }
-
-      const catchUp = agent.resume().catch(() => undefined);
-      backgroundCatchUp.current = catchUp;
-      void catchUp.finally(() => {
-        if (backgroundCatchUp.current === catchUp) {
-          backgroundCatchUp.current = undefined;
-        }
-      });
+      startBackgroundCatchUp(agent, backgroundCatchUp);
     }, 750);
 
     return () => {
@@ -56,25 +107,26 @@ export function ChatInput({
   }, [agent, hasPendingWorker, sessionId]);
 
   const handleSubmit = async (message: PromptInputMessage) => {
-    const text = message.text.trim();
-    if (
-      (text.length === 0 && message.files.length === 0) ||
-      agent.status === "submitted" ||
-      isRestoring
-    ) {
+    if (shouldIgnoreSubmit(message, agent.status, isRestoring)) {
       return;
     }
 
     const catchUp = backgroundCatchUp.current;
+
     if (catchUp !== undefined) {
-      await Promise.all([agent.cancel().catch(() => undefined), catchUp]);
+      await waitForBackgroundCatchUp(agent, catchUp);
     }
 
-    if (sessionId !== undefined) saveChat({ sessionId });
-    await agent.send(
-      messageContent(message),
-      isBusy || catchUp !== undefined ? { turnPolicy: "steer" } : undefined
-    );
+    if (sessionId !== undefined) {
+      saveChat({ sessionId });
+    }
+
+    const steer =
+      isBusy || catchUp !== undefined
+        ? { turnPolicy: "steer" as const }
+        : undefined;
+
+    await agent.send(messageContent(message), steer);
   };
 
   return (
@@ -91,7 +143,9 @@ export function ChatInput({
           <PromptInputTools />
           <PromptInputSubmit
             disabled={isRestoring}
-            onStop={() => void agent.cancel()}
+            onStop={() => {
+              void agent.cancel();
+            }}
             status={isBusy ? agent.status : undefined}
           />
         </PromptInputFooter>

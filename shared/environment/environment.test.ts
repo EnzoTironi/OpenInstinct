@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Redacted } from "effect";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const requiredEnvironment = {
   BETTER_AUTH_SECRET: "test-auth-secret-0123456789abcdefghijklmnop",
@@ -10,196 +10,196 @@ const requiredEnvironment = {
   SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
 };
 
-describe("environment", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
-    for (const [name, value] of Object.entries(requiredEnvironment)) {
-      vi.stubEnv(name, value);
-    }
-    vi.stubEnv("LINQ_CONNECTOR", "");
-    vi.stubEnv("LINQ_PHONE_NUMBER", "");
-    vi.stubEnv("GOOGLE_CLIENT_ID", "");
-    vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
-    vi.stubEnv("STRIPE_SECRET_KEY", "");
-    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
-    vi.stubEnv("STRIPE_PRICE_PRO", "");
-    vi.stubEnv("STRIPE_PRICE_ORG_SEAT", "");
+beforeEach(() => {
+  vi.resetModules();
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+  for (const [name, value] of Object.entries(requiredEnvironment)) {
+    vi.stubEnv(name, value);
+  }
+
+  vi.stubEnv("LINQ_CONNECTOR", "");
+  vi.stubEnv("LINQ_PHONE_NUMBER", "");
+  vi.stubEnv("GOOGLE_CLIENT_ID", "");
+  vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
+  vi.stubEnv("STRIPE_SECRET_KEY", "");
+  vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
+  vi.stubEnv("STRIPE_PRICE_PRO", "");
+  vi.stubEnv("STRIPE_PRICE_ORG_SEAT", "");
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+
+it("exports the validated environment", async () => {
+  const { env } = await import("@shared/environment");
+
+  expect(env).toMatchObject(requiredEnvironment);
+});
+
+it("keeps Linq disabled without configuration", async () => {
+  const { env } = await import("@shared/environment");
+
+  expect(env.LINQ_CONNECTOR).toBeUndefined();
+  expect(env.LINQ_PHONE_NUMBER).toBeUndefined();
+});
+
+it("keeps Google optional and redacts its configured client secret", async () => {
+  const unconfigured = await import("@shared/environment");
+  expect(unconfigured.env.GOOGLE_CLIENT_ID).toBeUndefined();
+  expect(unconfigured.env.GOOGLE_CLIENT_SECRET).toBeUndefined();
+
+  vi.resetModules();
+  vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client-id");
+  vi.stubEnv("GOOGLE_CLIENT_SECRET", "synthetic-client-secret");
+  const { env } = await import("@shared/environment");
+  expect(env.GOOGLE_CLIENT_ID).toBe("synthetic-client-id");
+  expect(Redacted.isRedacted(env.GOOGLE_CLIENT_SECRET)).toBe(true);
+  expect(JSON.stringify(env.GOOGLE_CLIENT_SECRET)).not.toContain(
+    "synthetic-client-secret"
+  );
+});
+
+it("provides stable auth and encryption defaults in local development", async () => {
+  vi.stubEnv("BETTER_AUTH_SECRET", "");
+  vi.stubEnv("BETTER_AUTH_URL", "");
+  vi.stubEnv("SECRET_ENCRYPTION_KEY", "");
+  vi.stubEnv("NODE_ENV", "development");
+  vi.stubEnv("VERCEL_ENV", undefined);
+
+  const { env } = await import("@shared/environment");
+
+  expect(env).toMatchObject({
+    BETTER_AUTH_SECRET: "openinstinct-local-auth-development-secret",
+    BETTER_AUTH_URL: "http://localhost:3000",
+    SECRET_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   });
+});
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-  });
-
-  it("exports the validated environment", async () => {
-    const { env } = await import("@shared/environment");
-
-    expect(env).toMatchObject(requiredEnvironment);
-  });
-
-  it("keeps Linq disabled without configuration", async () => {
-    const { env } = await import("@shared/environment");
-
-    expect(env.LINQ_CONNECTOR).toBeUndefined();
-    expect(env.LINQ_PHONE_NUMBER).toBeUndefined();
-  });
-
-  it("keeps Google optional and redacts its configured client secret", async () => {
-    const unconfigured = await import("@shared/environment");
-    expect(unconfigured.env.GOOGLE_CLIENT_ID).toBeUndefined();
-    expect(unconfigured.env.GOOGLE_CLIENT_SECRET).toBeUndefined();
-
-    vi.resetModules();
-    vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client-id");
-    vi.stubEnv("GOOGLE_CLIENT_SECRET", "synthetic-client-secret");
-    const { env } = await import("@shared/environment");
-    expect(env.GOOGLE_CLIENT_ID).toBe("synthetic-client-id");
-    expect(Redacted.isRedacted(env.GOOGLE_CLIENT_SECRET)).toBe(true);
-    expect(JSON.stringify(env.GOOGLE_CLIENT_SECRET)).not.toContain(
-      "synthetic-client-secret"
-    );
-  });
-
-  it("provides stable auth and encryption defaults in local development", async () => {
-    vi.stubEnv("BETTER_AUTH_SECRET", "");
-    vi.stubEnv("BETTER_AUTH_URL", "");
-    vi.stubEnv("SECRET_ENCRYPTION_KEY", "");
+it.each([
+  ["test-auth-secret-0123456789abcdefghijklmnop", ""],
+  ["", Buffer.alloc(32, 2).toString("base64")],
+])(
+  "rejects asymmetric local installation-secret overrides",
+  async (betterAuthSecret, secretEncryptionKey) => {
+    vi.stubEnv("BETTER_AUTH_SECRET", betterAuthSecret);
+    vi.stubEnv("SECRET_ENCRYPTION_KEY", secretEncryptionKey);
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("VERCEL_ENV", undefined);
 
-    const { env } = await import("@shared/environment");
+    await expect(import("@shared/environment")).rejects.toThrow(
+      "Set both BETTER_AUTH_SECRET and SECRET_ENCRYPTION_KEY"
+    );
+  }
+);
 
-    expect(env).toMatchObject({
-      BETTER_AUTH_SECRET: "openinstinct-local-auth-development-secret",
-      BETTER_AUTH_URL: "http://localhost:3000",
-      SECRET_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-    });
-  });
+it("accepts connector overrides", async () => {
+  vi.stubEnv("LINQ_CONNECTOR", "linq/custom");
+  vi.stubEnv("LINQ_PHONE_NUMBER", "+12025550123");
 
-  it.each([
-    ["test-auth-secret-0123456789abcdefghijklmnop", ""],
-    ["", Buffer.alloc(32, 2).toString("base64")],
-  ])(
-    "rejects asymmetric local installation-secret overrides",
-    async (betterAuthSecret, secretEncryptionKey) => {
-      vi.stubEnv("BETTER_AUTH_SECRET", betterAuthSecret);
-      vi.stubEnv("SECRET_ENCRYPTION_KEY", secretEncryptionKey);
-      vi.stubEnv("NODE_ENV", "development");
-      vi.stubEnv("VERCEL_ENV", undefined);
+  const { env } = await import("@shared/environment");
 
-      await expect(import("@shared/environment")).rejects.toThrow(
-        "Set both BETTER_AUTH_SECRET and SECRET_ENCRYPTION_KEY"
-      );
-    }
-  );
+  expect(env.LINQ_CONNECTOR).toBe("linq/custom");
+  expect(env.LINQ_PHONE_NUMBER).toBe("+12025550123");
+});
 
-  it("accepts connector overrides", async () => {
-    vi.stubEnv("LINQ_CONNECTOR", "linq/custom");
-    vi.stubEnv("LINQ_PHONE_NUMBER", "+12025550123");
+it("does not provide local defaults in a Vercel development environment", async () => {
+  vi.stubEnv("BETTER_AUTH_SECRET", "");
+  vi.stubEnv("BETTER_AUTH_URL", "");
+  vi.stubEnv("SECRET_ENCRYPTION_KEY", "");
+  vi.stubEnv("NODE_ENV", "development");
+  vi.stubEnv("VERCEL_ENV", "development");
+  vi.stubEnv("VERCEL_URL", "open-instinct-preview.vercel.app");
 
-    const { env } = await import("@shared/environment");
+  const { env } = await import("@shared/environment");
 
-    expect(env.LINQ_CONNECTOR).toBe("linq/custom");
-    expect(env.LINQ_PHONE_NUMBER).toBe("+12025550123");
-  });
+  expect(env.BETTER_AUTH_SECRET).toBeUndefined();
+  expect(env.BETTER_AUTH_URL).toBeUndefined();
+  expect(env.SECRET_ENCRYPTION_KEY).toBeUndefined();
+});
 
-  it("does not provide local defaults in a Vercel development environment", async () => {
-    vi.stubEnv("BETTER_AUTH_SECRET", "");
-    vi.stubEnv("BETTER_AUTH_URL", "");
-    vi.stubEnv("SECRET_ENCRYPTION_KEY", "");
+it.each(["DATABASE_URL"])(
+  "keeps %s required in local development",
+  async (name) => {
+    vi.stubEnv(name, "");
     vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("VERCEL_ENV", "development");
-    vi.stubEnv("VERCEL_URL", "open-instinct-preview.vercel.app");
+    vi.stubEnv("VERCEL_ENV", undefined);
 
-    const { env } = await import("@shared/environment");
+    await expect(import("@shared/environment")).rejects.toThrow(
+      "Invalid environment variables"
+    );
+  }
+);
 
-    expect(env.BETTER_AUTH_SECRET).toBeUndefined();
-    expect(env.BETTER_AUTH_URL).toBeUndefined();
-    expect(env.SECRET_ENCRYPTION_KEY).toBeUndefined();
-  });
+it.each([
+  requiredEnvironment.SECRET_ENCRYPTION_KEY.slice(0, -1),
+  Buffer.alloc(32, 255).toString("base64url"),
+])("accepts a Node-compatible 32-byte encryption key", async (key) => {
+  vi.stubEnv("SECRET_ENCRYPTION_KEY", key);
 
-  it.each(["DATABASE_URL"])(
-    "keeps %s required in local development",
-    async (name) => {
-      vi.stubEnv(name, "");
-      vi.stubEnv("NODE_ENV", "development");
-      vi.stubEnv("VERCEL_ENV", undefined);
+  const { env } = await import("@shared/environment");
+  expect(env.SECRET_ENCRYPTION_KEY).toBe(key);
+});
 
-      await expect(import("@shared/environment")).rejects.toThrow(
-        "Invalid environment variables"
-      );
-    }
+it.each([["DATABASE_URL", "Invalid environment variables"]])(
+  "rejects a missing required %s value during import",
+  async (name, errorMessage) => {
+    vi.stubEnv(name, "");
+
+    await expect(import("@shared/environment")).rejects.toThrow(errorMessage);
+  }
+);
+
+it("rejects an encryption key that does not decode to 32 bytes", async () => {
+  vi.stubEnv("SECRET_ENCRYPTION_KEY", Buffer.alloc(31, 1).toString("base64"));
+
+  await expect(import("@shared/environment")).rejects.toThrow(
+    "Invalid environment variables"
   );
+});
 
-  it.each([
-    requiredEnvironment.SECRET_ENCRYPTION_KEY.slice(0, -1),
-    Buffer.alloc(32, 255).toString("base64url"),
-  ])("accepts a Node-compatible 32-byte encryption key", async (key) => {
-    vi.stubEnv("SECRET_ENCRYPTION_KEY", key);
+it("rejects a non-Postgres database URL", async () => {
+  vi.stubEnv("DATABASE_URL", "https://example.com/database");
 
-    const { env } = await import("@shared/environment");
-    expect(env.SECRET_ENCRYPTION_KEY).toBe(key);
-  });
-
-  it.each([["DATABASE_URL", "Invalid environment variables"]])(
-    "rejects a missing required %s value during import",
-    async (name, errorMessage) => {
-      vi.stubEnv(name, "");
-
-      await expect(import("@shared/environment")).rejects.toThrow(errorMessage);
-    }
+  await expect(import("@shared/environment")).rejects.toThrow(
+    "Invalid environment variables"
   );
+});
 
-  it("rejects an encryption key that does not decode to 32 bytes", async () => {
-    vi.stubEnv("SECRET_ENCRYPTION_KEY", Buffer.alloc(31, 1).toString("base64"));
+it("accepts a Linq connector without a copied phone number", async () => {
+  vi.stubEnv("LINQ_CONNECTOR", "linq/open-instinct");
+  vi.stubEnv("LINQ_PHONE_NUMBER", "");
 
-    await expect(import("@shared/environment")).rejects.toThrow(
-      "Invalid environment variables"
-    );
-  });
+  const { env } = await import("@shared/environment");
 
-  it("rejects a non-Postgres database URL", async () => {
-    vi.stubEnv("DATABASE_URL", "https://example.com/database");
+  expect(env.LINQ_CONNECTOR).toBe("linq/open-instinct");
+  expect(env.LINQ_PHONE_NUMBER).toBeUndefined();
+});
 
-    await expect(import("@shared/environment")).rejects.toThrow(
-      "Invalid environment variables"
-    );
-  });
+it("accepts Vercel OIDC Blob storage without a static token", async () => {
+  vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
+  vi.stubEnv("BLOB_STORE_ID", "store_openinstinct");
 
-  it("accepts a Linq connector without a copied phone number", async () => {
-    vi.stubEnv("LINQ_CONNECTOR", "linq/open-instinct");
-    vi.stubEnv("LINQ_PHONE_NUMBER", "");
+  const { env } = await import("@shared/environment");
 
-    const { env } = await import("@shared/environment");
+  expect(env.BLOB_READ_WRITE_TOKEN).toBeUndefined();
+  expect(env.BLOB_STORE_ID).toBe("store_openinstinct");
+});
 
-    expect(env.LINQ_CONNECTOR).toBe("linq/open-instinct");
-    expect(env.LINQ_PHONE_NUMBER).toBeUndefined();
-  });
+it("rejects a Linq phone number outside E.164 format", async () => {
+  vi.stubEnv("LINQ_CONNECTOR", "linq/open-instinct");
+  vi.stubEnv("LINQ_PHONE_NUMBER", "(202) 555-0123");
 
-  it("accepts Vercel OIDC Blob storage without a static token", async () => {
-    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
-    vi.stubEnv("BLOB_STORE_ID", "store_openinstinct");
+  await expect(import("@shared/environment")).rejects.toThrow(
+    "Invalid environment variables"
+  );
+});
 
-    const { env } = await import("@shared/environment");
-
-    expect(env.BLOB_READ_WRITE_TOKEN).toBeUndefined();
-    expect(env.BLOB_STORE_ID).toBe("store_openinstinct");
-  });
-
-  it("rejects a Linq phone number outside E.164 format", async () => {
-    vi.stubEnv("LINQ_CONNECTOR", "linq/open-instinct");
-    vi.stubEnv("LINQ_PHONE_NUMBER", "(202) 555-0123");
-
-    await expect(import("@shared/environment")).rejects.toThrow(
-      "Invalid environment variables"
-    );
-  });
-
-  it("allows non-browser application configuration without a Kernel key", async () => {
-    vi.stubEnv("KERNEL_API_KEY", undefined);
-    const { env } = await import("@shared/environment");
-    expect(env.KERNEL_API_KEY).toBeUndefined();
-    expect(env.DATABASE_URL).toBe(requiredEnvironment.DATABASE_URL);
-  });
+it("allows non-browser application configuration without a Kernel key", async () => {
+  vi.stubEnv("KERNEL_API_KEY", undefined);
+  const { env } = await import("@shared/environment");
+  expect(env.KERNEL_API_KEY).toBeUndefined();
+  expect(env.DATABASE_URL).toBe(requiredEnvironment.DATABASE_URL);
 });

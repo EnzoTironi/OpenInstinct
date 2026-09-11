@@ -24,5 +24,7 @@ export const saveChatSchema = z.object({
 });
 
 export type ChatUsage = z.infer<typeof chatUsageSchema>;
+
 export type ChatSummary = z.infer<typeof chatSummarySchema>;
+
 export type SaveChat = z.infer<typeof saveChatSchema>;

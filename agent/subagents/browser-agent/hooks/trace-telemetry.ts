@@ -1,19 +1,21 @@
-import { defineHook } from "eve/hooks";
-import type { HookContext } from "eve/hooks";
+import { taskCompletionOutputSchema } from "@agent/subagents/browser-agent/lib/completion";
+import { harvestBrowserTraceDomains } from "@agent/subagents/browser-agent/lib/trace/domains";
+import { traceTimelineRows } from "@agent/subagents/browser-agent/lib/trace/timeline";
 import {
   beginBrowserTrace,
   completeBrowserTrace,
   recordBrowserTraceEvents,
 } from "@db/services/browser-traces";
-import { traceTimelineRows } from "@agent/subagents/browser-agent/lib/trace/timeline";
 import { listWorkerBrowserSessions } from "@db/services/browsers";
 import type { AccessScope } from "@shared/identity/access-scope";
+import { defineHook } from "eve/hooks";
+import type { HookContext } from "eve/hooks";
+
 import { scopeFromPrincipal } from "../../../../shared/identity/principal-scope";
-import { taskCompletionOutputSchema } from "@agent/subagents/browser-agent/lib/completion";
-import { harvestBrowserTraceDomains } from "@agent/subagents/browser-agent/lib/trace/domains";
 
 function traceScope(ctx: HookContext) {
   const initiator = ctx.session.auth.initiator;
+
   return initiator ? scopeFromPrincipal(initiator) : undefined;
 }
 
@@ -39,6 +41,7 @@ async function finishTrace(
   }
 ) {
   const scope = traceScope(ctx);
+
   if (!scope) return;
   await completeBrowserTrace(scope, ctx.session.id, {
     completedAt: emittedAt,
@@ -53,6 +56,7 @@ export default defineHook({
     async "*"(event, ctx) {
       try {
         const scope = traceScope(ctx);
+
         if (!scope) return;
         await recordBrowserTraceEvents(
           scope,
@@ -66,6 +70,7 @@ export default defineHook({
     async "message.received"(event, ctx) {
       try {
         const scope = traceScope(ctx);
+
         if (!scope) return;
         await beginBrowserTrace(scope, {
           sessionId: ctx.session.id,
@@ -81,6 +86,7 @@ export default defineHook({
         const completion = taskCompletionOutputSchema.safeParse(
           event.data.result
         );
+
         if (!completion.success) return;
         await finishTrace(ctx, event.meta.at, {
           resultMessage: completion.data.message,

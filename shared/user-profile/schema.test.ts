@@ -1,11 +1,11 @@
-import { z } from "zod";
-import { describe, expect, it } from "vitest";
 import {
   emptyUserProfile,
   hasUserProfileValues,
   parseUserProfile,
   userProfilePatchSchema,
 } from "@shared/user-profile/schema";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 describe("user profile", () => {
   it("validates and normalizes form-ready personal information", () => {

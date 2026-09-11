@@ -1,8 +1,6 @@
-import { accessScopeForUser } from "../../shared/identity/access-scope";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
-import { test } from "vitest";
-import type { SqlError } from "effect/unstable/sql/SqlError";
+
 import { PgClient } from "@effect/sql-pg";
 import {
   Config,
@@ -13,10 +11,14 @@ import {
   Redacted,
   Schedule,
 } from "effect";
+import type { SqlError } from "effect/unstable/sql/SqlError";
+import { test } from "vitest";
+
 import {
   ChannelAccounts,
   ChannelAccountError,
 } from "../../server/accounts/index.ts";
+import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
 
 const secret = () => randomBytes(32).toString("base64url");
@@ -34,6 +36,78 @@ const rejected = <A>(
       onSuccess: () => assert.fail(`Expected ${reason}`),
     })
   );
+
+const insertLoginSession = (sessionId: string, userId: string) =>
+  Effect.gen(function* () {
+    const separateConnection = yield* PgClient.PgClient;
+    yield* separateConnection`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
+            VALUES (${sessionId}, ${secret()}, ${userId}, clock_timestamp() + interval '1 hour', clock_timestamp(), clock_timestamp())`;
+
+    return sessionId;
+  });
+
+const holdLoginSessionUntilReleased = <A, E, R>(
+  entered: Deferred.Deferred<undefined>,
+  release: Deferred.Deferred<undefined>,
+  createSession: Effect.Effect<A, E, R>
+) =>
+  Effect.gen(function* () {
+    yield* Deferred.succeed(entered, undefined);
+    yield* Deferred.await(release);
+
+    return yield* createSession;
+  }).pipe(Effect.catch((error) => Effect.die(error)));
+
+const advisoryLockIsWaiting = (
+  rows: readonly { readonly waiting: boolean | undefined }[]
+) => rows[0]?.waiting === true;
+
+const identityIds = (rows: readonly { readonly id: string }[]) =>
+  rows.map((identity) => identity.id);
+
+const rowIds = (rows: readonly { readonly id: string }[]) =>
+  rows.map((row) => row.id);
+
+const resolveSenderTwelve = (
+  accounts: ChannelAccounts["Service"],
+  sender: {
+    readonly channel: "telegram";
+    readonly installationId: string;
+    readonly senderId: string;
+  }
+) =>
+  Effect.all(
+    Array.from({ length: 12 }, () => accounts.resolveVerifiedSender(sender)),
+    { concurrency: 8 }
+  );
+
+const consumeChallengeEight = (
+  accounts: ChannelAccounts["Service"],
+  challengeId: string,
+  browserSecret: string
+) =>
+  Effect.all(
+    Array.from({ length: 8 }, () =>
+      accounts
+        .consumeChallenge({
+          challengeId,
+          browserSecret,
+        })
+        .pipe(
+          Effect.match({
+            onSuccess: (value) => value,
+            onFailure: (error) => {
+              assert.ok(error instanceof ChannelAccountError);
+              assert.equal(error.reason, "invalid_challenge");
+
+              return null;
+            },
+          })
+        )
+    ),
+    { concurrency: 8 }
+  );
+
 test("channel identities, browser binding, races and revocation against migrated PostgreSQL", async () => {
   const live = ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase));
   await Effect.runPromise(
@@ -41,56 +115,62 @@ test("channel identities, browser binding, races and revocation against migrated
       const accounts = yield* ChannelAccounts;
       const sql = yield* PgClient.PgClient;
       const installationId = `test-${randomUUID()}`;
+
       const sender = {
         channel: "telegram",
         installationId,
         senderId: "12345",
       } as const;
+
       const userIds = new Set<string>();
       yield* Effect.gen(function* () {
         yield* rejected(
           accounts.resolveVerifiedSender({ ...sender, senderId: " 12345" }),
           "invalid_input"
         );
+
         const beforeUsers = yield* sql<{
           id: string;
         }>`SELECT id FROM public."user"`;
-        const results = yield* Effect.all(
-          Array.from({ length: 12 }, () =>
-            accounts.resolveVerifiedSender(sender)
-          ),
-          { concurrency: "unbounded" }
-        );
+
+        const results = yield* resolveSenderTwelve(accounts, sender);
+
         const first = results[0];
         assert.ok(first);
         userIds.add(first.userId);
-        assert.equal(new Set(results.map((identity) => identity.id)).size, 1);
+        assert.equal(new Set(identityIds(results)).size, 1);
+
         const created = yield* sql<{
           count: number;
         }>`SELECT count(*)::int AS count FROM public.channel_identity WHERE installation_id = ${installationId}`;
+
         assert.equal(created[0]?.count, 1);
+
         const afterUsers = yield* sql<{
           id: string;
         }>`SELECT id FROM public."user"`;
-        const previousIds = new Set(beforeUsers.map((user) => user.id));
+
+        const previousIds = new Set(rowIds(beforeUsers));
         const newIds = afterUsers.filter((user) => !previousIds.has(user.id));
+
         for (const user of newIds) userIds.add(user.id);
-        assert.deepEqual(
-          newIds.map((user) => user.id),
-          [first.userId]
-        );
+        assert.deepEqual(rowIds(newIds), [first.userId]);
         const browserSecret = secret();
+
         const challenge = yield* accounts.issueChallenge({
           purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
         });
+
         const previewSender = { ...sender, senderId: "preview-only" };
+
         const preview = yield* accounts.previewChallenge({
           token: challenge.token,
           sender: previewSender,
         });
+
         assert.deepEqual(preview, {
           id: challenge.challengeId,
           purpose: "login",
@@ -100,6 +180,7 @@ test("channel identities, browser binding, races and revocation against migrated
           challenge.expiresAt,
           /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u
         );
+
         const expiry = yield* sql<{
           expiresAt: string;
           untouched: boolean;
@@ -107,6 +188,7 @@ test("channel identities, browser binding, races and revocation against migrated
           to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "expiresAt",
           confirmed_at IS NULL AND identity_id IS NULL AND consumed_at IS NULL AS untouched
           FROM public.channel_auth_challenge WHERE id = ${challenge.challengeId}`;
+
         assert.equal(expiry[0]?.expiresAt, challenge.expiresAt);
         assert.equal(expiry[0].untouched, true);
         yield* rejected(
@@ -131,10 +213,12 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.previewChallenge({ token: secret(), sender }),
           "invalid_challenge"
         );
+
         const statusInput = {
           challengeId: challenge.challengeId,
           browserSecret,
         };
+
         assert.deepEqual(yield* accounts.getChallengeStatus(statusInput), {
           status: "pending",
         });
@@ -188,26 +272,13 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.previewChallenge({ token: challenge.token, sender }),
           "invalid_challenge"
         );
-        const consumes = yield* Effect.all(
-          Array.from({ length: 8 }, () =>
-            accounts
-              .consumeChallenge({
-                challengeId: challenge.challengeId,
-                browserSecret,
-              })
-              .pipe(
-                Effect.match({
-                  onSuccess: (value) => value,
-                  onFailure: (error) => {
-                    assert.ok(error instanceof ChannelAccountError);
-                    assert.equal(error.reason, "invalid_challenge");
-                    return null;
-                  },
-                })
-              )
-          ),
-          { concurrency: "unbounded" }
+
+        const consumes = yield* consumeChallengeEight(
+          accounts,
+          challenge.challengeId,
+          browserSecret
         );
+
         assert.equal(consumes.filter(Boolean).length, 1);
         assert.deepEqual(yield* accounts.getChallengeStatus(statusInput), {
           status: "consumed",
@@ -216,11 +287,13 @@ test("channel identities, browser binding, races and revocation against migrated
           consumes.find(Boolean)?.principalId,
           `better-auth:${first.userId}`
         );
+
         const stored = yield* sql<{
           token_hash: string;
           browser_secret_hash: string;
         }>`SELECT token_hash, browser_secret_hash
         FROM public.channel_auth_challenge WHERE id = ${challenge.challengeId}`;
+
         assert.notEqual(stored[0]?.token_hash, challenge.token);
         assert.notEqual(stored[0]?.browser_secret_hash, browserSecret);
         yield* rejected(
@@ -230,10 +303,12 @@ test("channel identities, browser binding, races and revocation against migrated
           }),
           "last_access"
         );
+
         const other = yield* accounts.resolveVerifiedSender({
           ...sender,
           senderId: "67890",
         });
+
         userIds.add(other.userId);
         yield* rejected(
           accounts.revokeIdentity({
@@ -258,10 +333,13 @@ test("channel identities, browser binding, races and revocation against migrated
           }),
           "session_invalid"
         );
+
         const rejectedLinks =
           yield* sql`SELECT id FROM public.channel_auth_challenge WHERE requesting_session_id = ${sessionId}`;
+
         assert.equal(rejectedLinks.length, 0);
         yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp() WHERE id = ${sessionId}`;
+
         const conflict = yield* accounts.issueChallenge({
           purpose: "link" as const,
           userId: link.userId,
@@ -270,6 +348,7 @@ test("channel identities, browser binding, races and revocation against migrated
           installationId,
           browserSecret,
         });
+
         yield* rejected(
           accounts.previewChallenge({
             token: conflict.token,
@@ -284,11 +363,13 @@ test("channel identities, browser binding, races and revocation against migrated
           }),
           "account_conflict"
         );
+
         const linkedSender = {
           ...sender,
           channel: "kapso",
           senderId: "5511999999999",
         } as const;
+
         const linking = yield* accounts.issueChallenge({
           purpose: "link" as const,
           userId: link.userId,
@@ -297,6 +378,7 @@ test("channel identities, browser binding, races and revocation against migrated
           installationId,
           browserSecret,
         });
+
         assert.deepEqual(
           yield* accounts.previewChallenge({
             token: linking.token,
@@ -328,13 +410,16 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.getActiveIdentity(linkedSender),
           "identity_inactive"
         );
+
         const linked = yield* accounts.consumeChallenge({
           challengeId: linking.challengeId,
           browserSecret,
           currentSessionId: sessionId,
         });
+
         assert.equal(linked.userId, first.userId);
         const staleSender = { ...sender, senderId: "stale-link-proof" };
+
         const staleLink = yield* accounts.issueChallenge({
           purpose: "link" as const,
           userId: link.userId,
@@ -343,6 +428,7 @@ test("channel identities, browser binding, races and revocation against migrated
           installationId,
           browserSecret,
         });
+
         yield* sql`UPDATE public.session SET "createdAt" = clock_timestamp() - interval '11 minutes' WHERE id = ${sessionId}`;
         yield* rejected(
           accounts.previewChallenge({
@@ -403,16 +489,19 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.getActiveIdentity(staleSender),
           "identity_inactive"
         );
+
         const newLoginSender = {
           ...sender,
           senderId: "new-login-at-consumption",
         };
+
         const newLogin = yield* accounts.issueChallenge({
           purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
         });
+
         yield* accounts.confirmChallenge({
           token: newLogin.token,
           sender: newLoginSender,
@@ -421,28 +510,34 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.getActiveIdentity(newLoginSender),
           "identity_inactive"
         );
+
         const activatedLogin = yield* accounts.consumeChallenge({
           challengeId: newLogin.challengeId,
           browserSecret,
         });
+
         userIds.add(activatedLogin.userId);
         assert.equal(
           (yield* accounts.getActiveIdentity(newLoginSender)).userId,
           activatedLogin.userId
         );
+
         const abandonedSender = {
           ...sender,
           senderId: "abandoned-login-proof",
         };
+
         const abandoned = yield* accounts.issueChallenge({
           purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
         });
+
         const beforeProofUsers = yield* sql<{
           count: number;
         }>`SELECT count(*)::int AS count FROM public."user"`;
+
         yield* accounts.confirmChallenge({
           token: abandoned.token,
           sender: abandonedSender,
@@ -451,9 +546,11 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.getActiveIdentity(abandonedSender),
           "identity_inactive"
         );
+
         const afterProofUsers = yield* sql<{
           count: number;
         }>`SELECT count(*)::int AS count FROM public."user"`;
+
         assert.equal(afterProofUsers[0]?.count, beforeProofUsers[0]?.count);
         yield* rejected(
           accounts.consumeChallenge({
@@ -478,12 +575,14 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.getActiveIdentity(abandonedSender),
           "identity_inactive"
         );
+
         const expiring = yield* accounts.issueChallenge({
           purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
         });
+
         yield* sql`UPDATE public.channel_auth_challenge SET created_at = clock_timestamp() - interval '6 minutes', expires_at = clock_timestamp() - interval '1 second' WHERE id = ${expiring.challengeId}`;
         yield* rejected(
           accounts.confirmChallenge({ token: expiring.token, sender }),
@@ -493,12 +592,14 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.previewChallenge({ token: expiring.token, sender }),
           "invalid_challenge"
         );
+
         const expiredConsumption = yield* accounts.issueChallenge({
           purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
         });
+
         yield* accounts.confirmChallenge({
           token: expiredConsumption.token,
           sender,
@@ -518,12 +619,14 @@ test("channel identities, browser binding, races and revocation against migrated
           }),
           { status: "expired" }
         );
+
         const pending = yield* accounts.issueChallenge({
           purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
         });
+
         yield* accounts.confirmChallenge({ token: pending.token, sender });
         yield* accounts.revokeIdentity({
           identityId: first.id,
@@ -555,18 +658,22 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.previewChallenge({ token: pending.token, sender }),
           "invalid_challenge"
         );
+
         const revokedLogin = yield* accounts.issueChallenge({
           purpose: "login" as const,
           channel: "telegram",
           installationId,
           browserSecret,
         });
+
         yield* rejected(
           accounts.previewChallenge({ token: revokedLogin.token, sender }),
           "identity_inactive"
         );
+
         const sessions =
           yield* sql`SELECT id FROM public.session WHERE "userId" = ${first.userId}`;
+
         assert.equal(sessions.length, 0);
         yield* rejected(
           accounts.revokeIdentity({
@@ -580,11 +687,16 @@ test("channel identities, browser binding, races and revocation against migrated
           Effect.gen(function* () {
             yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
             yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
-            for (const id of userIds) {
-              yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
-              yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
-            }
-          }).pipe(Effect.orDie)
+
+            yield* Effect.forEach(
+              [...userIds],
+              Effect.fn("accounts.deleteUser")(function* (id) {
+                yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
+                yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
+              }),
+              { concurrency: 1 }
+            );
+          }).pipe(Effect.catch((error) => Effect.die(error)))
         )
       );
     }).pipe(Effect.provide(live))
@@ -595,98 +707,117 @@ test("session issuance serializes with revocation across real PostgreSQL connect
   const url = await Effect.runPromise(
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
   );
+
   const storage = PgClient.layer({ url: Redacted.make(url) });
   const live = ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase));
   await Effect.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
       const sql = yield* PgClient.PgClient;
-      for (const order of ["before", "during", "after"] as const) {
-        const installationId = `issuance-${randomUUID()}`;
-        const browserSecret = secret();
-        const challenge = yield* accounts.issueChallenge({
-          purpose: "login" as const,
-          channel: "telegram",
-          installationId,
-          browserSecret,
-        });
-        const sender = {
-          channel: "telegram" as const,
-          installationId,
-          senderId: "first-contact",
-        };
-        yield* accounts.confirmChallenge({ token: challenge.token, sender });
-        const owner = yield* accounts.consumeChallenge({
-          challengeId: challenge.challengeId,
-          browserSecret,
-        });
-        try {
-          // A second synthetic access path makes revocation legal; all storage is real.
-          yield* sql`INSERT INTO public.channel_identity (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)
+
+      yield* Effect.forEach(
+        ["before", "during", "after"] as const,
+        Effect.fn("accounts.issuanceOrder")(function* (order) {
+          const installationId = `issuance-${randomUUID()}`;
+          const browserSecret = secret();
+
+          const challenge = yield* accounts.issueChallenge({
+            purpose: "login" as const,
+            channel: "telegram",
+            installationId,
+            browserSecret,
+          });
+
+          const sender = {
+            channel: "telegram" as const,
+            installationId,
+            senderId: "first-contact",
+          };
+
+          yield* accounts.confirmChallenge({ token: challenge.token, sender });
+
+          const owner = yield* accounts.consumeChallenge({
+            challengeId: challenge.challengeId,
+            browserSecret,
+          });
+
+          yield* Effect.gen(function* () {
+            // A second synthetic access path makes revocation legal; all storage is real.
+            yield* sql`INSERT INTO public.channel_identity (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)
           VALUES (${randomUUID()}, 'telegram', ${installationId}, 'backup', ${owner.userId}, clock_timestamp(), clock_timestamp(), clock_timestamp())`;
-          const sessionId = randomUUID();
-          const createSession = Effect.gen(function* () {
-            const separateConnection = yield* PgClient.PgClient;
-            yield* separateConnection`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
-            VALUES (${sessionId}, ${secret()}, ${owner.userId}, clock_timestamp() + interval '1 hour', clock_timestamp(), clock_timestamp())`;
-            return sessionId;
-          }).pipe(Effect.provide(storage));
-          if (order === "before") {
-            yield* accounts.revokeIdentity(owner);
-            yield* rejected(
-              accounts.withLoginSession(owner, createSession),
-              "identity_inactive"
-            );
-          } else if (order === "after") {
-            assert.equal(
-              yield* accounts.withLoginSession(owner, createSession),
-              sessionId
-            );
-            const inserted =
-              yield* sql`SELECT id FROM public.session WHERE id = ${sessionId}`;
-            assert.equal(inserted.length, 1);
-            yield* accounts.revokeIdentity(owner);
-          } else {
-            const entered = yield* Deferred.make<undefined>();
-            const release = yield* Deferred.make<undefined>();
-            const finalization = yield* accounts
-              .withLoginSession(
-                owner,
-                Effect.gen(function* () {
-                  yield* Deferred.succeed(entered, undefined);
-                  yield* Deferred.await(release);
-                  return yield* createSession;
-                })
-              )
-              .pipe(Effect.forkChild);
-            yield* Deferred.await(entered);
-            const revocation = yield* accounts
-              .revokeIdentity(owner)
-              .pipe(Effect.forkChild);
-            yield* sql<{
-              waiting: boolean;
-            }>`SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory'
+            const sessionId = randomUUID();
+
+            const createSession = insertLoginSession(
+              sessionId,
+              owner.userId
+            ).pipe(Effect.provide(storage));
+
+            if (order === "before") {
+              yield* accounts.revokeIdentity(owner);
+              yield* rejected(
+                accounts.withLoginSession(owner, createSession),
+                "identity_inactive"
+              );
+            } else if (order === "after") {
+              assert.equal(
+                yield* accounts.withLoginSession(owner, createSession),
+                sessionId
+              );
+
+              const inserted =
+                yield* sql`SELECT id FROM public.session WHERE id = ${sessionId}`;
+
+              assert.equal(inserted.length, 1);
+              yield* accounts.revokeIdentity(owner);
+            } else {
+              const entered = yield* Deferred.make<undefined>();
+              const release = yield* Deferred.make<undefined>();
+
+              const finalization = yield* accounts
+                .withLoginSession(
+                  owner,
+                  holdLoginSessionUntilReleased(entered, release, createSession)
+                )
+                .pipe(Effect.forkChild);
+
+              yield* Deferred.await(entered);
+
+              const revocation = yield* accounts
+                .revokeIdentity(owner)
+                .pipe(Effect.forkChild);
+
+              yield* sql<{
+                waiting: boolean;
+              }>`SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory'
             AND classid = 724193 AND objid = 1 AND NOT granted) AS waiting`.pipe(
-              Effect.repeat({
-                until: (rows) => rows[0]?.waiting === true,
-                schedule: Schedule.spaced("10 millis"),
-              }),
-              Effect.timeout("5 seconds"),
-              Effect.ensuring(Deferred.succeed(release, undefined))
-            );
-            assert.equal(yield* Fiber.join(finalization), sessionId);
-            yield* Fiber.join(revocation);
-          }
-          const sessions =
-            yield* sql`SELECT id FROM public.session WHERE "userId" = ${owner.userId}`;
-          assert.equal(sessions.length, 0);
-        } finally {
-          yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
-          yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
-          yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
-          yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
-        }
-      }
+                Effect.repeat({
+                  until: advisoryLockIsWaiting,
+                  schedule: Schedule.spaced("10 millis"),
+                }),
+                Effect.timeout("5 seconds"),
+                Effect.ensuring(Deferred.succeed(release, undefined))
+              );
+              assert.equal(yield* Fiber.join(finalization), sessionId);
+              yield* Fiber.join(revocation);
+            }
+
+            const sessions =
+              yield* sql`SELECT id FROM public.session WHERE "userId" = ${owner.userId}`;
+
+            assert.equal(sessions.length, 0);
+          }).pipe(
+            Effect.ensuring(
+              Effect.gen(function* () {
+                yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
+                yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
+                yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
+                yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
+              }).pipe(Effect.catch((error) => Effect.die(error)))
+            )
+          );
+        }),
+        { concurrency: 1 }
+      );
     }).pipe(Effect.provide(live))
   );
 });
