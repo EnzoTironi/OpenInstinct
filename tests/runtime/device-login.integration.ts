@@ -53,45 +53,42 @@ function makeDeviceRuntime(secret: string) {
   );
 }
 
-function resolveVerifiedSender(installationId: string, senderId: string) {
-  return Effect.gen(function* () {
-    const accounts = yield* ChannelAccounts;
+const resolveVerifiedSender = Effect.fn("resolveVerifiedSender")(function* (
+  installationId: string,
+  senderId: string
+) {
+  const accounts = yield* ChannelAccounts;
 
-    return yield* accounts.resolveVerifiedSender({
-      channel: "kapso",
-      installationId,
-      senderId,
-    });
+  return yield* accounts.resolveVerifiedSender({
+    channel: "kapso",
+    installationId,
+    senderId,
   });
-}
+});
 
-function insertOwnerSessions(
+const insertOwnerSessions = Effect.fn("insertOwnerSessions")(function* (
   sessionIds: readonly string[],
   workspaceId: string,
   userId: string
 ) {
-  return Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
+  const sql = yield* PgClient.PgClient;
 
-    yield* Effect.forEach(
-      sessionIds,
-      (id) =>
-        sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${id}, ${workspaceId}, ${userId})`,
-      { concurrency: 1 }
-    );
-  });
-}
+  yield* Effect.forEach(
+    sessionIds,
+    (id) =>
+      sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${id}, ${workspaceId}, ${userId})`,
+    { concurrency: 1 }
+  );
+});
 
-function insertForeignSession(
+const insertForeignSession = Effect.fn("insertForeignSession")(function* (
   sessionId: string,
   workspaceId: string,
   userId: string
 ) {
-  return Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
-    yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${workspaceId}, ${userId})`;
-  });
-}
+  const sql = yield* PgClient.PgClient;
+  yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${workspaceId}, ${userId})`;
+});
 
 function unsupportedToolContextMethod(): never {
   throw new Error("This test has no sandbox.");
@@ -141,23 +138,23 @@ function pendingFor(run: DeviceRun, identityId: string, sessionId: string) {
   );
 }
 
-function confirmLogin(
-  run: DeviceRun,
-  identityId: string,
-  sessionId: string,
-  challengeId: string,
-  browserBoundAt: string
-) {
-  return run(
+function confirmLogin(input: {
+  readonly run: DeviceRun;
+  readonly identityId: string;
+  readonly sessionId: string;
+  readonly challengeId: string;
+  readonly browserBoundAt: string;
+}) {
+  return input.run(
     Effect.gen(function* () {
       const devices = yield* NativeDeviceAuth;
 
       return yield* devices.confirm({
         purpose: "login",
-        identityId,
-        sessionId,
-        challengeId,
-        browserBoundAt,
+        identityId: input.identityId,
+        sessionId: input.sessionId,
+        challengeId: input.challengeId,
+        browserBoundAt: input.browserBoundAt,
       });
     })
   );
@@ -185,26 +182,30 @@ function confirmChallengeToken(
   );
 }
 
-function authRequest(
-  auth: { handler: (request: Request) => Promise<Response> },
-  baseURL: string,
-  path: string,
-  body?: {
+function authRequest(input: {
+  readonly auth: { handler: (request: Request) => Promise<Response> };
+  readonly baseURL: string;
+  readonly path: string;
+  readonly body?: {
     readonly id: string;
     readonly token?: string;
     readonly purpose?: "login" | "link";
-  },
-  cookie = "",
-  origin = baseURL
-) {
+  };
+  readonly cookie?: string;
+  readonly origin?: string;
+}) {
+  const cookie = input.cookie ?? "";
+  const origin = input.origin ?? input.baseURL;
   const init: RequestInit = {
-    method: body === undefined ? "GET" : "POST",
+    method: input.body === undefined ? "GET" : "POST",
     headers: { origin, cookie, "content-type": "application/json" },
   };
 
-  if (body) init.body = JSON.stringify(body);
+  if (input.body) init.body = JSON.stringify(input.body);
 
-  return auth.handler(new Request(`${baseURL}/api/auth${path}`, init));
+  return input.auth.handler(
+    new Request(`${input.baseURL}/api/auth${input.path}`, init)
+  );
 }
 
 function revokeIdentity(run: DeviceRun, identityId: string) {
@@ -216,23 +217,23 @@ function revokeIdentity(run: DeviceRun, identityId: string) {
   );
 }
 
-function cleanupDeviceLogin(
-  run: DeviceRun,
-  installationId: string,
-  scope: { workspaceId: string; userId: string },
-  otherScope: { workspaceId: string; userId: string },
-  identityUserId: string,
-  otherUserId: string
-) {
-  return run(
+function cleanupDeviceLogin(input: {
+  readonly run: DeviceRun;
+  readonly installationId: string;
+  readonly scope: { workspaceId: string; userId: string };
+  readonly otherScope: { workspaceId: string; userId: string };
+  readonly identityUserId: string;
+  readonly otherUserId: string;
+}) {
+  return input.run(
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
-      yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
-      yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
-      yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
-      yield* sql`DELETE FROM public."user" WHERE id = ${identityUserId}`;
-      yield* sql`DELETE FROM workspaces WHERE id = ${otherScope.workspaceId}`;
-      yield* sql`DELETE FROM public."user" WHERE id = ${otherUserId}`;
+      yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${input.installationId}`;
+      yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${input.installationId}`;
+      yield* sql`DELETE FROM workspaces WHERE id = ${input.scope.workspaceId}`;
+      yield* sql`DELETE FROM public."user" WHERE id = ${input.identityUserId}`;
+      yield* sql`DELETE FROM workspaces WHERE id = ${input.otherScope.workspaceId}`;
+      yield* sql`DELETE FROM public."user" WHERE id = ${input.otherUserId}`;
     })
   );
 }
@@ -370,13 +371,13 @@ test("native browser binding requires same-session approval before BetterAuth ca
     assert.ok(entryToken);
     assert.deepEqual(await pendingFor(run, identity.id, source.sessionId), []);
     await assert.rejects(
-      confirmLogin(
+      confirmLogin({
         run,
-        identity.id,
-        source.sessionId,
-        issued.challenge.id,
-        new Date().toISOString()
-      )
+        identityId: identity.id,
+        sessionId: source.sessionId,
+        challengeId: issued.challenge.id,
+        browserBoundAt: new Date().toISOString(),
+      })
     );
     await assert.rejects(
       confirmChallengeToken(run, entryToken, identity, installationId)
@@ -390,64 +391,75 @@ test("native browser binding requires same-session approval before BetterAuth ca
 
     assert.equal(
       (
-        await authRequest(
+        await authRequest({
           auth,
           baseURL,
-          "/channel-auth/device-bind",
+          path: "/channel-auth/device-bind",
           body,
-          "",
-          "https://attacker.invalid"
-        )
+          cookie: "",
+          origin: "https://attacker.invalid",
+        })
       ).status,
       403
     );
     assert.equal(
       (
-        await authRequest(auth, baseURL, "/channel-auth/device-bind", {
-          ...body,
-          token: randomBytes(32).toString("base64url"),
+        await authRequest({
+          auth,
+          baseURL,
+          path: "/channel-auth/device-bind",
+          body: {
+            ...body,
+            token: randomBytes(32).toString("base64url"),
+          },
         })
       ).status,
       400
     );
 
-    const binding = await authRequest(
+    const binding = await authRequest({
       auth,
       baseURL,
-      "/channel-auth/device-bind",
-      body
-    );
+      path: "/channel-auth/device-bind",
+      body,
+    });
 
     assert.equal(binding.status, 200);
     assert.equal(binding.headers.get("cache-control"), "no-store");
     const browser = cookies(binding);
     assert.match(browser, /channel_challenge/);
     assert.equal(
-      (await authRequest(auth, baseURL, "/channel-auth/device-bind", body))
-        .status,
+      (
+        await authRequest({
+          auth,
+          baseURL,
+          path: "/channel-auth/device-bind",
+          body,
+        })
+      ).status,
       400
     );
     assert.equal(
       (
-        await authRequest(
+        await authRequest({
           auth,
           baseURL,
-          "/channel-auth/device-bind",
+          path: "/channel-auth/device-bind",
           body,
-          browser
-        )
+          cookie: browser,
+        })
       ).status,
       200
     );
     assert.equal(
       (
-        await authRequest(
+        await authRequest({
           auth,
           baseURL,
-          "/channel-auth/complete",
-          { id: body.id },
-          browser
-        )
+          path: "/channel-auth/complete",
+          body: { id: body.id },
+          cookie: browser,
+        })
       ).status,
       400
     );
@@ -457,22 +469,22 @@ test("native browser binding requires same-session approval before BetterAuth ca
     assert.equal((await issueLogin(run, source, "first")).entryToken, null);
     assert.equal(
       (
-        await authRequest(
+        await authRequest({
           auth,
           baseURL,
-          `/channel-auth/device?id=${body.id}&purpose=login`
-        )
+          path: `/channel-auth/device?id=${body.id}&purpose=login`,
+        })
       ).status,
       400
     );
 
-    const resumed = await authRequest(
+    const resumed = await authRequest({
       auth,
       baseURL,
-      `/channel-auth/device?id=${body.id}&purpose=login`,
-      undefined,
-      browser
-    );
+      path: `/channel-auth/device?id=${body.id}&purpose=login`,
+      body: undefined,
+      cookie: browser,
+    });
 
     assert.equal(resumed.status, 200);
     assert.equal(resumed.headers.get("cache-control"), "no-store");
@@ -487,83 +499,88 @@ test("native browser binding requires same-session approval before BetterAuth ca
       []
     );
     await assert.rejects(
-      confirmLogin(
+      confirmLogin({
         run,
-        otherIdentity.id,
-        foreignSession,
-        body.id,
-        bound.browserBoundAt ?? ""
-      )
+        identityId: otherIdentity.id,
+        sessionId: foreignSession,
+        challengeId: body.id,
+        browserBoundAt: bound.browserBoundAt ?? "",
+      })
     );
 
     await assert.rejects(
-      confirmLogin(
+      confirmLogin({
         run,
-        identity.id,
-        otherSession,
-        body.id,
-        bound.browserBoundAt
-      )
+        identityId: identity.id,
+        sessionId: otherSession,
+        challengeId: body.id,
+        browserBoundAt: bound.browserBoundAt,
+      })
     );
     await assert.rejects(
-      confirmLogin(
+      confirmLogin({
         run,
-        identity.id,
-        source.sessionId,
-        body.id,
-        "2000-01-01T00:00:00.000Z"
-      )
+        identityId: identity.id,
+        sessionId: source.sessionId,
+        challengeId: body.id,
+        browserBoundAt: "2000-01-01T00:00:00.000Z",
+      })
     );
     assert.deepEqual(
-      await confirmLogin(
+      await confirmLogin({
         run,
-        identity.id,
-        source.sessionId,
-        body.id,
-        bound.browserBoundAt
-      ),
+        identityId: identity.id,
+        sessionId: source.sessionId,
+        challengeId: body.id,
+        browserBoundAt: bound.browserBoundAt,
+      }),
       {
         confirmed: true,
       }
     );
     assert.equal(
       (
-        await authRequest(auth, baseURL, "/channel-auth/complete", {
-          id: body.id,
+        await authRequest({
+          auth,
+          baseURL,
+          path: "/channel-auth/complete",
+          body: {
+            id: body.id,
+          },
         })
       ).status,
       400
     );
     assert.equal(
       (
-        await authRequest(
+        await authRequest({
           auth,
           baseURL,
-          `/channel-auth/device?id=${body.id}&purpose=login`,
-          undefined,
-          browser
-        )
+          path: `/channel-auth/device?id=${body.id}&purpose=login`,
+          body: undefined,
+          cookie: browser,
+        })
       ).status,
       200
     );
 
-    const complete = await authRequest(
+    const complete = await authRequest({
       auth,
       baseURL,
-      "/channel-auth/complete",
-      { id: body.id },
-      browser
-    );
+      path: "/channel-auth/complete",
+      body: { id: body.id },
+      cookie: browser,
+    });
 
     assert.equal(complete.status, 200);
 
-    const session = await authRequest(
+    const session = await authRequest({
       auth,
       baseURL,
-      "/get-session",
-      undefined,
-      cookies(complete)
-    );
+      path: "/get-session",
+      body: undefined,
+      cookie: cookies(complete),
+    });
 
     const sessionBody = decodeSchema_Struct_user_Schema_Struct_id_Schema_String(
       await session.json()
@@ -572,38 +589,38 @@ test("native browser binding requires same-session approval before BetterAuth ca
     assert.equal(sessionBody.user.id, identity.userId);
     assert.equal(
       (
-        await authRequest(
+        await authRequest({
           auth,
           baseURL,
-          "/channel-auth/complete",
-          { id: body.id },
-          browser
-        )
+          path: "/channel-auth/complete",
+          body: { id: body.id },
+          cookie: browser,
+        })
       ).status,
       400
     );
     await assert.rejects(
-      confirmLogin(
+      confirmLogin({
         run,
-        identity.id,
-        source.sessionId,
-        body.id,
-        bound.browserBoundAt
-      )
+        identityId: identity.id,
+        sessionId: source.sessionId,
+        challengeId: body.id,
+        browserBoundAt: bound.browserBoundAt,
+      })
     );
     const revoked = await issueLogin(run, source, "revoked");
     assert.ok(revoked.entryToken);
 
-    const boundRevoked = await authRequest(
+    const boundRevoked = await authRequest({
       auth,
       baseURL,
-      "/channel-auth/device-bind",
-      {
+      path: "/channel-auth/device-bind",
+      body: {
         id: revoked.challenge.id,
         purpose: "login",
         token: revoked.entryToken,
-      }
-    );
+      },
+    });
 
     assert.equal(boundRevoked.status, 200);
 
@@ -612,48 +629,48 @@ test("native browser binding requires same-session approval before BetterAuth ca
     )[0];
 
     assert.ok(revocationTarget?.browserBoundAt);
-    await confirmLogin(
+    await confirmLogin({
       run,
-      identity.id,
-      source.sessionId,
-      revoked.challenge.id,
-      revocationTarget.browserBoundAt
-    );
+      identityId: identity.id,
+      sessionId: source.sessionId,
+      challengeId: revoked.challenge.id,
+      browserBoundAt: revocationTarget.browserBoundAt,
+    });
     await revokeIdentity(run, identity.id);
     await assert.rejects(pendingFor(run, identity.id, source.sessionId));
     assert.equal(
       (
-        await authRequest(
+        await authRequest({
           auth,
           baseURL,
-          `/channel-auth/device?id=${revoked.challenge.id}&purpose=login`,
-          undefined,
-          cookies(boundRevoked)
-        )
+          path: `/channel-auth/device?id=${revoked.challenge.id}&purpose=login`,
+          body: undefined,
+          cookie: cookies(boundRevoked),
+        })
       ).status,
       400
     );
     assert.equal(
       (
-        await authRequest(
+        await authRequest({
           auth,
           baseURL,
-          "/channel-auth/complete",
-          { id: revoked.challenge.id },
-          cookies(boundRevoked)
-        )
+          path: "/channel-auth/complete",
+          body: { id: revoked.challenge.id },
+          cookie: cookies(boundRevoked),
+        })
       ).status,
       400
     );
   } finally {
-    await cleanupDeviceLogin(
+    await cleanupDeviceLogin({
       run,
       installationId,
       scope,
       otherScope,
-      identity.userId,
-      otherIdentity.userId
-    );
+      identityUserId: identity.userId,
+      otherUserId: otherIdentity.userId,
+    });
     await runtime.dispose();
     await pool.end();
   }

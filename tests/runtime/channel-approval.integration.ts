@@ -22,30 +22,29 @@ const resolveApprovalOwner = Effect.gen(function* () {
   });
 });
 
-const insertApprovalSession = (
+const insertApprovalSession = Effect.fn("insertApprovalSession")(function* (
   sessionId: string,
   scope: ReturnType<typeof accessScopeForUser>
-) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
-    yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${scope.workspaceId}, ${scope.userId})`;
-  });
+) {
+  const sql = yield* PgClient.PgClient;
+  yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${scope.workspaceId}, ${scope.userId})`;
+});
 
-const revokeApprovalIdentity = (identityId: string) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
-    yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
-  });
+const revokeApprovalIdentity = Effect.fn("revokeApprovalIdentity")(function* (
+  identityId: string
+) {
+  const sql = yield* PgClient.PgClient;
+  yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
+});
 
-const cleanupApprovalOwner = (
+const cleanupApprovalOwner = Effect.fn("cleanupApprovalOwner")(function* (
   scope: ReturnType<typeof accessScopeForUser>,
   userId: string
-) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
-    yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
-    yield* sql`DELETE FROM public."user" WHERE id = ${userId}`;
-  });
+) {
+  const sql = yield* PgClient.PgClient;
+  yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
+  yield* sql`DELETE FROM public."user" WHERE id = ${userId}`;
+});
 
 const approvalContext =
   (auth: SessionAuthContext, sessionId: string) =>

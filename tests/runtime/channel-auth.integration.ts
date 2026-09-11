@@ -52,43 +52,44 @@ interface ChallengeSender {
   readonly senderId: string;
 }
 
-const confirmChannelChallenge = (token: string, sender: ChallengeSender) =>
-  Effect.gen(function* () {
-    const accounts = yield* ChannelAccounts;
-    yield* accounts.confirmChallenge({ token, sender });
-  });
+const confirmChannelChallenge = Effect.fn("confirmChannelChallenge")(function* (
+  token: string,
+  sender: ChallengeSender
+) {
+  const accounts = yield* ChannelAccounts;
+  yield* accounts.confirmChallenge({ token, sender });
+});
 
-const readActiveChannelIdentity = (sender: ChallengeSender) =>
-  Effect.gen(function* () {
+const readActiveChannelIdentity = Effect.fn("readActiveChannelIdentity")(
+  function* (sender: ChallengeSender) {
     const accounts = yield* ChannelAccounts;
 
     return yield* accounts.getActiveIdentity(sender);
-  });
+  }
+);
 
 const hasSessionTokenCookie = (cookies: readonly string[]) =>
   cookies.some((cookie) => cookie.includes("session_token="));
 
-const deleteChannelAuthUser = (sql: PgClient.PgClient, id: string) =>
-  Effect.gen(function* () {
-    yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
-    yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
-  });
+const deleteChannelAuthUser = Effect.fn("deleteChannelAuthUser")(function* (
+  sql: PgClient.PgClient,
+  id: string
+) {
+  yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
+  yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
+});
 
-const cleanupChannelAuthInstallation = (
-  installationId: string,
-  userIds: ReadonlySet<string>
-) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
-    yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
-    yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
+const cleanupChannelAuthInstallation = Effect.fn(
+  "cleanupChannelAuthInstallation"
+)(function* (installationId: string, userIds: ReadonlySet<string>) {
+  const sql = yield* PgClient.PgClient;
+  yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
+  yield* sql`DELETE FROM public.channel_identity WHERE installation_id = ${installationId}`;
 
-    yield* Effect.forEach(
-      [...userIds],
-      (id) => deleteChannelAuthUser(sql, id),
-      { concurrency: 1 }
-    );
+  yield* Effect.forEach([...userIds], (id) => deleteChannelAuthUser(sql, id), {
+    concurrency: 1,
   });
+});
 
 test("real BetterAuth router, signed browser challenge and database session", async () => {
   const url = await Effect.runPromise(

@@ -121,24 +121,24 @@ const requireActiveReportOwner = (report: Report) =>
     )
   );
 
-const insertReportOutput = (
-  sql: Sql,
-  runId: string,
-  reportSequence: number,
-  receipt: { readonly id: string },
-  index: number
-) =>
-  sql`INSERT INTO scheduled_agent_report_outputs (run_id, report_sequence, chunk_index, outbox_id)
-        VALUES (${runId}, ${reportSequence}, ${index}, ${receipt.id})`;
+const insertReportOutput = (input: {
+  readonly sql: Sql;
+  readonly runId: string;
+  readonly reportSequence: number;
+  readonly receipt: { readonly id: string };
+  readonly index: number;
+}) => {
+  const { sql, runId, reportSequence, receipt, index } = input;
 
-const makeDispatchNativeScheduledReport = (
-  sql: Sql,
-  transport: TransportService,
-  runId: string
-) =>
-  Effect.gen(function* () {
-    const rows =
-      yield* sql`SELECT r.id, r.report_sequence AS "reportSequence", r.report_status AS "reportStatus",
+  return sql`INSERT INTO scheduled_agent_report_outputs (run_id, report_sequence, chunk_index, outbox_id)
+        VALUES (${runId}, ${reportSequence}, ${index}, ${receipt.id})`;
+};
+
+const makeDispatchNativeScheduledReport = Effect.fn(
+  "makeDispatchNativeScheduledReport"
+)(function* (sql: Sql, transport: TransportService, runId: string) {
+  const rows =
+    yield* sql`SELECT r.id, r.report_sequence AS "reportSequence", r.report_status AS "reportStatus",
       r.outcome, r.pending_input_requests AS "pendingInputRequests", j.prompt,
       j.conversation_channel AS "conversationChannel", j.conversation_id AS "conversationId",
       j.created_by_user_id AS "createdByUserId", j.workspace_id AS "workspaceId"
@@ -146,76 +146,82 @@ const makeDispatchNativeScheduledReport = (
       WHERE r.id = ${runId} AND j.conversation_channel IN ('telegram', 'kapso')
       AND r.status IN ('completed', 'dead_letter', 'waiting_for_input') FOR UPDATE OF r`;
 
-    if (!rows[0]) return false;
-    const report = yield* decodeEffect_reportSchema(rows[0]);
+  if (!rows[0]) return false;
+  const report = yield* decodeEffect_reportSchema(rows[0]);
 
-    if (!isOpenReportStatus(report.reportStatus)) return true;
-    const deliveryKey = `schedulereport:${runId}:${String(report.reportSequence)}`;
-    const prefix = `${deliveryKey}:`;
+  if (!isOpenReportStatus(report.reportStatus)) return true;
+  const deliveryKey = `schedulereport:${runId}:${String(report.reportSequence)}`;
+  const prefix = `${deliveryKey}:`;
 
-    const outputs = yield* sql<{
-      chunkIndex: number;
-      outboxId: string;
-    }>`SELECT chunk_index AS "chunkIndex", outbox_id AS "outboxId"
+  const outputs = yield* sql<{
+    chunkIndex: number;
+    outboxId: string;
+  }>`SELECT chunk_index AS "chunkIndex", outbox_id AS "outboxId"
         FROM scheduled_agent_report_outputs
         WHERE run_id = ${runId} AND report_sequence = ${report.reportSequence} ORDER BY chunk_index`;
 
-    const chunks = yield* sql<{
-      id: string;
-      key: string;
-      status: string;
-    }>`SELECT id, delivery_key AS key, status
+  const chunks = yield* sql<{
+    id: string;
+    key: string;
+    status: string;
+  }>`SELECT id, delivery_key AS key, status
         FROM channel_outbox WHERE identity_id = ${report.conversationId}
         AND left(delivery_key, char_length(${prefix})) = ${prefix}`;
 
-    // Queued is the commit seal: enqueue, the complete bindings and this transition
-    // share one transaction. Recovery compares every durable chunk, never a subset.
-    if (hasRecoverableReportState(report, outputs, chunks)) {
-      const status = recoverQueuedReportStatus(report, outputs, chunks, prefix);
-      yield* sql`UPDATE scheduled_agent_runs SET report_status = ${status}, updated_at = clock_timestamp()
+  // Queued is the commit seal: enqueue, the complete bindings and this transition
+  // share one transaction. Recovery compares every durable chunk, never a subset.
+  if (hasRecoverableReportState(report, outputs, chunks)) {
+    const status = recoverQueuedReportStatus(report, outputs, chunks, prefix);
+    yield* sql`UPDATE scheduled_agent_runs SET report_status = ${status}, updated_at = clock_timestamp()
           WHERE id = ${runId} AND report_sequence = ${report.reportSequence}`;
 
-      return true;
-    }
+    return true;
+  }
 
-    const active = yield* requireActiveReportOwner(report);
+  const active = yield* requireActiveReportOwner(report);
 
-    if (!active) {
-      yield* sql`UPDATE scheduled_agent_runs SET report_status = 'cancelled',
+  if (!active) {
+    yield* sql`UPDATE scheduled_agent_runs SET report_status = 'cancelled',
         report_lease_token = NULL, report_lease_expires_at = NULL, updated_at = clock_timestamp()
         WHERE id = ${runId} AND report_sequence = ${report.reportSequence}`;
 
-      return true;
-    }
+    return true;
+  }
 
-    const text = yield* renderStoredReport(report);
+  const text = yield* renderStoredReport(report);
 
-    if (!text) {
-      yield* sql`UPDATE scheduled_agent_runs SET report_status = 'not_needed', updated_at = clock_timestamp()
+  if (!text) {
+    yield* sql`UPDATE scheduled_agent_runs SET report_status = 'not_needed', updated_at = clock_timestamp()
         WHERE id = ${runId} AND report_sequence = ${report.reportSequence}`;
 
-      return true;
-    }
+    return true;
+  }
 
-    const receipts = yield* transport.enqueueText({
-      identityId: report.conversationId,
-      deliveryKey,
-      text,
-    });
+  const receipts = yield* transport.enqueueText({
+    identityId: report.conversationId,
+    deliveryKey,
+    text,
+  });
 
-    yield* Effect.forEach(
-      receipts,
-      (receipt, index) =>
-        insertReportOutput(sql, runId, report.reportSequence, receipt, index),
-      { concurrency: 1, discard: true }
-    );
+  yield* Effect.forEach(
+    receipts,
+    (receipt, index) =>
+      insertReportOutput({
+        sql,
+        runId,
+        reportSequence: report.reportSequence,
+        receipt,
+        index,
+      }),
+    { concurrency: 1, discard: true }
+  );
 
-    yield* sql`UPDATE scheduled_agent_runs SET report_status = 'queued',
+  yield* sql`UPDATE scheduled_agent_runs SET report_status = 'queued',
       report_lease_token = NULL, report_lease_expires_at = NULL, updated_at = clock_timestamp()
       WHERE id = ${runId} AND report_sequence = ${report.reportSequence}`;
 
-    return true;
-  });
+  return true;
+});
 
 export const dispatchNativeScheduledReport = Effect.fn(
   "dispatchNativeScheduledReport"

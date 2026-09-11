@@ -331,14 +331,12 @@ const unlinkGoogleAccount = (
     catch: googleUnavailable,
   });
 
-const revokeEncryptedGoogleToken = (
-  auth: Effect.Success<typeof authentication>,
-  encrypted: string
-) =>
-  Effect.gen(function* () {
+const revokeEncryptedGoogleToken = Effect.fn("revokeEncryptedGoogleToken")(
+  function* (auth: Effect.Success<typeof authentication>, encrypted: string) {
     const token = yield* decryptGoogleAccountToken(auth, encrypted);
     yield* revokeGoogleOAuthToken(token);
-  });
+  }
+);
 
 export const disconnectGoogleWorkspace = Effect.fn("disconnectGoogleWorkspace")(
   function* (headers: Headers) {

@@ -57,25 +57,25 @@ const raceAuthUnavailable = () => {
   throw new Error("No external authorization belongs in this memory proof");
 };
 
-const channelOrWebPrincipal = (
-  authority: "channel" | "web",
-  identity: Parameters<typeof channelPrincipal>[0],
-  scope: ReturnType<typeof accessScopeForUser>,
-  workspaceId: string,
-  authSessionId: string
-) => {
-  if (authority === "channel") {
-    return channelPrincipal(identity);
+const channelOrWebPrincipal = (input: {
+  readonly authority: "channel" | "web";
+  readonly identity: Parameters<typeof channelPrincipal>[0];
+  readonly scope: ReturnType<typeof accessScopeForUser>;
+  readonly workspaceId: string;
+  readonly authSessionId: string;
+}) => {
+  if (input.authority === "channel") {
+    return channelPrincipal(input.identity);
   }
 
   return {
-    principalId: scope.userId,
+    principalId: input.scope.userId,
     principalType: "user" as const,
     authenticator: "authjs",
     attributes: {
       conversationChannel: "eve",
-      workspaceId,
-      authSessionId,
+      workspaceId: input.workspaceId,
+      authSessionId: input.authSessionId,
     },
   };
 };
@@ -126,27 +126,31 @@ const makeRevocationBlockedPoll = (
   };
 };
 
-const runAuthorityRevocation = async (
-  authority: "channel" | "web",
-  accounts: AccountsService,
-  identity: { id: string; userId: string },
-  auth: AuthApi,
-  origin: string,
-  cookie: string,
-  revocation: { completed: boolean }
-) => {
-  if (authority === "channel") {
+const runAuthorityRevocation = async (input: {
+  readonly authority: "channel" | "web";
+  readonly accounts: AccountsService;
+  readonly identity: { id: string; userId: string };
+  readonly auth: AuthApi;
+  readonly origin: string;
+  readonly cookie: string;
+  readonly revocation: { completed: boolean };
+}) => {
+  if (input.authority === "channel") {
     await serverRuntime.runPromise(
-      accounts.revokeIdentity({
-        identityId: identity.id,
-        userId: identity.userId,
+      input.accounts.revokeIdentity({
+        identityId: input.identity.id,
+        userId: input.identity.userId,
       })
     );
   } else {
-    const response = await auth.handler(
-      new Request(`${origin}/api/auth/sign-out`, {
+    const response = await input.auth.handler(
+      new Request(`${input.origin}/api/auth/sign-out`, {
         method: "POST",
-        headers: { origin, cookie, "content-type": "application/json" },
+        headers: {
+          origin: input.origin,
+          cookie: input.cookie,
+          "content-type": "application/json",
+        },
         body: "{}",
       })
     );
@@ -154,7 +158,7 @@ const runAuthorityRevocation = async (
     assert.equal(response.status, 200);
   }
 
-  revocation.completed = true;
+  input.revocation.completed = true;
 };
 
 const assertRaceOutcome = (
@@ -286,13 +290,13 @@ for (const authority of ["channel", "web"] as const) {
 
       assert.ok(session);
 
-      const principal = channelOrWebPrincipal(
+      const principal = channelOrWebPrincipal({
         authority,
         identity,
         scope,
         workspaceId,
-        session.session.id
-      );
+        authSessionId: session.session.id,
+      });
 
       const turnId = randomUUID();
 
@@ -367,15 +371,15 @@ for (const authority of ["channel", "web"] as const) {
         .toBe(true);
       const writerPid = writerSlot.pid;
       const revocation = { completed: false };
-      revoke = runAuthorityRevocation(
+      revoke = runAuthorityRevocation({
         authority,
         accounts,
         identity,
         auth,
         origin,
         cookie,
-        revocation
-      );
+        revocation,
+      });
       // Establish order from database locks, not an assumed sleep duration.
       await expect
         .poll(makeRevocationBlockedPoll(database, writerPid, revocation), {

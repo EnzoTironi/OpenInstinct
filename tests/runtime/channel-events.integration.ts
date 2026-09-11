@@ -37,35 +37,39 @@ const assertCompanionRuntimeDatabase = Effect.gen(function* () {
   assert.equal(rows[0]?.name, "companion_runtime_test");
 });
 
-const resolveTelegramSender = (senderId: string) =>
-  Effect.gen(function* () {
-    const accounts = yield* ChannelAccounts;
+const resolveTelegramSender = Effect.fn("resolveTelegramSender")(function* (
+  senderId: string
+) {
+  const accounts = yield* ChannelAccounts;
 
-    return yield* accounts.resolveVerifiedSender({
-      channel: "telegram",
-      installationId: randomUUID(),
-      senderId,
-    });
+  return yield* accounts.resolveVerifiedSender({
+    channel: "telegram",
+    installationId: randomUUID(),
+    senderId,
   });
+});
 
-const revokeChannelIdentity = (identityId: string) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
-    yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
-  });
+const revokeChannelIdentity = Effect.fn("revokeChannelIdentity")(function* (
+  identityId: string
+) {
+  const sql = yield* PgClient.PgClient;
+  yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
+});
 
-const deleteMembership = (userId: string) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
-    yield* sql`DELETE FROM workspace_memberships WHERE user_id = ${accessScopeForUser(`better-auth:${userId}`).userId}`;
-  });
+const deleteMembership = Effect.fn("deleteMembership")(function* (
+  userId: string
+) {
+  const sql = yield* PgClient.PgClient;
+  yield* sql`DELETE FROM workspace_memberships WHERE user_id = ${accessScopeForUser(`better-auth:${userId}`).userId}`;
+});
 
-const cleanupTelegramUser = (userId: string) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
-    yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${userId}`).workspaceId}`;
-    yield* sql`DELETE FROM public."user" WHERE id = ${userId}`;
-  });
+const cleanupTelegramUser = Effect.fn("cleanupTelegramUser")(function* (
+  userId: string
+) {
+  const sql = yield* PgClient.PgClient;
+  yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${userId}`).workspaceId}`;
+  yield* sql`DELETE FROM public."user" WHERE id = ${userId}`;
+});
 
 const makeFailedContext =
   (sessionId: string, auth: AuthPrincipal) =>
@@ -107,26 +111,26 @@ const fireFailedSequences = (
     )
   );
 
-const rejectInvalidFailedPrincipals = (
-  handlers: ReturnType<typeof privateChannelEvents>,
-  failure: {
+const rejectInvalidFailedPrincipals = (input: {
+  readonly handlers: ReturnType<typeof privateChannelEvents>;
+  readonly failure: {
     readonly turnId: string;
     readonly sequence: number;
     readonly code: string;
     readonly message: string;
     readonly details: { readonly token: string };
-  },
-  channel: FailedChannel,
-  context: ReturnType<typeof makeFailedContext>,
-  invalid: readonly AuthPrincipal[]
-) =>
+  };
+  readonly channel: FailedChannel;
+  readonly context: ReturnType<typeof makeFailedContext>;
+  readonly invalid: readonly AuthPrincipal[];
+}) =>
   Promise.all(
-    invalid.map((principal) =>
+    input.invalid.map((principal) =>
       assert.rejects(async () =>
-        handlers["turn.failed"](
-          { ...failure, turnId: randomUUID() },
-          channel,
-          context(principal)
+        input.handlers["turn.failed"](
+          { ...input.failure, turnId: randomUUID() },
+          input.channel,
+          input.context(principal)
         )
       )
     )
@@ -147,24 +151,23 @@ const expectedTurnStatusRows = (
     }))
     .toSorted((a, b) => a.delivery_key.localeCompare(b.delivery_key));
 
-const assertTurnStatusOutbox = (
+const assertTurnStatusOutbox = Effect.fn("assertTurnStatusOutbox")(function* (
   identityId: string,
   sessionId: string,
   turnIds: readonly string[]
-) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
+) {
+  const sql = yield* PgClient.PgClient;
 
-    const rows = yield* sql<{
-      delivery_key: string;
-      payload: { text: string };
-      status: string;
-    }>`
+  const rows = yield* sql<{
+    delivery_key: string;
+    payload: { text: string };
+    status: string;
+  }>`
         SELECT delivery_key, payload, status FROM channel_outbox WHERE identity_id = ${identityId}
         ORDER BY delivery_key`;
 
-    assert.deepEqual(rows, expectedTurnStatusRows(sessionId, turnIds));
-  });
+  assert.deepEqual(rows, expectedTurnStatusRows(sessionId, turnIds));
+});
 
 const fireAuthorizationSequences = (
   handlers: ReturnType<typeof privateChannelEvents>,
@@ -196,8 +199,8 @@ const fireAuthorizationSequences = (
     )
   );
 
-const assertAuthorizationOutbox = (identityId: string) =>
-  Effect.gen(function* () {
+const assertAuthorizationOutbox = Effect.fn("assertAuthorizationOutbox")(
+  function* (identityId: string) {
     const sql = yield* PgClient.PgClient;
 
     const rows = yield* sql<{
@@ -211,17 +214,19 @@ const assertAuthorizationOutbox = (identityId: string) =>
       rows[0].payload.text,
       "Connect Google Workspace\n\nConnect to create the event.\n\nUse your linked account.\n\nCode: TEST-CODE\n\nhttps://example.com/authorize"
     );
-  });
+  }
+);
 
-const assertSingleOutboxRow = (identityId: string) =>
-  Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient;
+const assertSingleOutboxRow = Effect.fn("assertSingleOutboxRow")(function* (
+  identityId: string
+) {
+  const sql = yield* PgClient.PgClient;
 
-    const rows =
-      yield* sql`SELECT id FROM channel_outbox WHERE identity_id = ${identityId}`;
+  const rows =
+    yield* sql`SELECT id FROM channel_outbox WHERE identity_id = ${identityId}`;
 
-    assert.equal(rows.length, 1);
-  });
+  assert.equal(rows.length, 1);
+});
 
 test("terminal channel events persist once per turn and enforce current authority", async () => {
   const url = await Effect.runPromise(Config.string("DATABASE_URL"));
@@ -274,13 +279,13 @@ test("terminal channel events persist once per turn and enforce current authorit
       },
     ];
 
-    await rejectInvalidFailedPrincipals(
+    await rejectInvalidFailedPrincipals({
       handlers,
       failure,
       channel,
       context,
-      invalid
-    );
+      invalid,
+    });
     await assert.rejects(async () =>
       handlers["turn.failed"](
         { ...failure, turnId: randomUUID() },

@@ -269,16 +269,18 @@ const makeRequireFreshSession = (
     );
   });
 
-const insertNewUserWorkspace = (sql: Sql, userId: string) =>
-  Effect.gen(function* () {
-    yield* sql`INSERT INTO public."user"
+const insertNewUserWorkspace = Effect.fn("insertNewUserWorkspace")(function* (
+  sql: Sql,
+  userId: string
+) {
+  yield* sql`INSERT INTO public."user"
         (id, name, email, "emailVerified", "createdAt", "updatedAt")
         VALUES (${userId}, 'Companion user', ${`${userId}@accounts.invalid`}, false, clock_timestamp(), clock_timestamp())`;
-    const scope = accessScopeForUser(`better-auth:${userId}`);
-    yield* sql`INSERT INTO workspaces (id) VALUES (${scope.workspaceId})`;
-    yield* sql`INSERT INTO workspace_memberships (workspace_id, user_id, role)
+  const scope = accessScopeForUser(`better-auth:${userId}`);
+  yield* sql`INSERT INTO workspaces (id) VALUES (${scope.workspaceId})`;
+  yield* sql`INSERT INTO workspace_memberships (workspace_id, user_id, role)
             VALUES (${scope.workspaceId}, ${scope.userId}, 'owner')`;
-  });
+});
 
 const provisionExisting = (
   existing: typeof IdentityRow.Type,
@@ -348,24 +350,23 @@ const issueLinkSessionGuard = (
   return requireSession(request.userId, request.sessionId, true);
 };
 
-const issueChallengeBody = (
+const issueChallengeBody = Effect.fn("issueChallengeBody")(function* (
   sql: Sql,
   request: typeof IssueChallenge.Type,
   requireSession: RequireSession
-) =>
-  Effect.gen(function* () {
-    yield* issueLinkSessionGuard(request, requireSession);
-    const id = randomUUID();
-    const token = randomBytes(32).toString("base64url");
+) {
+  yield* issueLinkSessionGuard(request, requireSession);
+  const id = randomUUID();
+  const token = randomBytes(32).toString("base64url");
 
-    const targetUserId = request.purpose === "link" ? request.userId : null;
+  const targetUserId = request.purpose === "link" ? request.userId : null;
 
-    const requestingSessionId =
-      request.purpose === "link" ? request.sessionId : null;
+  const requestingSessionId =
+    request.purpose === "link" ? request.sessionId : null;
 
-    const issued = yield* sql<{
-      expiresAt: string;
-    }>`INSERT INTO public.channel_auth_challenge
+  const issued = yield* sql<{
+    expiresAt: string;
+  }>`INSERT INTO public.channel_auth_challenge
           (id, purpose, token_hash, browser_secret_hash, target_user_id, requesting_session_id,
            channel, installation_id, expires_at, created_at)
           VALUES (${id}, ${request.purpose}, ${hash(token)}, ${hash(request.browserSecret)},
@@ -373,12 +374,12 @@ const issueChallengeBody = (
             ${request.installationId}, clock_timestamp() + interval '5 minutes', clock_timestamp())
           RETURNING to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "expiresAt"`;
 
-    const expiry = issued[0];
+  const expiry = issued[0];
 
-    if (!expiry) return yield* fail("invalid_challenge");
+  if (!expiry) return yield* fail("invalid_challenge");
 
-    return { challengeId: id, token, expiresAt: expiry.expiresAt };
-  });
+  return { challengeId: id, token, expiresAt: expiry.expiresAt };
+});
 
 const makeIssueChallenge = (
   sql: Sql,
@@ -393,41 +394,39 @@ const makeIssueChallenge = (
     return yield* transaction(issueChallengeBody(sql, request, requireSession));
   });
 
-const previewLinkGuards = (
+const previewLinkGuards = Effect.fn("previewLinkGuards")(function* (
   preview: typeof ChallengePreview.Type &
     Pick<typeof ChallengeRow.Type, "targetUserId" | "requestingSessionId">,
   existing: typeof IdentityRow.Type | undefined,
   requireSession: RequireSession
-) =>
-  Effect.gen(function* () {
-    if (!preview.targetUserId || !preview.requestingSessionId) {
-      return yield* fail("invalid_challenge");
-    }
+) {
+  if (!preview.targetUserId || !preview.requestingSessionId) {
+    return yield* fail("invalid_challenge");
+  }
 
-    yield* requireSession(
-      preview.targetUserId,
-      preview.requestingSessionId,
-      true
-    );
+  yield* requireSession(
+    preview.targetUserId,
+    preview.requestingSessionId,
+    true
+  );
 
-    if (existing && existing.userId !== preview.targetUserId) {
-      return yield* fail("account_conflict");
-    }
+  if (existing && existing.userId !== preview.targetUserId) {
+    return yield* fail("account_conflict");
+  }
 
-    return undefined;
-  });
+  return undefined;
+});
 
-const previewChallengeBody = (
+const previewChallengeBody = Effect.fn("previewChallengeBody")(function* (
   sql: Sql,
   request: typeof PreviewChallenge.Type,
   findIdentity: FindIdentity,
   requireSession: RequireSession
-) =>
-  Effect.gen(function* () {
-    const rows = yield* sql<
-      typeof ChallengePreview.Type &
-        Pick<typeof ChallengeRow.Type, "targetUserId" | "requestingSessionId">
-    >`
+) {
+  const rows = yield* sql<
+    typeof ChallengePreview.Type &
+      Pick<typeof ChallengeRow.Type, "targetUserId" | "requestingSessionId">
+  >`
               SELECT id, purpose, target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId",
               to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "expiresAt"
               FROM public.channel_auth_challenge
@@ -437,23 +436,23 @@ const previewChallengeBody = (
               AND confirmed_at IS NULL AND consumed_at IS NULL AND cancelled_at IS NULL
               AND expires_at > clock_timestamp()`;
 
-    const preview = rows[0];
+  const preview = rows[0];
 
-    if (!preview) return yield* fail("invalid_challenge");
-    const existing = yield* findIdentity(request.sender);
+  if (!preview) return yield* fail("invalid_challenge");
+  const existing = yield* findIdentity(request.sender);
 
-    if (existing?.revoked) return yield* fail("identity_inactive");
+  if (existing?.revoked) return yield* fail("identity_inactive");
 
-    if (preview.purpose === "link") {
-      yield* previewLinkGuards(preview, existing, requireSession);
-    }
+  if (preview.purpose === "link") {
+    yield* previewLinkGuards(preview, existing, requireSession);
+  }
 
-    return {
-      id: preview.id,
-      purpose: preview.purpose,
-      expiresAt: preview.expiresAt,
-    };
-  });
+  return {
+    id: preview.id,
+    purpose: preview.purpose,
+    expiresAt: preview.expiresAt,
+  };
+});
 
 const makePreviewChallenge = (
   sql: Sql,
@@ -478,67 +477,62 @@ const challengeMatchesSender = (
   challenge.channel === sender.channel &&
   challenge.installationId === sender.installationId;
 
-const confirmLinkGuards = (
+const confirmLinkGuards = Effect.fn("confirmLinkGuards")(function* (
   challenge: typeof ChallengeRow.Type,
   requireSession: RequireSession
-) =>
-  Effect.gen(function* () {
-    if (!challenge.targetUserId || !challenge.requestingSessionId) {
-      return yield* fail("invalid_challenge");
-    }
+) {
+  if (!challenge.targetUserId || !challenge.requestingSessionId) {
+    return yield* fail("invalid_challenge");
+  }
 
-    yield* requireSession(
-      challenge.targetUserId,
-      challenge.requestingSessionId
-    );
+  yield* requireSession(challenge.targetUserId, challenge.requestingSessionId);
 
-    return undefined;
-  });
+  return undefined;
+});
 
-const confirmChallengeBody = (
+const confirmChallengeBody = Effect.fn("confirmChallengeBody")(function* (
   sql: Sql,
   request: typeof ConfirmChallenge.Type,
   findIdentity: FindIdentity,
   requireSession: RequireSession
-) =>
-  Effect.gen(function* () {
-    const rows = yield* sql<
-      typeof ChallengeRow.Type
-    >`SELECT id, purpose, channel, installation_id AS "installationId",
+) {
+  const rows = yield* sql<
+    typeof ChallengeRow.Type
+  >`SELECT id, purpose, channel, installation_id AS "installationId",
           target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
           FROM public.channel_auth_challenge WHERE token_hash = ${hash(request.token)}
           AND intended_identity_id IS NULL
           AND consumed_at IS NULL AND cancelled_at IS NULL AND confirmed_at IS NULL
           AND expires_at > clock_timestamp() FOR UPDATE`;
 
-    const challenge = rows[0];
+  const challenge = rows[0];
 
-    if (!challenge || !challengeMatchesSender(challenge, request.sender)) {
-      return yield* fail("invalid_challenge");
-    }
+  if (!challenge || !challengeMatchesSender(challenge, request.sender)) {
+    return yield* fail("invalid_challenge");
+  }
 
-    if (challenge.purpose === "link") {
-      yield* confirmLinkGuards(challenge, requireSession);
-    }
+  if (challenge.purpose === "link") {
+    yield* confirmLinkGuards(challenge, requireSession);
+  }
 
-    const existing = yield* findIdentity(request.sender);
+  const existing = yield* findIdentity(request.sender);
 
-    if (existing?.revoked) return yield* fail("identity_inactive");
+  if (existing?.revoked) return yield* fail("identity_inactive");
 
-    if (
-      existing &&
-      challenge.targetUserId &&
-      existing.userId !== challenge.targetUserId
-    ) {
-      return yield* fail("account_conflict");
-    }
+  if (
+    existing &&
+    challenge.targetUserId &&
+    existing.userId !== challenge.targetUserId
+  ) {
+    return yield* fail("account_conflict");
+  }
 
-    yield* sql`UPDATE public.channel_auth_challenge
+  yield* sql`UPDATE public.channel_auth_challenge
                 SET confirmed_sender_id = ${request.sender.senderId}, confirmed_at = clock_timestamp()
                 WHERE id = ${challenge.id}`;
 
-    return { challengeId: challenge.id };
-  });
+  return { challengeId: challenge.id };
+});
 
 const makeConfirmChallenge = (
   sql: Sql,
@@ -579,73 +573,71 @@ const makeGetChallengeStatus = (sql: Sql) =>
     return result;
   });
 
-const consumeLinkGuards = (
+const consumeLinkGuards = Effect.fn("consumeLinkGuards")(function* (
   challenge: typeof ChallengeRow.Type,
   request: typeof ConsumeChallenge.Type,
   requireSession: RequireSession
-) =>
-  Effect.gen(function* () {
-    if (
-      !challenge.targetUserId ||
-      !challenge.requestingSessionId ||
-      challenge.requestingSessionId !== request.currentSessionId
-    ) {
-      return yield* fail("session_invalid");
-    }
+) {
+  if (
+    !challenge.targetUserId ||
+    !challenge.requestingSessionId ||
+    challenge.requestingSessionId !== request.currentSessionId
+  ) {
+    return yield* fail("session_invalid");
+  }
 
-    yield* requireSession(
-      challenge.targetUserId,
-      challenge.requestingSessionId,
-      true
-    );
+  yield* requireSession(
+    challenge.targetUserId,
+    challenge.requestingSessionId,
+    true
+  );
 
-    return undefined;
-  });
+  return undefined;
+});
 
-const consumeChallengeBody = (
+const consumeChallengeBody = Effect.fn("consumeChallengeBody")(function* (
   sql: Sql,
   request: typeof ConsumeChallenge.Type,
   provision: ReturnType<typeof makeProvision>,
   requireSession: RequireSession
-) =>
-  Effect.gen(function* () {
-    const rows = yield* sql<
-      typeof ChallengeRow.Type
-    >`SELECT id, purpose, channel, installation_id AS "installationId",
+) {
+  const rows = yield* sql<
+    typeof ChallengeRow.Type
+  >`SELECT id, purpose, channel, installation_id AS "installationId",
           target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
           FROM public.channel_auth_challenge WHERE id = ${request.challengeId}
           AND browser_secret_hash = ${hash(request.browserSecret)} AND confirmed_at IS NOT NULL
           AND consumed_at IS NULL AND cancelled_at IS NULL AND expires_at > clock_timestamp() FOR UPDATE`;
 
-    const challenge = rows[0];
+  const challenge = rows[0];
 
-    if (!challenge?.confirmedSenderId) return yield* fail("invalid_challenge");
+  if (!challenge?.confirmedSenderId) return yield* fail("invalid_challenge");
 
-    if (challenge.purpose === "link") {
-      yield* consumeLinkGuards(challenge, request, requireSession);
-    }
+  if (challenge.purpose === "link") {
+    yield* consumeLinkGuards(challenge, request, requireSession);
+  }
 
-    const identity = yield* provision(
-      {
-        channel: challenge.channel,
-        installationId: challenge.installationId,
-        senderId: challenge.confirmedSenderId,
-      },
-      challenge.targetUserId ?? undefined
-    );
+  const identity = yield* provision(
+    {
+      channel: challenge.channel,
+      installationId: challenge.installationId,
+      senderId: challenge.confirmedSenderId,
+    },
+    challenge.targetUserId ?? undefined
+  );
 
-    yield* sql`UPDATE public.channel_auth_challenge SET identity_id = ${identity.id}, consumed_at = clock_timestamp() WHERE id = ${challenge.id}`;
-    const principalId = `better-auth:${identity.userId}`;
-    const scope = accessScopeForUser(principalId);
+  yield* sql`UPDATE public.channel_auth_challenge SET identity_id = ${identity.id}, consumed_at = clock_timestamp() WHERE id = ${challenge.id}`;
+  const principalId = `better-auth:${identity.userId}`;
+  const scope = accessScopeForUser(principalId);
 
-    return {
-      userId: identity.userId,
-      identityId: identity.id,
-      purpose: challenge.purpose,
-      principalId,
-      workspaceId: scope.workspaceId,
-    };
-  });
+  return {
+    userId: identity.userId,
+    identityId: identity.id,
+    purpose: challenge.purpose,
+    principalId,
+    workspaceId: scope.workspaceId,
+  };
+});
 
 const makeConsumeChallenge = (
   sql: Sql,
@@ -686,22 +678,24 @@ const makeWithLoginSession = (sql: Sql, transaction: Transaction) =>
     );
   });
 
-const revokeIdentityBody = (sql: Sql, request: typeof RevokeIdentity.Type) =>
-  Effect.gen(function* () {
-    const identities =
-      yield* sql`SELECT id FROM public.channel_identity WHERE id = ${request.identityId}
+const revokeIdentityBody = Effect.fn("revokeIdentityBody")(function* (
+  sql: Sql,
+  request: typeof RevokeIdentity.Type
+) {
+  const identities =
+    yield* sql`SELECT id FROM public.channel_identity WHERE id = ${request.identityId}
           AND user_id = ${request.userId} AND revoked_at IS NULL FOR UPDATE`;
 
-    if (!identities.length) return yield* fail("identity_inactive");
+  if (!identities.length) return yield* fail("identity_inactive");
 
-    const remaining =
-      yield* sql`SELECT id FROM public.channel_identity WHERE user_id = ${request.userId}
+  const remaining =
+    yield* sql`SELECT id FROM public.channel_identity WHERE user_id = ${request.userId}
           AND id <> ${request.identityId} AND revoked_at IS NULL`;
 
-    if (!remaining.length) return yield* fail("last_access");
-    yield* sql`UPDATE public.channel_identity SET revoked_at = clock_timestamp(), updated_at = clock_timestamp()
+  if (!remaining.length) return yield* fail("last_access");
+  yield* sql`UPDATE public.channel_identity SET revoked_at = clock_timestamp(), updated_at = clock_timestamp()
           WHERE id = ${request.identityId}`;
-    yield* sql`UPDATE public.channel_auth_challenge SET cancelled_at = clock_timestamp()
+  yield* sql`UPDATE public.channel_auth_challenge SET cancelled_at = clock_timestamp()
           WHERE consumed_at IS NULL AND cancelled_at IS NULL
           AND (identity_id = ${request.identityId} OR intended_identity_id = ${request.identityId} OR target_user_id = ${request.userId}
             OR requesting_session_id IN (SELECT id FROM public.session WHERE "userId" = ${request.userId})
@@ -709,10 +703,10 @@ const revokeIdentityBody = (sql: Sql, request: typeof RevokeIdentity.Type) =>
               AND i.channel = public.channel_auth_challenge.channel
               AND i.installation_id = public.channel_auth_challenge.installation_id
               AND i.sender_id = public.channel_auth_challenge.confirmed_sender_id))`;
-    yield* sql`DELETE FROM public.session WHERE "userId" = ${request.userId}`;
+  yield* sql`DELETE FROM public.session WHERE "userId" = ${request.userId}`;
 
-    return undefined;
-  });
+  return undefined;
+});
 
 const makeRevokeIdentity = (sql: Sql, transaction: Transaction) =>
   Effect.fn("ChannelAccounts.revokeIdentity")(function* (
