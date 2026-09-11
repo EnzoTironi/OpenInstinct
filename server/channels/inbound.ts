@@ -108,64 +108,95 @@ const buildMessagePayloadCandidate = (
   return candidate;
 };
 
+const isTelegramAuthPrefix = (text: string) =>
+  /^\/(?:start|confirm)(?:@|\s|$)/i.test(text);
+
+const matchTelegramAuthCommand = (text: string) =>
+  /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text);
+
+const commandTargetsOtherBot = (
+  mentioned: string | undefined,
+  botUsername: string | undefined
+) =>
+  Boolean(mentioned && mentioned.toLowerCase() !== botUsername?.toLowerCase());
+
+const isBareStartGreeting = (command: RegExpExecArray) =>
+  command[1]?.toLowerCase() === "start" && !command[3];
+
+const telegramAuthAction = (command: RegExpExecArray) =>
+  command[1]?.toLowerCase() === "start"
+    ? ("start" as const)
+    : ("confirm" as const);
+
+const invalidTelegramCommand =
+  (provider: InboundCoordinates["channel"]) => () =>
+    new ProviderInputError({
+      provider,
+      reason: "invalid_command",
+    });
+
+const parseGroupTelegramAuthCommand = (text: string) => {
+  // Auth challenges stay private-only; groups never mint login/link commands.
+  if (isTelegramAuthPrefix(text)) return null;
+
+  return { kind: "none" as const };
+};
+
+type TelegramAuthParse =
+  | { readonly kind: "command"; readonly event: InboundEvent }
+  | { readonly kind: "greeting" }
+  | { readonly kind: "none" }
+  | null;
+
+const parsePrivateTelegramAuthCommand = Effect.fn(
+  "parsePrivateTelegramAuthCommand"
+)(function* (
+  coordinates: InboundCoordinates,
+  text: string,
+  botUsername?: string
+): Effect.fn.Return<TelegramAuthParse, ProviderInputError> {
+  const command = matchTelegramAuthCommand(text);
+
+  if (!command && isTelegramAuthPrefix(text))
+    return yield* invalidTelegramCommand(coordinates.channel)();
+
+  if (!command) return { kind: "none" };
+
+  if (commandTargetsOtherBot(command[2], botUsername)) return null;
+
+  if (isBareStartGreeting(command)) return { kind: "greeting" };
+
+  const token = yield* decodeEffect_LoginTokenSchema(command[3]).pipe(
+    Effect.mapError(invalidTelegramCommand(coordinates.channel))
+  );
+
+  return {
+    kind: "command",
+    event: {
+      ...coordinates,
+      kind: "command",
+      command: telegramAuthAction(command),
+      token,
+    },
+  };
+});
+
 const parseTelegramAuthCommand = Effect.fn("parseTelegramAuthCommand")(
   function* (
     coordinates: InboundCoordinates,
     text: string,
     botUsername?: string
-  ): Effect.fn.Return<
-    | { readonly kind: "command"; readonly event: InboundEvent }
-    | { readonly kind: "greeting" }
-    | { readonly kind: "none" }
-    | null,
-    ProviderInputError
-  > {
-    if (coordinates.chatKind === "group") {
-      // Auth challenges stay private-only; groups never mint login/link commands.
-      if (/^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) return null;
-
-      return { kind: "none" };
-    }
+  ): Effect.fn.Return<TelegramAuthParse, ProviderInputError> {
+    if (coordinates.chatKind === "group")
+      return parseGroupTelegramAuthCommand(text);
 
     if (coordinates.channel !== "telegram") return { kind: "none" };
 
-    const command =
-      /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text);
-
-    if (!command) {
-      if (/^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) {
-        return yield* new ProviderInputError({
-          provider: coordinates.channel,
-          reason: "invalid_command",
-        });
-      }
-
-      return { kind: "none" };
-    }
-
-    if (command[2] && command[2].toLowerCase() !== botUsername?.toLowerCase())
-      return null;
-
-    const greeting = command[1]?.toLowerCase() === "start" && !command[3];
-
-    if (greeting) return { kind: "greeting" };
-
-    const token = yield* decodeEffect_LoginTokenSchema(command[3]).pipe(
-      Effect.mapError(
-        () =>
-          new ProviderInputError({
-            provider: coordinates.channel,
-            reason: "invalid_command",
-          })
-      )
+    return yield* parsePrivateTelegramAuthCommand(
+      coordinates,
+      text,
+      botUsername
     );
-
-    const action = command[1]?.toLowerCase() === "start" ? "start" : "confirm";
-
-    return {
-      kind: "command",
-      event: { ...coordinates, kind: "command", command: action, token },
-    };
   }
 );
 

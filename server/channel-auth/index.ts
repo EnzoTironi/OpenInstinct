@@ -220,6 +220,36 @@ const execute = async <A, E>(
   return result.value;
 };
 
+const kapsoConversationPrompt = (purpose: "link" | "login") =>
+  purpose === "link"
+    ? "quero vincular meu WhatsApp à conta aberta no navegador"
+    : "quero abrir minha conta no navegador";
+
+const telegramChallengeInput = (
+  current: { readonly userId: string; readonly sessionId: string } | null,
+  channel: "telegram",
+  installationId: string,
+  browserSecret: string
+) => {
+  if (!current) {
+    return {
+      purpose: "login" as const,
+      channel,
+      installationId,
+      browserSecret,
+    };
+  }
+
+  return {
+    purpose: "link" as const,
+    channel,
+    installationId,
+    browserSecret,
+    userId: current.userId,
+    sessionId: current.sessionId,
+  };
+};
+
 export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
   ({
     id: "channel-auth",
@@ -249,7 +279,7 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
 
                   return yield* decodeChannelConversationEntrySchema({
                     channel: "kapso",
-                    conversationUrl: `${destination.url}?text=${encodeURIComponent(ctx.body.purpose === "link" ? "quero vincular meu WhatsApp à conta aberta no navegador" : "quero abrir minha conta no navegador")}`,
+                    conversationUrl: `${destination.url}?text=${encodeURIComponent(kapsoConversationPrompt(ctx.body.purpose))}`,
                   });
                 }
 
@@ -260,29 +290,18 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                 );
 
                 const challenge = yield* accounts.issueChallenge(
-                  current
-                    ? {
-                        purpose: "link" as const,
-                        channel: ctx.body.channel,
-                        installationId: destination.installationId,
-                        browserSecret,
-                        userId: current.userId,
-                        sessionId: current.sessionId,
-                      }
-                    : {
-                        purpose: "login" as const,
-                        channel: ctx.body.channel,
-                        installationId: destination.installationId,
-                        browserSecret,
-                      }
+                  telegramChallengeInput(
+                    current,
+                    ctx.body.channel,
+                    destination.installationId,
+                    browserSecret
+                  )
                 );
-
-                const message = challenge.token;
 
                 const response = yield* decodeChannelChallengeSchema({
                   id: challenge.challengeId,
                   channel: ctx.body.channel,
-                  deepLink: `${destination.url}?${destination.parameter}=${encodeURIComponent(message)}`,
+                  deepLink: `${destination.url}?${destination.parameter}=${encodeURIComponent(challenge.token)}`,
                   expiresAt: challenge.expiresAt,
                 });
 

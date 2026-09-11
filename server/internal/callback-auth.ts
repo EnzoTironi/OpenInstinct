@@ -143,42 +143,85 @@ export const internalCallbackHeaders = Effect.fn("internalCallbackHeaders")(
   }
 );
 
+const rejectBadRequest = () => reject(400);
+
+const rejectPayloadTooLarge = () => reject(413);
+
+const rejectTimeout = () => reject(408);
+
+interface CallbackBodyAcc {
+  size: number;
+  chunks: Uint8Array[];
+}
+
+const emptyCallbackBodyAcc = (): CallbackBodyAcc => ({
+  size: 0,
+  chunks: [],
+});
+
+const appendCallbackBodyChunk = (acc: CallbackBodyAcc, chunk: Uint8Array) => {
+  if (acc.size + chunk.length > 64 * 1024)
+    return Effect.fail(rejectPayloadTooLarge());
+
+  return Effect.sync(() => {
+    acc.size += chunk.length;
+    acc.chunks.push(chunk);
+
+    return acc;
+  });
+};
+
+const cancelRequestBody = (source: ReadableStream<Uint8Array>) =>
+  Effect.tryPromise({
+    try: () => source.cancel(),
+    catch: rejectBadRequest,
+  }).pipe(Effect.interruptible, Effect.timeout("100 millis"), Effect.ignore);
+
+const concatCallbackBody = ({ chunks, size }: CallbackBodyAcc) =>
+  Buffer.concat(chunks, size);
+
 const readInternalCallbackBody = Effect.fn("readInternalCallbackBody")(
   function* (request: Request) {
-    if (!request.body) return yield* reject(400);
+    if (!request.body) return yield* rejectBadRequest();
     const source = request.body;
-
-    const cancel = Effect.tryPromise({
-      try: () => source.cancel(),
-      catch: () => reject(400),
-    }).pipe(Effect.interruptible, Effect.timeout("100 millis"), Effect.ignore);
+    const cancel = cancelRequestBody(source);
 
     return yield* Stream.fromReadableStream({
       evaluate: () => source,
-      onError: () => reject(400),
+      onError: rejectBadRequest,
       releaseLockOnEnd: true,
     }).pipe(
-      Stream.runFoldEffect(
-        () => ({ size: 0, chunks: new Array<Uint8Array>() }),
-        (acc, chunk) => {
-          if (acc.size + chunk.length > 64 * 1024)
-            return Effect.fail(reject(413));
-
-          return Effect.sync(() => {
-            acc.size += chunk.length;
-            acc.chunks.push(chunk);
-
-            return acc;
-          });
-        }
-      ),
-      Effect.map(({ chunks, size }) => Buffer.concat(chunks, size)),
+      Stream.runFoldEffect(emptyCallbackBodyAcc, appendCallbackBodyChunk),
+      Effect.map(concatCallbackBody),
       Effect.timeout("5 seconds"),
-      Effect.catchTag("TimeoutError", () => Effect.fail(reject(408))),
+      Effect.catchTag("TimeoutError", () => Effect.fail(rejectTimeout())),
       Effect.ensuring(cancel)
     );
   }
 );
+
+const rejectUnauthorized = () => reject(401);
+
+const isInvalidCallbackRoute = (
+  request: Request,
+  route: InternalCallbackRoute,
+  url: URL
+) => request.method !== "POST" || url.pathname !== route || Boolean(url.search);
+
+const isStaleCallbackTimestamp = (age: number) => age < -5 || age > 60;
+
+const decodeCallbackTimestamp = (value: string | null) =>
+  decodeSchema_String_check_Schema_isPattern_d_10_u(value).pipe(
+    Effect.mapError(rejectUnauthorized)
+  );
+
+const decodeCallbackSignature = (value: string | null) =>
+  decodeSchema_String_check_Schema_isPattern_a_f0_9_64_u(value).pipe(
+    Effect.mapError(rejectUnauthorized)
+  );
+
+const signaturesMatch = (encoded: string, expected: Buffer) =>
+  timingSafeEqual(Buffer.from(encoded, "hex"), expected);
 
 export const readVerifiedInternalCallback = Effect.fn(
   "readVerifiedInternalCallback"
@@ -187,27 +230,26 @@ export const readVerifiedInternalCallback = Effect.fn(
   const key = yield* callbackKey;
   const url = new URL(request.url);
 
-  if (request.method !== "POST" || url.pathname !== route || url.search)
-    return yield* reject(401);
+  if (isInvalidCallbackRoute(request, route, url))
+    return yield* rejectUnauthorized();
 
-  const timestamp = yield* decodeSchema_String_check_Schema_isPattern_d_10_u(
+  const timestamp = yield* decodeCallbackTimestamp(
     request.headers.get("x-internal-callback-time")
-  ).pipe(Effect.mapError(() => reject(401)));
+  );
 
   const age =
     Math.floor((yield* Clock.currentTimeMillis) / 1000) - Number(timestamp);
 
-  if (age < -5 || age > 60) return yield* reject(401);
+  if (isStaleCallbackTimestamp(age)) return yield* rejectUnauthorized();
 
-  const encoded = yield* decodeSchema_String_check_Schema_isPattern_a_f0_9_64_u(
+  const encoded = yield* decodeCallbackSignature(
     request.headers.get("x-internal-callback-signature")
-  ).pipe(Effect.mapError(() => reject(401)));
+  );
 
   const body = yield* readInternalCallbackBody(request);
   const expected = signature({ key, origin, route, timestamp, body });
 
-  if (!timingSafeEqual(Buffer.from(encoded, "hex"), expected))
-    return yield* reject(401);
+  if (!signaturesMatch(encoded, expected)) return yield* rejectUnauthorized();
 
   // Authentication is time-bounded, not single-use. The existing run/report claim fences dispatch.
   return body;
