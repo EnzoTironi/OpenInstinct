@@ -20,7 +20,7 @@ export const dispatchItem = Effect.fn("dispatchItem")(function* <
 });
 
 interface AuthPromptClaim {
-  readonly channel: string;
+  readonly channel: "kapso" | "telegram";
   readonly installationId: string;
   readonly senderId: string;
   readonly token: string;
