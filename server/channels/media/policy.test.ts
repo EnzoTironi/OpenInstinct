@@ -91,33 +91,33 @@ it("provides a truthful alternative when voice transcription is unavailable", ()
   );
 });
 
-describe("current model input capability gate", () => {
-  it.each(["image/png", "image/jpeg", "application/pdf"])(
-    "rejects %s before Eve handoff",
-    async (mediaType) => {
-      await expect(
-        Effect.runPromise(requireChannelModelInput(mediaType))
-      ).rejects.toMatchObject({ reason: "model_input_unavailable" });
-    }
-  );
-  it.each([
-    "text/plain",
-    "text/csv",
-    "application/json",
-    "audio/ogg",
-    "audio/wav",
-  ])("allows %s for real text decoding or transcription", async (mediaType) => {
+it.each(["image/png", "image/jpeg", "application/pdf"])(
+  "rejects %s before Eve handoff",
+  async (mediaType) => {
     await expect(
       Effect.runPromise(requireChannelModelInput(mediaType))
-    ).resolves.toBeUndefined();
-  });
-  it("explains the unavailable capability without claiming an image interpretation", () => {
-    expect(
-      mediaFailureMessage(
-        new ChannelMediaError({ reason: "model_input_unavailable" })
-      )
-    ).toBe(
-      "Image and PDF reading is unavailable with the current model. Please send a UTF-8 text file or paste the information as text."
-    );
-  });
+    ).rejects.toMatchObject({ reason: "model_input_unavailable" });
+  }
+);
+
+it.each([
+  "text/plain",
+  "text/csv",
+  "application/json",
+  "audio/ogg",
+  "audio/wav",
+])("allows %s for real text decoding or transcription", async (mediaType) => {
+  await expect(
+    Effect.runPromise(requireChannelModelInput(mediaType))
+  ).resolves.toBeUndefined();
+});
+
+it("explains the unavailable capability without claiming an image interpretation", () => {
+  expect(
+    mediaFailureMessage(
+      new ChannelMediaError({ reason: "model_input_unavailable" })
+    )
+  ).toBe(
+    "Image and PDF reading is unavailable with the current model. Please send a UTF-8 text file or paste the information as text."
+  );
 });
