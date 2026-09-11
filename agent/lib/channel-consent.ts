@@ -213,26 +213,44 @@ export function validateChannelConsent(
   };
 }
 
+function isInvalidConsentSource(source: ChannelConsentSource) {
+  return Result.isFailure(decodeSource(source)) || !source.text.trim();
+}
+
+function isConsentSourceMismatch(
+  source: ChannelConsentSource,
+  interpretation: ChannelConsentInterpretation
+) {
+  return (
+    source.sourceMessageId !== interpretation.sourceMessageId ||
+    source.text !== interpretation.sourceText
+  );
+}
+
+function isConsentScopeMismatch(
+  source: ChannelConsentSource,
+  snapshot: ChannelConsentSnapshot
+) {
+  return (
+    source.identityId !== snapshot.identityId ||
+    source.sessionId !== snapshot.sessionId
+  );
+}
+
 function validateConsentSource(
   source: ChannelConsentSource,
   interpretation: ChannelConsentInterpretation,
   snapshot: ChannelConsentSnapshot
 ): Rejection | undefined {
-  if (Result.isFailure(decodeSource(source)) || !source.text.trim()) {
+  if (isInvalidConsentSource(source)) {
     return "invalid_source";
   }
 
-  if (
-    source.sourceMessageId !== interpretation.sourceMessageId ||
-    source.text !== interpretation.sourceText
-  ) {
+  if (isConsentSourceMismatch(source, interpretation)) {
     return "source_mismatch";
   }
 
-  if (
-    source.identityId !== snapshot.identityId ||
-    source.sessionId !== snapshot.sessionId
-  ) {
+  if (isConsentScopeMismatch(source, snapshot)) {
     return "scope_mismatch";
   }
 
@@ -243,39 +261,70 @@ function validateConsentSource(
   return undefined;
 }
 
+function matchesConsentDelivery(
+  delivery: ChannelConsentDelivery,
+  source: ChannelConsentSource,
+  target: typeof reference.Type
+) {
+  return (
+    delivery.requestId === target.requestId &&
+    delivery.revision === target.revision &&
+    delivery.identityId === source.identityId &&
+    delivery.sessionId === source.sessionId
+  );
+}
+
+function isValidConsentDelivery(delivery: ChannelConsentDelivery) {
+  const providerMessageIds = delivery.providerMessageIds;
+
+  return (
+    Result.isSuccess(decodeDelivery(delivery)) &&
+    Boolean(delivery.text.trim()) &&
+    new Set(providerMessageIds).size === providerMessageIds.length &&
+    providerMessageIds.includes(delivery.receiptId)
+  );
+}
+
+function validateDeliveryTiming(
+  delivery: ChannelConsentDelivery,
+  source: ChannelConsentSource
+): Rejection | undefined {
+  if (!Number.isFinite(delivery.deliveredAtMs)) {
+    return "delivery_not_before_source";
+  }
+
+  if (delivery.deliveredAtMs >= source.sourceOccurredAtMs) {
+    return "delivery_not_before_source";
+  }
+
+  return undefined;
+}
+
 function resolveConsentDelivery(
   source: ChannelConsentSource,
   target: typeof reference.Type,
   receipts: readonly ChannelConsentDelivery[]
 ): Result.Result<ChannelConsentDelivery, Rejection> {
-  const deliveries = receipts.filter(
-    (delivery) =>
-      delivery.requestId === target.requestId &&
-      delivery.revision === target.revision &&
-      delivery.identityId === source.identityId &&
-      delivery.sessionId === source.sessionId
+  const deliveries = receipts.filter((delivery) =>
+    matchesConsentDelivery(delivery, source, target)
   );
-
   const [delivery] = deliveries;
 
-  if (!delivery) return Result.fail("missing_delivery");
-
-  if (deliveries.length !== 1) return Result.fail("ambiguous_delivery");
-
-  if (
-    !Number.isFinite(delivery.deliveredAtMs) ||
-    delivery.deliveredAtMs >= source.sourceOccurredAtMs
-  ) {
-    return Result.fail("delivery_not_before_source");
+  if (!delivery) {
+    return Result.fail("missing_delivery");
   }
 
-  if (
-    Result.isFailure(decodeDelivery(delivery)) ||
-    !delivery.text.trim() ||
-    new Set(delivery.providerMessageIds).size !==
-      delivery.providerMessageIds.length ||
-    !delivery.providerMessageIds.includes(delivery.receiptId)
-  ) {
+  if (deliveries.length !== 1) {
+    return Result.fail("ambiguous_delivery");
+  }
+
+  const timingRejection = validateDeliveryTiming(delivery, source);
+
+  if (timingRejection) {
+    return Result.fail(timingRejection);
+  }
+
+  if (!isValidConsentDelivery(delivery)) {
     return Result.fail("missing_delivery");
   }
 

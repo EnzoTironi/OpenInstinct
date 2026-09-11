@@ -69,25 +69,43 @@ export const boundRetryAfterSeconds = (raw: number | undefined): number => {
 };
 
 /** Parse Retry-After as delta-seconds or HTTP-date; undefined when absent/malformed. */
+function parseRetryAfterDeltaSeconds(trimmed: string): number | undefined {
+  if (!/^\d+$/u.test(trimmed)) {
+    return undefined;
+  }
+
+  const seconds = Number(trimmed);
+
+  return Number.isSafeInteger(seconds) ? seconds : undefined;
+}
+
+function parseRetryAfterHttpDate(trimmed: string): number | undefined {
+  const millis = Date.parse(trimmed);
+
+  if (Number.isNaN(millis)) {
+    return undefined;
+  }
+
+  return Math.ceil((millis - Date.now()) / 1_000);
+}
+
+/** Parse Retry-After as delta-seconds or HTTP-date; undefined when absent/malformed. */
 export const parseRetryAfterHeader = (
   value: string | undefined
 ): number | undefined => {
-  if (value === undefined) return undefined;
-  const trimmed = value.trim();
-
-  if (trimmed.length === 0 || trimmed.length > 64) return undefined;
-
-  if (/^\d+$/u.test(trimmed)) {
-    const seconds = Number(trimmed);
-
-    return Number.isSafeInteger(seconds) ? seconds : undefined;
+  if (value === undefined) {
+    return undefined;
   }
 
-  const millis = Date.parse(trimmed);
+  const trimmed = value.trim();
 
-  if (Number.isNaN(millis)) return undefined;
+  if (trimmed.length === 0 || trimmed.length > 64) {
+    return undefined;
+  }
 
-  return Math.ceil((millis - Date.now()) / 1_000);
+  return (
+    parseRetryAfterDeltaSeconds(trimmed) ?? parseRetryAfterHttpDate(trimmed)
+  );
 };
 
 const telegramRetryAfterSchema = Schema.Struct({

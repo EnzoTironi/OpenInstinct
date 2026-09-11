@@ -82,31 +82,41 @@ export function sumBrowserActivityDurations(
   return durations;
 }
 
+const waitingActivityTypes = new Set([
+  "input.requested",
+  "authorization.required",
+]);
+
+const modelActivityTypes = new Set([
+  "message.received",
+  "message.completed",
+  "action.result",
+  "input.resolved",
+  "authorization.completed",
+  "result.completed",
+]);
+
+function actionsRequestedActivityKind(label: string): BrowserActivityKind {
+  if (label === "Load skill") {
+    return "setup";
+  }
+
+  return browserActivityKindForTool(label);
+}
+
 function browserTraceActivityKind(event: {
   readonly label: string;
   readonly type: string;
 }): BrowserActivityKind | null {
   if (event.type === "actions.requested") {
-    return event.label === "Load skill"
-      ? "setup"
-      : browserActivityKindForTool(event.label);
+    return actionsRequestedActivityKind(event.label);
   }
 
-  if (
-    event.type === "input.requested" ||
-    event.type === "authorization.required"
-  ) {
+  if (waitingActivityTypes.has(event.type)) {
     return "waiting";
   }
 
-  if (
-    event.type === "message.received" ||
-    event.type === "message.completed" ||
-    event.type === "action.result" ||
-    event.type === "input.resolved" ||
-    event.type === "authorization.completed" ||
-    event.type === "result.completed"
-  ) {
+  if (modelActivityTypes.has(event.type)) {
     return "model";
   }
 

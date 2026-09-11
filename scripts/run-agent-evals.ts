@@ -268,19 +268,33 @@ async function output(command: string, args: string[]) {
   return value;
 }
 
+function sendInterruptSignal(
+  pid: number,
+  child: ChildProcess,
+  signal: NodeJS.Signals
+) {
+  if (process.platform === "win32") {
+    child.kill(signal);
+    return;
+  }
+
+  process.kill(-pid, signal);
+}
+
 function interrupt(child: ChildProcess | undefined, signal: NodeJS.Signals) {
-  if (!child?.pid) return;
+  const pid = child?.pid;
+
+  if (!pid || !child) {
+    return;
+  }
 
   try {
-    if (process.platform === "win32") {
-      child.kill(signal);
-    } else {
-      process.kill(-child.pid, signal);
-    }
-  } catch (error) {
-    if (
-      !(error instanceof Error && "code" in error && error.code === "ESRCH")
-    ) {
+    sendInterruptSignal(pid, child, signal);
+  } catch (error: unknown) {
+    const gone =
+      error instanceof Error && "code" in error && error.code === "ESRCH";
+
+    if (!gone) {
       throw error;
     }
   }

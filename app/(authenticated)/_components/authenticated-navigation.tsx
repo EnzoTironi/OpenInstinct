@@ -105,20 +105,38 @@ export function AuthenticatedMobileHeader() {
   );
 }
 
-function activeRoute(pathname: string) {
-  if (pathname === "/") return "workspace";
+function prefixActiveRoute(pathname: string) {
+  if (pathname.startsWith("/vault")) {
+    return "vault";
+  }
 
-  if (pathname.startsWith("/vault")) return "vault";
+  if (pathname.startsWith("/personal-info")) {
+    return "personal-info";
+  }
 
-  if (pathname.startsWith("/personal-info")) return "personal-info";
+  if (pathname.startsWith("/reminders")) {
+    return "reminders";
+  }
 
-  if (pathname.startsWith("/reminders")) return "reminders";
+  if (pathname.startsWith("/chat/history")) {
+    return "history";
+  }
 
-  if (pathname.startsWith("/chat/history")) return "history";
+  if (pathname.startsWith("/chat")) {
+    return "chat";
+  }
 
-  if (pathname.startsWith("/chat")) return "chat";
-
-  if (pathname.startsWith("/tasks")) return "tasks";
+  if (pathname.startsWith("/tasks")) {
+    return "tasks";
+  }
 
   return undefined;
+}
+
+function activeRoute(pathname: string) {
+  if (pathname === "/") {
+    return "workspace";
+  }
+
+  return prefixActiveRoute(pathname);
 }

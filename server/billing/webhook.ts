@@ -125,37 +125,59 @@ async function applySubscription(subscription: Stripe.Subscription) {
   });
 }
 
-async function applyCheckoutSession(session: Stripe.Checkout.Session) {
-  if (session.mode !== "subscription") return;
-  const metadata = session.metadata ?? {};
+function checkoutSeatCount(metadata: Stripe.Metadata) {
+  const seatRaw = Number(metadata.instinctSeatCount ?? 1);
+
+  return Math.max(1, Number.isFinite(seatRaw) ? seatRaw : 1);
+}
+
+function checkoutSubjects(metadata: Stripe.Metadata) {
   const plan = parsePlan(metadata.instinctPlan);
   const subjectType = parseSubjectType(metadata.instinctSubjectType);
   const subjectId = metadata.instinctSubjectId;
 
-  if (!plan || !subjectType || !subjectId) return;
+  if (!plan || !subjectType || !subjectId || plan === "free") {
+    return undefined;
+  }
 
-  if (plan === "free") return;
+  return { plan, subjectId, subjectType };
+}
 
-  const customerId = readStripeId(session.customer);
+async function syncCheckoutSubscription(subscriptionId: string | undefined) {
+  if (!subscriptionId) {
+    return;
+  }
+
+  const stripe = await Effect.runPromise(requireStripe());
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  await applySubscription(subscription);
+}
+
+async function applyCheckoutSession(session: Stripe.Checkout.Session) {
+  if (session.mode !== "subscription") {
+    return;
+  }
+
+  const metadata = session.metadata ?? {};
+  const subjects = checkoutSubjects(metadata);
+
+  if (!subjects) {
+    return;
+  }
+
   const subscriptionId = readStripeId(session.subscription);
-  const seatRaw = Number(metadata.instinctSeatCount ?? 1);
-  const seatCount = Math.max(1, Number.isFinite(seatRaw) ? seatRaw : 1);
 
   await upsertEntitlement({
-    subjectType,
-    subjectId,
-    plan,
+    subjectType: subjects.subjectType,
+    subjectId: subjects.subjectId,
+    plan: subjects.plan,
     status: "active",
-    seatCount,
-    stripeCustomerId: customerId,
+    seatCount: checkoutSeatCount(metadata),
+    stripeCustomerId: readStripeId(session.customer),
     stripeSubscriptionId: subscriptionId,
   });
 
-  if (subscriptionId) {
-    const stripe = await Effect.runPromise(requireStripe());
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    await applySubscription(subscription);
-  }
+  await syncCheckoutSubscription(subscriptionId);
 }
 
 export const handleStripeWebhook = Effect.fn("handleStripeWebhook")(function* (

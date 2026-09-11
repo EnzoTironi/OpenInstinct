@@ -128,37 +128,58 @@ export function browserBenchmarkLiveViewUrl(
   return null;
 }
 
+const modelActivityEventTypes = new Set([
+  "step.started",
+  "message.appended",
+  "message.completed",
+  "action.result",
+]);
+
+function activityKindForAction(
+  action: Extract<
+    MessageStreamEvent,
+    { type: "actions.requested" }
+  >["data"]["actions"][number]
+): BrowserActivityKind | "other" {
+  if (action.kind === "load-skill") {
+    return "setup";
+  }
+
+  if (action.kind === "tool-call") {
+    return browserActivityKindForTool(action.toolName);
+  }
+
+  return "other";
+}
+
+function requestedActionsActivityKind(
+  event: Extract<MessageStreamEvent, { type: "actions.requested" }>
+) {
+  const kinds = new Set(event.data.actions.map(activityKindForAction));
+
+  if (kinds.size !== 1) {
+    return "other";
+  }
+
+  return kinds.values().next().value ?? "other";
+}
+
 function activityKindForEvent(
   event: MessageStreamEvent
 ): BrowserActivityKind | null {
-  if (
-    event.type === "step.started" ||
-    event.type === "message.appended" ||
-    event.type === "message.completed" ||
-    event.type === "action.result"
-  ) {
+  if (modelActivityEventTypes.has(event.type)) {
     return "model";
   }
 
-  if (event.type === "input.requested") return "waiting";
+  if (event.type === "input.requested") {
+    return "waiting";
+  }
 
-  if (event.type !== "actions.requested") return null;
+  if (event.type !== "actions.requested") {
+    return null;
+  }
 
-  const kinds = new Set(
-    event.data.actions.map((action) => {
-      if (action.kind === "load-skill") return "setup";
-
-      if (action.kind === "tool-call") {
-        return browserActivityKindForTool(action.toolName);
-      }
-
-      return "other";
-    })
-  );
-
-  if (kinds.size !== 1) return "other";
-
-  return kinds.values().next().value ?? "other";
+  return requestedActionsActivityKind(event);
 }
 
 function activityForTool(name: string) {
