@@ -86,6 +86,72 @@ const getSelectedValues = (
   return [...currentValues, optionValue];
 };
 
+function resolveQuestionValue(
+  controlledValue: QuestionValue | undefined,
+  internalValue: QuestionValue
+): QuestionValue {
+  return controlledValue ?? internalValue;
+}
+
+function applyQuestionValue(
+  controlledValue: QuestionValue | undefined,
+  setInternalValue: (value: QuestionValue) => void,
+  onValueChange: QuestionProps["onValueChange"],
+  nextValue: QuestionValue
+): void {
+  if (controlledValue === undefined) {
+    setInternalValue(nextValue);
+  }
+
+  onValueChange?.(nextValue);
+}
+
+function updateQuestionText(value: QuestionValue, text: string): QuestionValue {
+  return { ...value, text };
+}
+
+function updateQuestionSelection(
+  value: QuestionValue,
+  optionValue: string,
+  selectionMode: QuestionProps["selectionMode"]
+): QuestionValue {
+  return {
+    ...value,
+    selectedValues: getSelectedValues(
+      value.selectedValues,
+      optionValue,
+      selectionMode
+    ),
+  };
+}
+
+async function submitQuestionForm(args: {
+  event: SubmitEvent<HTMLFormElement>;
+  disabled: boolean;
+  value: QuestionValue;
+  onSubmit: QuestionProps["onSubmit"];
+}): Promise<void> {
+  args.event.preventDefault();
+
+  if (args.disabled) {
+    return;
+  }
+
+  const text = args.value.text.trim();
+
+  if (args.value.selectedValues.length === 0 && text.length === 0) {
+    return;
+  }
+
+  await args.onSubmit?.(
+    {
+      selectedValues: args.value.selectedValues,
+      text: text.length > 0 ? text : undefined,
+    },
+    args.event
+  );
+}
+
 export const Question = ({
   children,
   className,
@@ -98,35 +164,30 @@ export const Question = ({
   ...props
 }: QuestionProps) => {
   const [internalValue, setInternalValue] = useState(defaultValue);
-  const value = controlledValue ?? internalValue;
+  const value = resolveQuestionValue(controlledValue, internalValue);
 
   const setValue = useCallback(
     (nextValue: QuestionValue) => {
-      if (controlledValue === undefined) {
-        setInternalValue(nextValue);
-      }
-
-      onValueChange?.(nextValue);
+      applyQuestionValue(
+        controlledValue,
+        setInternalValue,
+        onValueChange,
+        nextValue
+      );
     },
     [controlledValue, onValueChange]
   );
 
   const setText = useCallback(
     (text: string) => {
-      setValue({ ...value, text });
+      setValue(updateQuestionText(value, text));
     },
     [setValue, value]
   );
 
   const toggleValue = useCallback(
     (optionValue: string) => {
-      const selectedValues = getSelectedValues(
-        value.selectedValues,
-        optionValue,
-        selectionMode
-      );
-
-      setValue({ ...value, selectedValues });
+      setValue(updateQuestionSelection(value, optionValue, selectionMode));
     },
     [selectionMode, setValue, value]
   );
@@ -145,25 +206,12 @@ export const Question = ({
 
   const handleSubmit = useCallback(
     async (event: SubmitEvent<HTMLFormElement>) => {
-      event.preventDefault();
-
-      if (disabled) {
-        return;
-      }
-
-      const text = value.text.trim();
-
-      if (value.selectedValues.length === 0 && text.length === 0) {
-        return;
-      }
-
-      await onSubmit?.(
-        {
-          selectedValues: value.selectedValues,
-          text: text.length > 0 ? text : undefined,
-        },
-        event
-      );
+      await submitQuestionForm({
+        event,
+        disabled,
+        value,
+        onSubmit,
+      });
     },
     [disabled, onSubmit, value]
   );

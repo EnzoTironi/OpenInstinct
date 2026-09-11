@@ -150,16 +150,21 @@ function evalOptionName(argument: string) {
   return argument.slice(0, argument.indexOf("="));
 }
 
-function consumeEvalArgument(
-  args: string[],
-  index: number,
-  validated: string[],
-  booleanOptions: ReadonlySet<string>,
-  valueOptions: ReadonlySet<string>
-) {
+interface ConsumeEvalArgumentInput {
+  readonly args: string[];
+  readonly index: number;
+  readonly validated: string[];
+  readonly booleanOptions: ReadonlySet<string>;
+  readonly valueOptions: ReadonlySet<string>;
+}
+
+function consumeEvalArgument(input: ConsumeEvalArgumentInput) {
+  const { args, index, validated, booleanOptions, valueOptions } = input;
   const argument = args[index];
 
-  if (!argument) return index;
+  if (!argument) {
+    return index;
+  }
 
   if (booleanOptions.has(argument)) {
     validated.push(argument);
@@ -194,13 +199,13 @@ function validateEvalArguments(args: string[]) {
   const validated: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
-    index = consumeEvalArgument(
+    index = consumeEvalArgument({
       args,
       index,
       validated,
       booleanOptions,
-      valueOptions
-    );
+      valueOptions,
+    });
   }
 
   return validated;
