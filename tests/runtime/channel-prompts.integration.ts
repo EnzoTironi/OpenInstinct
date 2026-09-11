@@ -35,6 +35,45 @@ const rejected = <A>(
     })
   );
 
+const preparePromptEight = (
+  prompts: ChannelAuthPrompts["Service"],
+  request: {
+    readonly token: string;
+    readonly sender: {
+      readonly channel: "telegram";
+      readonly installationId: string;
+      readonly senderId: string;
+    };
+    readonly eventId: string;
+  }
+) =>
+  Effect.all(
+    Array.from({ length: 8 }, () => prompts.prepare(request)),
+    {
+      concurrency: 8,
+    }
+  );
+
+const claimPromptEight = (
+  prompts: ChannelAuthPrompts["Service"],
+  challengeId: string
+) =>
+  Effect.all(
+    Array.from({ length: 8 }, () => prompts.claim(challengeId)),
+    {
+      concurrency: 8,
+    }
+  );
+
+const truthyCount = (values: readonly (object | null | undefined)[]) =>
+  values.filter(Boolean).length;
+
+const queuedPromptReceipts = (challengeId: string) =>
+  Array.from({ length: 8 }, () => ({
+    challengeId,
+    status: "queued" as const,
+  }));
+
 test("encrypted confirmation outbox is idempotent, fenced and never retries uncertain delivery", async () => {
   const accountsLayer = ChannelAccounts.layer.pipe(
     Layer.provideMerge(runtimeDatabase)
@@ -121,16 +160,9 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           count: number;
         }>`SELECT count(*)::int AS count FROM public."user"`;
 
-        const receipts = yield* Effect.all(
-          Array.from({ length: 8 }, () => prompts.prepare(request)),
-          { concurrency: 8 }
-        );
+        const receipts = yield* preparePromptEight(prompts, request);
 
-        for (const receipt of receipts)
-          assert.deepEqual(receipt, {
-            challengeId: challenge.challengeId,
-            status: "queued",
-          });
+        assert.deepEqual(receipts, queuedPromptReceipts(challenge.challengeId));
 
         const afterUsers = yield* sql<{
           count: number;
@@ -176,12 +208,9 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           (yield* prompts.pending(100)).includes(challenge.challengeId)
         );
 
-        const claims = yield* Effect.all(
-          Array.from({ length: 8 }, () => prompts.claim(challenge.challengeId)),
-          { concurrency: 8 }
-        );
+        const claims = yield* claimPromptEight(prompts, challenge.challengeId);
 
-        assert.equal(claims.filter(Boolean).length, 1);
+        assert.equal(truthyCount(claims), 1);
         const claimed = claims.find((value) => value !== null);
         assert.ok(claimed);
         assert.equal(claimed.token, challenge.token);
