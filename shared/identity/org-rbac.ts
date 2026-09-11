@@ -58,23 +58,19 @@ export function assertCanManageMembers(
       );
 }
 
-export function assertCanAssignRole(
+export const assertCanAssignRole = Effect.fn("assertCanAssignRole")(function* (
   actorRole: WorkspaceRole | CompanyRole,
   targetRole: WorkspaceRole | CompanyRole
-): Effect.Effect<void, RbacDenied> {
-  return Effect.gen(function* () {
-    yield* assertCanManageMembers(actorRole);
+) {
+  yield* assertCanManageMembers(actorRole);
 
-    if (!canAssignRole(actorRole, targetRole)) {
-      yield* Effect.fail(
-        new RbacDenied({
-          reason: "cannot_elevate",
-          message: "Members cannot elevate roles; only admins may grant admin.",
-        })
-      );
-    }
-  });
-}
+  if (!canAssignRole(actorRole, targetRole)) {
+    yield* new RbacDenied({
+      reason: "cannot_elevate",
+      message: "Members cannot elevate roles; only admins may grant admin.",
+    });
+  }
+});
 
 /**
  * Personal workspaces must keep a single `owner` membership role.

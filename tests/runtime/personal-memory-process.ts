@@ -4,10 +4,12 @@ import { db } from "../../db";
 import { inspectPersonalMemory } from "../../server/personal-memory/export";
 import { serverRuntime } from "../../server/runtime";
 
+const decodeSyncSchema = Schema.decodeUnknownSync(Schema.Uint8Array);
+
 const chunks: Buffer[] = [];
 
 for await (const chunk of process.stdin)
-  chunks.push(Buffer.from(Schema.decodeUnknownSync(Schema.Uint8Array)(chunk)));
+  chunks.push(Buffer.from(decodeSyncSchema(chunk)));
 
 const cookie = Buffer.concat(chunks).toString("utf8");
 

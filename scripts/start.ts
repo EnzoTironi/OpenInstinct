@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Config, Effect, FileSystem, Schedule, Schema } from "effect";
+import { Config, Effect, FileSystem, Layer, Schedule, Schema } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 import { FetchHttpClient, HttpClient } from "effect/unstable/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
@@ -177,7 +177,6 @@ const start = Command.make(
 
 start.pipe(
   Command.run({ version: "0.0.0" }),
-  Effect.provide(FetchHttpClient.layer),
-  Effect.provide(NodeServices.layer),
+  Effect.provide(Layer.mergeAll(FetchHttpClient.layer, NodeServices.layer)),
   NodeRuntime.runMain
 );

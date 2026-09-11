@@ -93,25 +93,28 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
           receipt.payload,
           receipt.id
         ).pipe(
-          Effect.catchTag("ChannelMediaError", (error) =>
-            Effect.gen(function* () {
-              yield* requireChannelPrincipal(channel, auth);
-              yield* messaging.checkInboxLease(lease);
-              const transport = yield* ChannelTransport;
-              yield* transport.enqueueText({
-                identityId: identity.id,
-                deliveryKey: `unsupported:${receipt.id}`,
-                text: mediaFailureMessage(error),
-              });
-              yield* messaging.markInboxFailed({
-                lease,
-                reason: "adapter_rejected",
-              });
+          Effect.catchTag(
+            "ChannelMediaError",
+            Effect.fn("dispatchChannelSession.unsupportedMedia")(
+              function* (error) {
+                yield* requireChannelPrincipal(channel, auth);
+                yield* messaging.checkInboxLease(lease);
+                const transport = yield* ChannelTransport;
+                yield* transport.enqueueText({
+                  identityId: identity.id,
+                  deliveryKey: `unsupported:${receipt.id}`,
+                  text: mediaFailureMessage(error),
+                });
+                yield* messaging.markInboxFailed({
+                  lease,
+                  reason: "adapter_rejected",
+                });
 
-              return yield* new ChannelDispatchError({
-                reason: "unsupported_media",
-              });
-            })
+                return yield* new ChannelDispatchError({
+                  reason: "unsupported_media",
+                });
+              }
+            )
           )
         );
 

@@ -112,7 +112,7 @@ export function useSessionAgent(sessionId: string): ChatAgent {
     const controller = new AbortController();
 
     void readLatestSessionHistory(sessionId, controller.signal)
-      .then(async (latest) => {
+      .then((latest) => {
         if (controller.signal.aborted) return undefined;
         historyRef.current = latest;
         setHistory(latest);
@@ -120,9 +120,13 @@ export function useSessionAgent(sessionId: string): ChatAgent {
 
         if (tail && !isCurrentTurnBoundaryEvent(tail)) {
           setStatus("streaming");
-          await runOperation(async () => {
+          void runOperation(async () => {
             await followActiveTurn(latest.endIndex, controller.signal);
+
+            if (!controller.signal.aborted) setStatus("ready");
           });
+
+          return undefined;
         }
 
         setStatus("ready");

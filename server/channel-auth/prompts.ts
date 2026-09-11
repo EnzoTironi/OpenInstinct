@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { PgClient } from "@effect/sql-pg";
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
-import { Context, Effect, Layer, Redacted, Schema } from "effect";
+import { Option, Context, Effect, Layer, Redacted, Schema } from "effect";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 
 import {
@@ -178,20 +178,23 @@ export class ChannelAuthPrompts extends Context.Service<
         if (!ciphertext) return null;
         const key = yield* encryptionKey;
 
-        const plaintext = yield* Effect.tryPromise({
+        const plaintextOption = yield* Effect.tryPromise({
           try: () =>
             symmetricDecrypt({
               key: Redacted.value(key),
               data: ciphertext,
             }),
           catch: () => "corrupt" as const,
-        }).pipe(Effect.catch(() => Effect.succeed(null)));
+        }).pipe(Effect.option);
 
-        if (plaintext === null) return null;
+        if (Option.isNone(plaintextOption)) return null;
+        const plaintext = plaintextOption.value;
 
-        const envelope = yield* Schema.decodeUnknownEffect(EnvelopeJson)(
+        const envelopeOption = yield* Schema.decodeUnknownEffect(EnvelopeJson)(
           plaintext
-        ).pipe(Effect.catch(() => Effect.succeed(null)));
+        ).pipe(Effect.option);
+
+        const envelope = Option.getOrNull(envelopeOption);
 
         if (
           !envelope ||

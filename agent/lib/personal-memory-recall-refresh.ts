@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import type {
   MemoryRecallMessage,
   MemoryRecallResult,
@@ -31,22 +31,18 @@ export type RecallRefreshPhase =
   | { readonly kind: "dirty"; readonly reason: "mutation-pending-refresh" }
   | { readonly kind: "absent" };
 
-export class RecallRefreshError extends Error {
-  readonly reason:
-    | "refresh-failed"
-    | "stale-projection"
-    | "missing-recall"
-    | "mutation-tool-unavailable";
-
-  constructor(
-    reason: RecallRefreshError["reason"],
-    message = "Personal memory recall refresh failed closed."
-  ) {
-    super(message);
-    this.name = "RecallRefreshError";
-    this.reason = reason;
+export class RecallRefreshError extends Schema.TaggedError<RecallRefreshError>()(
+  "RecallRefreshError",
+  {
+    reason: Schema.Literals([
+      "refresh-failed",
+      "stale-projection",
+      "missing-recall",
+      "mutation-tool-unavailable",
+    ]),
+    message: Schema.optional(Schema.String),
   }
-}
+) {}
 
 const MUTATING_MEMORY_TOOLS = new Set(["save_memory", "remove_memory"]);
 
@@ -120,10 +116,10 @@ const refreshRecalledProjection = Effect.fn("refreshRecalledProjection")(
     const result = yield* Effect.tryPromise({
       try: () => Promise.resolve(input.recall(input.context)),
       catch: (cause) =>
-        new RecallRefreshError(
-          "refresh-failed",
-          cause instanceof Error ? cause.message : String(cause)
-        ),
+        new RecallRefreshError({
+          reason: "refresh-failed",
+          message: cause instanceof Error ? cause.message : String(cause),
+        }),
     });
 
     return recalledProjectionFrom(result);
@@ -171,21 +167,18 @@ export const requireCleanProjectionForNextModelStep = Effect.fn(
   "requireCleanProjectionForNextModelStep"
 )(function* (phase: RecallRefreshPhase) {
   if (phase.kind === "dirty") {
-    return yield* Effect.fail(
-      new RecallRefreshError(
-        "stale-projection",
-        "Refusing next model step with a dirty recalled projection after memory mutation."
-      )
-    );
+    return yield* new RecallRefreshError({
+      reason: "stale-projection",
+      message:
+        "Refusing next model step with a dirty recalled projection after memory mutation.",
+    });
   }
 
   if (phase.kind === "absent") {
-    return yield* Effect.fail(
-      new RecallRefreshError(
-        "missing-recall",
-        "No recalled projection is available for the next model step."
-      )
-    );
+    return yield* new RecallRefreshError({
+      reason: "missing-recall",
+      message: "No recalled projection is available for the next model step.",
+    });
   }
 
   return phase.projection;

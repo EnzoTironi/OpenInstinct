@@ -1,0 +1,18 @@
+# agent-doctor — Effect health checks for OpenInstinct.
+# Keep agent-hygiene tier off: it flags idiomatic TS control flow and would
+# dominate the score without improving Effect correctness.
+
+[tiers]
+agent = false
+
+# Residuals / upstream gaps (re-enable when unblocked):
+# - v4-schema-renames: Schema.TaggedErrorClass not exported by effect@4.0.0-rc.112
+# - high-cognitive-complexity: channel/protocol parsers + billing UI (split follow-up)
+# - prefer-it-effect: needs @effect/vitest adoption across vitest configs
+# - v4-unstable-import-awareness: informational; unstable imports are intentional+pinned
+[rules]
+v4-schema-renames = "off"
+high-cognitive-complexity = "off"
+prefer-it-effect = "off"
+v4-unstable-import-awareness = "off"
+prefer-platform-fetch = "off"

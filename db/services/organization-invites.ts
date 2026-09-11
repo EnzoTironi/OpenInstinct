@@ -9,13 +9,11 @@ import {
   assertCanAcceptOrgInvite,
   assertEmailDomainAllowed,
   type GoogleLinkedIdentity,
-  type OrgSsoDenied,
 } from "@shared/identity/org-sso";
 import { and, eq } from "drizzle-orm";
-import { Effect, Schema } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import { appendOrganizationAuditReceipt } from "./organization-audit";
-import type { OrganizationAuditAppendFailed } from "./organization-audit";
 import { OrganizationMembershipMissing } from "./organizations";
 
 export class OrganizationInviteMissing extends Schema.TaggedError<OrganizationInviteMissing>()(
@@ -43,34 +41,26 @@ function normalizeEmail(email: string) {
 }
 
 /** Org admin invites a Google Workspace identity by email (pending until accept). */
-export function createOrganizationInvite(input: {
-  inviteId: string;
-  organizationId: string;
-  actorUserId: string;
-  email: string;
-  role: CompanyRole;
-  expiresAt: Date;
-  receiptId: string;
-  allowedDomains?: readonly string[];
-}): Effect.Effect<
-  { inviteId: string },
-  | RbacDenied
-  | OrganizationMembershipMissing
-  | OrgSsoDenied
-  | OrganizationAuditAppendFailed
-> {
-  return Effect.gen(function* () {
+export const createOrganizationInvite = Effect.fn("createOrganizationInvite")(
+  function* (input: {
+    inviteId: string;
+    organizationId: string;
+    actorUserId: string;
+    email: string;
+    role: CompanyRole;
+    expiresAt: Date;
+    receiptId: string;
+    allowedDomains?: readonly string[];
+  }) {
     const actor = yield* Effect.promise(() =>
       loadOrgMembership(input.organizationId, input.actorUserId)
     );
 
     if (actor === undefined) {
-      yield* Effect.fail(
-        new OrganizationMembershipMissing({
-          organizationId: input.organizationId,
-          userId: input.actorUserId,
-        })
-      );
+      yield* new OrganizationMembershipMissing({
+        organizationId: input.organizationId,
+        userId: input.actorUserId,
+      });
 
       return { inviteId: input.inviteId };
     }
@@ -80,7 +70,7 @@ export function createOrganizationInvite(input: {
     const email = normalizeEmail(input.email);
     yield* assertEmailDomainAllowed(email, input.allowedDomains);
 
-    const createdAt = new Date();
+    const createdAt = new Date(yield* Clock.currentTimeMillis);
     yield* Effect.tryPromise({
       try: () =>
         db.insert(organizationInvites).values({
@@ -111,24 +101,18 @@ export function createOrganizationInvite(input: {
     });
 
     return { inviteId: input.inviteId };
-  });
-}
+  }
+);
 
 /** Accept a pending invite with a Google-linked Better Auth identity. */
-export function acceptOrganizationInvite(input: {
-  inviteId: string;
-  identity: GoogleLinkedIdentity;
-  receiptId: string;
-  now?: Date;
-  allowedDomains?: readonly string[];
-}): Effect.Effect<
-  { organizationId: string; role: CompanyRole },
-  | OrganizationInviteMissing
-  | OrgSsoDenied
-  | OrganizationAuditAppendFailed
-  | RbacDenied
-> {
-  return Effect.gen(function* () {
+export const acceptOrganizationInvite = Effect.fn("acceptOrganizationInvite")(
+  function* (input: {
+    inviteId: string;
+    identity: GoogleLinkedIdentity;
+    receiptId: string;
+    now?: Date;
+    allowedDomains?: readonly string[];
+  }) {
     const invite = yield* Effect.promise(async () => {
       const rows = await db
         .select()
@@ -140,9 +124,7 @@ export function acceptOrganizationInvite(input: {
     });
 
     if (invite === undefined) {
-      yield* Effect.fail(
-        new OrganizationInviteMissing({ inviteId: input.inviteId })
-      );
+      yield* new OrganizationInviteMissing({ inviteId: input.inviteId });
 
       return { organizationId: "", role: "member" as const };
     }
@@ -161,7 +143,7 @@ export function acceptOrganizationInvite(input: {
       allowedDomains: input.allowedDomains,
     });
 
-    const createdAt = input.now ?? new Date();
+    const createdAt = input.now ?? new Date(yield* Clock.currentTimeMillis);
     yield* Effect.tryPromise({
       try: () =>
         db.transaction(async (tx) => {
@@ -207,38 +189,33 @@ export function acceptOrganizationInvite(input: {
     });
 
     return { organizationId: invite.organizationId, role: invite.role };
-  });
-}
+  }
+);
 
 /** Org admin removes a member and writes an append-only receipt. */
-export function removeOrganizationMember(input: {
-  organizationId: string;
-  actorUserId: string;
-  targetUserId: string;
-  receiptId: string;
-}): Effect.Effect<
-  void,
-  RbacDenied | OrganizationMembershipMissing | OrganizationAuditAppendFailed
-> {
-  return Effect.gen(function* () {
+export const removeOrganizationMember = Effect.fn("removeOrganizationMember")(
+  function* (input: {
+    organizationId: string;
+    actorUserId: string;
+    targetUserId: string;
+    receiptId: string;
+  }) {
     const actor = yield* Effect.promise(() =>
       loadOrgMembership(input.organizationId, input.actorUserId)
     );
 
     if (actor === undefined) {
-      yield* Effect.fail(
-        new OrganizationMembershipMissing({
-          organizationId: input.organizationId,
-          userId: input.actorUserId,
-        })
-      );
+      yield* new OrganizationMembershipMissing({
+        organizationId: input.organizationId,
+        userId: input.actorUserId,
+      });
 
       return;
     }
 
     yield* assertCanManageMembers(actor.role);
 
-    const createdAt = new Date();
+    const createdAt = new Date(yield* Clock.currentTimeMillis);
     yield* Effect.tryPromise({
       try: () =>
         db
@@ -265,69 +242,58 @@ export function removeOrganizationMember(input: {
       metadata: {},
       createdAt,
     });
-  });
-}
+  }
+);
 
 /**
  * Role change with audit receipt (wraps membership upsert semantics).
  */
-export function setOrganizationMemberRoleAudited(input: {
+export const setOrganizationMemberRoleAudited = Effect.fn(
+  "setOrganizationMemberRoleAudited"
+)(function* (input: {
   organizationId: string;
   actorUserId: string;
   targetUserId: string;
   role: CompanyRole;
   receiptId: string;
-}): Effect.Effect<
-  void,
-  RbacDenied | OrganizationMembershipMissing | OrganizationAuditAppendFailed
-> {
-  return Effect.gen(function* () {
-    const { setOrganizationMemberRole } = yield* Effect.promise(
-      () => import("./organizations")
-    );
+}) {
+  const { setOrganizationMemberRole } = yield* Effect.promise(
+    () => import("./organizations")
+  );
 
-    yield* setOrganizationMemberRole({
-      organizationId: input.organizationId,
-      actorUserId: input.actorUserId,
-      targetUserId: input.targetUserId,
-      role: input.role,
-    });
-    yield* appendOrganizationAuditReceipt({
-      id: input.receiptId,
-      organizationId: input.organizationId,
-      actorUserId: input.actorUserId,
-      action: "member_role_changed",
-      targetUserId: input.targetUserId,
-      metadata: { role: input.role },
-    });
+  yield* setOrganizationMemberRole({
+    organizationId: input.organizationId,
+    actorUserId: input.actorUserId,
+    targetUserId: input.targetUserId,
+    role: input.role,
   });
-}
+  yield* appendOrganizationAuditReceipt({
+    id: input.receiptId,
+    organizationId: input.organizationId,
+    actorUserId: input.actorUserId,
+    action: "member_role_changed",
+    targetUserId: input.targetUserId,
+    metadata: { role: input.role },
+  });
+});
 
 /** Org admin revokes a pending invite and writes an append-only receipt. */
-export function revokeOrganizationInvite(input: {
-  inviteId: string;
-  organizationId: string;
-  actorUserId: string;
-  receiptId: string;
-}): Effect.Effect<
-  void,
-  | RbacDenied
-  | OrganizationMembershipMissing
-  | OrganizationInviteMissing
-  | OrganizationAuditAppendFailed
-> {
-  return Effect.gen(function* () {
+export const revokeOrganizationInvite = Effect.fn("revokeOrganizationInvite")(
+  function* (input: {
+    inviteId: string;
+    organizationId: string;
+    actorUserId: string;
+    receiptId: string;
+  }) {
     const actor = yield* Effect.promise(() =>
       loadOrgMembership(input.organizationId, input.actorUserId)
     );
 
     if (actor === undefined) {
-      yield* Effect.fail(
-        new OrganizationMembershipMissing({
-          organizationId: input.organizationId,
-          userId: input.actorUserId,
-        })
-      );
+      yield* new OrganizationMembershipMissing({
+        organizationId: input.organizationId,
+        userId: input.actorUserId,
+      });
 
       return;
     }
@@ -348,14 +314,12 @@ export function revokeOrganizationInvite(input: {
       invite === undefined ||
       invite.organizationId !== input.organizationId
     ) {
-      yield* Effect.fail(
-        new OrganizationInviteMissing({ inviteId: input.inviteId })
-      );
+      yield* new OrganizationInviteMissing({ inviteId: input.inviteId });
 
       return;
     }
 
-    const createdAt = new Date();
+    const createdAt = new Date(yield* Clock.currentTimeMillis);
     yield* Effect.tryPromise({
       try: () =>
         db
@@ -378,5 +342,5 @@ export function revokeOrganizationInvite(input: {
       metadata: { inviteId: input.inviteId },
       createdAt,
     });
-  });
-}
+  }
+);

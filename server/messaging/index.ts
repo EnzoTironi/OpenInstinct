@@ -117,7 +117,7 @@ const makeMessaging = Effect.gen(function* () {
         const value = yield* decodeInput(PrepareInboxHandoffSchema)(input);
         const current = yield* inbox.checkLease(value.lease);
 
-        const content = Schema.encodeSync(
+        const content = yield* Schema.encodeEffect(
           Schema.fromJsonString(NativeInboxContentSchema)
         )(value.content);
 

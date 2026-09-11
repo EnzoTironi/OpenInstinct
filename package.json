@@ -140,7 +140,8 @@
     "infra:fly-pg:plan:prod": "bash ./scripts/fly-alchemy-pg.sh plan --stage prod",
     "infra:fly-pg:deploy:prod": "bash ./scripts/fly-alchemy-pg.sh deploy --stage prod",
     "ingress:set-webhooks": "bash ./scripts/set-channel-webhooks.sh",
-    "ultracite": "ultracite"
+    "ultracite": "ultracite",
+    "agent-doctor": "pnpm dlx @jgalbsss/agent-doctor"
   },
   "version": "0.0.0",
   "type": "module"

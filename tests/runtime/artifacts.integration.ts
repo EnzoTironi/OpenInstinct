@@ -58,7 +58,8 @@ const fixture = Effect.fn("artifacts.fixture")(function* (
 
   const [owner, other] = identities;
 
-  if (!owner || !other) throw new Error("Fixture accounts were not created.");
+  if (!owner || !other)
+    return yield* Effect.fail(new Error("Fixture accounts were not created."));
   const linked = randomUUID();
   yield* sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
     VALUES (${linked}, 'kapso', 'artifact-proof', ${linked}, ${owner.userId})`;

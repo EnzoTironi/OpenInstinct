@@ -140,7 +140,7 @@ test("concurrent updates have exactly one winner; stale and missing versions con
       ).toBe(true);
       const winner = winners[0];
 
-      if (!winner) throw new Error("Missing winner");
+      if (!winner) return yield* Effect.fail(new Error("Missing winner"));
       expect(winner.success.version).not.toBe(first.version);
       expect(yield* documents.read(key)).toEqual(winner.success);
 

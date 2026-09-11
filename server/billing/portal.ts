@@ -2,7 +2,7 @@ import { readEntitlement } from "@db/services/billing";
 import { applicationOrigin } from "@shared/environment/origin";
 import { Effect, Schema } from "effect";
 
-import { requireStripe, StripeNotConfiguredError } from "./stripe";
+import { requireStripe } from "./stripe";
 
 export class BillingPortalError extends Schema.TaggedError<BillingPortalError>()(
   "BillingPortalError",
@@ -20,20 +20,15 @@ export class BillingPortalError extends Schema.TaggedError<BillingPortalError>()
 export const createCustomerPortalSession = Effect.fn(
   "createCustomerPortalSession"
 )(function* (input: { userId: string; organizationId?: string }) {
-  let stripe;
-
-  try {
-    stripe = requireStripe();
-  } catch (error) {
-    if (error instanceof StripeNotConfiguredError) {
-      return yield* new BillingPortalError({
-        reason: "stripe_not_configured",
-        message: error.message,
-      });
-    }
-
-    throw error;
-  }
+  const stripe = yield* requireStripe().pipe(
+    Effect.mapError(
+      (error) =>
+        new BillingPortalError({
+          reason: "stripe_not_configured",
+          message: error.message,
+        })
+    )
+  );
 
   const subjectType = input.organizationId ? "organization" : "user";
   const subjectId = input.organizationId ?? input.userId;

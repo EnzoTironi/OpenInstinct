@@ -9,11 +9,7 @@ import { applicationOrigin } from "@shared/environment/origin";
 import { and, eq } from "drizzle-orm";
 import { Effect, Schema } from "effect";
 
-import {
-  requireStripe,
-  stripePriceIdForPlan,
-  StripeNotConfiguredError,
-} from "./stripe";
+import { requireStripe, stripePriceIdForPlan } from "./stripe";
 
 export class BillingCheckoutError extends Schema.TaggedError<BillingCheckoutError>()(
   "BillingCheckoutError",
@@ -60,22 +56,25 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
       });
     }
 
-    let stripe;
-    let priceId: string;
+    const stripe = yield* requireStripe().pipe(
+      Effect.mapError(
+        (error) =>
+          new BillingCheckoutError({
+            reason: "stripe_not_configured",
+            message: error.message,
+          })
+      )
+    );
 
-    try {
-      stripe = requireStripe();
-      priceId = stripePriceIdForPlan(input.plan);
-    } catch (error) {
-      if (error instanceof StripeNotConfiguredError) {
-        return yield* new BillingCheckoutError({
-          reason: "stripe_not_configured",
-          message: error.message,
-        });
-      }
-
-      throw error;
-    }
+    const priceId = yield* stripePriceIdForPlan(input.plan).pipe(
+      Effect.mapError(
+        (error) =>
+          new BillingCheckoutError({
+            reason: "stripe_not_configured",
+            message: error.message,
+          })
+      )
+    );
 
     const seatCount =
       input.plan === "org" ? Math.max(1, Math.floor(input.seatCount ?? 1)) : 1;

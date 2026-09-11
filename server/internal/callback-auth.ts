@@ -83,22 +83,22 @@ const callbackKey = Effect.gen(function* () {
   );
 }).pipe(Effect.mapError(() => reject(503)));
 
-function signature(
-  key: Redacted.Redacted<Buffer>,
-  origin: string,
-  route: InternalCallbackRoute,
-  timestamp: string,
-  body: Uint8Array
-) {
-  return createHmac("sha256", Redacted.value(key))
+function signature(input: {
+  key: Redacted.Redacted<Buffer>;
+  origin: string;
+  route: InternalCallbackRoute;
+  timestamp: string;
+  body: Uint8Array;
+}) {
+  return createHmac("sha256", Redacted.value(input.key))
     .update(
       JSON.stringify([
         "v1",
-        origin,
+        input.origin,
         "POST",
-        route,
-        timestamp,
-        createHash("sha256").update(body).digest("hex"),
+        input.route,
+        input.timestamp,
+        createHash("sha256").update(input.body).digest("hex"),
       ])
     )
     .digest();
@@ -116,13 +116,13 @@ export const internalCallbackHeaders = Effect.fn("internalCallbackHeaders")(
     return new Headers({
       "content-type": "application/json",
       "x-internal-callback-time": timestamp,
-      "x-internal-callback-signature": signature(
+      "x-internal-callback-signature": signature({
         key,
         origin,
         route,
         timestamp,
-        Buffer.from(body)
-      ).toString("hex"),
+        body: Buffer.from(body),
+      }).toString("hex"),
     });
   }
 );
@@ -192,7 +192,7 @@ export const readVerifiedInternalCallback = Effect.fn(
   );
 
   const body = yield* readInternalCallbackBody(request);
-  const expected = signature(key, origin, route, timestamp, body);
+  const expected = signature({ key, origin, route, timestamp, body });
 
   if (!timingSafeEqual(Buffer.from(encoded, "hex"), expected))
     return yield* reject(401);

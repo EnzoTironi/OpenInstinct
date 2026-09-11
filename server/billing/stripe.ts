@@ -1,43 +1,57 @@
 import { env } from "@shared/environment";
-import { Redacted } from "effect";
+import { Effect, Redacted, Schema } from "effect";
 import { Stripe } from "stripe";
 
-export class StripeNotConfiguredError extends Error {
-  readonly _tag = "StripeNotConfiguredError";
-  constructor() {
-    super(
-      "Stripe is not configured. Set STRIPE_SECRET_KEY and plan price IDs to enable paid upgrades."
-    );
+export class StripeNotConfiguredError extends Schema.TaggedError<StripeNotConfiguredError>()(
+  "StripeNotConfiguredError",
+  {
+    message: Schema.String,
   }
-}
+) {}
 
-export function requireStripe(): Stripe {
+const notConfigured = () =>
+  new StripeNotConfiguredError({
+    message:
+      "Stripe is not configured. Set STRIPE_SECRET_KEY and plan price IDs to enable paid upgrades.",
+  });
+
+export const requireStripe = Effect.fn("requireStripe")(function* () {
   const key = env.STRIPE_SECRET_KEY;
 
-  if (!key) throw new StripeNotConfiguredError();
+  if (!key) {
+    return yield* notConfigured();
+  }
 
   return new Stripe(Redacted.value(key), {
     apiVersion: "2025-08-27.basil",
     typescript: true,
   });
-}
+});
 
-export function stripePriceIdForPlan(plan: "pro" | "org") {
-  const priceId =
-    plan === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_ORG_SEAT;
+export const stripePriceIdForPlan = Effect.fn("stripePriceIdForPlan")(
+  function* (plan: "pro" | "org") {
+    const priceId =
+      plan === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_ORG_SEAT;
 
-  if (!priceId) throw new StripeNotConfiguredError();
+    if (!priceId) {
+      return yield* notConfigured();
+    }
 
-  return priceId;
-}
+    return priceId;
+  }
+);
 
-export function stripeWebhookSecret() {
-  const secret = env.STRIPE_WEBHOOK_SECRET;
+export const stripeWebhookSecret = Effect.fn("stripeWebhookSecret")(
+  function* () {
+    const secret = env.STRIPE_WEBHOOK_SECRET;
 
-  if (!secret) throw new StripeNotConfiguredError();
+    if (!secret) {
+      return yield* notConfigured();
+    }
 
-  return Redacted.value(secret);
-}
+    return Redacted.value(secret);
+  }
+);
 
 /** True when Checkout can run for a paid plan (secret + that plan's Price id). */
 export function isStripeCheckoutConfigured(plan: "pro" | "org"): boolean {

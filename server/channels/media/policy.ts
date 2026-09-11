@@ -71,19 +71,34 @@ export const identifyMedia = Effect.fn("identifyMedia")(function* (
   const claimed = reference.mediaType.split(";")[0]?.trim().toLowerCase();
   const imageType = sniffBrowserImageMediaType(bytes);
 
-  const mediaType =
-    imageType === "image/png" || imageType === "image/jpeg"
-      ? imageType
-      : head.subarray(0, 5).toString("ascii") === "%PDF-"
-        ? "application/pdf"
-        : head.subarray(0, 4).toString("ascii") === "OggS"
-          ? "audio/ogg"
-          : head.subarray(0, 4).toString("ascii") === "RIFF" &&
-              head.subarray(8, 12).toString("ascii") === "WAVE"
-            ? "audio/wav"
-            : Schema.is(textType)(claimed)
-              ? claimed
-              : undefined;
+  const ascii = (start: number, end: number) =>
+    head.subarray(start, end).toString("ascii");
+
+  const sniffedMediaType = (): string | undefined => {
+    if (imageType === "image/png" || imageType === "image/jpeg") {
+      return imageType;
+    }
+
+    if (ascii(0, 5) === "%PDF-") {
+      return "application/pdf";
+    }
+
+    if (ascii(0, 4) === "OggS") {
+      return "audio/ogg";
+    }
+
+    if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WAVE") {
+      return "audio/wav";
+    }
+
+    if (Schema.is(textType)(claimed)) {
+      return claimed;
+    }
+
+    return undefined;
+  };
+
+  const mediaType = sniffedMediaType();
 
   if (!mediaType)
     return yield* new ChannelMediaError({ reason: "unsupported_type" });

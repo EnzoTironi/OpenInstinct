@@ -77,7 +77,8 @@ test("input response fence survives concurrent replay and refuses uncertain redi
         leaseSeconds: 30,
       });
 
-      if (!acceptedSource) throw new Error("Missing source claim");
+      if (!acceptedSource)
+        return yield* Effect.fail(new Error("Missing source claim"));
       yield* messaging.markAccepted({
         lease: {
           identityId,
@@ -103,7 +104,8 @@ test("input response fence survives concurrent replay and refuses uncertain redi
       expect(new Set(results.map((result) => result.id)).size).toBe(1);
       const first = results[0];
 
-      if (!first) throw new Error("Missing response claim");
+      if (!first)
+        return yield* Effect.fail(new Error("Missing response claim"));
 
       for (const changed of [
         { decision: "cancel" as const },
@@ -187,7 +189,8 @@ test("different accepted sources cannot race approval and cancellation of one re
           leaseSeconds: 30,
         });
 
-        if (!source) throw new Error("Missing source claim");
+        if (!source)
+          return yield* Effect.fail(new Error("Missing source claim"));
         yield* messaging.markAccepted({
           lease: { identityId, id: source.id, leaseToken: source.leaseToken },
           receipt: { status: "accepted", sessionId },
@@ -276,7 +279,7 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
       expect(conflict).toBeInstanceOf(PayloadConflict);
       const original = receipts[0];
 
-      if (!original) throw new Error("Missing receipt");
+      if (!original) return yield* Effect.fail(new Error("Missing receipt"));
       expect(original.status).toBe("queued");
       expect(original.sourceMessageId).toBe("source-event-1");
       expect(
@@ -391,7 +394,8 @@ test("claims FIFO once per identity under concurrency and fences completion", ()
       expect(winners).toHaveLength(1);
       const winner = winners[0];
 
-      if (!winner) throw new Error("Expected a lease holder");
+      if (!winner)
+        return yield* Effect.fail(new Error("Expected a lease holder"));
       expect(winner.id).toBe(first.id);
 
       const lease: Lease = {
@@ -453,7 +457,8 @@ test("an input without native protocol evidence remains uncertain and blocks lat
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected a lease holder");
+      if (!claim)
+        return yield* Effect.fail(new Error("Expected a lease holder"));
       yield* sql`UPDATE channel_inbox SET native_input = NULL, lease_expires_at = clock_timestamp() - interval '1 second'
       WHERE id = ${claim.id}`;
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
@@ -529,7 +534,9 @@ test("outbox deduplicates intent, fences sends, and keeps lanes independent", ()
       expect(incoming).not.toBeNull();
 
       if (!outgoing)
-        throw new Error("Expected outgoing lease independently of inbox");
+        return yield* Effect.fail(
+          new Error("Expected outgoing lease independently of inbox")
+        );
       expect(outgoing.sourceMessageId).toBeNull();
 
       const lease = {
@@ -582,7 +589,8 @@ test("expired outbox is uncertain, cannot resend, and blocks later output", () =
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected outgoing lease");
+      if (!claim)
+        return yield* Effect.fail(new Error("Expected outgoing lease"));
       yield* sql`UPDATE channel_outbox SET lease_expires_at = clock_timestamp() - interval '1 second'
       WHERE id = ${claim.id}`;
       expect(
@@ -618,7 +626,8 @@ test("revocation blocks acceptance, dispatch, and completion and cancels queued 
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected incoming lease");
+      if (!claim)
+        return yield* Effect.fail(new Error("Expected incoming lease"));
       yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
       expect(
         yield* messaging
@@ -677,7 +686,8 @@ test("explicit uncertainty stores only categorical errors and remains visible", 
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected outgoing lease");
+      if (!claim)
+        return yield* Effect.fail(new Error("Expected outgoing lease"));
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       const unsafe = { lease, reason: "token=secret provider traceback" };
       // Untrusted adapter errors must never be persisted as diagnostic strings.
@@ -723,7 +733,7 @@ test("a confirmed rejection releases the lane but ambiguous errors cannot be ter
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected lease");
+      if (!claim) return yield* Effect.fail(new Error("Expected lease"));
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       const ambiguous = { lease, reason: "handoff_unknown" };
       expect(
@@ -801,7 +811,8 @@ test("prepared native input survives uncertain recovery with immutable content a
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected initial claim");
+      if (!claim)
+        return yield* Effect.fail(new Error("Expected initial claim"));
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
 
       const content = [
@@ -835,7 +846,8 @@ test("prepared native input survives uncertain recovery with immutable content a
 
       const account = owner[0];
 
-      if (!account) throw new Error("Missing identity owner");
+      if (!account)
+        return yield* Effect.fail(new Error("Missing identity owner"));
       expect(snapshots[0]?.principalId).toBe(`better-auth:${account.userId}`);
       expect(
         yield* messaging
@@ -855,7 +867,8 @@ test("prepared native input survives uncertain recovery with immutable content a
       expect(recovered).toHaveLength(1);
       const next = recovered[0];
 
-      if (!next) throw new Error("Expected recovered claim");
+      if (!next)
+        return yield* Effect.fail(new Error("Expected recovered claim"));
       expect(next.id).toBe(first.id);
       expect(next.nativeInput).toEqual(snapshots[0]);
       expect(next.leaseToken).not.toBe(lease.leaseToken);
@@ -890,7 +903,8 @@ test("expired prepared input can be recovered but a revoked identity cannot prep
         leaseSeconds: 1,
       });
 
-      if (!claim) throw new Error("Expected initial claim");
+      if (!claim)
+        return yield* Effect.fail(new Error("Expected initial claim"));
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       yield* messaging.prepareInboxHandoff({
         transcripts: [],
@@ -906,7 +920,8 @@ test("expired prepared input can be recovered but a revoked identity cannot prep
 
       expect(recovered?.id).toBe(claim.id);
 
-      if (!recovered) throw new Error("Expected expired input recovery");
+      if (!recovered)
+        return yield* Effect.fail(new Error("Expected expired input recovery"));
       yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
       expect(
         yield* messaging
@@ -942,7 +957,8 @@ test("a lease expiring before media preparation retains its native key and fence
         leaseSeconds: 1,
       });
 
-      if (!first) throw new Error("Expected initial claim");
+      if (!first)
+        return yield* Effect.fail(new Error("Expected initial claim"));
       expect(first.nativeInput).toMatchObject({
         inputId: input.id,
         address: identityId,
@@ -956,7 +972,10 @@ test("a lease expiring before media preparation retains its native key and fence
         leaseSeconds: 30,
       });
 
-      if (!next) throw new Error("Expected recovery before preparation");
+      if (!next)
+        return yield* Effect.fail(
+          new Error("Expected recovery before preparation")
+        );
       expect(next.nativeInput).toEqual(first.nativeInput);
       expect(next.leaseToken).not.toBe(first.leaseToken);
 
@@ -1013,7 +1032,7 @@ test("the first prepared transcript intents commit together and never mix or res
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected claim");
+      if (!claim) return yield* Effect.fail(new Error("Expected claim"));
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
 
       const candidates = [
@@ -1093,7 +1112,7 @@ test("a conflicting transcript intent rolls back both preparation and earlier in
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected claim");
+      if (!claim) return yield* Effect.fail(new Error("Expected claim"));
       const lease = { identityId, id: claim.id, leaseToken: claim.leaseToken };
       expect(
         yield* messaging
@@ -1136,7 +1155,10 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
           leaseSeconds: 30,
         });
 
-        if (!claim) throw new Error(`Expected claim for ${deliveryKey}`);
+        if (!claim)
+          return yield* Effect.fail(
+            new Error(`Expected claim for ${deliveryKey}`)
+          );
         yield* messaging.markOutboxUncertain({
           lease: {
             identityId,
@@ -1302,7 +1324,8 @@ test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery 
 
       const queuedId = queued[0]?.id;
 
-      if (!queuedId) throw new Error("Expected queued outbox row");
+      if (!queuedId)
+        return yield* Effect.fail(new Error("Expected queued outbox row"));
       expect(
         yield* messaging
           .resolveOutboxUncertain({
@@ -1329,7 +1352,7 @@ test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery 
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected claim");
+      if (!claim) return yield* Effect.fail(new Error("Expected claim"));
       yield* messaging.markOutboxUncertain({
         lease: {
           identityId,

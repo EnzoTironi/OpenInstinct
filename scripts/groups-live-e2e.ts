@@ -32,9 +32,16 @@ for (const key of required) {
   }
 }
 
-const token = process.env.TELEGRAM_BOT_TOKEN!;
-const botId = process.env.TELEGRAM_BOT_ID!;
-const botUsername = process.env.TELEGRAM_BOT_USERNAME!.replace(/^@/, "");
+const token = process.env.TELEGRAM_BOT_TOKEN;
+const botId = process.env.TELEGRAM_BOT_ID;
+const botUsernameRaw = process.env.TELEGRAM_BOT_USERNAME;
+if (!token || !botId || !botUsernameRaw) {
+  console.log(
+    "BLOCKER missing TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_ID / TELEGRAM_BOT_USERNAME"
+  );
+  process.exit(2);
+}
+const botUsername = botUsernameRaw.replace(/^@/, "");
 const base = `https://api.telegram.org/bot${token}`;
 
 const api = async (method: string, body?: unknown) => {

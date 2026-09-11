@@ -21,8 +21,8 @@ async function withDocument(body: (key: string) => Promise<void>) {
       }>`SELECT current_database() AS name`;
 
       if (current[0]?.name !== "companion_runtime_test")
-        throw new Error(
-          "Memory backend proof requires its dedicated database."
+        return yield* Effect.fail(
+          new Error("Memory backend proof requires its dedicated database.")
         );
     })
   );
@@ -208,7 +208,8 @@ test("aborting a real lock-blocked adapter write cannot commit after the lock is
 
             const pid = rows[0]?.pid;
 
-            if (!pid) throw new Error("Missing lock connection");
+            if (!pid)
+              return yield* Effect.fail(new Error("Missing lock connection"));
             locked.resolve(pid);
             yield* Effect.promise(() => release.promise);
           })

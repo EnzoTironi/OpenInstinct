@@ -8,11 +8,7 @@ import type { BillingPlanId } from "@shared/billing/plans";
 import { Effect, Option, Schema } from "effect";
 import type { Stripe } from "stripe";
 
-import {
-  requireStripe,
-  stripeWebhookSecret,
-  StripeNotConfiguredError,
-} from "./stripe";
+import { requireStripe, stripeWebhookSecret } from "./stripe";
 
 export class BillingWebhookError extends Schema.TaggedError<BillingWebhookError>()(
   "BillingWebhookError",
@@ -153,7 +149,7 @@ async function applyCheckoutSession(session: Stripe.Checkout.Session) {
   });
 
   if (subscriptionId) {
-    const stripe = requireStripe();
+    const stripe = await Effect.runPromise(requireStripe());
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     await applySubscription(subscription);
   }
@@ -162,22 +158,25 @@ async function applyCheckoutSession(session: Stripe.Checkout.Session) {
 export const handleStripeWebhook = Effect.fn("handleStripeWebhook")(function* (
   request: Request
 ) {
-  let stripe;
-  let secret: string;
+  const stripe = yield* requireStripe().pipe(
+    Effect.mapError(
+      (error) =>
+        new BillingWebhookError({
+          reason: "stripe_not_configured",
+          message: error.message,
+        })
+    )
+  );
 
-  try {
-    stripe = requireStripe();
-    secret = stripeWebhookSecret();
-  } catch (error) {
-    if (error instanceof StripeNotConfiguredError) {
-      return yield* new BillingWebhookError({
-        reason: "stripe_not_configured",
-        message: error.message,
-      });
-    }
-
-    throw error;
-  }
+  const secret = yield* stripeWebhookSecret().pipe(
+    Effect.mapError(
+      (error) =>
+        new BillingWebhookError({
+          reason: "stripe_not_configured",
+          message: error.message,
+        })
+    )
+  );
 
   const signature = request.headers.get("stripe-signature");
 

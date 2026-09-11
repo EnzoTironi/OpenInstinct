@@ -27,10 +27,10 @@ async function postBilling(
     body: JSON.stringify(body),
   });
 
-  const raw: unknown = await response.json();
-  const decoded = Schema.decodeUnknownOption(billingRedirectSchema)(raw);
+  if (!response.ok) {
+    const raw: unknown = await response.json().catch(() => ({}));
+    const decoded = Schema.decodeUnknownOption(billingRedirectSchema)(raw);
 
-  if (Option.isNone(decoded) || !decoded.value.url || !response.ok) {
     if (
       Option.isSome(decoded) &&
       decoded.value.reason === "stripe_not_configured"
@@ -46,6 +46,17 @@ async function postBilling(
         : "Billing request failed.";
 
     throw new Error(message);
+  }
+
+  const raw: unknown = await response.json();
+  const decoded = Schema.decodeUnknownOption(billingRedirectSchema)(raw);
+
+  if (Option.isNone(decoded) || !decoded.value.url) {
+    throw new Error(
+      Option.isSome(decoded) && decoded.value.error
+        ? decoded.value.error
+        : "Billing request failed."
+    );
   }
 
   return decoded.value.url;

@@ -224,7 +224,8 @@ test("uncertain output blocks recovery and is never enqueued again", () =>
         leaseSeconds: 30,
       });
 
-      if (!claim) throw new Error("Expected durable output claim");
+      if (!claim)
+        return yield* Effect.fail(new Error("Expected durable output claim"));
       yield* messaging.markOutboxUncertain({
         lease: { identityId, id: claim.id, leaseToken: claim.leaseToken },
         reason: "handoff_unknown",
@@ -474,7 +475,10 @@ test("native completion hook persists and attempts the report before returning",
       const handler = completionHook.events?.["message.completed"];
       expect(handler).toBeDefined();
 
-      if (!handler) throw new Error("The completion hook is required.");
+      if (!handler)
+        return yield* Effect.fail(
+          new Error("The completion hook is required.")
+        );
       yield* Effect.tryPromise(async () => {
         await handler(
           {

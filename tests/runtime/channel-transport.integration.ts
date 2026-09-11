@@ -80,7 +80,7 @@ test("input delivery requires every original chunk, current revision and matchin
       const [identityId, otherIdentityId] = identities;
 
       if (!identityId || !otherIdentityId)
-        throw new Error("Missing identities");
+        return yield* Effect.fail(new Error("Missing identities"));
 
       const inputRequest = {
         sessionId: "session-delivery-proof",
@@ -103,7 +103,7 @@ test("input delivery requires every original chunk, current revision and matchin
       ).toBeNull();
       const first = receipts[0];
 
-      if (!first) throw new Error("Missing first receipt");
+      if (!first) return yield* Effect.fail(new Error("Missing first receipt"));
       // These rows model accepted delivery facts; this test does not qualify a provider send.
       yield* sql`UPDATE channel_outbox SET status = 'sent',
         sent_at = '2026-09-08T12:00:00Z', provider_message_id = 'part-1'
@@ -186,7 +186,7 @@ test.each(["inbox", "outbox"] as const)(
           !revoked ||
           !anotherChannel
         )
-          throw new Error("Missing fixtures");
+          return yield* Effect.fail(new Error("Missing fixtures"));
 
         const put = (identityId: string, key: string) =>
           lane === "inbox"
@@ -221,7 +221,7 @@ test.each(["inbox", "outbox"] as const)(
 
         const lease = yield* claim({ identityId: uncertain, leaseSeconds: 30 });
 
-        if (!lease) throw new Error("Missing lease");
+        if (!lease) return yield* Effect.fail(new Error("Missing lease"));
         yield* stop({
           lease: {
             id: lease.id,
@@ -297,7 +297,7 @@ test("validates active identity and rejects mismatched channel or revocation", (
     Effect.gen(function* () {
       const id = identities[0];
 
-      if (!id) throw new Error("Missing fixture");
+      if (!id) return yield* Effect.fail(new Error("Missing fixture"));
       expect(yield* transport.activeIdentity(id, "telegram")).toMatchObject({
         id,
         userId,
@@ -327,7 +327,7 @@ test("enqueues stable chunks idempotently and rolls back partial writes on confl
     Effect.gen(function* () {
       const id = identities[0];
 
-      if (!id) throw new Error("Missing fixture");
+      if (!id) return yield* Effect.fail(new Error("Missing fixture"));
       const text = `${"a".repeat(3999)}😀${"b".repeat(5000)}`;
 
       const input = {
@@ -402,7 +402,7 @@ test("unsupported stored media fails before any provider configuration or send",
     Effect.gen(function* () {
       const id = identities[0];
 
-      if (!id) throw new Error("Missing fixture");
+      if (!id) return yield* Effect.fail(new Error("Missing fixture"));
 
       const receipt = yield* messaging.enqueue({
         identityId: id,
@@ -446,7 +446,7 @@ test.each([
     Effect.gen(function* () {
       const id = identities[0];
 
-      if (!id) throw new Error("Missing fixture");
+      if (!id) return yield* Effect.fail(new Error("Missing fixture"));
 
       const receipt = yield* messaging.enqueue({
         identityId: id,
@@ -480,7 +480,7 @@ test("claims atomic text chunks in enqueue order despite tied timestamps and rev
     Effect.gen(function* () {
       const identityId = identities[0];
 
-      if (!identityId) throw new Error("Missing fixture");
+      if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
       const chunks = ["a", "b", "c", "d"].map((letter) => letter.repeat(4000));
 
       const receipts = yield* transport.enqueueText({
@@ -513,7 +513,8 @@ test("claims atomic text chunks in enqueue order despite tied timestamps and rev
             leaseSeconds: 30,
           });
 
-          if (!claim) throw new Error("Missing ordered claim");
+          if (!claim)
+            return yield* Effect.fail(new Error("Missing ordered claim"));
           expect(claim.key).toBe(`ordered:${String(index)}`);
           expect(claim.payload.text).toBe(text);
           delivered.push(text);
@@ -542,7 +543,7 @@ test("rejects a stored chunk key hole even when its count matches the requested 
     Effect.gen(function* () {
       const identityId = identities[0];
 
-      if (!identityId) throw new Error("Missing fixture");
+      if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
       yield* messaging.enqueue({
         identityId,
         deliveryKey: "hole:0",
@@ -577,7 +578,7 @@ test("settled task reports retain the first atomic delivery across concurrent re
     Effect.gen(function* () {
       const identityId = identities[0];
 
-      if (!identityId) throw new Error("Missing fixture");
+      if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
       const deliveryKey = `task-report:${"a".repeat(64)}`;
 
       const wording = [
@@ -652,7 +653,7 @@ test("the dispatcher recovers native inputs before and after preparation while b
       const [preparedId, unpreparedId, outboundId, unmarkedId] = identities;
 
       if (!preparedId || !unpreparedId || !outboundId || !unmarkedId)
-        throw new Error("Missing identities");
+        return yield* Effect.fail(new Error("Missing identities"));
       yield* Effect.forEach(
         [preparedId, unpreparedId, unmarkedId],
         (identityId) =>
@@ -669,7 +670,8 @@ test("the dispatcher recovers native inputs before and after preparation while b
               leaseSeconds: 30,
             });
 
-            if (!claim) throw new Error("Expected initial claim");
+            if (!claim)
+              return yield* Effect.fail(new Error("Expected initial claim"));
 
             if (identityId === unmarkedId)
               yield* sql`UPDATE channel_inbox SET native_input = NULL WHERE id = ${claim.id}`;
@@ -703,7 +705,8 @@ test("the dispatcher recovers native inputs before and after preparation while b
         leaseSeconds: 30,
       });
 
-      if (!outbound) throw new Error("Expected outbox claim");
+      if (!outbound)
+        return yield* Effect.fail(new Error("Expected outbox claim"));
       yield* messaging.markOutboxUncertain({
         lease: {
           identityId: outboundId,
@@ -777,7 +780,7 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
     Effect.gen(function* () {
       const identityId = identities[0];
 
-      if (!identityId) throw new Error("Missing fixture");
+      if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
       yield* sql`UPDATE channel_identity SET installation_id = '123456'
         WHERE id = ${identityId}`;
 

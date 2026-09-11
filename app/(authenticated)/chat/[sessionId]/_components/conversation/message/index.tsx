@@ -109,12 +109,12 @@ function userVisibleParts(
   return [...(sentMessageParts ?? []), ...controls];
 }
 
-const timestampFormatter = new Intl.DateTimeFormat(undefined, {
+const timestampFormatter = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
 });
 
-const fullTimestampFormatter = new Intl.DateTimeFormat(undefined, {
+const fullTimestampFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
 });

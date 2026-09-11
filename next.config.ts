@@ -27,67 +27,63 @@ class EveRoutingUnavailable extends Schema.TaggedError<EveRoutingUnavailable>()(
   { message: Schema.String }
 ) {}
 
-export default function companionConfig(
+const resolveCompanionRewrites = Effect.fn("resolveCompanionRewrites")(
+  function* (
+    frameworkRewrites: NonNullable<NextConfig["rewrites"]> | undefined
+  ) {
+    if (!frameworkRewrites) {
+      return yield* new EveRoutingUnavailable({
+        message:
+          "This deployment needs an Eve proxy before enabling channel webhooks.",
+      });
+    }
+
+    const rewrites = yield* Effect.promise(() =>
+      Promise.resolve(frameworkRewrites())
+    );
+
+    const sections: EveNextRewriteSections = Array.isArray(rewrites)
+      ? { beforeFiles: [], afterFiles: rewrites, fallback: [] }
+      : rewrites;
+
+    const native = sections.beforeFiles?.find(
+      (route) => route.source === eveRoute
+    );
+
+    if (!native?.destination.endsWith(eveRoute)) {
+      return yield* new EveRoutingUnavailable({
+        message:
+          "Eve's generated route is missing or unsupported. Check the installed Eve routing configuration.",
+      });
+    }
+
+    const destination = native.destination.slice(0, -eveRoute.length);
+
+    return {
+      ...sections,
+      beforeFiles: [
+        ...(sections.beforeFiles ?? []),
+        ...["telegram", "kapso"].map((channel) => ({
+          source: `/api/channels/${channel}`,
+          destination: `${destination}/channels/${channel}`,
+        })),
+        ...["report", "respond"].map((operation) => ({
+          source: `/internal/scheduled-run/${operation}`,
+          destination: `${destination}/internal/scheduled-run/${operation}`,
+        })),
+      ],
+    };
+  }
+);
+
+export default async function companionConfig(
   ...args: Parameters<typeof frameworkConfig>
 ) {
-  return Effect.runPromise(
-    Effect.gen(function* () {
-      const resolved = yield* Effect.promise(() =>
-        Promise.resolve(frameworkConfig(...args))
-      );
+  const resolved = await Promise.resolve(frameworkConfig(...args));
 
-      const frameworkRewrites = resolved.rewrites;
-
-      return {
-        ...resolved,
-        rewrites: () =>
-          Effect.runPromise(
-            Effect.gen(function* () {
-              if (!frameworkRewrites) {
-                return yield* new EveRoutingUnavailable({
-                  message:
-                    "This deployment needs an Eve proxy before enabling channel webhooks.",
-                });
-              }
-
-              const rewrites = yield* Effect.promise(() =>
-                Promise.resolve(frameworkRewrites())
-              );
-
-              const sections: EveNextRewriteSections = Array.isArray(rewrites)
-                ? { beforeFiles: [], afterFiles: rewrites, fallback: [] }
-                : rewrites;
-
-              const native = sections.beforeFiles?.find(
-                (route) => route.source === eveRoute
-              );
-
-              if (!native?.destination.endsWith(eveRoute)) {
-                return yield* new EveRoutingUnavailable({
-                  message:
-                    "Eve's generated route is missing or unsupported. Check the installed Eve routing configuration.",
-                });
-              }
-
-              const destination = native.destination.slice(0, -eveRoute.length);
-
-              return {
-                ...sections,
-                beforeFiles: [
-                  ...(sections.beforeFiles ?? []),
-                  ...["telegram", "kapso"].map((channel) => ({
-                    source: `/api/channels/${channel}`,
-                    destination: `${destination}/channels/${channel}`,
-                  })),
-                  ...["report", "respond"].map((operation) => ({
-                    source: `/internal/scheduled-run/${operation}`,
-                    destination: `${destination}/internal/scheduled-run/${operation}`,
-                  })),
-                ],
-              };
-            })
-          ),
-      };
-    })
-  );
+  return {
+    ...resolved,
+    rewrites: () =>
+      Effect.runPromise(resolveCompanionRewrites(resolved.rewrites)),
+  };
 }

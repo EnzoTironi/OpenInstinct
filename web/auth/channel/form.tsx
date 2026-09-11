@@ -23,7 +23,7 @@ import {
 import { authClient } from "@web/auth/client";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
-import { Effect, Result } from "effect";
+import { Clock, Effect, Result } from "effect";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -147,7 +147,9 @@ export function PendingAuthorization({
       const poll = Effect.gen(function* pollConfirmation() {
         let failures = 0;
 
-        while (Date.now() < Date.parse(challenge.expiresAt)) {
+        while (
+          (yield* Clock.currentTimeMillis) < Date.parse(challenge.expiresAt)
+        ) {
           const result = yield* checkChannelAuthorization(challenge.id).pipe(
             Effect.result
           );
@@ -167,7 +169,7 @@ export function PendingAuthorization({
             const next = channelPollFailure(
               result.failure,
               failures,
-              Date.now(),
+              yield* Clock.currentTimeMillis,
               Date.parse(challenge.expiresAt)
             );
 
@@ -207,7 +209,7 @@ export function PendingAuthorization({
   function complete() {
     if (status !== "confirmed") return;
 
-    if (Date.now() >= Date.parse(challenge.expiresAt)) {
+    if (new Date() >= new Date(challenge.expiresAt)) {
       setStatus("expired");
 
       return;

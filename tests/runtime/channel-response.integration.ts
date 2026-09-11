@@ -83,7 +83,10 @@ test("response source requires accepted inbox state in the exact session", () =>
         leaseSeconds: 60,
       });
 
-      if (!lease) throw new Error("Expected a claimed synthetic inbox fixture");
+      if (!lease)
+        return yield* Effect.fail(
+          new Error("Expected a claimed synthetic inbox fixture")
+        );
 
       const result3 = yield* readChannelResponseContext(input).pipe(
         Effect.result
@@ -138,7 +141,10 @@ test("accepted sources without provider occurrence time do not acquire consent",
         leaseSeconds: 60,
       });
 
-      if (!lease) throw new Error("Expected a claimed synthetic inbox fixture");
+      if (!lease)
+        return yield* Effect.fail(
+          new Error("Expected a claimed synthetic inbox fixture")
+        );
       yield* messaging.markAccepted({
         lease: {
           id: lease.id,
@@ -174,7 +180,9 @@ test("revocation and ambiguous accepted source records reject response context",
         });
 
         if (!lease)
-          throw new Error("Expected a claimed synthetic inbox fixture");
+          return yield* Effect.fail(
+            new Error("Expected a claimed synthetic inbox fixture")
+          );
         yield* messaging.markAccepted({
           lease: {
             id: lease.id,

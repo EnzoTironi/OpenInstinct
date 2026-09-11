@@ -281,6 +281,13 @@ export default defineConfig({
   },
   overrides: [
     {
+      files: ["tests/runtime/**/*.ts"],
+      rules: {
+        "typescript/consistent-return": "off", // Effect.gen fixture guards use `return yield* Effect.fail`
+      },
+    },
+
+    {
       files: [
         "**/env.{js,cjs,mjs,ts,cts,mts}",
         "**/env/**/*.{js,cjs,mjs,ts,cts,mts}",

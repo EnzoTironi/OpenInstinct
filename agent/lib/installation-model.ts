@@ -20,7 +20,7 @@ export const installationModel = Effect.gen(function* () {
     };
 
   const key = yield* Config.schema(
-    Schema.Redacted(Schema.NonEmptyString.check(Schema.isTrimmed())),
+    Schema.RedactedFromValue(Schema.NonEmptyString.check(Schema.isTrimmed())),
     "OPENROUTER_API_KEY"
   );
 

@@ -443,8 +443,9 @@ const makeTransport = Effect.gen(function* () {
       )
         return yield* invalidInput();
 
-      return yield* Effect.forEach(existing, (row) =>
-        Effect.gen(function* () {
+      return yield* Effect.forEach(
+        existing,
+        Effect.fn("ChannelTransport.enqueueExistingDelivery")(function* (row) {
           const payload = yield* Schema.decodeUnknownEffect(
             MessagePayloadSchema
           )(row.payload).pipe(Effect.mapError(invalidInput));
