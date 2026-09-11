@@ -33,5 +33,14 @@ export default defineConfig({
     // Keep simultaneous PGlite initialization bounded while CI runs TS7 and lint.
     maxWorkers: 2,
     setupFiles: ["./tests/setup-env.ts"],
+    // Upstream anti-slop RuleTester suites are not Vitest; exclude so test:app stays green.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/cypress/**",
+      "**/.{idea,git,cache,output,temp}/**",
+      "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*",
+      "tools/oxlint/anti-slop/**",
+    ],
   },
 });

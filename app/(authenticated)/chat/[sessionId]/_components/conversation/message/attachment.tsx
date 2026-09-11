@@ -19,7 +19,7 @@ export function AttachmentPart({ part }: { readonly part: EveFilePart }) {
     <>
       {isImage ? (
         // Browser artifacts use runtime URLs that cannot be declared in Next Image configuration.
-        // oxlint-disable-next-line nextjs/no-img-element -- runtime browser artifact URL
+        // oxlint-disable-next-line next/no-img-element, nextjs/no-img-element, react-doctor/nextjs-no-img-element -- runtime browser artifact URL
         <img
           alt={label}
           className="size-12 shrink-0 rounded-sm object-cover"

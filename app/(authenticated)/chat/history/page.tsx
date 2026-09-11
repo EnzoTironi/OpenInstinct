@@ -83,10 +83,12 @@ export default async function AllChatsPage() {
   );
 }
 
+const chatDateFormatter = new Intl.DateTimeFormat("en", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
 function formatChatDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
+  return chatDateFormatter.format(new Date(value));
 }

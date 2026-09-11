@@ -294,12 +294,11 @@ function formatStreetAddress(
   return [address.line1, address.line2].filter(Boolean).join("\n");
 }
 
+const regionDisplayNames = new Intl.DisplayNames("en", { type: "region" });
+
 function countryName(countryCode: string) {
   try {
-    return (
-      new Intl.DisplayNames("en", { type: "region" }).of(countryCode) ??
-      countryCode
-    );
+    return regionDisplayNames.of(countryCode) ?? countryCode;
   } catch {
     return countryCode;
   }

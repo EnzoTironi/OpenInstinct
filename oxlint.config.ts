@@ -1,12 +1,22 @@
 import { defineConfig } from "oxlint";
 import core from "ultracite/oxlint/core";
+import { jsPluginSettings, selectJsPlugins } from "ultracite/oxlint/js-plugins";
 import next from "ultracite/oxlint/next";
+import nextJsPlugins from "ultracite/oxlint/next/js-plugins";
 import react from "ultracite/oxlint/react";
+
+/** React Doctor only — do not enable Ultracite github/sonarjs JS plugins. */
+const reactDoctorJsPlugins = selectJsPlugins(["react-doctor"]);
 
 /**
  * Ultracite Oxlint presets (core/react/next) plus repository-owned JS plugins.
  * Vendored `tools/oxlint/anti-slop` (generic + Effect) is the anti-slop source
  * of truth — do not also extend `ultracite/oxlint/anti-slop`.
+ *
+ * React Doctor is enabled via Ultracite `selectJsPlugins(["react-doctor"])` and
+ * `ultracite/oxlint/next/js-plugins` (github/sonarjs intentionally omitted).
+ * Root `settings` must include `jsPluginSettings` so curated ported-rule mode
+ * skips Next route-segment export false positives.
  *
  * The Ultracite `vitest` preset is intentionally not extended: its pedantic
  * suite (max-expects, prefer-strict-equal, require-top-level-describe, …)
@@ -15,7 +25,7 @@ import react from "ultracite/oxlint/react";
  * conventions are opted out (Ultracite's documented opt-out model).
  */
 export default defineConfig({
-  extends: [core, react, next],
+  extends: [core, react, next, reactDoctorJsPlugins, nextJsPlugins],
   plugins: [
     "eslint",
     "typescript",
@@ -61,8 +71,12 @@ export default defineConfig({
       specifier: "eslint-plugin-react-hooks",
     },
     "oxlint-tailwindcss",
+    // Declared on the root for Knip/analyzers (Ultracite #784); also loaded via
+    // `reactDoctorJsPlugins` / `nextJsPlugins` extends.
+    ...(reactDoctorJsPlugins.jsPlugins ?? []),
   ],
   settings: {
+    ...jsPluginSettings,
     tailwindcss: {
       entryPoint: "app/globals.css",
     },
@@ -210,6 +224,20 @@ export default defineConfig({
     "hooks/unsupported-syntax": "warn",
     "hooks/use-memo": "error",
 
+    // ── React Doctor opt-outs (Ultracite selectJsPlugins preset) ───────
+    // Keep Next/React anti-patterns; drop rules that conflict with this repo's
+    // Compiler-aware hooks plugin, shadcn/cva export style, or intentional I/O.
+    "react-doctor/react-compiler-no-manual-memoization": "off", // conflicts with hooks/preserve-manual-memoization
+    "react-doctor/only-export-components": "off", // shadcn/cva + helper co-exports are intentional
+    "react-doctor/no-giant-component": "off",
+    "react-doctor/prefer-useReducer": "off",
+    "react-doctor/js-combine-iterations": "off",
+    "react-doctor/js-flatmap-filter": "off",
+    "react-doctor/js-cache-property-access": "off",
+    "react-doctor/js-set-map-lookups": "off",
+    "react-doctor/async-await-in-loop": "off", // sequential autofill/channel I/O is intentional
+    "react-doctor/server-hoist-static-io": "off", // eval dashboards re-read inputs by design
+
     // ── Env boundary ──────────────────────────────────────────────────
     "no-restricted-properties": [
       "error",
@@ -291,6 +319,27 @@ export default defineConfig({
       files: ["web/components/ui/**/*.tsx"],
       rules: {
         "tailwindcss/no-unknown-classes": "off",
+      },
+    },
+    {
+      files: [
+        "web/components/ui/**/*.{ts,tsx}",
+        "web/components/ai-elements/**/*.{ts,tsx}",
+      ],
+      rules: {
+        // Registry / Eve AI Elements surfaces — not app-owned React.
+        "react-doctor/no-adjust-state-on-prop-change": "off",
+        "react-doctor/no-chain-state-updates": "off",
+        "react-doctor/no-usememo-simple-expression": "off",
+        "react-doctor/nextjs-no-img-element": "off",
+        "react-doctor/rerender-state-only-in-handlers": "off",
+      },
+    },
+    {
+      files: ["evals/**/*.{ts,tsx}"],
+      rules: {
+        "react-doctor/server-sequential-independent-await": "off",
+        "react-doctor/js-hoist-intl": "off",
       },
     },
     {

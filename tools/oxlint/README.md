@@ -7,3 +7,5 @@ It is kept local because this public repository cannot depend on Foundation's in
 The `architecture` plugin enforces the repository's production dependency direction across `agent`, `app`, `db`, `shared`, and `web`. Root `proxy.ts` is treated as web-owned. Violations are reported on static imports and exports, dynamic imports, and Vitest or Jest module mocks.
 
 The `anti-slop` plugin vendors the generic rules, shared helpers, Effect plugin, and vendor assets from [`dmmulroy/anti-slop`](https://github.com/dmmulroy/anti-slop) at commit `c44ef22ca116d0ba62a3ff663a0bd13a3f3fa40b`. Its MIT license is included in the plugin folder. Upstream colocated rule tests ship under `rules/` and `effect/rules/`. Refresh those whenever the vendored source is updated.
+
+React Doctor (`oxlint-plugin-react-doctor`) is enabled through Ultracite `selectJsPlugins(["react-doctor"])` plus `ultracite/oxlint/next/js-plugins` in the root `oxlint.config.ts`. Full-project CLI scans: `pnpm react-doctor`.

@@ -10,6 +10,7 @@ const timezoneSchema = z
   .refine(
     (timezone) => {
       try {
+        // oxlint-disable-next-line react-doctor/js-hoist-intl -- timeZone is the value under validation
         new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
 
         return true;

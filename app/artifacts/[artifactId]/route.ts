@@ -7,6 +7,7 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
+// oxlint-disable-next-line react-doctor/nextjs-no-side-effect-in-get-handler -- sets cache/etag response headers after auth, not a mutating CSRF sink
 export async function GET(
   request: Request,
   context: RouteContext<"/artifacts/[artifactId]">

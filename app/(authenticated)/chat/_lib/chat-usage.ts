@@ -57,22 +57,44 @@ export function combineChatUsage(usages: readonly ChatUsage[]): ChatUsage {
   };
 }
 
+const tokenCountFormatterCompact = new Intl.NumberFormat("en", {
+  maximumFractionDigits: 1,
+  notation: "compact",
+});
+
+const tokenCountFormatterStandard = new Intl.NumberFormat("en", {
+  maximumFractionDigits: 1,
+  notation: "standard",
+});
+
+const costFormatterCents = new Intl.NumberFormat("en-US", {
+  currency: "USD",
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2,
+  style: "currency",
+});
+
+const costFormatterFractions = new Intl.NumberFormat("en-US", {
+  currency: "USD",
+  maximumFractionDigits: 4,
+  minimumFractionDigits: 2,
+  style: "currency",
+});
+
 export function formatChatUsage(usage: ChatUsage) {
   const tokens = usage.inputTokens + usage.outputTokens;
 
-  const tokenLabel = `${new Intl.NumberFormat("en", {
-    notation: tokens >= 10_000 ? "compact" : "standard",
-    maximumFractionDigits: 1,
-  }).format(tokens)} tokens`;
+  const tokenFormatter =
+    tokens >= 10_000 ? tokenCountFormatterCompact : tokenCountFormatterStandard;
+
+  const tokenLabel = `${tokenFormatter.format(tokens)} tokens`;
 
   if (usage.costUsd === null) return tokenLabel;
 
-  const costLabel = new Intl.NumberFormat("en-US", {
-    currency: "USD",
-    maximumFractionDigits: usage.costUsd < 0.01 ? 4 : 2,
-    minimumFractionDigits: 2,
-    style: "currency",
-  }).format(usage.costUsd);
+  const costFormatter =
+    usage.costUsd < 0.01 ? costFormatterFractions : costFormatterCents;
+
+  const costLabel = costFormatter.format(usage.costUsd);
 
   return `${tokenLabel} · ${costLabel}`;
 }

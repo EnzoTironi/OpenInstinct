@@ -6,8 +6,11 @@ import { ChatSession } from "./_components/chat-session";
 export default async function ChatSessionPage({
   params,
 }: PageProps<"/chat/[sessionId]">) {
-  const { sessionId } = await params;
-  const scope = await requireRequestScope();
+  const [{ sessionId }, scope] = await Promise.all([
+    params,
+    requireRequestScope(),
+  ]);
+
   const chat = await readChat(scope, sessionId);
 
   return (

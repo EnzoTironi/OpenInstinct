@@ -1,5 +1,6 @@
 import { readVaultItems } from "@db/services/vault";
 import { requireRequestScope } from "@web/auth/request-scope";
+import { Suspense } from "react";
 
 import { VaultAddresses } from "./_components/addresses";
 import { VaultCards } from "./_components/cards";
@@ -20,7 +21,9 @@ export default async function Page() {
   return (
     <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="type-page-title">Vault</h1>
-      <VaultLogins items={itemsByKind.login ?? []} />
+      <Suspense fallback={null}>
+        <VaultLogins items={itemsByKind.login ?? []} />
+      </Suspense>
       <VaultCards items={itemsByKind.payment ?? []} />
       <VaultAddresses items={itemsByKind.address ?? []} />
       <VaultContacts items={itemsByKind.contact ?? []} />

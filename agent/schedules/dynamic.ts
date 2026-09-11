@@ -25,6 +25,10 @@ export default defineSchedule({
 async function dispatchDueWork(to: ScheduleToFn) {
   const now = new Date();
 
+  // Claim must follow materialize (DB write then read). Overlap report recovery.
+  const reportsPromise = listRecoverableScheduledReports(now, 25);
+
+  /* oxlint-disable react-doctor/server-sequential-independent-await -- claim reads rows materialize just wrote */
   const materializedRunIds = await materializeDueScheduledAgentRuns({
     limit: 25,
     now,
@@ -35,8 +39,9 @@ async function dispatchDueWork(to: ScheduleToFn) {
     limit: 25,
     now,
   });
+  /* oxlint-enable react-doctor/server-sequential-independent-await */
 
-  const reports = await listRecoverableScheduledReports(now, 25);
+  const reports = await reportsPromise;
 
   if (materializedRunIds.length > 0 || runs.length > 0 || reports.length > 0) {
     console.info("[scheduled-run] schedule tick found work", {

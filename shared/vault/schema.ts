@@ -243,22 +243,18 @@ export const vaultImportItemsSchema = z
   .max(3_000);
 
 export const vaultSetupRequestSchema = z.union([
-  z
-    .object({
-      identifierType: loginIdentifierTypeSchema,
-      kind: z.literal("login"),
-      label: z.string().trim().min(1).max(120),
-      origin: loginOriginSchema,
-      target: z.literal("vault"),
-    })
-    .strict(),
-  z
-    .object({
-      kind: vaultCreateItemKindSchema.exclude(["login"]),
-      label: z.string().trim().min(1).max(120).optional(),
-      target: z.literal("vault"),
-    })
-    .strict(),
+  z.strictObject({
+    identifierType: loginIdentifierTypeSchema,
+    kind: z.literal("login"),
+    label: z.string().trim().min(1).max(120),
+    origin: loginOriginSchema,
+    target: z.literal("vault"),
+  }),
+  z.strictObject({
+    kind: vaultCreateItemKindSchema.exclude(["login"]),
+    label: z.string().trim().min(1).max(120).optional(),
+    target: z.literal("vault"),
+  }),
 ]);
 
 export type VaultCreateItem = z.infer<typeof vaultCreateItemSchema>;
