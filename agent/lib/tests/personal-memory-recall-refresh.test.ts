@@ -293,12 +293,11 @@ describe("personal memory unstructured forget + recall-refresh", () => {
     expect(indexes.length).toBe(notes.length);
 
     const finalProjection = await Effect.runPromise(
-      Effect.gen(function* () {
+      Effect.fn("personal-memory.finalProjection")(function* () {
         let projection = prior;
         yield* Effect.forEach(
           indexes,
-          (index) =>
-            Effect.gen(function* () {
+          Effect.fn("personal-memory.removeIndex")(function* (index) {
               const refreshed = yield* executeMemoryMutationWithRecallRefresh({
                 mutate: () =>
                   removeMemory.execute(
@@ -320,7 +319,7 @@ describe("personal memory unstructured forget + recall-refresh", () => {
         );
 
         return projection;
-      })
+      })()
     );
 
     for (const text of notes) {

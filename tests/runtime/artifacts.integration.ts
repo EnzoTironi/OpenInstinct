@@ -26,6 +26,9 @@ const artifactProcessResultSchema = Schema.fromJsonString(
 const decodeArtifactProcessResult = Schema.decodeUnknownEffect(
   artifactProcessResultSchema
 );
+const encodeJsonUnknown = Schema.encodeSync(
+  Schema.fromJsonString(Schema.Unknown)
+);
 
 const dependencies = Layer.mergeAll(
   ChannelAccounts.layer,
@@ -55,7 +58,7 @@ const fixture = Effect.fn("artifacts.fixture")(function* (
 
         return sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`.pipe(
           Effect.andThen(sql`DELETE FROM "user" WHERE id = ${identity.userId}`),
-          Effect.orDie
+          Effect.catch((error) => Effect.die(error))
         );
       },
       { concurrency: 1 }
@@ -126,8 +129,7 @@ const source = Effect.fn("artifacts.source")(function* (
 });
 
 test("persists immutable bytes and server-owned source metadata; exact replay returns one ID and same-name new events stay distinct", () =>
-  run(({ artifacts, messaging, owner }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.1")(function* ({ artifacts, messaging, owner }) {
       const input = yield* source(messaging, owner.id);
       const bytes = Buffer.from("private attachment");
       const first = yield* artifacts.put({ ...input, bytes });
@@ -177,8 +179,7 @@ test("persists immutable bytes and server-owned source metadata; exact replay re
   ));
 
 test("concurrent exact source replay has one durable ID", () =>
-  run(({ artifacts, messaging, owner }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.2")(function* ({ artifacts, messaging, owner }) {
       const input = {
         ...(yield* source(messaging, owner.id)),
         bytes: Buffer.from("one source"),
@@ -197,8 +198,7 @@ test("concurrent exact source replay has one durable ID", () =>
   ));
 
 test("source lookup rejects changed source metadata and missing or foreign inbox bindings", () =>
-  run(({ artifacts, messaging, owner, other, sql }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.3")(function* ({ artifacts, messaging, owner, other, sql }) {
       const input = yield* source(messaging, owner.id);
       yield* artifacts.put({ ...input, bytes: Buffer.from("original") });
       expect(
@@ -219,8 +219,7 @@ test("source lookup rejects changed source metadata and missing or foreign inbox
   ));
 
 test("scopes every operation to the current account and membership, and source revocation blocks linked readers", () =>
-  run(({ artifacts, messaging, owner, other, linked, sql }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.4")(function* ({ artifacts, messaging, owner, other, linked, sql }) {
       const file = yield* artifacts.put({
         ...(yield* source(messaging, owner.id)),
         bytes: Buffer.from("account private"),
@@ -283,8 +282,7 @@ test("scopes every operation to the current account and membership, and source r
   ));
 
 test("detects persisted byte corruption before content or derivation can be returned", () =>
-  run(({ artifacts, messaging, owner, sql }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.5")(function* ({ artifacts, messaging, owner, sql }) {
       const file = yield* artifacts.put({
         ...(yield* source(messaging, owner.id)),
         bytes: Buffer.from("good"),
@@ -311,8 +309,7 @@ test("detects persisted byte corruption before content or derivation can be retu
   ));
 
 test("derived text is hash-bound and UTF-8 bounded; deletion wipes bytes and derivatives without resurrection", () =>
-  run(({ artifacts, messaging, owner, sql }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.6")(function* ({ artifacts, messaging, owner, sql }) {
       const input = yield* source(messaging, owner.id);
       const bytes = Buffer.from("source text");
       const file = yield* artifacts.put({ ...input, bytes });
@@ -380,8 +377,7 @@ test("derived text is hash-bound and UTF-8 bounded; deletion wipes bytes and der
   ));
 
 test("database rejects orphan derived text and invalid byte lengths, and source deletion cascades", () =>
-  run(({ artifacts, messaging, owner, sql }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.7")(function* ({ artifacts, messaging, owner, sql }) {
       const input = yield* source(messaging, owner.id);
 
       const file = yield* artifacts.put({
@@ -431,7 +427,7 @@ test("a fresh process reads exact persisted bytes after the writing process and 
           "tsx",
           childPath,
           "put",
-          JSON.stringify(input),
+          encodeJsonUnknown(input),
         ])
       );
 
@@ -443,7 +439,7 @@ test("a fresh process reads exact persisted bytes after the writing process and 
           "tsx",
           childPath,
           "read",
-          JSON.stringify({
+          encodeJsonUnknown({
             identityId: owner.id,
             artifactId: metadata.artifactId,
           }),

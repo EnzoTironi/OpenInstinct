@@ -9,7 +9,13 @@ import {
   channelChallengeIdSchema,
   channelChallengeRequestSchema,
 } from "@shared/identity/channel-auth";
-import { Effect, Result, Schema } from "effect";
+import { Effect, Layer, Option, Result, Schema } from "effect";
+import {
+  FetchHttpClient,
+  Headers as HttpHeaders,
+  HttpClient,
+  HttpClientRequest,
+} from "effect/unstable/http";
 const decodeChannelChallengeRequestSchema = Schema.decodeEffect(channelChallengeRequestSchema);
 const decodeChannelChallengeIdSchema = Schema.decodeEffect(channelChallengeIdSchema);
 const decodeDeviceBindingSchema = Schema.decodeEffect(deviceBindingSchema);
@@ -190,35 +196,59 @@ const requestJson = Effect.fn("channelAuthorization.request")(
       body: string
     ) => Effect.Effect<A, Schema.SchemaError>
   ) {
-    const response = yield* Effect.tryPromise({
-      try: (signal) =>
-        fetch(`/api/auth/channel-auth/${path}`, {
-          ...init,
-          cache: "no-store",
-          credentials: "same-origin",
-          redirect: "error",
-          signal,
-        }),
-      catch: () => channelHttpError(0),
-    });
+    const http = yield* HttpClient.HttpClient;
+    const method = (init.method ?? "GET").toUpperCase();
+    const url = `/api/auth/channel-auth/${path}`;
+    let request =
+      method === "POST"
+        ? HttpClientRequest.post(url)
+        : HttpClientRequest.get(url);
 
-    if (!response.ok)
+    const headers = new Headers(init.headers);
+    if ([...headers.keys()].length > 0) {
+      request = request.pipe(
+        HttpClientRequest.setHeaders(Object.fromEntries(headers.entries()))
+      );
+    }
+
+    if (typeof init.body === "string") {
+      request = request.pipe(
+        HttpClientRequest.bodyText(
+          init.body,
+          headers.get("content-type") ?? "application/json"
+        )
+      );
+    }
+
+    const response = yield* http.execute(request).pipe(
+      Effect.mapError(() => channelHttpError(0)),
+      Effect.provideService(FetchHttpClient.RequestInit, {
+        cache: "no-store",
+        credentials: "same-origin",
+        redirect: "error",
+      })
+    );
+
+    if (response.status < 200 || response.status >= 300)
       return yield* channelHttpError(
         response.status,
-        response.headers.get("Retry-After")
+        Option.getOrNull(HttpHeaders.get(response.headers, "retry-after"))
       );
 
-    const body = yield* Effect.tryPromise({
-      try: () => response.text(),
-      catch: () => channelHttpError(0),
-    });
+    const body = yield* response.text.pipe(
+      Effect.mapError(() => channelHttpError(0))
+    );
 
     return yield* decodeResponse(body).pipe(
       Effect.mapError(() => invalidChannelChallenge(response.status))
     );
   },
-  Effect.timeout("10 seconds"),
-  Effect.catchTag("TimeoutError", () => Effect.fail(channelHttpError(0)))
+  (effect) =>
+    effect.pipe(
+      Effect.timeout("10 seconds"),
+      Effect.catchTag("TimeoutError", () => Effect.fail(channelHttpError(0))),
+      Effect.provide(FetchHttpClient.layer)
+    )
 );
 
 export const startChannelAuthorization = Effect.fn(

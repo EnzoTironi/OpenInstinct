@@ -42,7 +42,7 @@ test("channel callbacks require the current identity, owner, workspace and conve
           Effect.andThen(
             sql`DELETE FROM public."user" WHERE id = ${identity.userId}`
           ),
-          Effect.orDie
+          Effect.catch((error) => Effect.die(error))
         )
       );
       const auth = channelPrincipal(identity, "message-5");

@@ -1,5 +1,6 @@
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { ConfigProvider, Effect } from "effect";
+import { FetchHttpClient } from "effect/unstable/http";
 
 import { InternalCallbackRejected } from "../../../server/internal/callback-auth";
 import { postInternalRequestEffect } from "../internal-request";
@@ -18,6 +19,7 @@ export function postScheduledReport(runId: string) {
       return undefined;
     }).pipe(
       Effect.provide(ResolvedInstallationSecrets.layer),
+      Effect.provide(FetchHttpClient.layer),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromEnv()

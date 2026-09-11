@@ -70,7 +70,7 @@ const fixture = Effect.fn("nativeReports.fixture")(function* (
       Effect.gen(function* () {
         yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
         yield* sql`DELETE FROM "user" WHERE id = ${userId}`;
-      }).pipe(Effect.orDie)
+      }).pipe(Effect.catch((error) => Effect.die(error)))
   );
   yield* sql`INSERT INTO workspace_memberships (workspace_id, user_id, role)
     VALUES (${scope.workspaceId}, ${scope.userId}, 'owner')`;
@@ -104,8 +104,7 @@ test.each(["telegram", "kapso"] as const)(
   "%s recovery keeps exact output IDs despite changed stored outcome",
   (channel) =>
     run(
-      ({ runId, identityId }) =>
-        Effect.gen(function* () {
+      Effect.fn("scheduled.case1")(function* ({ runId, identityId }) {
           const sql = yield* PgClient.PgClient;
           yield* Effect.all(
             [
@@ -135,8 +134,7 @@ test.each(["telegram", "kapso"] as const)(
 );
 
 test("outer PostgreSQL rollback removes both output chunks and their bindings", () =>
-  run(({ runId, identityId }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.1")(function* ({ runId, identityId }) {
       const sql = yield* PgClient.PgClient;
       yield* sql
         .withTransaction(
@@ -163,8 +161,7 @@ test("outer PostgreSQL rollback removes both output chunks and their bindings", 
 test.each(["membership", "identity"] as const)(
   "revoked %s prevents waiting-input delivery",
   (revoke) =>
-    run(({ runId, identityId, workspaceId, userId }) =>
-      Effect.gen(function* () {
+    run(Effect.fn("run.2")(function* ({ runId, identityId, workspaceId, userId }) {
         const sql = yield* PgClient.PgClient;
         yield* sql`UPDATE scheduled_agent_runs SET status = 'waiting_for_input' WHERE id = ${runId}`;
 
@@ -188,8 +185,7 @@ test.each(["membership", "identity"] as const)(
 );
 
 test("identity owner and current membership are independently required", () =>
-  run(({ identityId, workspaceId, userId }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.3")(function* ({ identityId, workspaceId, userId }) {
       yield* requireScheduledChannelOwner({
         conversationChannel: "telegram",
         conversationId: identityId,
@@ -220,8 +216,7 @@ test("identity owner and current membership are independently required", () =>
   ));
 
 test("uncertain output blocks recovery and is never enqueued again", () =>
-  run(({ runId, identityId }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.4")(function* ({ runId, identityId }) {
       const sql = yield* PgClient.PgClient;
       const messaging = yield* Messaging;
       yield* dispatchNativeScheduledReport(runId);
@@ -252,8 +247,7 @@ test("uncertain output blocks recovery and is never enqueued again", () =>
   ));
 
 test("revocation cancels queued chunks and preserves their durable bindings", () =>
-  run(({ runId, identityId }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.5")(function* ({ runId, identityId }) {
       const sql = yield* PgClient.PgClient;
       const messaging = yield* Messaging;
       yield* dispatchNativeScheduledReport(runId);
@@ -286,8 +280,7 @@ test("revocation cancels queued chunks and preserves their durable bindings", ()
   ));
 
 test("membership deletion after enqueue denies transport before configuration or provider I/O", () =>
-  run(({ runId, identityId, workspaceId, userId }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.6")(function* ({ runId, identityId, workspaceId, userId }) {
       const sql = yield* PgClient.PgClient;
       const transport = yield* ChannelTransport;
       yield* dispatchNativeScheduledReport(runId);
@@ -342,8 +335,7 @@ test("membership deletion after enqueue denies transport before configuration or
 test.each(["last", "all"] as const)(
   "missing %s bindings block recovery without regenerating existing chunks",
   (missing) =>
-    run(({ runId, identityId }) =>
-      Effect.gen(function* () {
+    run(Effect.fn("run.7")(function* ({ runId, identityId }) {
         const sql = yield* PgClient.PgClient;
         yield* dispatchNativeScheduledReport(runId);
 
@@ -376,8 +368,7 @@ test.each(["telegram", "kapso"] as const)(
   "legacy report claim leaves %s pending until atomic native enqueue",
   (channel) =>
     run(
-      ({ runId }) =>
-        Effect.gen(function* () {
+      Effect.fn("scheduled.case2")(function* ({ runId }) {
           const sql = yield* PgClient.PgClient;
           expect(
             yield* Effect.tryPromise({
@@ -420,8 +411,7 @@ test.each(["telegram", "kapso"] as const)(
   "%s report delivery attempts the durable outbox immediately and reconciles rejection",
   (channel) =>
     run(
-      ({ runId, identityId }) =>
-        Effect.gen(function* () {
+      Effect.fn("scheduled.case3")(function* ({ runId, identityId }) {
           const sql = yield* PgClient.PgClient;
           yield* sql`UPDATE scheduled_agent_runs SET outcome = ${sql.json({ kind: "result", summary: "Lembrete: revisar a demonstração do Companion.", urgency: "normal" })} WHERE id = ${runId}`;
 
@@ -463,8 +453,7 @@ test.each(["telegram", "kapso"] as const)(
 );
 
 test("native completion hook persists and attempts the report before returning", () =>
-  run(({ runId, identityId, userId, workspaceId }) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.8")(function* ({ runId, identityId, userId, workspaceId }) {
       const sql = yield* PgClient.PgClient;
       const leaseToken = randomUUID();
       const sessionId = randomUUID();

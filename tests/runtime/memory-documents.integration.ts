@@ -32,7 +32,7 @@ const fixture = Effect.fn("memory.fixture")(function* (
   const prefix = `memory-proof/${randomUUID()}/`;
   yield* Effect.acquireRelease(Effect.succeed(prefix), () =>
     sql`DELETE FROM memory_document WHERE left(key, char_length(${prefix})) = ${prefix}`.pipe(
-      Effect.orDie
+      Effect.catch((error) => Effect.die(error))
     )
   );
   yield* body(yield* MemoryDocuments, sql, prefix);
@@ -44,8 +44,7 @@ const run = (body: Parameters<typeof fixture>[0]) =>
   );
 
 test("creates, reads and isolates keys, including an initially empty document", () =>
-  run((documents, _sql, prefix) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.1")(function* (documents, _sql, prefix) {
       expect(yield* documents.read(`${prefix}missing`)).toBeNull();
 
       const first = yield* documents.write({
@@ -69,8 +68,7 @@ test("creates, reads and isolates keys, including an initially empty document", 
   ));
 
 test("concurrent create has exactly one winner and never overwrites it", () =>
-  run((documents, sql, prefix) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.2")(function* (documents, sql, prefix) {
       const key = `${prefix}race-create`;
 
       const results = yield* Effect.all(
@@ -106,8 +104,7 @@ test("concurrent create has exactly one winner and never overwrites it", () =>
   ));
 
 test("concurrent updates have exactly one winner; stale and missing versions conflict", () =>
-  run((documents, _sql, prefix) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.3")(function* (documents, _sql, prefix) {
       const key = `${prefix}race-update`;
 
       const first = yield* documents.write({
@@ -175,8 +172,7 @@ test("concurrent updates have exactly one winner; stale and missing versions con
   ));
 
 test("forgetting persists empty content with a new version across a second service connection", () =>
-  run((documents, sql, prefix) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.4")(function* (documents, sql, prefix) {
       const key = `${prefix}forget`;
 
       const first = yield* documents.write({
@@ -225,8 +221,7 @@ test("forgetting persists empty content with a new version across a second servi
   ));
 
 test("invalid key, oversized content and invalid expected version are typed failures", () =>
-  run((documents, sql, prefix) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.5")(function* (documents, sql, prefix) {
       const valid = {
         key: `${prefix}invalid`,
         content: "bounded",

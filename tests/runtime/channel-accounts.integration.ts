@@ -645,7 +645,7 @@ test("channel identities, browser binding, races and revocation against migrated
               yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${id}`).workspaceId}`;
               yield* sql`DELETE FROM public."user" WHERE id = ${id}`;
             }
-          }).pipe(Effect.orDie)
+          }).pipe(Effect.catch((error) => Effect.die(error)))
         )
       );
     }).pipe(Effect.provide(live))

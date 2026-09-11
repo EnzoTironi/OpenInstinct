@@ -82,15 +82,22 @@ test("real BetterAuth router, signed browser challenge and database session", as
     ],
   });
 
-  const request = (
-    path: string,
-    method: string,
-    cookie = "",
+  const request = (options: {
+    path: string;
+    method: string;
+    cookie?: string;
     body?:
       | typeof channelChallengeIdSchema.Type
-      | typeof channelChallengeRequestSchema.Type,
-    origin = baseURL
-  ) => {
+      | typeof channelChallengeRequestSchema.Type;
+    origin?: string;
+  }) => {
+    const {
+      path,
+      method,
+      cookie = "",
+      body,
+      origin = baseURL,
+    } = options;
     const headers = new Headers({ origin });
 
     if (cookie) headers.set("cookie", cookie);
@@ -107,33 +114,48 @@ test("real BetterAuth router, signed browser challenge and database session", as
   const userIds = new Set<string>();
 
   try {
-    const unavailable = await request("/channel-auth/start", "POST", "", {
+    const unavailable = await request({
+      path: "/channel-auth/start",
+      method: "POST",
+      cookie: "",
+      body: {
       channel: "kapso",
       purpose: "login",
+    },
     });
 
     assert.equal(unavailable.status, 503);
 
-    const forbidden = await request(
-      "/channel-auth/start",
-      "POST",
-      "",
-      { channel: "telegram", purpose: "login" },
-      "https://attacker.invalid"
-    );
+    const forbidden = await request({
+      path: "/channel-auth/start",
+      method: "POST",
+      cookie: "",
+      body: { channel: "telegram", purpose: "login" },
+      origin: "https://attacker.invalid",
+    });
 
     assert.equal(forbidden.status, 403);
 
-    const noSession = await request("/channel-auth/start", "POST", "", {
+    const noSession = await request({
+      path: "/channel-auth/start",
+      method: "POST",
+      cookie: "",
+      body: {
       channel: "telegram",
       purpose: "link",
+    },
     });
 
     assert.equal(noSession.status, 401);
 
-    const started = await request("/channel-auth/start", "POST", "", {
+    const started = await request({
+      path: "/channel-auth/start",
+      method: "POST",
+      cookie: "",
+      body: {
       channel: "telegram",
       purpose: "login",
+    },
     });
 
     assert.equal(started.status, 200);
@@ -155,32 +177,37 @@ test("real BetterAuth router, signed browser challenge and database session", as
     assert.match(setCookie, /Path=\/api\/auth\/channel-auth/iu);
     assert.match(setCookie, /Max-Age=600/iu);
 
-    const noBrowser = await request(
-      `/channel-auth/status?id=${challenge.id}`,
-      "GET"
-    );
+    const noBrowser = await request({
+      path: `/channel-auth/status?id=${challenge.id}`,
+      method: "GET",
+    });
 
     assert.equal(noBrowser.status, 400);
 
-    const tampered = await request(
-      `/channel-auth/status?id=${challenge.id}`,
-      "GET",
-      `${browser}x`
-    );
+    const tampered = await request({
+      path: `/channel-auth/status?id=${challenge.id}`,
+      method: "GET",
+      cookie: `${browser}x`,
+    });
 
     assert.equal(tampered.status, 400);
 
-    const pending = await request(
-      `/channel-auth/status?id=${challenge.id}`,
-      "GET",
-      browser
-    );
+    const pending = await request({
+      path: `/channel-auth/status?id=${challenge.id}`,
+      method: "GET",
+      cookie: browser,
+    });
 
     assert.deepEqual(await pending.json(), { status: "pending" });
     assert.equal(pending.headers.get("cache-control"), "no-store");
 
-    const premature = await request("/channel-auth/complete", "POST", browser, {
+    const premature = await request({
+      path: "/channel-auth/complete",
+      method: "POST",
+      cookie: browser,
+      body: {
       id: challenge.id,
+    },
     });
 
     assert.equal(premature.status, 400);
@@ -198,26 +225,31 @@ test("real BetterAuth router, signed browser challenge and database session", as
       })
     );
 
-    const confirmed = await request(
-      `/channel-auth/status?id=${challenge.id}`,
-      "GET",
-      browser
-    );
+    const confirmed = await request({
+      path: `/channel-auth/status?id=${challenge.id}`,
+      method: "GET",
+      cookie: browser,
+    });
 
     assert.deepEqual(await confirmed.json(), { status: "confirmed" });
 
-    const crossSite = await request(
-      "/channel-auth/complete",
-      "POST",
-      browser,
-      { id: challenge.id },
-      "https://attacker.invalid"
-    );
+    const crossSite = await request({
+      path: "/channel-auth/complete",
+      method: "POST",
+      cookie: browser,
+      body: { id: challenge.id },
+      origin: "https://attacker.invalid",
+    });
 
     assert.equal(crossSite.status, 403);
 
-    const completed = await request("/channel-auth/complete", "POST", browser, {
+    const completed = await request({
+      path: "/channel-auth/complete",
+      method: "POST",
+      cookie: browser,
+      body: {
       id: challenge.id,
+    },
     });
 
     assert.equal(completed.status, 200);
@@ -233,25 +265,34 @@ test("real BetterAuth router, signed browser challenge and database session", as
 
     userIds.add(identity.userId);
     const sessionCookie = cookieHeader(completed);
-    const sessionResponse = await request("/get-session", "GET", sessionCookie);
+    const sessionResponse = await request({
+      path: "/get-session",
+      method: "GET",
+      cookie: sessionCookie,
+    });
     assert.equal(sessionResponse.status, 200);
 
     const authenticated = decodeSchema_Struct_user_Schema_Struct_id_Schema_String(await sessionResponse.json());
 
     assert.equal(authenticated.user.id, identity.userId);
 
-    const replay = await request("/channel-auth/complete", "POST", browser, {
+    const replay = await request({
+      path: "/channel-auth/complete",
+      method: "POST",
+      cookie: browser,
+      body: {
       id: challenge.id,
+    },
     });
 
     assert.equal(replay.status, 400);
 
-    const linking = await request(
-      "/channel-auth/start",
-      "POST",
-      sessionCookie,
-      { channel: "telegram", purpose: "link" }
-    );
+    const linking = await request({
+      path: "/channel-auth/start",
+      method: "POST",
+      cookie: sessionCookie,
+      body: { channel: "telegram", purpose: "link" },
+    });
 
     assert.equal(linking.status, 200);
 
@@ -272,21 +313,21 @@ test("real BetterAuth router, signed browser challenge and database session", as
     );
     const linkBrowser = cookieHeader(linking);
 
-    const missingLinkSession = await request(
-      "/channel-auth/complete",
-      "POST",
-      linkBrowser,
-      { id: linkChallenge.id }
-    );
+    const missingLinkSession = await request({
+      path: "/channel-auth/complete",
+      method: "POST",
+      cookie: linkBrowser,
+      body: { id: linkChallenge.id },
+    });
 
     assert.equal(missingLinkSession.status, 401);
 
-    const linked = await request(
-      "/channel-auth/complete",
-      "POST",
-      `${sessionCookie}; ${linkBrowser}`,
-      { id: linkChallenge.id }
-    );
+    const linked = await request({
+      path: "/channel-auth/complete",
+      method: "POST",
+      cookie: `${sessionCookie}; ${linkBrowser}`,
+      body: { id: linkChallenge.id },
+    });
 
     assert.equal(linked.status, 200);
     assert.equal(
@@ -307,9 +348,14 @@ test("real BetterAuth router, signed browser challenge and database session", as
       KAPSO_PHONE_NUMBER: "+5511999999999",
     });
 
-    const kapsoStarted = await request("/channel-auth/start", "POST", "", {
+    const kapsoStarted = await request({
+      path: "/channel-auth/start",
+      method: "POST",
+      cookie: "",
+      body: {
       channel: "kapso",
       purpose: "login",
+    },
     });
 
     assert.equal(kapsoStarted.status, 200);

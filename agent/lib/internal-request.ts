@@ -1,6 +1,11 @@
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { getVercelOidcToken } from "@vercel/oidc";
 import { Config, ConfigProvider, Effect, Option, Schema } from "effect";
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientRequest,
+} from "effect/unstable/http";
 
 import {
   InternalCallbackRejected,
@@ -59,17 +64,34 @@ export const postInternalRequestEffect = Effect.fn("postInternalRequestEffect")(
       headers = yield* internalCallbackHeaders(route, serialized);
     }
 
-    return yield* Effect.tryPromise({
-      try: (signal) =>
-        fetch(new URL(route, origin), {
-          body: serialized,
-          headers,
-          method: "POST",
-          redirect: "error",
-          signal,
-        }),
-      catch: () => new InternalCallbackRejected({ status: 503 }),
-    }).pipe(Effect.timeout("10 seconds"));
+    const http = yield* HttpClient.HttpClient;
+    const headerRecord = Object.fromEntries(headers.entries());
+    const request = HttpClientRequest.post(new URL(route, origin).href).pipe(
+      HttpClientRequest.setHeaders(headerRecord),
+      HttpClientRequest.bodyText(serialized, "application/json")
+    );
+
+    const response = yield* http.execute(request).pipe(
+      Effect.mapError(() => new InternalCallbackRejected({ status: 503 })),
+      Effect.timeout("10 seconds"),
+      Effect.catchTag(
+        "TimeoutError",
+        () => new InternalCallbackRejected({ status: 503 })
+      ),
+      Effect.provideService(FetchHttpClient.RequestInit, {
+        redirect: "error",
+      })
+    );
+
+    const bodyText = yield* response.text.pipe(
+      Effect.mapError(() => new InternalCallbackRejected({ status: 503 }))
+    );
+
+    return {
+      ok: response.status >= 200 && response.status < 300,
+      status: response.status,
+      json: async () => JSON.parse(bodyText) as unknown,
+    };
   }
 );
 
@@ -80,6 +102,7 @@ export function postInternalRequest<Route extends InternalCallbackRoute>(
   return Effect.runPromise(
     postInternalRequestEffect(route, body).pipe(
       Effect.provide(ResolvedInstallationSecrets.layer),
+      Effect.provide(FetchHttpClient.layer),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromEnv()

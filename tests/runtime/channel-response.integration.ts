@@ -37,7 +37,7 @@ const fixture = Effect.gen(function* () {
       Effect.andThen(
         sql`DELETE FROM public."user" WHERE id = ${identity.userId}`
       ),
-      Effect.orDie
+      Effect.catch((error) => Effect.die(error))
     )
   );
 

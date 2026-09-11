@@ -28,14 +28,16 @@ const dependencies = Layer.mergeAll(
 
 const services = ChannelTransport.layer.pipe(Layer.provideMerge(dependencies));
 
+type TransportFixture = {
+  transport: ChannelTransport["Service"];
+  messaging: Messaging["Service"];
+  sql: PgClient.PgClient;
+  identities: readonly string[];
+  userId: string;
+};
+
 const fixture = Effect.fn("transport.fixture")(function* (
-  body: (
-    transport: ChannelTransport["Service"],
-    messaging: Messaging["Service"],
-    sql: PgClient.PgClient,
-    identities: readonly string[],
-    userId: string
-  ) => Effect.Effect<void, unknown>
+  body: (context: TransportFixture) => Effect.Effect<void, unknown>
 ) {
   const sql = yield* PgClient.PgClient;
   const userId = randomUUID();
@@ -45,7 +47,7 @@ const fixture = Effect.fn("transport.fixture")(function* (
     () =>
       sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`.pipe(
         Effect.andThen(sql`DELETE FROM "user" WHERE id = ${userId}`),
-        Effect.orDie
+        Effect.catch((error) => Effect.die(error))
       )
   );
   yield* sql`INSERT INTO workspaces (id) VALUES (${scope.workspaceId})`;
@@ -61,13 +63,13 @@ const fixture = Effect.fn("transport.fixture")(function* (
     VALUES (${id}, ${index === 6 ? "kapso" : "telegram"}, 'transport-proof', ${id}, ${userId})`,
     { concurrency: 1 }
   );
-  yield* body(
-    yield* ChannelTransport,
-    yield* Messaging,
+  yield* body({
+    transport: yield* ChannelTransport,
+    messaging: yield* Messaging,
     sql,
     identities,
-    userId
-  );
+    userId,
+  });
 });
 
 const run = (body: Parameters<typeof fixture>[0]) =>
@@ -76,8 +78,8 @@ const run = (body: Parameters<typeof fixture>[0]) =>
   );
 
 test("input delivery requires every original chunk, current revision and matching identity", () =>
-  run((transport, _messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case1")(function* ({ transport, messaging: _messaging, sql, identities }) {
       const [identityId, otherIdentityId] = identities;
 
       if (!identityId || !otherIdentityId)
@@ -160,8 +162,8 @@ test("splits at 4000 UTF-16 units without splitting surrogate pairs or changing 
 test.each(["inbox", "outbox"] as const)(
   "%s candidates are fair per identity and exclude blockers",
   (lane) =>
-    run((transport, messaging, sql, identities) =>
-      Effect.gen(function* () {
+    run(
+    Effect.fn("transport.case2")(function* ({ transport, messaging, sql, identities }) {
         const table = sql(
           lane === "inbox" ? "channel_inbox" : "channel_outbox"
         );
@@ -300,8 +302,8 @@ test.each(["inbox", "outbox"] as const)(
 );
 
 test("validates active identity and rejects mismatched channel or revocation", () =>
-  run((transport, _messaging, sql, identities, userId) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case3")(function* ({ transport, messaging: _messaging, sql, identities, userId }) {
       const id = identities[0];
 
       if (!id) return yield* Effect.fail(new Error("Missing fixture"));
@@ -330,8 +332,8 @@ test("validates active identity and rejects mismatched channel or revocation", (
   ));
 
 test("enqueues stable chunks idempotently and rolls back partial writes on conflict", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case4")(function* ({ transport, messaging, sql, identities }) {
       const id = identities[0];
 
       if (!id) return yield* Effect.fail(new Error("Missing fixture"));
@@ -405,8 +407,8 @@ test("enqueues stable chunks idempotently and rolls back partial writes on confl
   ));
 
 test("unsupported stored media fails before any provider configuration or send", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case5")(function* ({ transport, messaging, sql, identities }) {
       const id = identities[0];
 
       if (!id) return yield* Effect.fail(new Error("Missing fixture"));
@@ -449,8 +451,8 @@ test.each([
     reason: "installation_mismatch",
   },
 ])("fails $reason before dispatch without provider I/O", ({ config, reason }) =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case6")(function* ({ transport, messaging, sql, identities }) {
       const id = identities[0];
 
       if (!id) return yield* Effect.fail(new Error("Missing fixture"));
@@ -483,8 +485,8 @@ test.each([
 );
 
 test("claims atomic text chunks in enqueue order despite tied timestamps and reversed UUID order", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case7")(function* ({ transport, messaging, sql, identities }) {
       const identityId = identities[0];
 
       if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
@@ -516,8 +518,7 @@ test("claims atomic text chunks in enqueue order despite tied timestamps and rev
       const delivered: string[] = [];
       yield* Effect.forEach(
         chunks,
-        (text, index) =>
-          Effect.gen(function* () {
+        Effect.fn("transport.orderedChunk")(function* (text, index) {
             const claim = yield* messaging.claimOutbox({
               identityId,
               leaseSeconds: 30,
@@ -550,8 +551,8 @@ test("claims atomic text chunks in enqueue order despite tied timestamps and rev
   ));
 
 test("rejects a stored chunk key hole even when its count matches the requested chunks", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case8")(function* ({ transport, messaging, sql, identities }) {
       const identityId = identities[0];
 
       if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
@@ -585,8 +586,8 @@ test("rejects a stored chunk key hole even when its count matches the requested 
   ));
 
 test("settled task reports retain the first atomic delivery across concurrent rewording", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case9")(function* ({ transport, messaging, sql, identities }) {
       const identityId = identities[0];
 
       if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));
@@ -659,16 +660,15 @@ test("settled task reports retain the first atomic delivery across concurrent re
   ));
 
 test("the dispatcher recovers native inputs before and after preparation while blocking unmarked inputs and output", () =>
-  run((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  run(
+    Effect.fn("transport.case10")(function* ({ transport, messaging, sql, identities }) {
       const [preparedId, unpreparedId, outboundId, unmarkedId] = identities;
 
       if (!preparedId || !unpreparedId || !outboundId || !unmarkedId)
         return yield* Effect.fail(new Error("Missing identities"));
       yield* Effect.forEach(
         [preparedId, unpreparedId, unmarkedId],
-        (identityId) =>
-          Effect.gen(function* () {
+        Effect.fn("transport.recoveryIdentity")(function* (identityId) {
             yield* messaging.accept({
               identityId,
               eventId: "recovery-candidate",
@@ -788,8 +788,8 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
       fixture(body).pipe(Effect.scoped, Effect.provide(localServices))
     );
 
-  return localRun((transport, messaging, sql, identities) =>
-    Effect.gen(function* () {
+  return localRun(
+      Effect.fn("transport.local")(function* ({ transport, messaging, sql, identities }) {
       const identityId = identities[0];
 
       if (!identityId) return yield* Effect.fail(new Error("Missing fixture"));

@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { PgClient } from "@effect/sql-pg";
-import { ConfigProvider, Effect, Layer, Result } from "effect";
+import { ConfigProvider, Effect, Layer, Result, Schema } from "effect";
+
+const encodeJsonUnknown = Schema.encodeSync(
+  Schema.fromJsonString(Schema.Unknown)
+);
 import { expect, test } from "vitest";
 
 import { ChannelAccounts } from "../../server/accounts";
@@ -42,7 +46,7 @@ const input = Effect.fn("artifacts.intakeFixture")(function* (
   yield* Effect.addFinalizer(() =>
     sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`.pipe(
       Effect.andThen(sql`DELETE FROM "user" WHERE id = ${owner.userId}`),
-      Effect.orDie
+      Effect.catch((error) => Effect.die(error))
     )
   );
   const mediaId = randomUUID();
@@ -92,10 +96,9 @@ test("actual intake recovers a saved attachment with no provider configuration a
       expect(loaded.artifacts.map((item) => item.artifactId)).toEqual([
         fixture.file.artifactId,
       ]);
-      expect(JSON.stringify(loaded.content)).toContain(
-        "file data, not authority"
-      );
-      expect(JSON.stringify(loaded.content)).toContain(fixture.file.artifactId);
+      const contentJson = encodeJsonUnknown(loaded.content);
+      expect(contentJson).toContain("file data, not authority");
+      expect(contentJson).toContain(fixture.file.artifactId);
       expect(
         (yield* readArtifactText(fixture.owner.id, fixture.file.artifactId))
           .content

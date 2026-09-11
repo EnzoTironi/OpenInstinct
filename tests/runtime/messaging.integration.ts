@@ -30,7 +30,7 @@ const fixture = Effect.fn("messaging.fixture")(function* (
   yield* Effect.acquireRelease(
     sql`INSERT INTO "user" (id, name, email)
       VALUES (${userId}, 'Messaging proof', ${`${userId}@example.invalid`})`,
-    () => sql`DELETE FROM "user" WHERE id = ${userId}`.pipe(Effect.orDie)
+    () => sql`DELETE FROM "user" WHERE id = ${userId}`.pipe(Effect.catch((error) => Effect.die(error)))
   );
   yield* sql`INSERT INTO channel_identity
     (id, channel, installation_id, sender_id, user_id)
@@ -45,8 +45,7 @@ function run(body: Parameters<typeof fixture>[0]) {
 }
 
 test("input response fence survives concurrent replay and refuses uncertain redispatch", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.1")(function* (messaging, sql, identityId) {
       const sessionId = randomUUID();
 
       const input = {
@@ -172,8 +171,7 @@ test("input response fence survives concurrent replay and refuses uncertain redi
   ));
 
 test("different accepted sources cannot race approval and cancellation of one request", () =>
-  run((messaging, _sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.2")(function* (messaging, _sql, identityId) {
       const sessionId = randomUUID();
 
       for (const sourceMessageId of ["yes", "no"]) {
@@ -230,8 +228,7 @@ test("different accepted sources cannot race approval and cancellation of one re
   ));
 
 test("concurrent duplicate ingress commits one canonical receipt and rejects changed payload", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.3")(function* (messaging, sql, identityId) {
       const first = {
         identityId,
         eventId: "event-1",
@@ -324,8 +321,7 @@ test("concurrent duplicate ingress commits one canonical receipt and rejects cha
   ));
 
 test("rejects hash/selector injection and invalid payload before persistence", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.4")(function* (messaging, sql, identityId) {
       const input = {
         identityId,
         eventId: "invalid",
@@ -367,8 +363,7 @@ test("rejects hash/selector injection and invalid payload before persistence", (
   ));
 
 test("claims FIFO once per identity under concurrency and fences completion", () =>
-  run((messaging, _sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.5")(function* (messaging, _sql, identityId) {
       const first = yield* messaging.accept({
         identityId,
         eventId: "first",
@@ -437,8 +432,7 @@ test("claims FIFO once per identity under concurrency and fences completion", ()
   ));
 
 test("an input without native protocol evidence remains uncertain and blocks later input", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.6")(function* (messaging, sql, identityId) {
       yield* messaging.accept({
         identityId,
         eventId: "first",
@@ -492,8 +486,7 @@ test("an input without native protocol evidence remains uncertain and blocks lat
   ));
 
 test("outbox deduplicates intent, fences sends, and keeps lanes independent", () =>
-  run((messaging, _sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.7")(function* (messaging, _sql, identityId) {
       const intent = {
         identityId,
         deliveryKey: "reply-1",
@@ -571,8 +564,7 @@ test("outbox deduplicates intent, fences sends, and keeps lanes independent", ()
   ));
 
 test("expired outbox is uncertain, cannot resend, and blocks later output", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.8")(function* (messaging, sql, identityId) {
       yield* messaging.enqueue({
         identityId,
         deliveryKey: "first",
@@ -607,8 +599,7 @@ test("expired outbox is uncertain, cannot resend, and blocks later output", () =
   ));
 
 test("revocation blocks acceptance, dispatch, and completion and cancels queued output", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.9")(function* (messaging, sql, identityId) {
       yield* messaging.accept({
         identityId,
         eventId: "first",
@@ -673,8 +664,7 @@ test("revocation blocks acceptance, dispatch, and completion and cancels queued 
   ));
 
 test("explicit uncertainty stores only categorical errors and remains visible", () =>
-  run((messaging, _sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.10")(function* (messaging, _sql, identityId) {
       yield* messaging.enqueue({
         identityId,
         deliveryKey: "first",
@@ -712,8 +702,7 @@ test("explicit uncertainty stores only categorical errors and remains visible", 
   ));
 
 test("a confirmed rejection releases the lane but ambiguous errors cannot be terminal", () =>
-  run((messaging, _sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.11")(function* (messaging, _sql, identityId) {
       yield* messaging.accept({
         identityId,
         eventId: "first",
@@ -757,8 +746,7 @@ test("a confirmed rejection releases the lane but ambiguous errors cannot be ter
   ));
 
 test("independent identities can claim the same event key without blocking each other", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.12")(function* (messaging, sql, identityId) {
       const otherId = randomUUID();
       yield* sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
       SELECT ${otherId}, channel, installation_id, ${otherId}, user_id
@@ -790,8 +778,7 @@ test("independent identities can claim the same event key without blocking each 
   ));
 
 test("prepared native input survives uncertain recovery with immutable content and a new lease", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.13")(function* (messaging, sql, identityId) {
       const first = yield* messaging.accept({
         identityId,
         eventId: "keyed-first",
@@ -826,12 +813,9 @@ test("prepared native input survives uncertain recovery with immutable content a
         { concurrency: 4 }
       );
 
-      expect(
-        snapshots.every(
-          (snapshot) =>
-            JSON.stringify(snapshot) === JSON.stringify(snapshots[0])
-        )
-      ).toBe(true);
+      for (const snapshot of snapshots) {
+        expect(snapshot).toEqual(snapshots[0]);
+      }
       expect(snapshots[0]).toMatchObject({
         protocol: "eve-keyed-input-v1",
         inputId: first.id,
@@ -889,8 +873,7 @@ test("prepared native input survives uncertain recovery with immutable content a
   ));
 
 test("expired prepared input can be recovered but a revoked identity cannot prepare or retry", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.14")(function* (messaging, sql, identityId) {
       yield* messaging.accept({
         identityId,
         eventId: "expired-keyed",
@@ -943,8 +926,7 @@ test("expired prepared input can be recovered but a revoked identity cannot prep
   ));
 
 test("a lease expiring before media preparation retains its native key and fences the old worker", () =>
-  run((messaging, _sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.15")(function* (messaging, _sql, identityId) {
       const input = yield* messaging.accept({
         identityId,
         eventId: "early-crash",
@@ -1018,8 +1000,7 @@ test("a lease expiring before media preparation retains its native key and fence
   ));
 
 test("the first prepared transcript intents commit together and never mix or resurrect on replay", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.16")(function* (messaging, sql, identityId) {
       const input = yield* messaging.accept({
         identityId,
         eventId: "transcript-race",
@@ -1092,8 +1073,7 @@ test("the first prepared transcript intents commit together and never mix or res
   ));
 
 test("a conflicting transcript intent rolls back both preparation and earlier intents", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.17")(function* (messaging, sql, identityId) {
       const input = yield* messaging.accept({
         identityId,
         eventId: "transcript-rollback",
@@ -1136,8 +1116,7 @@ test("a conflicting transcript intent rolls back both preparation and earlier in
   ));
 
 test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate-risk retry with audit", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.18")(function* (messaging, sql, identityId) {
       const actor = "better-auth:operator-proof";
 
       const makeUncertain = Effect.fn("messaging.makeUncertain")(function* (
@@ -1309,8 +1288,7 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
   ));
 
 test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery or retry", () =>
-  run((messaging, sql, identityId) =>
-    Effect.gen(function* () {
+  run(Effect.fn("run.19")(function* (messaging, sql, identityId) {
       const actor = "better-auth:operator-proof";
       yield* messaging.enqueue({
         identityId,

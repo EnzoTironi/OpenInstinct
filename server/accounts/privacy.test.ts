@@ -60,6 +60,14 @@ const sqlMock = vi.hoisted(() =>
   )
 );
 
+function mockPgClientService(
+  sql: typeof sqlMock & {
+    withTransaction: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+  }
+): typeof PgClient.PgClient.Service {
+  return sql as never;
+}
+
 function privacyRuntime() {
   const sql = Object.assign(sqlMock, {
     withTransaction: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
@@ -76,10 +84,7 @@ function privacyRuntime() {
           return Effect.die("wipe must not run without auth");
         },
       }),
-      Layer.succeed(
-        PgClient.PgClient,
-        sql as unknown as typeof PgClient.PgClient.Service
-      )
+      Layer.succeed(PgClient.PgClient, mockPgClientService(sql))
     )
   );
 }
