@@ -65,20 +65,36 @@ function navigationDomain(event: {
 
 function maybeAddNavigationDomain(
   domains: Set<string>,
-  event: {
-    data?: {
-      parent_frame_id?: unknown;
-      target_type?: string;
-      url?: string;
-    };
-    type: string;
-  }
+  event: { data?: unknown; type: string }
 ) {
-  if (!isPageNavigationEvent(event)) {
+  if (event.type !== "page_navigation") {
     return;
   }
 
-  const domain = navigationDomain(event);
+  const data = event.data;
+
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("url" in data) ||
+    typeof data.url !== "string"
+  ) {
+    return;
+  }
+
+  if ("parent_frame_id" in data && data.parent_frame_id) {
+    return;
+  }
+
+  if (
+    "target_type" in data &&
+    data.target_type &&
+    data.target_type !== "page"
+  ) {
+    return;
+  }
+
+  const domain = domainFromUrl(data.url);
 
   if (domain) {
     domains.add(domain);

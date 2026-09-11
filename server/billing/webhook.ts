@@ -143,7 +143,9 @@ function checkoutSubjects(metadata: Stripe.Metadata) {
   return { plan, subjectId, subjectType };
 }
 
-async function syncCheckoutSubscription(subscriptionId: string | undefined) {
+async function syncCheckoutSubscription(
+  subscriptionId: string | null | undefined
+) {
   if (!subscriptionId) {
     return;
   }

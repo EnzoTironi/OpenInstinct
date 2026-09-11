@@ -18,7 +18,7 @@ function isSessionOwner(
 ) {
   return (
     responder.principalType === "user" &&
-    Boolean(initiator) &&
+    initiator != null &&
     responder.principalId === initiator.principalId
   );
 }

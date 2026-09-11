@@ -35,7 +35,10 @@ function recordSubagentCompletions(
 
 function recordTaskFromAction(
   tasks: Map<string, string>,
-  action: { callId: string; description: string; kind: string }
+  action: Extract<
+    MessageStreamEvent,
+    { type: "actions.requested" }
+  >["data"]["actions"][number]
 ) {
   if (action.kind !== "subagent-call" && action.kind !== "remote-agent-call") {
     return;
