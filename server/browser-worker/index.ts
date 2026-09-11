@@ -22,6 +22,76 @@ const decodeSchema_String_check_Schema_isUUID = Schema.decodeUnknownEffect(
   Schema.String.check(Schema.isUUID())
 );
 
+type AccessScope = ReturnType<typeof accessScopeForUser>;
+
+const authorizeScheduledWorker = Effect.fn(
+  "BrowserWorkerAccess.authorizeScheduledWorker"
+)(function* (principal: SessionAuthContext, scope: AccessScope) {
+  const runId = yield* decodeIdentifier(
+    principal.attributes.scheduledRunId
+  ).pipe(
+    Effect.mapError(
+      () => new BrowserWorkerAccessError({ reason: "lease_inactive" })
+    )
+  );
+
+  const leaseToken = yield* decodeIdentifier(
+    principal.attributes.scheduledRunLeaseToken
+  ).pipe(
+    Effect.mapError(
+      () => new BrowserWorkerAccessError({ reason: "lease_inactive" })
+    )
+  );
+
+  yield* requireBrowserWorkerLease(scope, runId, leaseToken);
+  const scheduleId = principal.attributes.scheduleId;
+
+  if (scheduleId === undefined) return;
+
+  const id = yield* decodeIdentifier(scheduleId).pipe(
+    Effect.mapError(() => new BrowserWorkerAccessError({ reason: "paused" }))
+  );
+
+  yield* requireBrowserWorkerScheduleActive(scope, id);
+});
+
+const authorizeChannelOrWeb = Effect.fn(
+  "BrowserWorkerAccess.authorizeChannelOrWeb"
+)(function* (principal: SessionAuthContext, scope: AccessScope) {
+  if (
+    principal.authenticator === "verified-channel" ||
+    Schema.is(channelProviderSchema)(principal.attributes.conversationChannel)
+  ) {
+    const identityId = yield* decodeSchema_String_check_Schema_isUUID(
+      principal.attributes.channelIdentityId
+    ).pipe(
+      Effect.mapError(() => new BrowserWorkerAccessError({ reason: "revoked" }))
+    );
+
+    yield* requireBrowserWorkerChannelIdentity(scope, identityId);
+
+    return;
+  }
+
+  if (principal.authenticator === "authjs") {
+    const sessionId = yield* decodeIdentifier(
+      principal.attributes.authSessionId
+    ).pipe(
+      Effect.mapError(
+        () => new BrowserWorkerAccessError({ reason: "unauthenticated" })
+      )
+    );
+
+    yield* requireBrowserWorkerWebSession(scope, sessionId);
+
+    return;
+  }
+
+  if (principal.authenticator !== "scheduled-worker") {
+    yield* requireBrowserWorkerMembership(scope);
+  }
+});
+
 const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
   function* (principal: SessionAuthContext) {
     if (principal.principalType !== "user")
@@ -42,62 +112,10 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       });
 
     if (principal.authenticator === "scheduled-worker") {
-      const runId = yield* decodeIdentifier(
-        principal.attributes.scheduledRunId
-      ).pipe(
-        Effect.mapError(
-          () => new BrowserWorkerAccessError({ reason: "lease_inactive" })
-        )
-      );
-
-      const leaseToken = yield* decodeIdentifier(
-        principal.attributes.scheduledRunLeaseToken
-      ).pipe(
-        Effect.mapError(
-          () => new BrowserWorkerAccessError({ reason: "lease_inactive" })
-        )
-      );
-
-      yield* requireBrowserWorkerLease(scope, runId, leaseToken);
-      const scheduleId = principal.attributes.scheduleId;
-
-      if (scheduleId !== undefined) {
-        const id = yield* decodeIdentifier(scheduleId).pipe(
-          Effect.mapError(
-            () => new BrowserWorkerAccessError({ reason: "paused" })
-          )
-        );
-
-        yield* requireBrowserWorkerScheduleActive(scope, id);
-      }
+      yield* authorizeScheduledWorker(principal, scope);
     }
 
-    if (
-      principal.authenticator === "verified-channel" ||
-      Schema.is(channelProviderSchema)(principal.attributes.conversationChannel)
-    ) {
-      const identityId = yield* decodeSchema_String_check_Schema_isUUID(
-        principal.attributes.channelIdentityId
-      ).pipe(
-        Effect.mapError(
-          () => new BrowserWorkerAccessError({ reason: "revoked" })
-        )
-      );
-
-      yield* requireBrowserWorkerChannelIdentity(scope, identityId);
-    } else if (principal.authenticator === "authjs") {
-      const sessionId = yield* decodeIdentifier(
-        principal.attributes.authSessionId
-      ).pipe(
-        Effect.mapError(
-          () => new BrowserWorkerAccessError({ reason: "unauthenticated" })
-        )
-      );
-
-      yield* requireBrowserWorkerWebSession(scope, sessionId);
-    } else if (principal.authenticator !== "scheduled-worker") {
-      yield* requireBrowserWorkerMembership(scope);
-    }
+    yield* authorizeChannelOrWeb(principal, scope);
 
     return scope;
   },
