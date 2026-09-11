@@ -220,40 +220,27 @@ export async function fillWithKernelNativeAutofill({
   );
 }
 
-async function fillNativeLoginControls(
+const controlIsFocused = (control: { readonly focused: boolean }) =>
+  control.focused;
+
+const sameFrameAsFocused = <
+  T extends { readonly frameId: string; readonly sessionId: string },
+>(
+  focused: T
+) => {
+  return (control: T) =>
+    control.frameId === focused.frameId &&
+    control.sessionId === focused.sessionId;
+};
+
+async function applyNativeLoginFills(
   connection: CdpConnection,
-  sessionIds: readonly string[],
-  claims: readonly AutofillClaim[],
+  fills: readonly {
+    readonly control: Parameters<typeof fillNativeLoginControl>[1];
+    readonly value: string;
+  }[],
   expectedOrigin: string
 ) {
-  const controls = await inspectNativeLoginControls(
-    connection,
-    sessionIds,
-    expectedOrigin
-  );
-
-  const focused = controls.find((control) => control.focused);
-
-  if (!focused) {
-    throw new Error(
-      "Focus a visible username, email, phone, or current-password field and retry."
-    );
-  }
-
-  const sameFrame = controls.filter(
-    (control) =>
-      control.frameId === focused.frameId &&
-      control.sessionId === focused.sessionId
-  );
-
-  const fills = selectNativeLoginFills(sameFrame, claims);
-
-  if (fills.length === 0) {
-    throw new Error(
-      "The focused login form does not accept a field available in this saved login."
-    );
-  }
-
   /* oxlint-disable eslint/no-await-in-loop -- Login fields must be filled in DOM order so page validation sees coherent intermediate state. */
   for (const { control, value } of fills) {
     const accepted = await fillNativeLoginControl(
@@ -269,8 +256,40 @@ async function fillNativeLoginControls(
       );
     }
   }
-
   /* oxlint-enable eslint/no-await-in-loop */
+}
+
+async function fillNativeLoginControls(
+  connection: CdpConnection,
+  sessionIds: readonly string[],
+  claims: readonly AutofillClaim[],
+  expectedOrigin: string
+) {
+  const controls = await inspectNativeLoginControls(
+    connection,
+    sessionIds,
+    expectedOrigin
+  );
+
+  const focused = controls.find(controlIsFocused);
+
+  if (!focused) {
+    throw new Error(
+      "Focus a visible username, email, phone, or current-password field and retry."
+    );
+  }
+
+  const sameFrame = controls.filter(sameFrameAsFocused(focused));
+  const fills = selectNativeLoginFills(sameFrame, claims);
+
+  if (fills.length === 0) {
+    throw new Error(
+      "The focused login form does not accept a field available in this saved login."
+    );
+  }
+
+  await applyNativeLoginFills(connection, fills, expectedOrigin);
+
   return fills.length;
 }
 
@@ -649,6 +668,97 @@ async function markNativeAutofilledControls(
   }
 }
 
+const isActivePageTarget = (target: {
+  readonly type: string;
+  readonly url: string;
+}) => target.type === "page" && isWebUrl(target.url);
+
+const frameIdOf = (frame: { readonly id: string }) => frame.id;
+
+const isIframeInFrames = (frameIds: ReadonlySet<string>) => {
+  return (target: { readonly targetId: string; readonly type: string }) =>
+    target.type === "iframe" && frameIds.has(target.targetId);
+};
+
+const ignoreDetachError = () => undefined;
+
+async function attachIframeSessions(
+  connection: CdpConnection,
+  iframeTargets: readonly { readonly targetId: string }[],
+  sessionIds: string[]
+) {
+  /* oxlint-disable eslint/no-await-in-loop -- CDP target attachment mutates one connection and session IDs are collected in target order. */
+  for (const iframeTarget of iframeTargets) {
+    const attached = attachedTargetSchema.safeParse(
+      await connection
+        .send("Target.attachToTarget", {
+          flatten: true,
+          targetId: iframeTarget.targetId,
+        })
+        .catch(ignoreDetachError)
+    );
+
+    if (attached.success) sessionIds.push(attached.data.sessionId);
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
+}
+
+async function detachSessions(
+  connection: CdpConnection,
+  sessionIds: readonly string[]
+) {
+  await Promise.all(
+    sessionIds.map((sessionId) =>
+      connection
+        .send("Target.detachFromTarget", { sessionId })
+        .catch(ignoreDetachError)
+    )
+  );
+}
+
+async function runOnAttachedPage<T>(
+  connection: CdpConnection,
+  target: { readonly targetId: string; readonly url: string },
+  targetInfos: readonly {
+    readonly targetId: string;
+    readonly type: string;
+  }[],
+  operation: (page: {
+    readonly connection: CdpConnection;
+    readonly origin: string;
+    readonly sessionId: readonly string[];
+  }) => Promise<T>
+) {
+  const { sessionId: pageSessionId } = attachedTargetSchema.parse(
+    await connection.send("Target.attachToTarget", {
+      flatten: true,
+      targetId: target.targetId,
+    })
+  );
+
+  const sessionIds = [pageSessionId];
+
+  try {
+    await connection.send("Page.enable", undefined, pageSessionId);
+
+    const { frameTree } = frameTreeSchema.parse(
+      await connection.send("Page.getFrameTree", undefined, pageSessionId)
+    );
+
+    const frameIds = new Set(flattenFrames(frameTree).map(frameIdOf));
+    const iframeTargets = targetInfos.filter(isIframeInFrames(frameIds));
+    await attachIframeSessions(connection, iframeTargets, sessionIds);
+
+    return await operation({
+      connection,
+      origin: new URL(target.url).origin,
+      sessionId: sessionIds,
+    });
+  } finally {
+    await detachSessions(connection, sessionIds);
+  }
+}
+
 async function withKernelPage<T>(
   browserSessionId: string,
   signal: AbortSignal | undefined,
@@ -671,63 +781,11 @@ async function withKernelPage<T>(
       await connection.send("Target.getTargets")
     );
 
-    const target = targetInfos.findLast(
-      ({ type, url }) => type === "page" && isWebUrl(url)
-    );
+    const target = targetInfos.findLast(isActivePageTarget);
 
     if (!target) throw new Error("No active browser tab was found.");
 
-    const { sessionId: pageSessionId } = attachedTargetSchema.parse(
-      await connection.send("Target.attachToTarget", {
-        flatten: true,
-        targetId: target.targetId,
-      })
-    );
-
-    const sessionIds = [pageSessionId];
-
-    try {
-      await connection.send("Page.enable", undefined, pageSessionId);
-
-      const { frameTree } = frameTreeSchema.parse(
-        await connection.send("Page.getFrameTree", undefined, pageSessionId)
-      );
-
-      const frameIds = new Set(flattenFrames(frameTree).map(({ id }) => id));
-
-      const iframeTargets = targetInfos.filter(
-        ({ targetId, type }) => type === "iframe" && frameIds.has(targetId)
-      );
-
-      /* oxlint-disable eslint/no-await-in-loop -- CDP target attachment mutates one connection and session IDs are collected in target order. */
-      for (const iframeTarget of iframeTargets) {
-        const attached = attachedTargetSchema.safeParse(
-          await connection
-            .send("Target.attachToTarget", {
-              flatten: true,
-              targetId: iframeTarget.targetId,
-            })
-            .catch(() => undefined)
-        );
-
-        if (attached.success) sessionIds.push(attached.data.sessionId);
-      }
-      /* oxlint-enable eslint/no-await-in-loop */
-
-      return await operation({
-        connection,
-        origin: new URL(target.url).origin,
-        sessionId: sessionIds,
-      });
-    } finally {
-      await Promise.all(
-        sessionIds.map((sessionId) =>
-          connection
-            .send("Target.detachFromTarget", { sessionId })
-            .catch(() => undefined)
-        )
-      );
-    }
+    return await runOnAttachedPage(connection, target, targetInfos, operation);
   } finally {
     connection.close();
   }
@@ -834,34 +892,53 @@ class CdpConnection {
     this.socket.close();
   }
 
+  #parseCdpRawMessage(data: string) {
+    try {
+      const parsed = cdpValueSchema.safeParse(JSON.parse(data));
+
+      if (!parsed.success) return undefined;
+
+      return parsed.data;
+    } catch {
+      return undefined;
+    }
+  }
+
+  #settlePendingResponse(
+    pending: {
+      readonly reject: (cause?: unknown) => void;
+      readonly resolve: (
+        value: z.infer<typeof cdpValueSchema> | undefined
+      ) => void;
+    },
+    message: z.infer<typeof cdpResponseSchema>
+  ) {
+    if (message.error) {
+      pending.reject(new Error(message.error.message));
+
+      return;
+    }
+
+    pending.resolve(message.result);
+  }
+
   #onMessage(event: MessageEvent) {
     const eventData = z.string().safeParse(event.data);
 
     if (!eventData.success) return;
-    let rawMessage: z.infer<typeof cdpValueSchema>;
+    const rawMessage = this.#parseCdpRawMessage(eventData.data);
 
-    try {
-      const parsed = cdpValueSchema.safeParse(JSON.parse(eventData.data));
-
-      if (!parsed.success) return;
-      rawMessage = parsed.data;
-    } catch {
-      return;
-    }
-
+    if (!rawMessage) return;
     const message = cdpResponseSchema.safeParse(rawMessage);
 
-    if (!message.success || message.data.id === undefined) return;
+    if (!message.success) return;
+
+    if (message.data.id === undefined) return;
     const pending = this.#pending.get(message.data.id);
 
     if (!pending) return;
     this.#pending.delete(message.data.id);
-
-    if (message.data.error) {
-      pending.reject(new Error(message.data.error.message));
-    } else {
-      pending.resolve(message.data.result);
-    }
+    this.#settlePendingResponse(pending, message.data);
   }
 
   #rejectPending(error: Error) {
