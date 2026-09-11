@@ -20,6 +20,27 @@ const cases = [
   },
 ] as const;
 
+function hasOneSession(ids: readonly string[]) {
+  return ids.length === 1;
+}
+
+function isDefined(value: string | undefined) {
+  return value !== undefined;
+}
+
+function deliveryIncludesText(
+  expectedDelivery: string,
+  input: Parameters<typeof decodeSendMessageOutputSchema>[0]
+) {
+  const parsed = decodeSendMessageOutputSchema(input);
+
+  return (
+    Result.isSuccess(parsed) &&
+    parsed.success.kind === "message" &&
+    parsed.success.text?.includes(expectedDelivery) === true
+  );
+}
+
 export default defineEval({
   description: "Delivers useful scheduled results and suppresses noise",
   tags: [...agentEvalTags, "schedules", "lifecycle", "notification"],
@@ -62,7 +83,7 @@ export default defineEval({
       const sessionIds = await t.require(
         dispatch.sessionIds,
         satisfies<readonly string[]>(
-          (ids) => ids.length === 1,
+          hasOneSession,
           "one due scheduled worker session was dispatched"
         )
       );
@@ -84,7 +105,7 @@ export default defineEval({
       const runId = await t.require(
         stored?.latestRun?.id,
         satisfies<string | undefined>(
-          (value) => value !== undefined,
+          isDefined,
           "the scheduled worker persisted a run"
         )
       );
@@ -112,15 +133,8 @@ export default defineEval({
         report.notCalledTool("send_message");
       } else {
         report.calledTool("send_message", {
-          input: (input) => {
-            const parsed = decodeSendMessageOutputSchema(input);
-
-            return (
-              Result.isSuccess(parsed) &&
-              parsed.success.kind === "message" &&
-              parsed.success.text?.includes(testCase.expectedDelivery) === true
-            );
-          },
+          input: (input) =>
+            deliveryIncludesText(testCase.expectedDelivery, input),
           status: "completed",
           count: 1,
         });

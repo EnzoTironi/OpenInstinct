@@ -15,6 +15,117 @@ import { deliverNativeScheduledReport } from "../../server/schedules/native-repo
 
 const workerRuntimeLimitMs = 6 * 60 * 60_000;
 
+async function releaseNonStopScheduledRun(
+  identity: NonNullable<ReturnType<typeof scheduledRunIdentity>>,
+  finishReason: string,
+  at: string,
+  sessionId: string
+) {
+  const status = await releaseScheduledAgentRun(
+    identity.runId,
+    identity.leaseToken,
+    `Scheduled worker stopped with finish reason: ${finishReason}.`,
+    new Date(at)
+  );
+
+  console.warn("[scheduled-run] worker stopped without a final result", {
+    finishReason,
+    nextStatus: status,
+    runId: identity.runId,
+    sessionId,
+  });
+  logDeadLetterReportQueued(status, identity.runId, sessionId);
+}
+
+async function dispatchPendingNativeReport(
+  runId: string,
+  sessionId: string,
+  channel: string | readonly string[] | undefined
+) {
+  console.info("[scheduled-run] completion report pending", {
+    runId,
+    sessionId,
+  });
+
+  if (channel !== "telegram" && channel !== "kapso") return;
+
+  await serverRuntime.runPromise(
+    dispatchItem(runId, deliverNativeScheduledReport(runId))
+  );
+}
+
+async function finalizeStoppedScheduledRun(
+  identity: NonNullable<ReturnType<typeof scheduledRunIdentity>>,
+  event: {
+    readonly data: {
+      readonly message?: string | null;
+      readonly turnId: string;
+    };
+    readonly meta: { readonly at: string };
+  },
+  sessionId: string,
+  channel: string | readonly string[] | undefined
+) {
+  const message = event.data.message?.trim().slice(0, 4_000);
+  const outcome = outcomeFromCompletedMessage(message);
+
+  const completed = await completeScheduledAgentRun(
+    identity.runId,
+    identity.leaseToken,
+    event.data.turnId,
+    outcome,
+    new Date(event.meta.at)
+  );
+
+  if (completed?.status === "deferred") {
+    console.info(
+      "[scheduled-run] worker completion deferred for background work",
+      {
+        runId: identity.runId,
+        sessionId,
+        turnId: event.data.turnId,
+      }
+    );
+
+    return;
+  }
+
+  if (!completed?.run) {
+    console.warn("[scheduled-run] worker completion missed its lease", {
+      runId: identity.runId,
+      sessionId,
+    });
+
+    return;
+  }
+
+  console.info("[scheduled-run] worker completed", {
+    outcomeKind: outcome.kind,
+    reportStatus: completed.run.reportStatus,
+    runId: completed.run.id,
+    sessionId,
+  });
+
+  if (completed.run.reportStatus === "pending") {
+    await dispatchPendingNativeReport(completed.run.id, sessionId, channel);
+  }
+}
+
+function outcomeFromCompletedMessage(message: string | undefined) {
+  if (message) {
+    return scheduledRunOutcomeSchema.parse({
+      kind: "result",
+      summary: message,
+      urgency: "normal",
+    });
+  }
+
+  return scheduledRunOutcomeSchema.parse({
+    kind: "nothing_to_report",
+    reason: "The scheduled task produced no useful update.",
+  });
+}
+
 export default defineHook({
   events: {
     async "turn.started"(event, ctx) {
@@ -104,94 +215,22 @@ export default defineHook({
       if (event.data.finishReason === "tool-calls") return;
 
       if (event.data.finishReason !== "stop") {
-        const status = await releaseScheduledAgentRun(
-          identity.runId,
-          identity.leaseToken,
-          `Scheduled worker stopped with finish reason: ${event.data.finishReason}.`,
-          new Date(event.meta.at)
-        );
-
-        console.warn("[scheduled-run] worker stopped without a final result", {
-          finishReason: event.data.finishReason,
-          nextStatus: status,
-          runId: identity.runId,
-          sessionId: ctx.session.id,
-        });
-        logDeadLetterReportQueued(status, identity.runId, ctx.session.id);
-
-        return;
-      }
-
-      const message = event.data.message?.trim().slice(0, 4_000);
-
-      const outcome = scheduledRunOutcomeSchema.parse(
-        message
-          ? {
-              kind: "result",
-              summary: message,
-              urgency: "normal",
-            }
-          : {
-              kind: "nothing_to_report",
-              reason: "The scheduled task produced no useful update.",
-            }
-      );
-
-      const completed = await completeScheduledAgentRun(
-        identity.runId,
-        identity.leaseToken,
-        event.data.turnId,
-        outcome,
-        new Date(event.meta.at)
-      );
-
-      if (completed?.status === "deferred") {
-        console.info(
-          "[scheduled-run] worker completion deferred for background work",
-          {
-            runId: identity.runId,
-            sessionId: ctx.session.id,
-            turnId: event.data.turnId,
-          }
+        await releaseNonStopScheduledRun(
+          identity,
+          event.data.finishReason,
+          event.meta.at,
+          ctx.session.id
         );
 
         return;
       }
 
-      if (!completed) {
-        console.warn("[scheduled-run] worker completion missed its lease", {
-          runId: identity.runId,
-          sessionId: ctx.session.id,
-        });
-
-        return;
-      }
-
-      console.info("[scheduled-run] worker completed", {
-        outcomeKind: outcome.kind,
-        reportStatus: completed.run.reportStatus,
-        runId: completed.run.id,
-        sessionId: ctx.session.id,
-      });
-
-      if (completed.run.reportStatus === "pending") {
-        console.info("[scheduled-run] completion report pending", {
-          runId: completed.run.id,
-          sessionId: ctx.session.id,
-        });
-
-        const channel =
-          ctx.session.auth.initiator?.attributes.conversationChannel;
-
-        if (channel === "telegram" || channel === "kapso") {
-          await serverRuntime.runPromise(
-            dispatchItem(
-              completed.run.id,
-              deliverNativeScheduledReport(completed.run.id)
-            )
-          );
-        }
-      }
+      await finalizeStoppedScheduledRun(
+        identity,
+        event,
+        ctx.session.id,
+        ctx.session.auth.initiator?.attributes.conversationChannel
+      );
     },
     async "turn.failed"(event, ctx) {
       const identity = scheduledRunIdentity(ctx.session.auth);

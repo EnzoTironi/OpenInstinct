@@ -59,6 +59,34 @@ function defineSendMessage() {
   });
 }
 
+function reactionJsonSchemaInput(
+  reactionSchema:
+    | typeof reactToMessageOutputSchema
+    | typeof addReactionToMessageOutputSchema
+) {
+  return (options: { readonly target: string }) => {
+    const document = Schema.toJsonSchemaDocument(reactionSchema, {
+      includeAnnotationKey: (key) => key === "additionalProperties",
+    });
+
+    if (options.target === "draft-2020-12") return document.schema;
+
+    if (options.target === "draft-07") {
+      return JsonSchema.toDocumentDraft07(document).schema;
+    }
+
+    throw new Error(`Unsupported JSON Schema target: ${options.target}`);
+  };
+}
+
+function reactionToolDescription(isLinq: boolean) {
+  if (isLinq) {
+    return "Add or remove a native iMessage Tapback on the user's current message. Use this instead of send_message when a reaction fully communicates a lightweight acknowledgement and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question.";
+  }
+
+  return "Acknowledge the user's current message with one compact reaction displayed in the conversation. Use this instead of send_message when the reaction fully communicates the response and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question.";
+}
+
 export default defineDynamic({
   // This resolver only selects tool definitions; cold recovery can safely rebuild them.
   rebindMissingCallbacks: true,
@@ -90,27 +118,13 @@ export default defineDynamic({
       )["~standard"];
 
       const react_to_message = defineTool({
-        description: isLinq
-          ? "Add or remove a native iMessage Tapback on the user's current message. Use this instead of send_message when a reaction fully communicates a lightweight acknowledgement and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question."
-          : "Acknowledge the user's current message with one compact reaction displayed in the conversation. Use this instead of send_message when the reaction fully communicates the response and words would add nothing. Supports thumbs_up, thumbs_down, heart, laugh, exclamation (emphasis), and question.",
+        description: reactionToolDescription(isLinq),
         inputSchema: {
           "~standard": {
             ...reactionStandard,
             jsonSchema: {
               ...reactionStandard.jsonSchema,
-              input(options) {
-                const document = Schema.toJsonSchemaDocument(reactionSchema, {
-                  includeAnnotationKey: (key) => key === "additionalProperties",
-                });
-
-                if (options.target === "draft-2020-12") return document.schema;
-
-                if (options.target === "draft-07")
-                  return JsonSchema.toDocumentDraft07(document).schema;
-                throw new Error(
-                  `Unsupported JSON Schema target: ${options.target}`
-                );
-              },
+              input: reactionJsonSchemaInput(reactionSchema),
             },
           },
         },
