@@ -4,12 +4,16 @@ import { serializeContactVaultPayload } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
 import { DialogFooter } from "@web/components/ui/dialog";
 import { FieldGroup } from "@web/components/ui/field";
-import { api } from "@web/trpc/client";
-import { useRouter } from "next/navigation";
-import { type SubmitEvent, useState } from "react";
+import { useCallback, useState } from "react";
 import { z } from "zod";
 
 import { FormField } from "../field";
+import {
+  patchVaultForm,
+  useVaultFormSubmit,
+  useVaultItemCreate,
+  vaultFormErrors,
+} from "../use-vault-form";
 
 const contactFormSchema = z
   .object({
@@ -36,25 +40,39 @@ const contactFormSchema = z
     path: ["fullName"],
   });
 
-export function ContactForm({
-  initialLabel = "",
-  onSaved,
-}: {
-  readonly initialLabel?: string;
-  readonly onSaved: () => void;
-}) {
-  const router = useRouter();
+interface ContactFormState {
+  email: string;
+  fullName: string;
+  nickname: string;
+  phone: string;
+}
 
-  const create = api.vault.create.useMutation({
-    onSuccess: () => {
-      router.refresh();
-      onSaved();
-    },
-  });
+function optionalText(value: string) {
+  if (value.length) return value;
 
+  return undefined;
+}
+
+function createContactPayload(data: z.output<typeof contactFormSchema>) {
+  return {
+    account: "",
+    kind: "contact" as const,
+    label: data.nickname,
+    secret: serializeContactVaultPayload({
+      email: optionalText(data.email),
+      fullName: optionalText(data.fullName),
+      kind: "contact",
+      phone: optionalText(data.phone),
+      version: 1,
+    }),
+  };
+}
+
+function useContactForm(initialLabel: string, onSaved: () => void) {
+  const create = useVaultItemCreate(onSaved);
   const [attempted, setAttempted] = useState(false);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ContactFormState>({
     email: "",
     fullName: "",
     nickname: initialLabel,
@@ -62,36 +80,60 @@ export function ContactForm({
   });
 
   const result = contactFormSchema.safeParse(form);
+  const errors = vaultFormErrors(attempted, result);
 
-  const errors =
-    attempted && !result.success
-      ? z.flattenError(result.error).fieldErrors
-      : {};
+  const onNicknameChange = useCallback((nickname: string) => {
+    patchVaultForm(setForm, "nickname", nickname);
+  }, []);
 
-  const submit = (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAttempted(true);
+  const onFullNameChange = useCallback((fullName: string) => {
+    patchVaultForm(setForm, "fullName", fullName);
+  }, []);
 
-    if (!result.success) return;
-    create.mutate({
-      account: "",
-      kind: "contact",
-      label: result.data.nickname,
-      secret: serializeContactVaultPayload({
-        email: result.data.email.length ? result.data.email : undefined,
-        fullName: result.data.fullName.length
-          ? result.data.fullName
-          : undefined,
-        kind: "contact",
-        phone: result.data.phone.length ? result.data.phone : undefined,
-        version: 1,
-      }),
-    });
+  const onEmailChange = useCallback((email: string) => {
+    patchVaultForm(setForm, "email", email);
+  }, []);
+
+  const onPhoneChange = useCallback((phone: string) => {
+    patchVaultForm(setForm, "phone", phone);
+  }, []);
+
+  const submit = useVaultFormSubmit(
+    setAttempted,
+    result,
+    create.mutate,
+    createContactPayload
+  );
+
+  return {
+    create,
+    errors,
+    form,
+    onEmailChange,
+    onFullNameChange,
+    onNicknameChange,
+    onPhoneChange,
+    submit,
   };
+}
 
-  const update = (field: keyof typeof form, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
+export function ContactForm({
+  initialLabel = "",
+  onSaved,
+}: {
+  readonly initialLabel?: string;
+  readonly onSaved: () => void;
+}) {
+  const {
+    create,
+    errors,
+    form,
+    onEmailChange,
+    onFullNameChange,
+    onNicknameChange,
+    onPhoneChange,
+    submit,
+  } = useContactForm(initialLabel, onSaved);
 
   return (
     <form noValidate onSubmit={submit}>
@@ -100,9 +142,7 @@ export function ContactForm({
           error={errors.nickname?.[0]}
           id="vault-contact-label"
           label="Name"
-          onChange={(value) => {
-            update("nickname", value);
-          }}
+          onChange={onNicknameChange}
           placeholder="Checkout"
           value={form.nickname}
         />
@@ -111,9 +151,7 @@ export function ContactForm({
           error={errors.fullName?.[0]}
           id="vault-contact-name"
           label="Full name (optional)"
-          onChange={(value) => {
-            update("fullName", value);
-          }}
+          onChange={onFullNameChange}
           value={form.fullName}
         />
         <FormField
@@ -121,9 +159,7 @@ export function ContactForm({
           error={errors.email?.[0]}
           id="vault-contact-email"
           label="Email (optional)"
-          onChange={(value) => {
-            update("email", value);
-          }}
+          onChange={onEmailChange}
           type="email"
           value={form.email}
         />
@@ -132,9 +168,7 @@ export function ContactForm({
           error={errors.phone?.[0]}
           id="vault-contact-phone"
           label="Phone (optional)"
-          onChange={(value) => {
-            update("phone", value);
-          }}
+          onChange={onPhoneChange}
           type="tel"
           value={form.phone}
         />

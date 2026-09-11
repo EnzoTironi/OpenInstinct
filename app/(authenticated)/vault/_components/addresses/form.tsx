@@ -4,12 +4,21 @@ import { serializeAddressVaultPayload } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
 import { DialogFooter } from "@web/components/ui/dialog";
 import { FieldGroup } from "@web/components/ui/field";
-import { api } from "@web/trpc/client";
-import { useRouter } from "next/navigation";
-import { type SubmitEvent, useState } from "react";
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useState,
+} from "react";
 import { z } from "zod";
 
 import { FormField } from "../field";
+import {
+  patchVaultForm,
+  useVaultFormSubmit,
+  useVaultItemCreate,
+  vaultFormErrors,
+} from "../use-vault-form";
 
 const addressFormSchema = z.object({
   city: z.string().trim().min(1, "Enter the city."),
@@ -22,25 +31,113 @@ const addressFormSchema = z.object({
   region: z.string().trim().min(1, "Enter the state, province, or region."),
 });
 
-export function AddressForm({
-  initialLabel = "",
-  onSaved,
-}: {
-  readonly initialLabel?: string;
-  readonly onSaved: () => void;
-}) {
-  const router = useRouter();
+interface AddressFormState {
+  city: string;
+  countryCode: string;
+  line1: string;
+  line2: string;
+  nickname: string;
+  postalCode: string;
+  recipientName: string;
+  region: string;
+}
 
-  const create = api.vault.create.useMutation({
-    onSuccess: () => {
-      router.refresh();
-      onSaved();
+function createAddressPayload(data: z.output<typeof addressFormSchema>) {
+  return {
+    account: "",
+    kind: "address" as const,
+    label: data.nickname,
+    secret: serializeAddressVaultPayload({
+      ...data,
+      kind: "address",
+      version: 1,
+    }),
+  };
+}
+
+function useAddressIdentityHandlers(
+  setForm: Dispatch<SetStateAction<AddressFormState>>
+) {
+  const onNicknameChange = useCallback(
+    (nickname: string) => {
+      patchVaultForm(setForm, "nickname", nickname);
     },
-  });
+    [setForm]
+  );
 
+  const onRecipientNameChange = useCallback(
+    (recipientName: string) => {
+      patchVaultForm(setForm, "recipientName", recipientName);
+    },
+    [setForm]
+  );
+
+  const onLine1Change = useCallback(
+    (line1: string) => {
+      patchVaultForm(setForm, "line1", line1);
+    },
+    [setForm]
+  );
+
+  const onLine2Change = useCallback(
+    (line2: string) => {
+      patchVaultForm(setForm, "line2", line2);
+    },
+    [setForm]
+  );
+
+  return {
+    onLine1Change,
+    onLine2Change,
+    onNicknameChange,
+    onRecipientNameChange,
+  };
+}
+
+function useAddressLocalityHandlers(
+  setForm: Dispatch<SetStateAction<AddressFormState>>
+) {
+  const onCityChange = useCallback(
+    (city: string) => {
+      patchVaultForm(setForm, "city", city);
+    },
+    [setForm]
+  );
+
+  const onRegionChange = useCallback(
+    (region: string) => {
+      patchVaultForm(setForm, "region", region);
+    },
+    [setForm]
+  );
+
+  const onPostalCodeChange = useCallback(
+    (postalCode: string) => {
+      patchVaultForm(setForm, "postalCode", postalCode);
+    },
+    [setForm]
+  );
+
+  const onCountryCodeChange = useCallback(
+    (value: string) => {
+      patchVaultForm(setForm, "countryCode", value.toUpperCase());
+    },
+    [setForm]
+  );
+
+  return {
+    onCityChange,
+    onCountryCodeChange,
+    onPostalCodeChange,
+    onRegionChange,
+  };
+}
+
+function useAddressForm(initialLabel: string, onSaved: () => void) {
+  const create = useVaultItemCreate(onSaved);
   const [attempted, setAttempted] = useState(false);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<AddressFormState>({
     city: "",
     countryCode: "US",
     line1: "",
@@ -52,32 +149,48 @@ export function AddressForm({
   });
 
   const result = addressFormSchema.safeParse(form);
+  const errors = vaultFormErrors(attempted, result);
+  const identity = useAddressIdentityHandlers(setForm);
+  const locality = useAddressLocalityHandlers(setForm);
 
-  const errors =
-    attempted && !result.success
-      ? z.flattenError(result.error).fieldErrors
-      : {};
+  const submit = useVaultFormSubmit(
+    setAttempted,
+    result,
+    create.mutate,
+    createAddressPayload
+  );
 
-  const submit = (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAttempted(true);
-
-    if (!result.success) return;
-    create.mutate({
-      account: "",
-      kind: "address",
-      label: result.data.nickname,
-      secret: serializeAddressVaultPayload({
-        ...result.data,
-        kind: "address",
-        version: 1,
-      }),
-    });
+  return {
+    create,
+    errors,
+    form,
+    submit,
+    ...identity,
+    ...locality,
   };
+}
 
-  const update = (field: keyof typeof form, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
+export function AddressForm({
+  initialLabel = "",
+  onSaved,
+}: {
+  readonly initialLabel?: string;
+  readonly onSaved: () => void;
+}) {
+  const {
+    create,
+    errors,
+    form,
+    onCityChange,
+    onCountryCodeChange,
+    onLine1Change,
+    onLine2Change,
+    onNicknameChange,
+    onPostalCodeChange,
+    onRecipientNameChange,
+    onRegionChange,
+    submit,
+  } = useAddressForm(initialLabel, onSaved);
 
   return (
     <form noValidate onSubmit={submit}>
@@ -87,9 +200,7 @@ export function AddressForm({
             error={errors.nickname?.[0]}
             id="vault-address-label"
             label="Name"
-            onChange={(value) => {
-              update("nickname", value);
-            }}
+            onChange={onNicknameChange}
             placeholder="Home"
             value={form.nickname}
           />
@@ -98,9 +209,7 @@ export function AddressForm({
             error={errors.recipientName?.[0]}
             id="vault-address-recipient"
             label="Recipient name"
-            onChange={(value) => {
-              update("recipientName", value);
-            }}
+            onChange={onRecipientNameChange}
             value={form.recipientName}
           />
         </div>
@@ -109,9 +218,7 @@ export function AddressForm({
           error={errors.line1?.[0]}
           id="vault-address-line1"
           label="Address line 1"
-          onChange={(value) => {
-            update("line1", value);
-          }}
+          onChange={onLine1Change}
           value={form.line1}
         />
         <FormField
@@ -119,9 +226,7 @@ export function AddressForm({
           error={errors.line2?.[0]}
           id="vault-address-line2"
           label="Address line 2 (optional)"
-          onChange={(value) => {
-            update("line2", value);
-          }}
+          onChange={onLine2Change}
           value={form.line2}
         />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -130,9 +235,7 @@ export function AddressForm({
             error={errors.city?.[0]}
             id="vault-address-city"
             label="City"
-            onChange={(value) => {
-              update("city", value);
-            }}
+            onChange={onCityChange}
             value={form.city}
           />
           <FormField
@@ -140,9 +243,7 @@ export function AddressForm({
             error={errors.region?.[0]}
             id="vault-address-region"
             label="State / province / region"
-            onChange={(value) => {
-              update("region", value);
-            }}
+            onChange={onRegionChange}
             value={form.region}
           />
         </div>
@@ -152,9 +253,7 @@ export function AddressForm({
             error={errors.postalCode?.[0]}
             id="vault-address-postal"
             label="ZIP / postal code"
-            onChange={(value) => {
-              update("postalCode", value);
-            }}
+            onChange={onPostalCodeChange}
             value={form.postalCode}
           />
           <FormField
@@ -163,9 +262,7 @@ export function AddressForm({
             id="vault-address-country"
             label="Country"
             maxLength={2}
-            onChange={(value) => {
-              update("countryCode", value.toUpperCase());
-            }}
+            onChange={onCountryCodeChange}
             value={form.countryCode}
           />
         </div>

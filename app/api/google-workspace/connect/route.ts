@@ -10,7 +10,6 @@ import {
 import { readGoogleWorkspaceChallenge } from "../../../../server/google-workspace/challenge";
 import { serverRuntime } from "../../../../server/runtime";
 
-// oxlint-disable-next-line react-doctor/nextjs-no-side-effect-in-get-handler -- OAuth connect handoff; Set-Cookie is the intended side effect
 export async function GET(request: Request) {
   return serverRuntime.runPromise(
     Effect.gen(connectGoogleWorkspaceHandoff(request)).pipe(
