@@ -22,6 +22,54 @@ const forgottenText = "My favorite color is orange.";
 
 const incomingText = "My favorite drink is tea.";
 
+const nativeSandboxUnavailable = () => {
+  throw new Error("Native file memory must not use a sandbox.");
+};
+
+const nativeSkillUnavailable = () => {
+  throw new Error("Native file memory must not load skills.");
+};
+
+const nativeTokenUnavailable = () => {
+  throw new Error("Native file memory must not use tokens.");
+};
+
+const nativeAuthUnavailable = () => {
+  throw new Error(
+    "Native file memory must not request provider authorization."
+  );
+};
+
+const hasSaveAndRemove = (
+  tools:
+    | {
+        save_memory?: unknown;
+        remove_memory?: unknown;
+      }
+    | null
+    | undefined
+) => Boolean(tools?.save_memory && tools.remove_memory);
+
+const recallLineIndex = (content: string | undefined) =>
+  /(?:^|\n)(\d+):.*orange/mu.exec(content ?? "")?.[1];
+
+const makeNativeRaceClose =
+  (
+    sql: Client,
+    key: string,
+    scope: ReturnType<typeof accessScopeForUser>,
+    userId: string
+  ) =>
+  async () => {
+    await sql.query("SELECT pg_advisory_unlock_all()");
+    await sql.query("DELETE FROM memory_document WHERE key = $1", [key]);
+    await sql.query("DELETE FROM workspaces WHERE id = $1", [
+      scope.workspaceId,
+    ]);
+    await sql.query('DELETE FROM "user" WHERE id = $1', [userId]);
+    await sql.end();
+  };
+
 async function fixture() {
   await Effect.runPromise(Effect.void.pipe(Effect.provide(runtimeDatabase)));
 
@@ -35,15 +83,7 @@ async function fixture() {
   const scope = accessScopeForUser(`better-auth:${userId}`);
   const key = `native-save-remove-race:${randomUUID()}`;
 
-  const close = async () => {
-    await sql.query("SELECT pg_advisory_unlock_all()");
-    await sql.query("DELETE FROM memory_document WHERE key = $1", [key]);
-    await sql.query("DELETE FROM workspaces WHERE id = $1", [
-      scope.workspaceId,
-    ]);
-    await sql.query('DELETE FROM "user" WHERE id = $1', [userId]);
-    await sql.end();
-  };
+  const close = makeNativeRaceClose(sql, key, scope, userId);
 
   try {
     await sql.query(
@@ -91,26 +131,16 @@ async function fixture() {
       operationId: randomUUID(),
       messages: [],
       abortSignal: new AbortController().signal,
-      getSandbox() {
-        throw new Error("Native file memory must not use a sandbox.");
-      },
-      getSkill() {
-        throw new Error("Native file memory must not load skills.");
-      },
+      getSandbox: nativeSandboxUnavailable,
+      getSkill: nativeSkillUnavailable,
     };
 
     const execution: ToolContext = {
       ...context,
       callId: randomUUID(),
       toolName: "profile__save_memory",
-      getToken() {
-        throw new Error("Native file memory must not use tokens.");
-      },
-      requireAuth() {
-        throw new Error(
-          "Native file memory must not request provider authorization."
-        );
-      },
+      getToken: nativeTokenUnavailable,
+      requireAuth: nativeAuthUnavailable,
     };
 
     const tools = await personalMemoryProvider.tools?.({
@@ -118,7 +148,7 @@ async function fixture() {
       channel: { kind: "eve" },
     });
 
-    assert.ok(tools?.save_memory && tools.remove_memory);
+    assert.ok(hasSaveAndRemove(tools));
     await executeErasedTool(
       tools.save_memory,
       { text: forgottenText },
@@ -126,9 +156,7 @@ async function fixture() {
     );
     const recall = await personalMemoryProvider.recall["turn.started"](context);
 
-    const index = /(?:^|\n)(\d+):.*orange/mu.exec(
-      recall?.messages[0]?.content ?? ""
-    )?.[1];
+    const index = recallLineIndex(recall?.messages[0]?.content);
 
     assert.ok(index);
 

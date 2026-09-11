@@ -60,23 +60,20 @@ it("limits authored scheduled reporting tools to delivery or resuming its own ru
   ]);
 });
 
-async function authoredCapabilities(authenticator: string) {
-  const context = dynamicContext(authenticator);
-  const capabilities: string[] = [];
+const resolveGroupedDefinition = async (
+  definition: (typeof groupedTools)[number],
+  context: DynamicResolveContext
+) => {
+  const resolve = definition.events["turn.started"];
+  const resolved = resolve ? await resolve({}, context) : null;
 
-  const resolvedGroups = await Promise.all(
-    groupedTools.map(async (definition) => {
-      const resolve = definition.events["turn.started"];
-      const resolved = resolve ? await resolve({}, context) : null;
+  if (Predicate.isObject(resolved) && !("execute" in resolved))
+    return Object.keys(resolved);
 
-      return Predicate.isObject(resolved) && !("execute" in resolved)
-        ? Object.keys(resolved)
-        : [];
-    })
-  );
+  return [];
+};
 
-  capabilities.push(...resolvedGroups.flat());
-
+const personalInfoCapabilityNames = async (context: DynamicResolveContext) => {
   const personalInfoTools = await personalInfoMemory.provider.tools({
     ...context,
     memory: {
@@ -90,12 +87,12 @@ async function authoredCapabilities(authenticator: string) {
     turn: { id: "turn-1", input: [], sequence: 1 },
   });
 
-  if (personalInfoTools) {
-    capabilities.push(
-      ...Object.keys(personalInfoTools).map((name) => `personal_info__${name}`)
-    );
-  }
+  if (!personalInfoTools) return [];
 
+  return Object.keys(personalInfoTools).map((name) => `personal_info__${name}`);
+};
+
+const workstreamCapabilityNames = async (context: DynamicResolveContext) => {
   const workstreamTools = await workstreamMemory.provider.tools({
     ...context,
     memory: {
@@ -109,18 +106,36 @@ async function authoredCapabilities(authenticator: string) {
     turn: { id: "turn-1", input: [], sequence: 1 },
   });
 
-  if (workstreamTools)
-    capabilities.push(
-      ...Object.keys(workstreamTools).map((name) => `workstreams__${name}`)
-    );
+  if (!workstreamTools) return [];
 
+  return Object.keys(workstreamTools).map((name) => `workstreams__${name}`);
+};
+
+const browserAgentCapability = async (context: DynamicResolveContext) => {
   const resolveBrowserAgent = browserAgent.events["turn.started"];
 
-  if (resolveBrowserAgent && (await resolveBrowserAgent({}, context))) {
-    capabilities.push("browser-agent");
-  }
+  if (!resolveBrowserAgent) return [];
 
-  return capabilities.toSorted();
+  if (!(await resolveBrowserAgent({}, context))) return [];
+
+  return ["browser-agent"];
+};
+
+async function authoredCapabilities(authenticator: string) {
+  const context = dynamicContext(authenticator);
+
+  const resolvedGroups = await Promise.all(
+    groupedTools.map((definition) =>
+      resolveGroupedDefinition(definition, context)
+    )
+  );
+
+  return [
+    ...resolvedGroups.flat(),
+    ...(await personalInfoCapabilityNames(context)),
+    ...(await workstreamCapabilityNames(context)),
+    ...(await browserAgentCapability(context)),
+  ].toSorted();
 }
 
 function dynamicContext(authenticator: string) {

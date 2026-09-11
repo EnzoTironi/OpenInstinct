@@ -36,6 +36,22 @@ const decodeChannelChallengeSchema = Schema.decodeUnknownSync(
   channelChallengeSchema
 );
 
+const profileSandboxUnavailable = () => {
+  throw new Error("Profile must not use sandbox");
+};
+
+const profileSkillUnavailable = () => {
+  throw new Error("Profile must not use skills");
+};
+
+const profileTokenUnavailable = () => {
+  throw new Error("Profile must not use tokens");
+};
+
+const profileAuthUnavailable = () => {
+  throw new Error("Profile must not request provider authorization");
+};
+
 async function fixture() {
   await Effect.runPromise(Effect.void.pipe(Effect.provide(runtimeDatabase)));
   const databaseUrl = await Effect.runPromise(Config.string("DATABASE_URL"));
@@ -96,24 +112,16 @@ async function fixture() {
       turn: { id, sequence: 1 },
     },
     turn: { id, input: [], sequence: 1 },
-    getSandbox() {
-      throw new Error("Profile must not use sandbox");
-    },
-    getSkill() {
-      throw new Error("Profile must not use skills");
-    },
+    getSandbox: profileSandboxUnavailable,
+    getSkill: profileSkillUnavailable,
   };
 
   const execution: ToolContext = {
     ...context,
     callId: id,
     toolName: "personal_info__update",
-    getToken() {
-      throw new Error("Profile must not use tokens");
-    },
-    requireAuth() {
-      throw new Error("Profile must not request provider authorization");
-    },
+    getToken: profileTokenUnavailable,
+    requireAuth: profileAuthUnavailable,
   };
 
   const tools = await personalInfo.provider.tools({

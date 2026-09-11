@@ -12,38 +12,61 @@ import { channelPrincipal } from "../../server/channels/principal";
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 
-test("approval responses require the exact native owner, current identity and owned session", async () => {
-  const url = await Effect.runPromise(Config.string("DATABASE_URL"));
-  assert.equal(new URL(url).pathname, "/companion_runtime_test");
+const resolveApprovalOwner = Effect.gen(function* () {
+  const accounts = yield* ChannelAccounts;
 
-  const identity = await serverRuntime.runPromise(
-    Effect.gen(function* () {
-      const accounts = yield* ChannelAccounts;
+  return yield* accounts.resolveVerifiedSender({
+    channel: "telegram",
+    installationId: randomUUID(),
+    senderId: "approval-owner",
+  });
+});
 
-      return yield* accounts.resolveVerifiedSender({
-        channel: "telegram",
-        installationId: randomUUID(),
-        senderId: "approval-owner",
-      });
-    })
-  );
+const insertApprovalSession = (
+  sessionId: string,
+  scope: ReturnType<typeof accessScopeForUser>
+) =>
+  Effect.gen(function* () {
+    const sql = yield* PgClient.PgClient;
+    yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${scope.workspaceId}, ${scope.userId})`;
+  });
 
-  const scope = accessScopeForUser(`better-auth:${identity.userId}`);
-  const sessionId = randomUUID();
-  const auth = channelPrincipal(identity);
+const revokeApprovalIdentity = (identityId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* PgClient.PgClient;
+    yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identityId}`;
+  });
 
-  const context = (responder: SessionAuthContext, id = sessionId) => ({
+const cleanupApprovalOwner = (
+  scope: ReturnType<typeof accessScopeForUser>,
+  userId: string
+) =>
+  Effect.gen(function* () {
+    const sql = yield* PgClient.PgClient;
+    yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
+    yield* sql`DELETE FROM public."user" WHERE id = ${userId}`;
+  });
+
+const approvalContext =
+  (auth: SessionAuthContext, sessionId: string) =>
+  (responder: SessionAuthContext, id = sessionId) => ({
     responder,
     session: { id, initiator: auth },
   });
 
+test("approval responses require the exact native owner, current identity and owned session", async () => {
+  const url = await Effect.runPromise(Config.string("DATABASE_URL"));
+  assert.equal(new URL(url).pathname, "/companion_runtime_test");
+
+  const identity = await serverRuntime.runPromise(resolveApprovalOwner);
+
+  const scope = accessScopeForUser(`better-auth:${identity.userId}`);
+  const sessionId = randomUUID();
+  const auth = channelPrincipal(identity);
+  const context = approvalContext(auth, sessionId);
+
   try {
-    await serverRuntime.runPromise(
-      Effect.gen(function* () {
-        const sql = yield* PgClient.PgClient;
-        yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${scope.workspaceId}, ${scope.userId})`;
-      })
-    );
+    await serverRuntime.runPromise(insertApprovalSession(sessionId, scope));
     assert.deepEqual(await authorizeApprovalResponse(context(auth)), {
       status: "allowed",
     });
@@ -80,22 +103,13 @@ test("approval responses require the exact native owner, current identity and ow
         )
       )
     );
-    await serverRuntime.runPromise(
-      Effect.gen(function* () {
-        const sql = yield* PgClient.PgClient;
-        yield* sql`UPDATE channel_identity SET revoked_at = clock_timestamp() WHERE id = ${identity.id}`;
-      })
-    );
+    await serverRuntime.runPromise(revokeApprovalIdentity(identity.id));
     await assert.rejects(() =>
       Promise.resolve(authorizeApprovalResponse(context(auth)))
     );
   } finally {
     await serverRuntime.runPromise(
-      Effect.gen(function* () {
-        const sql = yield* PgClient.PgClient;
-        yield* sql`DELETE FROM workspaces WHERE id = ${scope.workspaceId}`;
-        yield* sql`DELETE FROM public."user" WHERE id = ${identity.userId}`;
-      })
+      cleanupApprovalOwner(scope, identity.userId)
     );
   }
 });

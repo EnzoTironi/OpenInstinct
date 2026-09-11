@@ -45,6 +45,49 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null)));
 });
 
+type SchedulesResolve = NonNullable<(typeof schedules.events)["turn.started"]>;
+
+type SchedulesResolved = Awaited<ReturnType<SchedulesResolve>>;
+
+type MessagingResolve = NonNullable<(typeof messaging.events)["turn.started"]>;
+
+type MessagingResolved = Awaited<ReturnType<MessagingResolve>>;
+
+const scheduleAnswerFrom = (tools: SchedulesResolved) => {
+  if (!tools || "execute" in tools) return null;
+
+  return tools["schedules-answer"] ?? null;
+};
+
+const messagingKeys = (tools: MessagingResolved) => Object.keys(tools ?? {});
+
+const messagingSendFrom = (tools: MessagingResolved) => {
+  if (!Predicate.isObject(tools) || "execute" in tools) return undefined;
+
+  if (!("send_message" in tools)) return undefined;
+
+  return tools.send_message;
+};
+
+const assertSendMessageSchema = async (
+  tool: ReturnType<typeof messagingSendFrom>,
+  reply: {
+    readonly kind: string;
+    readonly replyTo: { readonly kind: "current" };
+    readonly text: string;
+  }
+) => {
+  const schema = tool?.inputSchema;
+
+  if (!isToolSchema(schema)) {
+    throw new Error("Expected authored send_message schemas.");
+  }
+
+  const result = await schema["~standard"].validate(reply);
+  expect(result.issues).toBeUndefined();
+  expect(result).toEqual({ value: reply });
+};
+
 it("lets interactive and reporting turns resume scheduled input", async () => {
   const resolve = schedules.events["turn.started"];
   expect(resolve).toBeDefined();
@@ -56,10 +99,7 @@ it("lets interactive and reporting turns resume scheduled input", async () => {
   expect(await resolve({}, dynamicContext("scheduled-result"))).not.toBeNull();
   const interactiveTools = await resolve({}, dynamicContext("linq"));
 
-  const answer =
-    interactiveTools && !("execute" in interactiveTools)
-      ? interactiveTools["schedules-answer"]
-      : null;
+  const answer = scheduleAnswerFrom(interactiveTools);
 
   if (!answer) {
     throw new Error("Expected the schedules-answer tool.");
@@ -99,10 +139,7 @@ it("lets interactive and reporting turns resume scheduled input", async () => {
   });
   const reportTools = await resolve({}, dynamicContext("scheduled-result"));
 
-  const reportAnswer =
-    reportTools && !("execute" in reportTools)
-      ? reportTools["schedules-answer"]
-      : null;
+  const reportAnswer = scheduleAnswerFrom(reportTools);
 
   if (!reportAnswer) {
     throw new Error("Expected the schedules-answer reporting tool.");
@@ -246,7 +283,7 @@ it("omits messaging capabilities outside their valid turns", async () => {
     dynamicContext("scheduled-result", "channel:linq")
   );
 
-  expect(Object.keys(reportMessaging ?? {})).toEqual(["send_message"]);
+  expect(messagingKeys(reportMessaging)).toEqual(["send_message"]);
 
   const debugMessaging = await resolveMessaging(
     {},
@@ -258,35 +295,18 @@ it("omits messaging capabilities outside their valid turns", async () => {
     dynamicContext("test", "channel:linq")
   );
 
-  expect(Object.keys(debugMessaging ?? {}).toSorted()).toEqual([
+  expect(messagingKeys(debugMessaging).toSorted()).toEqual([
     "react_to_message",
     "send_message",
   ]);
-  expect(Object.keys(interactiveMessaging ?? {}).toSorted()).toEqual([
+  expect(messagingKeys(interactiveMessaging).toSorted()).toEqual([
     "react_to_message",
     "send_message",
   ]);
 
-  const reportSend =
-    Predicate.isObject(reportMessaging) &&
-    !("execute" in reportMessaging) &&
-    "send_message" in reportMessaging
-      ? reportMessaging.send_message
-      : undefined;
-
-  const interactiveSend =
-    Predicate.isObject(interactiveMessaging) &&
-    !("execute" in interactiveMessaging) &&
-    "send_message" in interactiveMessaging
-      ? interactiveMessaging.send_message
-      : undefined;
-
-  const debugSend =
-    Predicate.isObject(debugMessaging) &&
-    !("execute" in debugMessaging) &&
-    "send_message" in debugMessaging
-      ? debugMessaging.send_message
-      : undefined;
+  const reportSend = messagingSendFrom(reportMessaging);
+  const interactiveSend = messagingSendFrom(interactiveMessaging);
+  const debugSend = messagingSendFrom(debugMessaging);
 
   const reply = {
     kind: "message",
@@ -295,17 +315,9 @@ it("omits messaging capabilities outside their valid turns", async () => {
   };
 
   await Promise.all(
-    [interactiveSend, debugSend, reportSend].map(async (tool) => {
-      const schema = tool?.inputSchema;
-
-      if (!isToolSchema(schema)) {
-        throw new Error("Expected authored send_message schemas.");
-      }
-
-      const result = await schema["~standard"].validate(reply);
-      expect(result.issues).toBeUndefined();
-      expect(result).toEqual({ value: reply });
-    })
+    [interactiveSend, debugSend, reportSend].map((tool) =>
+      assertSendMessageSchema(tool, reply)
+    )
   );
 });
 

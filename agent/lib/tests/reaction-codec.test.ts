@@ -26,6 +26,100 @@ const decodeAddReactionToMessageOutput = Schema.decodeUnknownSync(
 );
 
 // Real dynamic tools and installed Eve/AI SDK codecs; no provider I/O.
+
+const isLinqChannel = (channel: string) => channel === "channel:linq";
+
+const decodeCanonicalFor = (channel: string) =>
+  isLinqChannel(channel)
+    ? decodeReactToMessageOutput
+    : decodeAddReactionToMessageOutput;
+
+const validReactionsFor = (channel: string) => [
+  { type: "thumbs_up" },
+  { type: "thumbs_down" },
+  { type: "heart" },
+  { type: "laugh" },
+  { type: "exclamation" },
+  { type: "question" },
+  { type: "heart", operation: "add", extra: "metadata" },
+  ...(isLinqChannel(channel) ? [{ type: "heart", operation: "remove" }] : []),
+];
+
+const invalidReactionsFor = (channel: string) => [
+  null,
+  {},
+  [],
+  { type: null },
+  { type: "HEART" },
+  { type: " heart " },
+  { type: "heart", operation: null },
+  { type: "heart", operation: "replace" },
+  ...(channel === "http" ? [{ type: "heart", operation: "remove" }] : []),
+];
+
+type ReactionToolSchema = NonNullable<ReturnType<typeof toInputSchema>>;
+
+type MessagingTurnStarted = NonNullable<
+  (typeof messaging.events)["turn.started"]
+>;
+
+type MessagingTools = Awaited<ReturnType<MessagingTurnStarted>>;
+
+interface ReactionToolEntry {
+  readonly inputSchema: ReactionToolSchema;
+}
+
+const hasReactToMessage = (
+  tools: MessagingTools
+): tools is MessagingTools & {
+  readonly react_to_message: ReactionToolEntry;
+} => Predicate.isObject(tools) && "react_to_message" in tools;
+
+const hasInputSchema = (reaction: {
+  readonly inputSchema?: ReactionToolSchema;
+}): reaction is ReactionToolEntry =>
+  "inputSchema" in reaction && reaction.inputSchema !== undefined;
+
+const assertValidReactionInputs = (
+  schema: ReactionToolSchema,
+  valid: ReturnType<typeof validReactionsFor>,
+  decodeCanonical: ReturnType<typeof decodeCanonicalFor>
+) =>
+  valid.map(async (input) => {
+    const result = await schema["~standard"].validate(input);
+    expect(result.issues).toBeUndefined();
+
+    if (result.issues) throw new Error("Valid reaction was rejected.");
+    expect(result.value).toMatchObject({
+      operation: input.operation ?? "add",
+      type: input.type,
+    });
+    expect(decodeCanonical(result.value)).toEqual(decodeCanonical(input));
+  });
+
+const assertInvalidReactionInputs = (
+  schema: ReactionToolSchema,
+  invalid: ReturnType<typeof invalidReactionsFor>
+) =>
+  invalid.map(async (input) => {
+    const result = await schema["~standard"].validate(input);
+    expect(result.issues?.length).toBeGreaterThan(0);
+  });
+
+const reactionValidationPromises = (
+  schemas: readonly ReactionToolSchema[],
+  channel: string,
+  decodeCanonical: ReturnType<typeof decodeCanonicalFor>
+) => {
+  const valid = validReactionsFor(channel);
+  const invalid = invalidReactionsFor(channel);
+
+  return schemas.flatMap((schema) => [
+    ...assertValidReactionInputs(schema, valid, decodeCanonical),
+    ...assertInvalidReactionInputs(schema, invalid),
+  ]);
+};
+
 describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
   it("preserves defaults, allowed operations and stripping across JSON persistence", async () => {
     const handler = messaging.events["turn.started"];
@@ -44,11 +138,11 @@ describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
       }
     );
 
-    if (!Predicate.isObject(tools) || !("react_to_message" in tools))
+    if (!hasReactToMessage(tools))
       throw new Error("Reaction tool is required.");
     const reaction = tools.react_to_message;
 
-    if (!Predicate.isObject(reaction) || !("inputSchema" in reaction))
+    if (!hasInputSchema(reaction))
       throw new Error("Reaction schema is required.");
     const original = reaction.inputSchema;
     expect(isToolSchema(original)).toBe(true);
@@ -76,10 +170,7 @@ describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
     });
     expect(serializeInputSchema(restored)).toMatchObject({ type: "object" });
 
-    const decodeCanonical =
-      channel === "channel:linq"
-        ? decodeReactToMessageOutput
-        : decodeAddReactionToMessageOutput;
+    const decodeCanonical = decodeCanonicalFor(channel);
 
     const explicitUndefined = await original["~standard"].validate({
       type: "heart",
@@ -88,53 +179,11 @@ describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
 
     expect(explicitUndefined.issues?.length).toBeGreaterThan(0);
 
-    const valid = [
-      { type: "thumbs_up" },
-      { type: "thumbs_down" },
-      { type: "heart" },
-      { type: "laugh" },
-      { type: "exclamation" },
-      { type: "question" },
-      { type: "heart", operation: "add", extra: "metadata" },
-      ...(channel === "channel:linq"
-        ? [{ type: "heart", operation: "remove" }]
-        : []),
-    ];
-
-    const invalid = [
-      null,
-      {},
-      [],
-      { type: null },
-      { type: "HEART" },
-      { type: " heart " },
-      { type: "heart", operation: null },
-      { type: "heart", operation: "replace" },
-      ...(channel === "http" ? [{ type: "heart", operation: "remove" }] : []),
-    ];
-
     await Promise.all(
-      [toInputSchema(original), restored].flatMap((schema) =>
-        valid
-          .map(async (input) => {
-            const result = await schema["~standard"].validate(input);
-            expect(result.issues).toBeUndefined();
-
-            if (result.issues) throw new Error("Valid reaction was rejected.");
-            expect(result.value).toMatchObject({
-              operation: input.operation ?? "add",
-              type: input.type,
-            });
-            expect(decodeCanonical(result.value)).toEqual(
-              decodeCanonical(input)
-            );
-          })
-          .concat(
-            invalid.map(async (input) => {
-              const result = await schema["~standard"].validate(input);
-              expect(result.issues?.length).toBeGreaterThan(0);
-            })
-          )
+      reactionValidationPromises(
+        [toInputSchema(original), restored],
+        channel,
+        decodeCanonical
       )
     );
   });

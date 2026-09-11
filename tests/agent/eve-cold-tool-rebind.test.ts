@@ -76,6 +76,81 @@ const responder: SessionAuthContext = {
   authenticator: "local-component-test",
 };
 
+interface ColdCalls {
+  resolver: number;
+  policy: number;
+  execute: number;
+}
+
+const approvalRequestCallback = () => "user-approval";
+
+const makeExecuteCallback = (calls: ColdCalls) => () => {
+  calls.execute += 1;
+
+  return { local: true };
+};
+
+const makePolicyCallback = (calls: ColdCalls) => () => {
+  calls.policy += 1;
+
+  return { status: "allowed" };
+};
+
+const makeColdEntry = (calls: ColdCalls) => {
+  const entry = defineTool({
+    description: "Local approval gate",
+    inputSchema: { type: "object" },
+    execute: async () => ({ local: true }),
+    approval: {
+      request: approvalRequestCallback,
+      response: () => ({ status: "allowed" }),
+    },
+  });
+
+  stampDurableDynamicToolCallbacks(entry, {
+    execute: { closure: {}, callback: makeExecuteCallback(calls) },
+    approvalRequest: { closure: {}, callback: approvalRequestCallback },
+    approvalResponse: { closure: {}, callback: makePolicyCallback(calls) },
+  });
+
+  return entry;
+};
+
+const makeColdResolver = (
+  name: string,
+  entry: ReturnType<typeof makeColdEntry>,
+  calls: ColdCalls
+): ResolvedDynamicToolResolver => ({
+  slug: name,
+  eventNames: ["turn.started"],
+  events: {
+    "turn.started": () => {
+      calls.resolver += 1;
+
+      return { [name]: entry };
+    },
+  },
+  rebindMissingCallbacks: true,
+  sourceId: `local:${name}`,
+  sourceKind: "module",
+  logicalPath: `agent/tools/${name}.ts`,
+});
+
+const coldTurnMetadata = (name: string) => [
+  {
+    name,
+    resolverSlug: name,
+    entryKey: `${name}:${name}`,
+    description: "Local approval gate",
+    inputSchema: { type: "object" },
+    callbacks: {
+      execute: { closure: {} },
+      approvalRequest: { closure: {} },
+      approvalResponse: { closure: {} },
+    },
+  },
+];
+
 function coldTurn() {
   const name = `local_gate_${randomUUID().replaceAll("-", "")}`;
   const ctx = new ContextContainer();
@@ -86,67 +161,10 @@ function coldTurn() {
     turn: { id: "turn_0", sequence: 0 },
   });
   // Only durable metadata survives a cold process; no callback is registered.
-  ctx.set(TurnDynamicToolMetadataKey, [
-    {
-      name,
-      resolverSlug: name,
-      entryKey: `${name}:${name}`,
-      description: "Local approval gate",
-      inputSchema: { type: "object" },
-      callbacks: {
-        execute: { closure: {} },
-        approvalRequest: { closure: {} },
-        approvalResponse: { closure: {} },
-      },
-    },
-  ]);
-  const calls = { resolver: 0, policy: 0, execute: 0 };
-
-  const entry = defineTool({
-    description: "Local approval gate",
-    inputSchema: { type: "object" },
-    execute: async () => ({ local: true }),
-    approval: {
-      request: () => "user-approval",
-      response: () => ({ status: "allowed" }),
-    },
-  });
-
-  stampDurableDynamicToolCallbacks(entry, {
-    execute: {
-      closure: {},
-      callback: () => {
-        calls.execute += 1;
-
-        return { local: true };
-      },
-    },
-    approvalRequest: { closure: {}, callback: () => "user-approval" },
-    approvalResponse: {
-      closure: {},
-      callback: () => {
-        calls.policy += 1;
-
-        return { status: "allowed" };
-      },
-    },
-  });
-
-  const resolver: ResolvedDynamicToolResolver = {
-    slug: name,
-    eventNames: ["turn.started"],
-    events: {
-      "turn.started": () => {
-        calls.resolver += 1;
-
-        return { [name]: entry };
-      },
-    },
-    rebindMissingCallbacks: true,
-    sourceId: `local:${name}`,
-    sourceKind: "module",
-    logicalPath: `agent/tools/${name}.ts`,
-  };
+  ctx.set(TurnDynamicToolMetadataKey, coldTurnMetadata(name));
+  const calls: ColdCalls = { resolver: 0, policy: 0, execute: 0 };
+  const entry = makeColdEntry(calls);
+  const resolver = makeColdResolver(name, entry, calls);
 
   const session: HarnessSession = setHarnessEmissionState(
     {
