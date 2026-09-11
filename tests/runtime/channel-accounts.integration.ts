@@ -37,6 +37,77 @@ const rejected = <A>(
     })
   );
 
+const insertLoginSession = (sessionId: string, userId: string) =>
+  Effect.gen(function* () {
+    const separateConnection = yield* PgClient.PgClient;
+    yield* separateConnection`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
+            VALUES (${sessionId}, ${secret()}, ${userId}, clock_timestamp() + interval '1 hour', clock_timestamp(), clock_timestamp())`;
+
+    return sessionId;
+  });
+
+const holdLoginSessionUntilReleased = <A, E, R>(
+  entered: Deferred.Deferred<undefined>,
+  release: Deferred.Deferred<undefined>,
+  createSession: Effect.Effect<A, E, R>
+) =>
+  Effect.gen(function* () {
+    yield* Deferred.succeed(entered, undefined);
+    yield* Deferred.await(release);
+
+    return yield* createSession;
+  }).pipe(Effect.catch((error) => Effect.die(error)));
+
+const advisoryLockIsWaiting = (
+  rows: readonly { readonly waiting: boolean | undefined }[]
+) => rows[0]?.waiting === true;
+
+const identityIds = (rows: readonly { readonly id: string }[]) =>
+  rows.map((identity) => identity.id);
+
+const rowIds = (rows: readonly { readonly id: string }[]) =>
+  rows.map((row) => row.id);
+
+const resolveSenderTwelve = (
+  accounts: ChannelAccounts["Service"],
+  sender: {
+    readonly channel: "telegram";
+    readonly installationId: string;
+    readonly senderId: string;
+  }
+) =>
+  Effect.all(
+    Array.from({ length: 12 }, () => accounts.resolveVerifiedSender(sender)),
+    { concurrency: 8 }
+  );
+
+const consumeChallengeEight = (
+  accounts: ChannelAccounts["Service"],
+  challengeId: string,
+  browserSecret: string
+) =>
+  Effect.all(
+    Array.from({ length: 8 }, () =>
+      accounts
+        .consumeChallenge({
+          challengeId,
+          browserSecret,
+        })
+        .pipe(
+          Effect.match({
+            onSuccess: (value) => value,
+            onFailure: (error) => {
+              assert.ok(error instanceof ChannelAccountError);
+              assert.equal(error.reason, "invalid_challenge");
+
+              return null;
+            },
+          })
+        )
+    ),
+    { concurrency: 8 }
+  );
+
 test("channel identities, browser binding, races and revocation against migrated PostgreSQL", async () => {
   const live = ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase));
   await Effect.runPromise(
@@ -62,17 +133,12 @@ test("channel identities, browser binding, races and revocation against migrated
           id: string;
         }>`SELECT id FROM public."user"`;
 
-        const results = yield* Effect.all(
-          Array.from({ length: 12 }, () =>
-            accounts.resolveVerifiedSender(sender)
-          ),
-          { concurrency: 8 }
-        );
+        const results = yield* resolveSenderTwelve(accounts, sender);
 
         const first = results[0];
         assert.ok(first);
         userIds.add(first.userId);
-        assert.equal(new Set(results.map((identity) => identity.id)).size, 1);
+        assert.equal(new Set(identityIds(results)).size, 1);
 
         const created = yield* sql<{
           count: number;
@@ -84,14 +150,11 @@ test("channel identities, browser binding, races and revocation against migrated
           id: string;
         }>`SELECT id FROM public."user"`;
 
-        const previousIds = new Set(beforeUsers.map((user) => user.id));
+        const previousIds = new Set(rowIds(beforeUsers));
         const newIds = afterUsers.filter((user) => !previousIds.has(user.id));
 
         for (const user of newIds) userIds.add(user.id);
-        assert.deepEqual(
-          newIds.map((user) => user.id),
-          [first.userId]
-        );
+        assert.deepEqual(rowIds(newIds), [first.userId]);
         const browserSecret = secret();
 
         const challenge = yield* accounts.issueChallenge({
@@ -210,26 +273,10 @@ test("channel identities, browser binding, races and revocation against migrated
           "invalid_challenge"
         );
 
-        const consumes = yield* Effect.all(
-          Array.from({ length: 8 }, () =>
-            accounts
-              .consumeChallenge({
-                challengeId: challenge.challengeId,
-                browserSecret,
-              })
-              .pipe(
-                Effect.match({
-                  onSuccess: (value) => value,
-                  onFailure: (error) => {
-                    assert.ok(error instanceof ChannelAccountError);
-                    assert.equal(error.reason, "invalid_challenge");
-
-                    return null;
-                  },
-                })
-              )
-          ),
-          { concurrency: 8 }
+        const consumes = yield* consumeChallengeEight(
+          accounts,
+          challenge.challengeId,
+          browserSecret
         );
 
         assert.equal(consumes.filter(Boolean).length, 1);
@@ -700,13 +747,10 @@ test("session issuance serializes with revocation across real PostgreSQL connect
           VALUES (${randomUUID()}, 'telegram', ${installationId}, 'backup', ${owner.userId}, clock_timestamp(), clock_timestamp(), clock_timestamp())`;
             const sessionId = randomUUID();
 
-            const createSession = Effect.gen(function* () {
-              const separateConnection = yield* PgClient.PgClient;
-              yield* separateConnection`INSERT INTO public.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
-            VALUES (${sessionId}, ${secret()}, ${owner.userId}, clock_timestamp() + interval '1 hour', clock_timestamp(), clock_timestamp())`;
-
-              return sessionId;
-            }).pipe(Effect.provide(storage));
+            const createSession = insertLoginSession(
+              sessionId,
+              owner.userId
+            ).pipe(Effect.provide(storage));
 
             if (order === "before") {
               yield* accounts.revokeIdentity(owner);
@@ -732,12 +776,7 @@ test("session issuance serializes with revocation across real PostgreSQL connect
               const finalization = yield* accounts
                 .withLoginSession(
                   owner,
-                  Effect.gen(function* () {
-                    yield* Deferred.succeed(entered, undefined);
-                    yield* Deferred.await(release);
-
-                    return yield* createSession;
-                  }).pipe(Effect.catch((error) => Effect.die(error)))
+                  holdLoginSessionUntilReleased(entered, release, createSession)
                 )
                 .pipe(Effect.forkChild);
 
@@ -752,7 +791,7 @@ test("session issuance serializes with revocation across real PostgreSQL connect
               }>`SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory'
             AND classid = 724193 AND objid = 1 AND NOT granted) AS waiting`.pipe(
                 Effect.repeat({
-                  until: (rows) => rows[0]?.waiting === true,
+                  until: advisoryLockIsWaiting,
                   schedule: Schedule.spaced("10 millis"),
                 }),
                 Effect.timeout("5 seconds"),

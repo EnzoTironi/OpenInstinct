@@ -47,6 +47,73 @@ function run(body: Parameters<typeof fixture>[0]) {
   );
 }
 
+type MessagingService = Messaging["Service"];
+
+interface InputResponse {
+  readonly identityId: string;
+  readonly sessionId: string;
+  readonly sourceMessageId: string;
+  readonly requestId: string;
+  readonly revision: string;
+  readonly decision: "approve" | "cancel";
+  readonly turnId: string;
+}
+
+const claimInputResponseTwelve = (
+  messaging: MessagingService,
+  input: InputResponse
+) =>
+  Effect.all(
+    Array.from({ length: 12 }, () =>
+      messaging.claimChannelInputResponse(input)
+    ),
+    { concurrency: 8 }
+  );
+
+const inputResponsesOfKind = <K extends string>(
+  results: readonly { readonly kind: K; readonly id: string }[],
+  kind: K
+) => results.filter((result) => result.kind === kind);
+
+const inputResponseIds = (results: readonly { readonly id: string }[]) =>
+  new Set(results.map((result) => result.id));
+
+const claimInputThroughFreshLayer = (
+  sql: PgClient.PgClient,
+  input: InputResponse
+) =>
+  Messaging.layer.pipe(
+    Layer.build,
+    Effect.flatMap((context) =>
+      Context.get(context, Messaging).claimChannelInputResponse(input)
+    ),
+    Effect.provideService(PgClient.PgClient, sql),
+    Effect.scoped
+  );
+
+const prepareHandoffEight = (
+  messaging: MessagingService,
+  lease: Lease,
+  content: readonly { readonly type: "text"; readonly text: string }[]
+) =>
+  Effect.all(
+    Array.from({ length: 8 }, () =>
+      messaging.prepareInboxHandoff({ transcripts: [], lease, content })
+    ),
+    { concurrency: 4 }
+  );
+
+const claimInboxEight = (messaging: MessagingService, identityId: string) =>
+  Effect.all(
+    Array.from({ length: 8 }, () =>
+      messaging.claimInbox({ identityId, leaseSeconds: 30 })
+    ),
+    { concurrency: 4 }
+  );
+
+const nonNullClaims = <T>(claims: readonly (T | null)[]) =>
+  claims.filter((candidate): candidate is T => candidate !== null);
+
 test("input response fence survives concurrent replay and refuses uncertain redispatch", () =>
   run(
     Effect.fn("run.1")(function* (messaging, sql, identityId) {
@@ -91,41 +158,30 @@ test("input response fence survives concurrent replay and refuses uncertain redi
         receipt: { status: "accepted", sessionId },
       });
 
-      const results = yield* Effect.all(
-        Array.from({ length: 12 }, () =>
-          messaging.claimChannelInputResponse(input)
-        ),
-        { concurrency: 8 }
-      );
+      const results = yield* claimInputResponseTwelve(messaging, input);
 
-      expect(
-        results.filter((result) => result.kind === "acquired")
-      ).toHaveLength(1);
-      expect(
-        results.filter((result) => result.kind === "duplicate")
-      ).toHaveLength(11);
-      expect(new Set(results.map((result) => result.id)).size).toBe(1);
+      expect(inputResponsesOfKind(results, "acquired")).toHaveLength(1);
+      expect(inputResponsesOfKind(results, "duplicate")).toHaveLength(11);
+      expect(inputResponseIds(results).size).toBe(1);
       const first = results[0];
 
       if (!first)
         return yield* Effect.fail(new Error("Missing response claim"));
 
-      yield* Effect.forEach(
+      const conflictKinds = yield* Effect.forEach(
         [
           { decision: "cancel" as const },
           { revision: "b".repeat(64) },
           { turnId: "later-turn" },
         ],
-        Effect.fn("messaging.conflictClaim")(function* (changed) {
-          expect(
-            (yield* messaging.claimChannelInputResponse({
-              ...input,
-              ...changed,
-            })).kind
-          ).toBe("conflict");
-        }),
+        (changed) =>
+          messaging
+            .claimChannelInputResponse({ ...input, ...changed })
+            .pipe(Effect.map((result) => result.kind)),
         { concurrency: 1 }
       );
+
+      expect(conflictKinds).toEqual(["conflict", "conflict", "conflict"]);
 
       expect(
         yield* messaging.markChannelInputResponse({
@@ -140,14 +196,7 @@ test("input response fence survives concurrent replay and refuses uncertain redi
         })
       ).toBe(false);
 
-      const persisted = yield* Messaging.layer.pipe(
-        Layer.build,
-        Effect.flatMap((context) =>
-          Context.get(context, Messaging).claimChannelInputResponse(input)
-        ),
-        Effect.provideService(PgClient.PgClient, sql),
-        Effect.scoped
-      );
+      const persisted = yield* claimInputThroughFreshLayer(sql, input);
 
       expect(persisted).toEqual({
         kind: "duplicate",
@@ -834,12 +883,7 @@ test("prepared native input survives uncertain recovery with immutable content a
         { type: "text" as const, text: "Frozen extracted content" },
       ];
 
-      const snapshots = yield* Effect.all(
-        Array.from({ length: 8 }, () =>
-          messaging.prepareInboxHandoff({ transcripts: [], lease, content })
-        ),
-        { concurrency: 4 }
-      );
+      const snapshots = yield* prepareHandoffEight(messaging, lease, content);
 
       for (const snapshot of snapshots) {
         expect(snapshot).toEqual(snapshots[0]);
@@ -869,14 +913,9 @@ test("prepared native input survives uncertain recovery with immutable content a
       ).toBeInstanceOf(PayloadConflict);
       yield* messaging.markInboxUncertain({ lease, reason: "handoff_unknown" });
 
-      const claims = yield* Effect.all(
-        Array.from({ length: 8 }, () =>
-          messaging.claimInbox({ identityId, leaseSeconds: 30 })
-        ),
-        { concurrency: 4 }
-      );
+      const claims = yield* claimInboxEight(messaging, identityId);
 
-      const recovered = claims.filter((candidate) => candidate !== null);
+      const recovered = nonNullClaims(claims);
       expect(recovered).toHaveLength(1);
       const next = recovered[0];
 
