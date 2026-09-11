@@ -72,38 +72,59 @@ export async function prepareLinqImageArtifactDelivery(
   };
 }
 
-async function readLinqImageArtifact(
-  scope: AccessScope,
-  artifactId: string,
-  options: { readonly rootSessionId: string; readonly signal?: AbortSignal }
+function artifactHasDeliveryFields<
+  T extends {
+    readonly byteSize?: number | null;
+    readonly contentHash?: string | null;
+    readonly filename?: string | null;
+    readonly mediaType?: string | null;
+    readonly storagePathname: string;
+    readonly id: string;
+  },
+>(
+  artifact: T | null | undefined
+): artifact is T & {
+  readonly byteSize: number;
+  readonly contentHash: string;
+  readonly filename: string;
+  readonly mediaType: string;
+} {
+  return Boolean(
+    artifact &&
+    artifact.byteSize &&
+    artifact.contentHash &&
+    artifact.filename &&
+    artifact.mediaType
+  );
+}
+
+function blobStorageConfigured() {
+  return Boolean(env.BLOB_STORE_ID) || Boolean(env.BLOB_READ_WRITE_TOKEN);
+}
+
+type BlobGetResult = NonNullable<Awaited<ReturnType<typeof get>>>;
+
+function blobMatchesArtifact(
+  result: BlobGetResult | null,
+  artifact: {
+    readonly byteSize: number;
+    readonly mediaType: string;
+  }
+): result is Extract<BlobGetResult, { statusCode: 200 }> {
+  return Boolean(
+    result &&
+      result.statusCode === 200 &&
+      result.blob.size === artifact.byteSize &&
+      result.blob.contentType === artifact.mediaType &&
+      result.stream
+  );
+}
+
+async function readStreamChunksBounded(
+  stream: ReadableStream<Uint8Array>,
+  maximumBytes: number
 ) {
-  const artifact = await readReadyBrowserImageArtifact(scope, artifactId, {
-    rootSessionId: options.rootSessionId,
-  });
-
-  if (
-    !artifact?.byteSize ||
-    !artifact.contentHash ||
-    !artifact.filename ||
-    !artifact.mediaType
-  )
-    return undefined;
-
-  if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) return undefined;
-
-  const result = await get(artifact.storagePathname, {
-    access: "private",
-    abortSignal: options.signal,
-  });
-
-  if (result?.statusCode !== 200) return undefined;
-
-  if (
-    result.blob.size !== artifact.byteSize ||
-    result.blob.contentType !== artifact.mediaType
-  )
-    return undefined;
-  const reader = result.stream.getReader();
+  const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
 
@@ -115,7 +136,7 @@ async function readLinqImageArtifact(
       if (done) break;
       total += value.byteLength;
 
-      if (total > maximumBrowserImageBytes) return undefined;
+      if (total > maximumBytes) return undefined;
       chunks.push(value);
     }
     /* oxlint-enable eslint/no-await-in-loop */
@@ -123,6 +144,10 @@ async function readLinqImageArtifact(
     reader.releaseLock();
   }
 
+  return { chunks, total };
+}
+
+function concatUint8Chunks(chunks: readonly Uint8Array[], total: number) {
   const bytes = new Uint8Array(total);
   let offset = 0;
 
@@ -130,6 +155,38 @@ async function readLinqImageArtifact(
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
+
+  return bytes;
+}
+
+async function readLinqImageArtifact(
+  scope: AccessScope,
+  artifactId: string,
+  options: { readonly rootSessionId: string; readonly signal?: AbortSignal }
+) {
+  const artifact = await readReadyBrowserImageArtifact(scope, artifactId, {
+    rootSessionId: options.rootSessionId,
+  });
+
+  if (!artifactHasDeliveryFields(artifact)) return undefined;
+
+  if (!blobStorageConfigured()) return undefined;
+
+  const result = await get(artifact.storagePathname, {
+    access: "private",
+    abortSignal: options.signal,
+  });
+
+  if (!blobMatchesArtifact(result, artifact)) return undefined;
+
+  const streamed = await readStreamChunksBounded(
+    result.stream,
+    maximumBrowserImageBytes
+  );
+
+  if (!streamed) return undefined;
+
+  const bytes = concatUint8Chunks(streamed.chunks, streamed.total);
 
   if (createHash("sha256").update(bytes).digest("hex") !== artifact.contentHash)
     return undefined;
