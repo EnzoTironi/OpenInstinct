@@ -176,6 +176,55 @@ async function captureBrowserImage(
   throw new Error("Unsupported browser image source.");
 }
 
+function requireSuccessfulImageUrl(result: {
+  readonly success: boolean;
+  readonly result?: unknown;
+  readonly error?: string;
+}) {
+  const resolved = z
+    .object({ url: z.url() })
+    .safeParse(result.success ? result.result : undefined);
+
+  if (resolved.success) return resolved.data.url;
+
+  throw new Error(
+    result.error ?? "The selected image resource was unavailable."
+  );
+}
+
+function requireHttpImageUrl(rawUrl: string) {
+  const url = new URL(rawUrl);
+
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("The selected image does not use an HTTP URL.");
+  }
+
+  return url;
+}
+
+async function fetchBrowserImageBytes(
+  sessionId: string,
+  url: URL,
+  signal?: AbortSignal
+) {
+  const response = await getKernel().browsers.fetch(sessionId, url, {
+    headers: {
+      accept: "image/webp,image/png,image/jpeg,image/gif,*/*;q=0.1",
+    },
+    method: "GET",
+    signal,
+    timeout_ms: 20_000,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `The selected image resource returned HTTP ${String(response.status)}.`
+    );
+  }
+
+  return readBoundedResponse(response);
+}
+
 async function captureImageResource(
   sessionId: string,
   selector: string,
@@ -198,40 +247,12 @@ return await image.evaluate((element) => {
     { signal }
   );
 
-  const resolved = z
-    .object({ url: z.url() })
-    .safeParse(result.success ? result.result : undefined);
+  const rawUrl = requireSuccessfulImageUrl(result);
 
-  if (!resolved.success) {
-    throw new Error(
-      result.error ?? "The selected image resource was unavailable."
-    );
-  }
-
-  const url = new URL(resolved.data.url);
-
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("The selected image does not use an HTTP URL.");
-  }
+  const url = requireHttpImageUrl(rawUrl);
 
   await getKernel().browsers.retrieve(sessionId, {}, { signal });
-
-  const response = await getKernel().browsers.fetch(sessionId, url, {
-    headers: {
-      accept: "image/webp,image/png,image/jpeg,image/gif,*/*;q=0.1",
-    },
-    method: "GET",
-    signal,
-    timeout_ms: 20_000,
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `The selected image resource returned HTTP ${String(response.status)}.`
-    );
-  }
-
-  const bytes = await readBoundedResponse(response);
+  const bytes = await fetchBrowserImageBytes(sessionId, url, signal);
 
   if (!sniffBrowserImageMediaType(bytes)) {
     throw new Error("The selected resource is not a supported image.");
@@ -311,6 +332,49 @@ function safeBrowserImageFilename(
   return `${stem || "browser-image"}.${extension}`;
 }
 
+function requireBrowserImageStorageConfigured() {
+  if (env.BLOB_STORE_ID || env.BLOB_READ_WRITE_TOKEN) return;
+
+  throw new Error("Browser image storage is not configured.");
+}
+
+async function ignoreDeleteError(pathname: string) {
+  await del(pathname).catch(() => undefined);
+}
+
+async function finalizeOrCleanupCapturedImage(
+  scope: Awaited<ReturnType<typeof requireWorkerScope>>,
+  reservation: BrowserImageArtifactReservation,
+  input: {
+    readonly bytes: Uint8Array;
+    readonly filename: string;
+    readonly sourceKind: string;
+  },
+  storagePathname: string,
+  mediaType: NonNullable<ReturnType<typeof sniffBrowserImageMediaType>>,
+  contentHash: string
+) {
+  try {
+    const finalized = await finalizeBrowserImageArtifact(scope, reservation, {
+      byteSize: input.bytes.byteLength,
+      contentHash,
+      filename: input.filename,
+      mediaType,
+      sourceKind: input.sourceKind,
+      storagePathname,
+    });
+
+    if (finalized.storagePathname !== storagePathname) {
+      await ignoreDeleteError(storagePathname);
+    }
+
+    return finalized.image;
+  } catch (error) {
+    await ignoreDeleteError(storagePathname);
+    throw error;
+  }
+}
+
 async function persistCapturedImage(
   scope: Awaited<ReturnType<typeof requireWorkerScope>>,
   reservation: BrowserImageArtifactReservation,
@@ -328,9 +392,7 @@ async function persistCapturedImage(
   const contentHash = createHash("sha256").update(input.bytes).digest("hex");
   const storagePathname = `${reservation.storagePathname}/${contentHash}`;
 
-  if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("Browser image storage is not configured.");
-  }
+  requireBrowserImageStorageConfigured();
 
   await put(storagePathname, Buffer.from(input.bytes), {
     access: "private",
@@ -342,36 +404,59 @@ async function persistCapturedImage(
     maximumSizeInBytes: maximumBrowserImageBytes,
   });
 
-  try {
-    const finalized = await finalizeBrowserImageArtifact(scope, reservation, {
-      byteSize: input.bytes.byteLength,
-      contentHash,
-      filename: input.filename,
-      mediaType,
-      sourceKind: input.sourceKind,
-      storagePathname,
-    });
+  return finalizeOrCleanupCapturedImage(
+    scope,
+    reservation,
+    input,
+    storagePathname,
+    mediaType,
+    contentHash
+  );
+}
 
-    if (finalized.storagePathname !== storagePathname) {
-      await del(storagePathname).catch(() => undefined);
-    }
+function assertContentLengthAllowed(contentLengthHeader: string | null) {
+  const contentLength = Number(contentLengthHeader);
 
-    return finalized.image;
-  } catch (error) {
-    await del(storagePathname).catch(() => undefined);
-    throw error;
+  const tooLarge =
+    Number.isFinite(contentLength) && contentLength > maximumBrowserImageBytes;
+
+  if (tooLarge) {
+    throw new Error("The browser image exceeds the maximum size.");
   }
 }
 
-async function readBoundedResponse(response: Response) {
-  const contentLength = Number(response.headers.get("content-length"));
+async function appendBoundedChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  chunks: Uint8Array[],
+  total: number,
+  value: Uint8Array
+) {
+  const nextTotal = total + value.byteLength;
 
-  if (
-    Number.isFinite(contentLength) &&
-    contentLength > maximumBrowserImageBytes
-  ) {
+  if (nextTotal > maximumBrowserImageBytes) {
+    await reader.cancel();
     throw new Error("The browser image exceeds the maximum size.");
   }
+
+  chunks.push(value);
+
+  return nextTotal;
+}
+
+function concatChunks(chunks: readonly Uint8Array[], total: number) {
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return bytes;
+}
+
+async function readBoundedResponse(response: Response) {
+  assertContentLengthAllowed(response.headers.get("content-length"));
 
   if (!response.body) throw new Error("The browser image response is empty.");
   const reader = response.body.getReader();
@@ -384,27 +469,12 @@ async function readBoundedResponse(response: Response) {
       const { done, value } = await reader.read();
 
       if (done) break;
-      total += value.byteLength;
-
-      if (total > maximumBrowserImageBytes) {
-        await reader.cancel();
-        throw new Error("The browser image exceeds the maximum size.");
-      }
-
-      chunks.push(value);
+      total = await appendBoundedChunk(reader, chunks, total, value);
     }
     /* oxlint-enable eslint/no-await-in-loop */
   } finally {
     reader.releaseLock();
   }
 
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  return bytes;
+  return concatChunks(chunks, total);
 }

@@ -33,6 +33,12 @@ const decodeOption_checkoutResponseSchema = Schema.decodeUnknownOption(
   checkoutResponseSchema
 );
 
+interface CheckoutBody {
+  readonly error?: string;
+  readonly reason?: string;
+  readonly url?: string;
+}
+
 function formatPrice(planId: BillingPlanId, amount: number) {
   if (planId === "free") return "Free";
   const dollars = String(amount);
@@ -60,6 +66,78 @@ function FreePlanAction({
   );
 }
 
+function UnavailableCheckoutButton() {
+  return (
+    <Button className="w-full" disabled variant="secondary">
+      Checkout unavailable
+    </Button>
+  );
+}
+
+function SignInToUpgradeButton() {
+  return (
+    <Button
+      className="w-full"
+      render={<Link href="/sign-in?callbackUrl=%2Fpricing" />}
+    >
+      Sign in to upgrade
+    </Button>
+  );
+}
+
+function orgPlanLabel(isCurrent: boolean) {
+  if (isCurrent) return "Manage seats";
+
+  return "Org seats via Account";
+}
+
+function OrgPlanButton({ isCurrent }: { readonly isCurrent: boolean }) {
+  return (
+    <Button
+      className="w-full"
+      render={<Link href="/account#billing" />}
+      variant={isCurrent ? "secondary" : "default"}
+    >
+      {orgPlanLabel(isCurrent)}
+    </Button>
+  );
+}
+
+function proPlanLabel(busyPlan: BillingPlanId | null, isCurrent: boolean) {
+  if (busyPlan === "pro") return "Redirecting…";
+
+  if (isCurrent) return "Current plan";
+
+  return "Upgrade to Pro";
+}
+
+function makeProCheckout(onCheckout: (plan: "pro") => void) {
+  return () => {
+    onCheckout("pro");
+  };
+}
+
+function ProPlanButton({
+  busyPlan,
+  isCurrent,
+  onCheckout,
+}: {
+  readonly busyPlan: BillingPlanId | null;
+  readonly isCurrent: boolean;
+  readonly onCheckout: (plan: "pro") => void;
+}) {
+  return (
+    <Button
+      className="w-full"
+      disabled={busyPlan !== null}
+      onClick={makeProCheckout(onCheckout)}
+      variant={isCurrent ? "secondary" : "default"}
+    >
+      {proPlanLabel(busyPlan, isCurrent)}
+    </Button>
+  );
+}
+
 function PaidPlanAction({
   planId,
   signedIn,
@@ -75,52 +153,18 @@ function PaidPlanAction({
   readonly busyPlan: BillingPlanId | null;
   readonly onCheckout: (plan: "pro" | "org") => void;
 }) {
-  if (!stripeConfigured) {
-    return (
-      <Button className="w-full" disabled variant="secondary">
-        Checkout unavailable
-      </Button>
-    );
-  }
+  if (!stripeConfigured) return <UnavailableCheckoutButton />;
 
-  if (!signedIn) {
-    return (
-      <Button
-        className="w-full"
-        render={<Link href="/sign-in?callbackUrl=%2Fpricing" />}
-      >
-        Sign in to upgrade
-      </Button>
-    );
-  }
+  if (!signedIn) return <SignInToUpgradeButton />;
 
-  if (planId === "org") {
-    return (
-      <Button
-        className="w-full"
-        render={<Link href="/account#billing" />}
-        variant={isCurrent ? "secondary" : "default"}
-      >
-        {isCurrent ? "Manage seats" : "Org seats via Account"}
-      </Button>
-    );
-  }
+  if (planId === "org") return <OrgPlanButton isCurrent={isCurrent} />;
 
   return (
-    <Button
-      className="w-full"
-      disabled={busyPlan !== null}
-      onClick={() => {
-        onCheckout("pro");
-      }}
-      variant={isCurrent ? "secondary" : "default"}
-    >
-      {busyPlan === "pro"
-        ? "Redirecting…"
-        : isCurrent
-          ? "Current plan"
-          : "Upgrade to Pro"}
-    </Button>
+    <ProPlanButton
+      busyPlan={busyPlan}
+      isCurrent={isCurrent}
+      onCheckout={onCheckout}
+    />
   );
 }
 
@@ -157,6 +201,16 @@ function PlanAction({
   );
 }
 
+function PopularBadge({ highlight }: { readonly highlight: boolean }) {
+  if (!highlight) return null;
+
+  return (
+    <span className="rounded-full bg-primary/10 px-2 py-0.5 type-caption text-primary">
+      Popular
+    </span>
+  );
+}
+
 function PricingPlanCard({
   plan,
   signedIn,
@@ -185,11 +239,7 @@ function PricingPlanCard({
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle>{plan.name}</CardTitle>
-          {highlight ? (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 type-caption text-primary">
-              Popular
-            </span>
-          ) : null}
+          <PopularBadge highlight={highlight} />
         </div>
         <CardDescription>{plan.tagline}</CardDescription>
       </CardHeader>
@@ -219,6 +269,152 @@ function PricingPlanCard({
   );
 }
 
+function checkoutFailureMessage(body: CheckoutBody) {
+  if (body.reason === "stripe_not_configured") {
+    return "Paid Checkout is disabled on this deployment (Stripe not configured). Free still works.";
+  }
+
+  if (body.reason === "org_required") {
+    return "Org seats need an organization first. Create one under Account, then retry with that org.";
+  }
+
+  return body.error ?? "Unable to start Checkout.";
+}
+
+function checkoutSeatCount(plan: "pro" | "org") {
+  if (plan === "org") return 1;
+
+  return undefined;
+}
+
+function checkoutBodyFromDecoded(
+  decoded: ReturnType<typeof decodeOption_checkoutResponseSchema>
+): CheckoutBody {
+  if (Option.isSome(decoded)) return decoded.value;
+
+  return {};
+}
+
+async function readCheckoutJson(response: Response): Promise<CheckoutBody> {
+  try {
+    // SAFETY: Response.json() is untyped fetch I/O; Schema.decodeUnknownOption validates next.
+    const raw = (await response.json()) as unknown;
+
+    return checkoutBodyFromDecoded(decodeOption_checkoutResponseSchema(raw));
+  } catch {
+    return {};
+  }
+}
+
+async function readCheckoutError(response: Response) {
+  return checkoutFailureMessage(await readCheckoutJson(response));
+}
+
+async function readCheckoutSuccess(response: Response) {
+  const body = await readCheckoutJson(response);
+
+  if (!body.url) {
+    return { error: body.error ?? "Unable to start Checkout." } as const;
+  }
+
+  return { url: body.url } as const;
+}
+
+async function postCheckout(plan: "pro" | "org") {
+  return fetch("/api/billing/checkout", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      plan,
+      seatCount: checkoutSeatCount(plan),
+    }),
+  });
+}
+
+async function runCheckout(
+  plan: "pro" | "org",
+  setError: (value: string | null) => void
+) {
+  const response = await postCheckout(plan);
+
+  if (!response.ok) {
+    setError(await readCheckoutError(response));
+
+    return;
+  }
+
+  const result = await readCheckoutSuccess(response);
+
+  if ("error" in result) {
+    setError(result.error ?? null);
+
+    return;
+  }
+
+  window.location.assign(result.url);
+}
+
+function billingFooterCopy(stripeConfigured: boolean) {
+  if (stripeConfigured) {
+    return "Already paying? Manage payment method and cancellation in Account via Stripe Customer Portal. Self-host stays on operator quotas — see docs.";
+  }
+
+  return "Paid billing stays off until an operator configures Stripe. Self-host stays on operator quotas — see docs.";
+}
+
+function StripeDisabledAlert({
+  stripeConfigured,
+}: {
+  readonly stripeConfigured: boolean;
+}) {
+  if (stripeConfigured) return null;
+
+  return (
+    <Alert variant="information">
+      <AlertTitle>Paid upgrades disabled</AlertTitle>
+      <AlertDescription>
+        Stripe Checkout is not configured on this deployment (
+        <code className="type-caption">STRIPE_*</code> unset). Free still works
+        with no card. Upgrade and Customer Portal CTAs stay off so Checkout
+        cannot start broken.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function BillingErrorAlert({ error }: { readonly error: string | null }) {
+  if (!error) return null;
+
+  return (
+    <Alert variant="destructive">
+      <AlertTitle>Billing</AlertTitle>
+      <AlertDescription>{error}</AlertDescription>
+    </Alert>
+  );
+}
+
+function makeCheckoutHandler(
+  setBusyPlan: (value: BillingPlanId | null) => void,
+  setError: (value: string | null) => void
+) {
+  return (plan: "pro" | "org") => {
+    void (async () => {
+      setBusyPlan(plan);
+      setError(null);
+
+      try {
+        await runCheckout(plan, setError);
+      } catch {
+        setError(
+          "Unable to start Checkout. Check your connection and try again."
+        );
+      } finally {
+        setBusyPlan(null);
+      }
+    })();
+  };
+}
+
 export function PricingPanel({
   signedIn,
   currentPlan,
@@ -230,60 +426,7 @@ export function PricingPanel({
 }) {
   const [busyPlan, setBusyPlan] = useState<BillingPlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  async function startCheckout(plan: "pro" | "org") {
-    setBusyPlan(plan);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          plan,
-          seatCount: plan === "org" ? 1 : undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        const raw: unknown = await response.json().catch(() => ({}));
-        const decoded = decodeOption_checkoutResponseSchema(raw);
-        const body = Option.isSome(decoded) ? decoded.value : {};
-
-        if (body.reason === "stripe_not_configured") {
-          setError(
-            "Paid Checkout is disabled on this deployment (Stripe not configured). Free still works."
-          );
-        } else if (body.reason === "org_required") {
-          setError(
-            "Org seats need an organization first. Create one under Account, then retry with that org."
-          );
-        } else {
-          setError(body.error ?? "Unable to start Checkout.");
-        }
-
-        return;
-      }
-
-      const raw: unknown = await response.json();
-      const decoded = decodeOption_checkoutResponseSchema(raw);
-      const body = Option.isSome(decoded) ? decoded.value : {};
-
-      if (!body.url) {
-        setError(body.error ?? "Unable to start Checkout.");
-
-        return;
-      }
-
-      window.location.assign(body.url);
-    } catch {
-      setError(
-        "Unable to start Checkout. Check your connection and try again."
-      );
-    } finally {
-      setBusyPlan(null);
-    }
-  }
+  const onCheckout = makeCheckoutHandler(setBusyPlan, setError);
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-4 py-12 sm:px-6 sm:py-16">
@@ -300,24 +443,8 @@ export function PricingPanel({
         </p>
       </header>
 
-      {!stripeConfigured ? (
-        <Alert variant="information">
-          <AlertTitle>Paid upgrades disabled</AlertTitle>
-          <AlertDescription>
-            Stripe Checkout is not configured on this deployment (
-            <code className="type-caption">STRIPE_*</code> unset). Free still
-            works with no card. Upgrade and Customer Portal CTAs stay off so
-            Checkout cannot start broken.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Billing</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      <StripeDisabledAlert stripeConfigured={stripeConfigured} />
+      <BillingErrorAlert error={error} />
 
       <div className="grid gap-4 md:grid-cols-3">
         {plans.map((plan) => (
@@ -325,9 +452,7 @@ export function PricingPanel({
             busyPlan={busyPlan}
             currentPlan={currentPlan}
             key={plan.id}
-            onCheckout={(next) => {
-              void startCheckout(next);
-            }}
+            onCheckout={onCheckout}
             plan={plan}
             signedIn={signedIn}
             stripeConfigured={stripeConfigured}
@@ -356,9 +481,7 @@ export function PricingPanel({
       </div>
 
       <p className="text-center type-caption text-muted-foreground">
-        {stripeConfigured
-          ? "Already paying? Manage payment method and cancellation in Account via Stripe Customer Portal. Self-host stays on operator quotas — see docs."
-          : "Paid billing stays off until an operator configures Stripe. Self-host stays on operator quotas — see docs."}
+        {billingFooterCopy(stripeConfigured)}
       </p>
     </section>
   );

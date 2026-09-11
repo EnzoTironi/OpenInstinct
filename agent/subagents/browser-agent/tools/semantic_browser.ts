@@ -209,35 +209,122 @@ function relaxedBrowserActInput(input: Record<string, unknown>) {
   };
 }
 
-function relaxedBrowserActSchema(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) return {};
-  const schema = structuredClone(value);
-  const properties = isRecord(schema.properties) ? schema.properties : {};
+function recordOrEmpty(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+function stripActExpectationKeys(properties: Record<string, unknown>) {
   delete properties.expect;
   delete properties.poll_ms;
   delete properties.timeout_ms;
+}
 
-  const steps = isRecord(properties.steps) ? properties.steps : undefined;
+function stripStepExpectationKeys(stepProperties: Record<string, unknown>) {
+  delete stepProperties.expect;
+  delete stepProperties.timeout_ms;
+}
 
-  if (steps) {
-    steps.maxItems = 8;
-    const items = isRecord(steps.items) ? steps.items : undefined;
-    const variants = items && Array.isArray(items.anyOf) ? items.anyOf : [];
+function stepAnyOfVariants(steps: Record<string, unknown>): unknown[] {
+  const items = isRecord(steps.items) ? steps.items : undefined;
+  const anyOf = items?.anyOf;
+  const variants: unknown[] = [];
 
-    for (const variant of variants) {
-      if (!isRecord(variant)) continue;
+  if (!Array.isArray(anyOf)) return variants;
 
-      const stepProperties = isRecord(variant.properties)
-        ? variant.properties
-        : undefined;
-
-      if (!stepProperties) continue;
-      delete stepProperties.expect;
-      delete stepProperties.timeout_ms;
-    }
+  for (const variant of anyOf) {
+    variants.push(variant);
   }
 
+  return variants;
+}
+
+function relaxStepVariant(variant: unknown) {
+  if (!isRecord(variant)) return;
+
+  const stepProperties = isRecord(variant.properties)
+    ? variant.properties
+    : undefined;
+
+  if (!stepProperties) return;
+  stripStepExpectationKeys(stepProperties);
+}
+
+function relaxStepsProperty(properties: Record<string, unknown>) {
+  const steps = isRecord(properties.steps) ? properties.steps : undefined;
+
+  if (!steps) return;
+  steps.maxItems = 8;
+
+  for (const variant of stepAnyOfVariants(steps)) {
+    relaxStepVariant(variant);
+  }
+}
+
+function relaxedBrowserActSchema(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) return {};
+  const schema = structuredClone(value);
+  const properties = recordOrEmpty(schema.properties);
+  stripActExpectationKeys(properties);
+  relaxStepsProperty(properties);
+
   return schema;
+}
+
+const uncertainBrowserActStops = new Set([
+  "action_failed",
+  "global_timeout",
+  "step_timeout",
+]);
+
+function browserActDispatchStatus(
+  dispatched: number,
+  stopReason: string | undefined
+) {
+  if (dispatched === 0) return "not_dispatched";
+
+  if (stopReason && uncertainBrowserActStops.has(stopReason)) {
+    return "uncertain";
+  }
+
+  return "dispatched";
+}
+
+function isActionDispatchedDiagnostic(diagnostic: string) {
+  return diagnostic === "action dispatched";
+}
+
+function appendStepDiagnostics(
+  lines: string[],
+  steps: BrowserActResult["steps"]
+) {
+  for (const step of steps) {
+    const diagnostics = step.diagnostics.filter(
+      (diagnostic) => !isActionDispatchedDiagnostic(diagnostic)
+    );
+
+    if (diagnostics.length === 0) continue;
+    lines.push(
+      `step ${String(step.index)} ${step.type}: ${diagnostics.join("; ")}`
+    );
+  }
+}
+
+function appendSuccessorLines(
+  lines: string[],
+  successor: BrowserActResult["successor"]
+) {
+  if (successor.status === "unavailable") {
+    lines.push(`successor unavailable: ${successor.error}`);
+
+    return;
+  }
+
+  lines.push(
+    `state_changed: ${String(successor.diff.changed)}`,
+    `successor: ${successor.title} (${successor.url})`,
+    "current interactive state:",
+    truncate(successor.text, relaxedBrowserActSnapshotCharacters)
+  );
 }
 
 function relaxedBrowserActModelText(output: LoopToolExecutionResult) {
@@ -251,47 +338,14 @@ function relaxedBrowserActModelText(output: LoopToolExecutionResult) {
     step.diagnostics.includes("action dispatched")
   ).length;
 
-  const uncertain =
-    result.stop_reason === "action_failed" ||
-    result.stop_reason === "global_timeout" ||
-    result.stop_reason === "step_timeout";
-
-  const status =
-    dispatched === 0
-      ? "not_dispatched"
-      : uncertain
-        ? "uncertain"
-        : "dispatched";
-
   const lines = [
-    `browser_act: ${status}`,
+    `browser_act: ${browserActDispatchStatus(dispatched, result.stop_reason)}`,
     `dispatched_steps: ${String(dispatched)}`,
   ];
 
   if (result.stop_reason) lines.push(`boundary: ${result.stop_reason}`);
-
-  for (const step of result.steps) {
-    const diagnostics = step.diagnostics.filter(
-      (diagnostic) => diagnostic !== "action dispatched"
-    );
-
-    if (diagnostics.length > 0) {
-      lines.push(
-        `step ${String(step.index)} ${step.type}: ${diagnostics.join("; ")}`
-      );
-    }
-  }
-
-  if (result.successor.status === "unavailable") {
-    lines.push(`successor unavailable: ${result.successor.error}`);
-  } else {
-    lines.push(
-      `state_changed: ${String(result.successor.diff.changed)}`,
-      `successor: ${result.successor.title} (${result.successor.url})`,
-      "current interactive state:",
-      truncate(result.successor.text, relaxedBrowserActSnapshotCharacters)
-    );
-  }
+  appendStepDiagnostics(lines, result.steps);
+  appendSuccessorLines(lines, result.successor);
 
   return truncate(lines.join("\n"), relaxedBrowserActOutputCharacters);
 }
