@@ -6,6 +6,8 @@ import {
 import { Result, Schema } from "effect";
 import type { MessageStreamEvent } from "eve/client";
 import type { EveMessagePart } from "eve/react";
+const decodeReactToMessageToolResultSchema = Schema.decodeUnknownResult(reactToMessageToolResultSchema);
+const decodeSendMessageToolResultSchema = Schema.decodeUnknownResult(sendMessageToolResultSchema);
 
 export function messageTimestamps(events: readonly MessageStreamEvent[]) {
   const timestamps = new Map<string, string>();
@@ -119,7 +121,7 @@ function completedReactionOutput(event: MessageStreamEvent) {
     return undefined;
   }
 
-  const result = Schema.decodeUnknownResult(reactToMessageToolResultSchema)(
+  const result = decodeReactToMessageToolResultSchema(
     event.data.result
   );
 
@@ -133,7 +135,7 @@ function completedSendMessageOutput(event: MessageStreamEvent) {
     return undefined;
   }
 
-  const result = Schema.decodeUnknownResult(sendMessageToolResultSchema)(
+  const result = decodeSendMessageToolResultSchema(
     event.data.result
   );
 

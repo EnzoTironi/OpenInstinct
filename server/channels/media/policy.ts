@@ -4,6 +4,18 @@ import { sniffBrowserImageMediaType } from "../../../shared/browser/artifact";
 import { artifactLimits } from "../../artifacts/model";
 import type { MessagePayload } from "../../messaging/model";
 
+const decodePlainTextMedia = Schema.decodeUnknownEffect(
+  Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.makeFilter((value) =>
+      value.split("").every((character) => {
+        const code = character.charCodeAt(0);
+
+        return code >= 32 || code === 9 || code === 10 || code === 13;
+      })
+    )
+  )
+);
 export type MediaReference = NonNullable<MessagePayload["attachments"]>[number];
 
 export const mediaLimits = {
@@ -134,18 +146,7 @@ export const decodeMediaText = Effect.fn("decodeMediaText")(function* (
     catch: () => new ChannelMediaError({ reason: "invalid_media" }),
   });
 
-  return yield* Schema.decodeUnknownEffect(
-    Schema.String.check(
-      Schema.isMinLength(1),
-      Schema.makeFilter((value) =>
-        value.split("").every((character) => {
-          const code = character.charCodeAt(0);
-
-          return code >= 32 || code === 9 || code === 10 || code === 13;
-        })
-      )
-    )
-  )(text).pipe(
+  return yield* decodePlainTextMedia(text).pipe(
     Effect.mapError(() => new ChannelMediaError({ reason: "invalid_media" }))
   );
 });

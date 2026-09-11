@@ -14,6 +14,18 @@ import { ArtifactId, artifactLimits } from "../../server/artifacts/model";
 import { Messaging } from "../../server/messaging";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
+const decodeArtifactId = Schema.decodeUnknownEffect(ArtifactId);
+
+const artifactProcessResultSchema = Schema.fromJsonString(
+  Schema.Struct({
+    artifactId: Schema.String,
+    sha256: Schema.String,
+    text: Schema.String,
+  })
+);
+const decodeArtifactProcessResult = Schema.decodeUnknownEffect(
+  artifactProcessResultSchema
+);
 
 const dependencies = Layer.mergeAll(
   ChannelAccounts.layer,
@@ -106,7 +118,7 @@ const source = Effect.fn("artifacts.source")(function* (
     },
   });
 
-  const sourceInboxId = yield* Schema.decodeUnknownEffect(ArtifactId)(
+  const sourceInboxId = yield* decodeArtifactId(
     receipt.id
   );
 
@@ -409,14 +421,6 @@ test("a fresh process reads exact persisted bytes after the writing process and 
       const input = yield* source(messaging, owner.id);
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
-      const resultSchema = Schema.fromJsonString(
-        Schema.Struct({
-          artifactId: Schema.String,
-          sha256: Schema.String,
-          text: Schema.String,
-        })
-      );
-
       const childPath = fileURLToPath(
         new URL("./artifacts-process.ts", import.meta.url)
       );
@@ -431,7 +435,7 @@ test("a fresh process reads exact persisted bytes after the writing process and 
         ])
       );
 
-      const metadata = yield* Schema.decodeUnknownEffect(resultSchema)(written);
+      const metadata = yield* decodeArtifactProcessResult(written);
 
       const read = yield* spawner.string(
         ChildProcess.make(process.execPath, [
@@ -446,7 +450,7 @@ test("a fresh process reads exact persisted bytes after the writing process and 
         ])
       );
 
-      const restored = yield* Schema.decodeUnknownEffect(resultSchema)(read);
+      const restored = yield* decodeArtifactProcessResult(read);
       expect(restored).toEqual({
         ...metadata,
         text: "stored before writer process exited",

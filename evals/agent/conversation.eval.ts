@@ -8,6 +8,8 @@ import { reactToMessageOutputSchema } from "@shared/chat/reaction";
 import { Result, Schema } from "effect";
 import { defineEval, type EveEvalContext } from "eve/evals";
 import { includes, satisfies } from "eve/evals/expect";
+const decodeReactToMessageOutputSchema = Schema.decodeUnknownResult(reactToMessageOutputSchema);
+const decodeSendMessageOutputSchema = Schema.decodeUnknownResult(sendMessageOutputSchema);
 
 const cases: readonly {
   description: string;
@@ -114,7 +116,7 @@ const reactionEvals = [
       thanked.calledTool("react_to_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(reactToMessageOutputSchema)(
+          const parsed = decodeReactToMessageOutputSchema(
             input
           );
 
@@ -181,7 +183,7 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+          const parsed = decodeSendMessageOutputSchema(
             input
           );
 
@@ -219,7 +221,7 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+          const parsed = decodeSendMessageOutputSchema(
             input
           );
 
@@ -246,7 +248,7 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+          const parsed = decodeSendMessageOutputSchema(
             input
           );
 
@@ -276,7 +278,7 @@ const replyEvals = [
       question.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+          const parsed = decodeSendMessageOutputSchema(
             input
           );
 
@@ -299,7 +301,7 @@ const replyEvals = [
       answer.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+          const parsed = decodeSendMessageOutputSchema(
             input
           );
 
@@ -333,7 +335,7 @@ const replyEvals = [
       second.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+          const parsed = decodeSendMessageOutputSchema(
             input
           );
 
@@ -367,7 +369,7 @@ const replyEvals = [
       turn.calledTool("send_message", {
         count: 1,
         input: (input) => {
-          const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+          const parsed = decodeSendMessageOutputSchema(
             input
           );
 

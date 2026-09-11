@@ -10,8 +10,9 @@ import { Schema } from "effect";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
 
-const challenge = Schema.decodeUnknownSync(channelChallengeSchema)({
+const challenge = decodeChannelChallengeSchema({
   id: "5dd20c8c-9d99-49ea-8e04-936d238dac03",
   channel: "telegram",
   deepLink: "https://t.me/assistant_bot?start=example",

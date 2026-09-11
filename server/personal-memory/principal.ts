@@ -10,6 +10,8 @@ import {
   requirePersonalMemoryMembership,
   requirePersonalMemoryWebSession,
 } from "./access";
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
+const decodeNonEmptyString = Schema.decodeUnknownEffect(Schema.NonEmptyString);
 
 // Storage callers keep these authority locks in the same transaction as document I/O.
 export const authorizePersonalMemoryPrincipal = Effect.fn(
@@ -28,7 +30,7 @@ export const authorizePersonalMemoryPrincipal = Effect.fn(
       principal.authenticator === "verified-channel" ||
       Schema.is(channelProviderSchema)(principal.attributes.conversationChannel)
     ) {
-      const channel = yield* Schema.decodeUnknownEffect(channelProviderSchema)(
+      const channel = yield* decodeChannelProviderSchema(
         principal.attributes.conversationChannel
       ).pipe(
         Effect.mapError(
@@ -52,9 +54,7 @@ export const authorizePersonalMemoryPrincipal = Effect.fn(
     }
 
     if (principal.authenticator === "authjs") {
-      const sessionId = yield* Schema.decodeUnknownEffect(
-        Schema.NonEmptyString
-      )(principal.attributes.authSessionId).pipe(
+      const sessionId = yield* decodeNonEmptyString(principal.attributes.authSessionId).pipe(
         Effect.mapError(
           () => new PersonalMemoryError({ reason: "unauthenticated" })
         )

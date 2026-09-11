@@ -8,26 +8,30 @@ import type { ToolContext } from "eve/tools";
 import { ScheduleOwnerInactive } from "../../../server/schedules/channel-owner";
 import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 import { scheduledConversationChannelSchema } from "../../../shared/schedules/conversation";
+const decodeScheduledConversationChannelSchema = Schema.decodeUnknownSync(scheduledConversationChannelSchema);
+const decodeNonEmptyString = Schema.decodeUnknownOption(Schema.NonEmptyString);
+const decodeLinqConversationId = Schema.decodeUnknownSync(
+  Schema.String.check(Schema.isStartsWith("linq:"))
+);
+const decodeUuidConversationId = Schema.decodeUnknownSync(
+  Schema.String.check(Schema.isUUID())
+);
 
 export function scheduleOwner(context: ToolContext) {
   const auth = context.session.auth.current;
 
   if (auth?.principalType !== "user") throw new ScheduleOwnerInactive();
 
-  const conversationChannel = Schema.decodeUnknownSync(
-    scheduledConversationChannelSchema
-  )(auth.attributes.conversationChannel);
+  const conversationChannel = decodeScheduledConversationChannelSchema(auth.attributes.conversationChannel);
 
   const scope = scopeFromPrincipal(auth);
 
   const conversationId =
     conversationChannel === "eve"
       ? context.session.id
-      : Schema.decodeUnknownSync(
-          conversationChannel === "linq"
-            ? Schema.String.check(Schema.isStartsWith("linq:"))
-            : Schema.String.check(Schema.isUUID())
-        )(auth.attributes.conversationId);
+      : (conversationChannel === "linq"
+          ? decodeLinqConversationId
+          : decodeUuidConversationId)(auth.attributes.conversationId);
 
   return { conversation: { conversationChannel, conversationId }, scope };
 }
@@ -38,7 +42,7 @@ export function scheduleReplyAnchor(context: ToolContext) {
   if (auth?.attributes.conversationChannel !== "linq") return undefined;
 
   return Option.getOrUndefined(
-    Schema.decodeUnknownOption(Schema.NonEmptyString)(
+    decodeNonEmptyString(
       auth.attributes.linqMessageId
     )
   );

@@ -16,6 +16,12 @@ import messaging from "../../tools/messaging";
 const decodeJsonObject = Schema.decodeSync(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))
 );
+const decodeReactToMessageOutput = Schema.decodeUnknownSync(
+  reactToMessageOutputSchema
+);
+const decodeAddReactionToMessageOutput = Schema.decodeUnknownSync(
+  addReactionToMessageOutputSchema
+);
 
 // Real dynamic tools and installed Eve/AI SDK codecs; no provider I/O.
 describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
@@ -68,10 +74,10 @@ describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
     });
     expect(serializeInputSchema(restored)).toMatchObject({ type: "object" });
 
-    const canonical =
+    const decodeCanonical =
       channel === "channel:linq"
-        ? reactToMessageOutputSchema
-        : addReactionToMessageOutputSchema;
+        ? decodeReactToMessageOutput
+        : decodeAddReactionToMessageOutput;
 
     const explicitUndefined = await original["~standard"].validate({
       type: "heart",
@@ -117,8 +123,8 @@ describe.each(["http", "channel:linq"])("reaction codec for %s", (channel) => {
               operation: input.operation ?? "add",
               type: input.type,
             });
-            expect(Schema.decodeUnknownSync(canonical)(result.value)).toEqual(
-              Schema.decodeUnknownSync(canonical)(input)
+            expect(decodeCanonical(result.value)).toEqual(
+              decodeCanonical(input)
             );
           })
           .concat(

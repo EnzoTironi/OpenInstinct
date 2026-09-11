@@ -7,6 +7,9 @@ import {
   ArtifactSourceSchema,
 } from "../../server/artifacts/model";
 import { runtimeDatabase } from "./database";
+const decodeSchema_Literals_put_read = Schema.decodeUnknownSync(Schema.Literals(["put", "read"]));
+const decodeSchema_fromJsonString_ArtifactSourceSchema = Schema.decodeUnknownEffect(Schema.fromJsonString(ArtifactSourceSchema));
+const decodeSchema_fromJsonString_ArtifactAccessSchema = Schema.decodeUnknownEffect(Schema.fromJsonString(ArtifactAccessSchema));
 
 const services = Artifacts.layer.pipe(
   Layer.provideMerge(
@@ -14,7 +17,7 @@ const services = Artifacts.layer.pipe(
   )
 );
 
-const operation = Schema.decodeUnknownSync(Schema.Literals(["put", "read"]))(
+const operation = decodeSchema_Literals_put_read(
   process.argv[2]
 );
 
@@ -25,9 +28,7 @@ const result = await Effect.runPromise(
     const artifacts = yield* Artifacts;
 
     if (operation === "put") {
-      const input = yield* Schema.decodeUnknownEffect(
-        Schema.fromJsonString(ArtifactSourceSchema)
-      )(raw);
+      const input = yield* decodeSchema_fromJsonString_ArtifactSourceSchema(raw);
 
       const metadata = yield* artifacts.put({
         ...input,
@@ -41,9 +42,7 @@ const result = await Effect.runPromise(
       };
     }
 
-    const input = yield* Schema.decodeUnknownEffect(
-      Schema.fromJsonString(ArtifactAccessSchema)
-    )(raw);
+    const input = yield* decodeSchema_fromJsonString_ArtifactAccessSchema(raw);
 
     const stored = yield* artifacts.read(input);
 

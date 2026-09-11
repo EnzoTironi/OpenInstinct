@@ -168,10 +168,26 @@ const hash = (secret: string) =>
 const fail = (reason: ChannelAccountError["reason"]) =>
   new ChannelAccountError({ reason });
 
-const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) =>
-  Schema.decodeUnknownEffect(schema)(input).pipe(
+const decodeUnknownEffectCache = new WeakMap<
+  object,
+  (input: unknown) => Effect.Effect<unknown, unknown>
+>();
+
+const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) => {
+  let decoder = decodeUnknownEffectCache.get(schema as object) as
+    | ((input: S["Type"]) => Effect.Effect<S["Type"], unknown>)
+    | undefined;
+
+  if (!decoder) {
+    const built = Schema.decodeUnknownEffect(schema);
+    decodeUnknownEffectCache.set(schema as object, built as never);
+    decoder = built as (input: S["Type"]) => Effect.Effect<S["Type"], unknown>;
+  }
+
+  return decoder(input).pipe(
     Effect.mapError(() => fail("invalid_input"))
   );
+};
 
 const publicIdentity = ({
   id,

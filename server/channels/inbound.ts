@@ -2,6 +2,8 @@ import { DateTime, Effect, Schema } from "effect";
 
 import { MessagePayloadSchema, type MessagePayload } from "../messaging/model";
 import { ProviderInputError } from "./provider-errors";
+const decodeFinite = Schema.decodeUnknownEffect(Schema.Finite);
+const decodeMessagePayloadSchema = Schema.decodeUnknownEffect(MessagePayloadSchema);
 
 export const ProviderReferenceSchema = Schema.String.check(
   Schema.isMinLength(1),
@@ -54,7 +56,7 @@ export const validateEventAge = Effect.fn("validateEventAge")(function* (
   timestampSeconds: number,
   nowMs: number
 ) {
-  yield* Schema.decodeUnknownEffect(Schema.Finite)(nowMs).pipe(
+  yield* decodeFinite(nowMs).pipe(
     Effect.mapError(
       () => new ProviderInputError({ provider: channel, reason: "malformed" })
     )
@@ -146,7 +148,7 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
       return reference;
     });
 
-  const normalized = yield* Schema.decodeUnknownEffect(MessagePayloadSchema)(
+  const normalized = yield* decodeMessagePayloadSchema(
     candidate
   ).pipe(
     Effect.mapError(

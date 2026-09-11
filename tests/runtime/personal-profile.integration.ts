@@ -30,6 +30,7 @@ import { channelChallengeSchema } from "../../shared/identity/channel-auth";
 import { emptyUserProfile } from "../../shared/user-profile/schema";
 import { runtimeDatabase } from "./database";
 import { waitForBlocked } from "./pg-locks";
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
 
 async function fixture() {
   await Effect.runPromise(Effect.void.pipe(Effect.provide(runtimeDatabase)));
@@ -382,7 +383,7 @@ async function login(owner: Awaited<ReturnType<typeof fixture>>) {
 
   assert.equal(started.status, 200);
 
-  const challenge = Schema.decodeUnknownSync(channelChallengeSchema)(
+  const challenge = decodeChannelChallengeSchema(
     await started.json()
   );
 

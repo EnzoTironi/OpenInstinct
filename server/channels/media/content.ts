@@ -18,6 +18,7 @@ import {
   requireChannelModelInput,
 } from "./policy";
 import { transcribeChannelAudio } from "./transcription";
+const decodeSchema_Array_ArtifactReferenceSchema = Schema.decodeUnknownEffect(Schema.Array(ArtifactReferenceSchema));
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
@@ -101,7 +102,7 @@ export const loadChannelContent = Effect.fn("loadChannelContent")(
     );
 
     const references: readonly ArtifactReference[] =
-      yield* Schema.decodeUnknownEffect(Schema.Array(ArtifactReferenceSchema))(
+      yield* decodeSchema_Array_ArtifactReferenceSchema(
         stored.map((item) => item.metadata)
       );
 

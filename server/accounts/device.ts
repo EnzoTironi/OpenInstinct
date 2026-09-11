@@ -69,10 +69,28 @@ const invalid = () => new ChannelAccountError({ reason: "invalid_challenge" });
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 
-const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) =>
-  Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
+const decodeUnknownEffectCache = new WeakMap<
+  object,
+  (input: unknown) => Effect.Effect<unknown, unknown>
+>();
+
+const decode = <S extends Schema.Constraint>(schema: S, input: S["Type"]) => {
+  let decoder = decodeUnknownEffectCache.get(schema as object) as
+    | ((input: S["Type"]) => Effect.Effect<S["Type"], unknown>)
+    | undefined;
+
+  if (!decoder) {
+    const built = Schema.decodeUnknownEffect(schema, {
+      onExcessProperty: "error",
+    });
+    decodeUnknownEffectCache.set(schema as object, built as never);
+    decoder = built as (input: S["Type"]) => Effect.Effect<S["Type"], unknown>;
+  }
+
+  return decoder(input).pipe(
     Effect.mapError(() => invalid())
   );
+};
 
 /** Native initiation and browser binding on the existing account challenge. */
 export class NativeDeviceAuth extends Context.Service<

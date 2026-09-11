@@ -21,6 +21,8 @@ const linkedIdentitySchema = Schema.Struct({
   channel: IdentitySchema.fields.channel,
   senderId: IdentitySchema.fields.senderId,
 });
+const decodeSchema_Array_linkedIdentitySchema = Schema.decodeUnknownEffect(Schema.Array(linkedIdentitySchema));
+const decodeId = Schema.decodeUnknownEffect(IdentitySchema.fields.id);
 
 const requireControlSession = Effect.fn("requireControlSession")(function* (
   headers: Headers
@@ -53,9 +55,7 @@ export const readLinkedChannelIdentities = Effect.fn(
     const rows =
       yield* sql`SELECT id, channel, sender_id AS "senderId" FROM public.channel_identity WHERE user_id = ${session.user.id} AND revoked_at IS NULL ORDER BY channel, created_at, id`;
 
-    return yield* Schema.decodeUnknownEffect(
-      Schema.Array(linkedIdentitySchema)
-    )(rows);
+    return yield* decodeSchema_Array_linkedIdentitySchema(rows);
   },
   Effect.catchTag(
     ["AuthUnavailable", "SqlError", "SchemaError"],
@@ -67,7 +67,7 @@ export const revokeLinkedChannelIdentity = Effect.fn(
   "revokeLinkedChannelIdentity"
 )(
   function* (headers: Headers, identityId: string) {
-    const id = yield* Schema.decodeUnknownEffect(IdentitySchema.fields.id)(
+    const id = yield* decodeId(
       identityId
     ).pipe(
       Effect.mapError(

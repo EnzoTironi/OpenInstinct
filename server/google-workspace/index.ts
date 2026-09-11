@@ -74,6 +74,8 @@ const accountSchema = Schema.Struct({
   scope: Schema.NullOr(Schema.String),
   hasToken: Schema.Boolean,
 });
+const decodeSchema_Array_accountSchema = Schema.decodeUnknownEffect(Schema.Array(accountSchema));
+const decodeSchema_Array_Schema_Struct_token_Schema_NullOr_Sch = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ token: Schema.NullOr(Schema.String) })));
 
 const findAccount = Effect.fn("findGoogleWorkspaceAccount")(
   function* (scope: AccessScope) {
@@ -87,9 +89,7 @@ const findAccount = Effect.fn("findGoogleWorkspaceAccount")(
     WHERE a."userId" = ${userId} AND a."providerId" = 'google'
       AND a.issuer = 'https://accounts.google.com' ORDER BY a."createdAt", a.id LIMIT 2`;
 
-    const accounts = yield* Schema.decodeUnknownEffect(
-      Schema.Array(accountSchema)
-    )(rows);
+    const accounts = yield* decodeSchema_Array_accountSchema(rows);
 
     if (accounts.length > 1)
       return yield* new GoogleWorkspaceError({ reason: "unavailable" });
@@ -274,9 +274,7 @@ export const disconnectGoogleWorkspace = Effect.fn("disconnectGoogleWorkspace")(
     const rows =
       yield* sql`SELECT COALESCE("refreshToken", "accessToken") AS token FROM account WHERE id = ${account.id} AND "userId" = ${session.user.id} AND "providerId" = 'google' AND issuer = 'https://accounts.google.com'`;
 
-    const tokens = yield* Schema.decodeUnknownEffect(
-      Schema.Array(Schema.Struct({ token: Schema.NullOr(Schema.String) }))
-    )(rows);
+    const tokens = yield* decodeSchema_Array_Schema_Struct_token_Schema_NullOr_Sch(rows);
 
     const encrypted = tokens[0]?.token;
 

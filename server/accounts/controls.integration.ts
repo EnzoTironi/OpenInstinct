@@ -13,6 +13,7 @@ import {
   revokeLinkedChannelIdentity,
 } from "./controls";
 import { ChannelAccounts } from "./index";
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
 
 const runtime = ManagedRuntime.make(
   ChannelAccounts.layer.pipe(Layer.provideMerge(runtimeDatabase))
@@ -63,7 +64,7 @@ try {
 
     assert.equal(started.status, 200);
 
-    const challenge = Schema.decodeUnknownSync(channelChallengeSchema)(
+    const challenge = decodeChannelChallengeSchema(
       await started.json()
     );
 

@@ -9,6 +9,8 @@ import { serverRuntime } from "../../server/runtime";
 import { submitChannelResponse } from "../lib/channel-response";
 
 const route = "/internal/channel-input/respond";
+const decodeSchema_fromJsonString_internalCallbackBodies_route = Schema.decodeUnknownEffect(Schema.fromJsonString(internalCallbackBodies[route]),
+            { onExcessProperty: "error" });
 
 export default defineChannel({
   routes: [
@@ -19,10 +21,7 @@ export default defineChannel({
 
           if (raw instanceof Response) return raw;
 
-          const input = yield* Schema.decodeUnknownEffect(
-            Schema.fromJsonString(internalCallbackBodies[route]),
-            { onExcessProperty: "error" }
-          )(raw.toString("utf8"));
+          const input = yield* decodeSchema_fromJsonString_internalCallbackBodies_route(raw.toString("utf8"));
 
           yield* submitChannelResponse(input, attachSession(input.sessionId));
 

@@ -15,6 +15,8 @@ import {
 } from "./access";
 
 const identifier = Schema.NonEmptyString.check(Schema.isTrimmed());
+const decodeIdentifier = Schema.decodeUnknownEffect(identifier);
+const decodeSchema_String_check_Schema_isUUID = Schema.decodeUnknownEffect(Schema.String.check(Schema.isUUID()));
 
 const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
   function* (principal: SessionAuthContext) {
@@ -36,7 +38,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       });
 
     if (principal.authenticator === "scheduled-worker") {
-      const runId = yield* Schema.decodeUnknownEffect(identifier)(
+      const runId = yield* decodeIdentifier(
         principal.attributes.scheduledRunId
       ).pipe(
         Effect.mapError(
@@ -44,7 +46,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
         )
       );
 
-      const leaseToken = yield* Schema.decodeUnknownEffect(identifier)(
+      const leaseToken = yield* decodeIdentifier(
         principal.attributes.scheduledRunLeaseToken
       ).pipe(
         Effect.mapError(
@@ -56,7 +58,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       const scheduleId = principal.attributes.scheduleId;
 
       if (scheduleId !== undefined) {
-        const id = yield* Schema.decodeUnknownEffect(identifier)(
+        const id = yield* decodeIdentifier(
           scheduleId
         ).pipe(
           Effect.mapError(
@@ -72,9 +74,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       principal.authenticator === "verified-channel" ||
       Schema.is(channelProviderSchema)(principal.attributes.conversationChannel)
     ) {
-      const identityId = yield* Schema.decodeUnknownEffect(
-        Schema.String.check(Schema.isUUID())
-      )(principal.attributes.channelIdentityId).pipe(
+      const identityId = yield* decodeSchema_String_check_Schema_isUUID(principal.attributes.channelIdentityId).pipe(
         Effect.mapError(
           () => new BrowserWorkerAccessError({ reason: "revoked" })
         )
@@ -82,7 +82,7 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
 
       yield* requireBrowserWorkerChannelIdentity(scope, identityId);
     } else if (principal.authenticator === "authjs") {
-      const sessionId = yield* Schema.decodeUnknownEffect(identifier)(
+      const sessionId = yield* decodeIdentifier(
         principal.attributes.authSessionId
       ).pipe(
         Effect.mapError(

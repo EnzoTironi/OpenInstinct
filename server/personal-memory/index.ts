@@ -7,6 +7,7 @@ import type { MemoryOperationContext } from "eve/memory";
 import { PersonalMemoryError, requirePersonalMemoryMembership } from "./access";
 import { admitPersonalWipeTarget } from "./group-memory-policy";
 import { storedNoteSchema, type PersonalMemorySnapshot } from "./model";
+const decodeSchema_Array_storedNoteSchema = Schema.decodeUnknownEffect(Schema.Array(storedNoteSchema));
 
 const bindingSchema = Schema.Struct({
   key: Schema.String.check(
@@ -77,9 +78,7 @@ const makePersonalMemory = Effect.gen(function* () {
         WHERE b.workspace_id = ${scope.workspaceId} AND b.slot = 'profile'
         ORDER BY b.namespace, b.key`;
 
-      const documents = yield* Schema.decodeUnknownEffect(
-        Schema.Array(storedNoteSchema)
-      )(rows).pipe(
+      const documents = yield* decodeSchema_Array_storedNoteSchema(rows).pipe(
         Effect.mapError(
           () => new PersonalMemoryError({ reason: "unavailable" })
         )

@@ -11,6 +11,7 @@ const bodySchema = Schema.Struct({
   organizationId: Schema.optionalKey(Schema.String),
   seatCount: Schema.optionalKey(Schema.Number),
 });
+const decodeBodySchema = Schema.decodeUnknownEffect(bodySchema);
 
 function checkoutErrorResponse(error: BillingCheckoutError) {
   const status =
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   const rawBody: unknown = await request.json().catch(() => null);
 
   return Effect.runPromise(
-    Schema.decodeUnknownEffect(bodySchema)(rawBody ?? {}).pipe(
+    decodeBodySchema(rawBody ?? {}).pipe(
       Effect.mapError(
         () =>
           new BillingCheckoutError({

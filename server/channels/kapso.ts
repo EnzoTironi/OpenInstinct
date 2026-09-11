@@ -297,9 +297,7 @@ export const parseKapsoWebhook = Effect.fn("parseKapsoWebhook")(function* (
     configuration
   ).pipe(Effect.mapError(malformed));
 
-  const marker = yield* Schema.decodeUnknownEffect(
-    Schema.Struct({ batch: Schema.optionalKey(Schema.Boolean) })
-  )(value).pipe(Effect.mapError(malformed));
+  const marker = yield* decodeSchema_Struct_batch_Schema_optionalKey_Schema_Bool(value).pipe(Effect.mapError(malformed));
 
   const items = marker.batch
     ? (yield* decodeEffect_batch(value).pipe(Effect.mapError(malformed))).data
@@ -329,6 +327,8 @@ const sendInput = Schema.Struct({
   text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
   reply: Schema.optional(messageId),
 });
+const decodeSchema_Struct_batch_Schema_optionalKey_Schema_Bool = Schema.decodeUnknownEffect(Schema.Struct({ batch: Schema.optionalKey(Schema.Boolean) }));
+const decodeSendInput = Schema.decodeUnknownEffect(sendInput);
 
 const receipt = Schema.Struct({
   messaging_product: Schema.Literal("whatsapp"),
@@ -376,7 +376,7 @@ const makeKapso = Effect.gen(function* () {
     text: string,
     reply?: string
   ) {
-    const input = yield* Schema.decodeUnknownEffect(sendInput)({
+    const input = yield* decodeSendInput({
       targetId,
       text,
       reply,

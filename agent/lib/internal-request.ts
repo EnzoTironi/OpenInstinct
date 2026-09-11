@@ -9,21 +9,32 @@ import {
   internalCallbackOrigin,
   type InternalCallbackRoute,
 } from "../../server/internal/callback-auth";
+const encodeSchema_fromJsonString_Schema_Unknown = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+
+const decodeInternalCallbackBodies = Object.fromEntries(
+  Object.entries(internalCallbackBodies).map(([key, schema]) => [
+    key,
+    Schema.decodeUnknownEffect(schema as Schema.Codec<unknown>, {
+      onExcessProperty: "error",
+    }),
+  ])
+) as {
+  [K in InternalCallbackRoute]: (
+    input: (typeof internalCallbackBodies)[K]["Type"]
+  ) => Effect.Effect<
+    (typeof internalCallbackBodies)[K]["Type"],
+    Schema.SchemaError
+  >;
+};
 
 export const postInternalRequestEffect = Effect.fn("postInternalRequestEffect")(
   function* <Route extends InternalCallbackRoute>(
     route: Route,
     body: (typeof internalCallbackBodies)[Route]["Type"]
   ) {
-    const schema: Schema.Codec<unknown> = internalCallbackBodies[route];
+    const value = yield* decodeInternalCallbackBodies[route](body);
 
-    const value = yield* Schema.decodeUnknownEffect(schema, {
-      onExcessProperty: "error",
-    })(body);
-
-    const serialized = yield* Schema.encodeEffect(
-      Schema.fromJsonString(Schema.Unknown)
-    )(value);
+    const serialized = yield* encodeSchema_fromJsonString_Schema_Unknown(value);
 
     const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
     let origin: string;

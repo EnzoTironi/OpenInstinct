@@ -17,6 +17,7 @@ import {
   decodeArtifactInput,
   type ArtifactRow,
 } from "./model";
+const decodeSchema_Array_ArtifactMetadataSchema = Schema.decodeUnknownEffect(Schema.Array(ArtifactMetadataSchema));
 
 const unavailable = () => new ArtifactError({ reason: "unavailable" });
 
@@ -171,9 +172,7 @@ const makeArtifacts = Effect.gen(function* () {
           AND ('better-auth:' || i.user_id) = ${scope.userId} AND a.deleted_at IS NULL
           ORDER BY a.created_at DESC, a.id DESC LIMIT ${value.limit} FOR SHARE OF a, i`;
 
-        return yield* Schema.decodeUnknownEffect(
-          Schema.Array(ArtifactMetadataSchema)
-        )(rows);
+        return yield* decodeSchema_Array_ArtifactMetadataSchema(rows);
       },
       sql.withTransaction,
       Effect.catchTag("SqlError", unavailable),

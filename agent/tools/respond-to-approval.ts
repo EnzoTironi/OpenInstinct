@@ -11,6 +11,10 @@ import { channelProviderSchema } from "../../shared/identity/channel-auth";
 import { postInternalRequest } from "../lib/internal-request";
 
 const callback = internalCallbackBodies["/internal/channel-input/respond"];
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
+const decodeCallback = Schema.decodeUnknownEffect(callback, {
+          onExcessProperty: "error",
+        });
 
 export const inputSchema = Schema.Struct({
   requestId: callback.fields.requestId,
@@ -32,15 +36,11 @@ export default defineTool({
       Effect.gen(function* () {
         const auth = context.session.auth.current;
 
-        const channel = yield* Schema.decodeUnknownEffect(
-          channelProviderSchema
-        )(auth?.attributes.conversationChannel);
+        const channel = yield* decodeChannelProviderSchema(auth?.attributes.conversationChannel);
 
         const identity = yield* requireChannelPrincipal(channel, auth);
 
-        const body = yield* Schema.decodeUnknownEffect(callback, {
-          onExcessProperty: "error",
-        })({
+        const body = yield* decodeCallback({
           ...input,
           sessionId: context.session.id,
           turnId: context.session.turn.id,

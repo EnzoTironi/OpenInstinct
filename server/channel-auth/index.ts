@@ -23,6 +23,9 @@ import {
 } from "../../shared/identity/channel-auth.ts";
 import { NativeDeviceAuth } from "../accounts/device";
 import { ChannelAccountError, ChannelAccounts } from "../accounts/index.ts";
+const decodeChannelConversationEntrySchema = Schema.decodeUnknownEffect(channelConversationEntrySchema);
+const decodeChannelChallengeSchema = Schema.decodeUnknownEffect(channelChallengeSchema);
+const decodeDeviceBoundSchema = Schema.decodeUnknownEffect(deviceBoundSchema);
 
 type EndpointContext = Parameters<typeof setSessionCookie>[0];
 
@@ -237,9 +240,7 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                 if (ctx.body.channel === "kapso") {
                   ctx.setHeader("Cache-Control", "no-store");
 
-                  return yield* Schema.decodeUnknownEffect(
-                    channelConversationEntrySchema
-                  )({
+                  return yield* decodeChannelConversationEntrySchema({
                     channel: "kapso",
                     conversationUrl: `${destination.url}?text=${encodeURIComponent(ctx.body.purpose === "link" ? "quero vincular meu WhatsApp à conta aberta no navegador" : "quero abrir minha conta no navegador")}`,
                   });
@@ -271,9 +272,7 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
 
                 const message = challenge.token;
 
-                const response = yield* Schema.decodeUnknownEffect(
-                  channelChallengeSchema
-                )({
+                const response = yield* decodeChannelChallengeSchema({
                   id: challenge.challengeId,
                   channel: ctx.body.channel,
                   deepLink: `${destination.url}?${destination.parameter}=${encodeURIComponent(message)}`,
@@ -342,7 +341,7 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                 );
                 ctx.setHeader("Cache-Control", "no-store");
 
-                return yield* Schema.decodeUnknownEffect(deviceBoundSchema)({
+                return yield* decodeDeviceBoundSchema({
                   id: bound.id,
                   purpose: bound.purpose,
                   channel: bound.channel,

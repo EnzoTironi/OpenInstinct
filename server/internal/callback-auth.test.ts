@@ -19,6 +19,8 @@ const configuration = {
 const unusedBetterAuthSecret = randomBytes(32).toString("base64");
 
 const route = "/internal/scheduled-run/report";
+const decodeSchema_fromJsonString_internalCallbackBodies_route = Schema.decodeUnknownEffect(Schema.fromJsonString(internalCallbackBodies[route]),
+            { onExcessProperty: "error" });
 
 const body = JSON.stringify({ runId: randomUUID() });
 
@@ -224,10 +226,7 @@ test("signed malformed JSON and extra authority fields fail the boundary schema"
         );
 
         const result = await run(
-          Schema.decodeUnknownEffect(
-            Schema.fromJsonString(internalCallbackBodies[route]),
-            { onExcessProperty: "error" }
-          )(raw.toString()).pipe(Effect.result)
+          decodeSchema_fromJsonString_internalCallbackBodies_route(raw.toString()).pipe(Effect.result)
         );
 
         expect(Result.isFailure(result)).toBe(true);

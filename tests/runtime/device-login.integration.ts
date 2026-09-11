@@ -16,6 +16,7 @@ import { channelAuthPlugin } from "../../server/channel-auth";
 import { channelPrincipal } from "../../server/channels/principal";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
+const decodeSchema_Struct_user_Schema_Struct_id_Schema_String = Schema.decodeUnknownSync(Schema.Struct({ user: Schema.Struct({ id: Schema.String }) }));
 
 const cookies = (response: Response) =>
   response.headers
@@ -396,9 +397,7 @@ test("native browser binding requires same-session approval before BetterAuth ca
     assert.equal(complete.status, 200);
     const session = await request("/get-session", undefined, cookies(complete));
 
-    const sessionBody = Schema.decodeUnknownSync(
-      Schema.Struct({ user: Schema.Struct({ id: Schema.String }) })
-    )(await session.json());
+    const sessionBody = decodeSchema_Struct_user_Schema_Struct_id_Schema_String(await session.json());
 
     assert.equal(sessionBody.user.id, identity.userId);
     assert.equal(

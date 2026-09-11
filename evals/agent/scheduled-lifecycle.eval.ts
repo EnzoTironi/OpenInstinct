@@ -4,6 +4,7 @@ import { accessScopeForUser } from "@shared/identity/access-scope";
 import { Result, Schema } from "effect";
 import { defineEval } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
+const decodeSendMessageOutputSchema = Schema.decodeUnknownResult(sendMessageOutputSchema);
 
 const cases = [
   {
@@ -109,7 +110,7 @@ export default defineEval({
       } else {
         report.calledTool("send_message", {
           input: (input) => {
-            const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
+            const parsed = decodeSendMessageOutputSchema(
               input
             );
 

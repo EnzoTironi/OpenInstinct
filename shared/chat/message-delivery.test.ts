@@ -5,11 +5,15 @@ import {
   sendMessageOutputSchema,
   sendMessageToolResultSchema,
 } from "./message-delivery";
+const decodeSendMessageOutputSchema = Schema.decodeUnknownSync(sendMessageOutputSchema);
+const decodeSendMessageOutputSchema2 = Schema.decodeUnknownResult(sendMessageOutputSchema);
+const decodeSendMessageToolResultSchema = Schema.decodeUnknownSync(sendMessageToolResultSchema);
+const decodeSendMessageToolResultSchema2 = Schema.decodeUnknownResult(sendMessageToolResultSchema);
 
 describe("message delivery contract", () => {
   it("trims text and URL edges without normalizing the URL itself", () => {
     expect(
-      Schema.decodeUnknownSync(sendMessageOutputSchema)({
+      decodeSendMessageOutputSchema({
         kind: "message",
         text: " \tOlá\n ",
         attachments: [
@@ -35,7 +39,7 @@ describe("message delivery contract", () => {
       ],
     });
     expect(
-      Schema.decodeUnknownSync(sendMessageOutputSchema)({
+      decodeSendMessageOutputSchema({
         kind: "link",
         url: " https:example.com ",
       })
@@ -68,7 +72,7 @@ describe("message delivery contract", () => {
         },
       },
     ])
-      expect(Schema.decodeUnknownSync(sendMessageOutputSchema)(input)).toEqual(
+      expect(decodeSendMessageOutputSchema(input)).toEqual(
         input
       );
   });
@@ -84,7 +88,7 @@ describe("message delivery contract", () => {
     };
 
     expect(
-      Schema.decodeUnknownSync(sendMessageOutputSchema)({
+      decodeSendMessageOutputSchema({
         kind: "message",
         text: ` ${"x".repeat(20_000)} `,
         attachments: Array.from({ length: 4 }, () => ({ ...attachment })),
@@ -92,7 +96,7 @@ describe("message delivery contract", () => {
     ).toMatchObject({ text: "x".repeat(20_000) });
     const link = `https://example.com/${"x".repeat(2048 - "https://example.com/".length)}`;
     expect(
-      Schema.decodeUnknownSync(sendMessageOutputSchema)({
+      decodeSendMessageOutputSchema({
         kind: "link",
         url: link,
       })
@@ -118,7 +122,7 @@ describe("message delivery contract", () => {
       { kind: "link", url: `${link}x` },
     ])
       expect(() =>
-        Schema.decodeUnknownSync(sendMessageOutputSchema)(input)
+        decodeSendMessageOutputSchema(input)
       ).toThrow(Schema.SchemaError);
   });
 
@@ -157,12 +161,12 @@ describe("message delivery contract", () => {
       },
     ])
       expect(() =>
-        Schema.decodeUnknownSync(sendMessageOutputSchema)(input)
+        decodeSendMessageOutputSchema(input)
       ).toThrow(Schema.SchemaError);
   });
 
   it("returns a typed failure for malformed URLs without throwing a URL defect", () => {
-    const result = Schema.decodeUnknownResult(sendMessageOutputSchema)({
+    const result = decodeSendMessageOutputSchema2({
       kind: "link",
       url: "https://bad host",
     });
@@ -176,7 +180,7 @@ describe("message delivery contract", () => {
 
   it("strips envelope metadata while enforcing the nested output contract", () => {
     expect(
-      Schema.decodeUnknownSync(sendMessageToolResultSchema)({
+      decodeSendMessageToolResultSchema({
         kind: "tool-result",
         toolName: "send_message",
         output: { kind: "message", text: " ok " },
@@ -203,7 +207,7 @@ describe("message delivery contract", () => {
     ])
       expect(
         Result.isSuccess(
-          Schema.decodeUnknownResult(sendMessageToolResultSchema)(input)
+          decodeSendMessageToolResultSchema2(input)
         )
       ).toBe(false);
   });

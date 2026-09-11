@@ -18,6 +18,8 @@ import {
   type OutboxResolutionDecision,
   type ResolveOutboxUncertainInput,
 } from "./model";
+const decodeMessageClaimSchema = Schema.decodeUnknownEffect(MessageClaimSchema);
+const decodeSchema_Array_Schema_Struct_status_Schema_String_co = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ status: Schema.String, count: Schema.Int })));
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
@@ -173,7 +175,7 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
       RETURNING ${columns}`;
 
     return rows[0]
-      ? yield* Schema.decodeUnknownEffect(MessageClaimSchema)(rows[0])
+      ? yield* decodeMessageClaimSchema(rows[0])
       : null;
   }, sql.withTransaction);
 
@@ -419,9 +421,7 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
       WHERE identity_id = ${identityId} AND status = 'uncertain'
       ORDER BY ${sql(queue.order)}, id LIMIT 100`;
 
-    const decodedCounts = yield* Schema.decodeUnknownEffect(
-      Schema.Array(Schema.Struct({ status: Schema.String, count: Schema.Int }))
-    )(counts);
+    const decodedCounts = yield* decodeSchema_Array_Schema_Struct_status_Schema_String_co(counts);
 
     return {
       counts: decodedCounts,

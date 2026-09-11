@@ -97,6 +97,28 @@ const enqueueInput = Schema.Struct({
   inputRequest: Schema.optionalKey(InputDeliveryReferenceSchema),
   replyToMessageId: Schema.optionalKey(ProviderReferenceSchema),
 });
+const decodeIdentityId = Schema.decodeUnknownEffect(IdentityId);
+const decodeIdentitySchema = Schema.decodeUnknownEffect(IdentitySchema);
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
+const decodeSchema_Array_IdentitySchema = Schema.decodeUnknownEffect(Schema.Array(IdentitySchema));
+const decodeEnqueueInput = Schema.decodeUnknownEffect(enqueueInput, {
+      onExcessProperty: "error",
+    });
+const decodeMessagePayloadSchema = Schema.decodeUnknownEffect(MessagePayloadSchema);
+const decodeEnqueueInput2 = Schema.decodeUnknownEffect(enqueueInput, {
+        onExcessProperty: "error",
+      });
+const decodeSchema_String_check_Schema_isPattern_task_report_0 = Schema.decodeUnknownEffect(Schema.String.check(Schema.isPattern(/^task-report:[0-9a-f]{64}$/u)));
+const decodeInputDeliveryReferenceSchema = Schema.decodeUnknownEffect(InputDeliveryReferenceSchema);
+const decodeSchema_Array_Schema_Struct_key_Schema_String_paylo = Schema.decodeUnknownEffect(Schema.Array(
+          Schema.Struct({
+            key: Schema.String,
+            payload: MessagePayloadSchema,
+            status: Schema.String,
+            sentAtMs: Schema.NullOr(Schema.Finite),
+            providerMessageId: Schema.NullOr(Schema.String),
+          })
+        ));
 
 const candidateInput = Schema.Struct({
   channel: channelProviderSchema,
@@ -140,7 +162,7 @@ const makeTransport = Effect.gen(function* () {
   const findIdentity = Effect.fn("ChannelTransport.findIdentity")(function* (
     identityId: string
   ) {
-    const id = yield* Schema.decodeUnknownEffect(IdentityId)(identityId).pipe(
+    const id = yield* decodeIdentityId(identityId).pipe(
       Effect.mapError(invalidInput)
     );
 
@@ -150,12 +172,12 @@ const makeTransport = Effect.gen(function* () {
     if (!rows[0])
       return yield* new ChannelTransportError({ reason: "identity_inactive" });
 
-    return yield* Schema.decodeUnknownEffect(IdentitySchema)(rows[0]);
+    return yield* decodeIdentitySchema(rows[0]);
   });
 
   const activeIdentity = Effect.fn("ChannelTransport.activeIdentity")(
     function* (identityId: string, expectedChannel: Identity["channel"]) {
-      const channel = yield* Schema.decodeUnknownEffect(channelProviderSchema)(
+      const channel = yield* decodeChannelProviderSchema(
         expectedChannel
       ).pipe(Effect.mapError(invalidInput));
 
@@ -240,7 +262,7 @@ const makeTransport = Effect.gen(function* () {
       WHERE i.channel = ${input.channel} AND ${visibility}
       ORDER BY eligible.oldest, i.id LIMIT ${input.limit}`;
 
-    return yield* Schema.decodeUnknownEffect(Schema.Array(IdentitySchema))(
+    return yield* decodeSchema_Array_IdentitySchema(
       rows
     );
   });
@@ -360,9 +382,7 @@ const makeTransport = Effect.gen(function* () {
   const enqueueText = Effect.fn("ChannelTransport.enqueueText")(function* (
     input: typeof enqueueInput.Type
   ) {
-    const value = yield* Schema.decodeUnknownEffect(enqueueInput, {
-      onExcessProperty: "error",
-    })(input).pipe(Effect.mapError(invalidInput));
+    const value = yield* decodeEnqueueInput(input).pipe(Effect.mapError(invalidInput));
 
     const identity = yield* findIdentity(value.identityId);
     yield* activeIdentity(identity.id, identity.channel);
@@ -379,7 +399,7 @@ const makeTransport = Effect.gen(function* () {
         if (value.replyToMessageId !== undefined)
           payload.replyToMessageId = value.replyToMessageId;
 
-        return Schema.decodeUnknownEffect(MessagePayloadSchema)(payload).pipe(
+        return decodeMessagePayloadSchema(payload).pipe(
           Effect.mapError(invalidInput)
         );
       },
@@ -426,13 +446,9 @@ const makeTransport = Effect.gen(function* () {
 
   const enqueueTaskReport = Effect.fn("ChannelTransport.enqueueTaskReport")(
     function* (input: typeof enqueueInput.Type) {
-      const value = yield* Schema.decodeUnknownEffect(enqueueInput, {
-        onExcessProperty: "error",
-      })(input).pipe(Effect.mapError(invalidInput));
+      const value = yield* decodeEnqueueInput2(input).pipe(Effect.mapError(invalidInput));
 
-      yield* Schema.decodeUnknownEffect(
-        Schema.String.check(Schema.isPattern(/^task-report:[0-9a-f]{64}$/u))
-      )(value.deliveryKey).pipe(Effect.mapError(invalidInput));
+      yield* decodeSchema_String_check_Schema_isPattern_task_report_0(value.deliveryKey).pipe(Effect.mapError(invalidInput));
       yield* sql`SELECT id FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
       const identity = yield* findIdentity(value.identityId);
       yield* activeIdentity(identity.id, identity.channel);
@@ -457,9 +473,7 @@ const makeTransport = Effect.gen(function* () {
       return yield* Effect.forEach(
         existing,
         Effect.fn("ChannelTransport.enqueueExistingDelivery")(function* (row) {
-          const payload = yield* Schema.decodeUnknownEffect(
-            MessagePayloadSchema
-          )(row.payload).pipe(Effect.mapError(invalidInput));
+          const payload = yield* decodeMessagePayloadSchema(row.payload).pipe(Effect.mapError(invalidInput));
 
           return yield* messaging.enqueue({
             identityId: value.identityId,
@@ -479,13 +493,11 @@ const makeTransport = Effect.gen(function* () {
       identityId: string,
       reference: typeof InputDeliveryReferenceSchema.Type
     ) {
-      const id = yield* Schema.decodeUnknownEffect(IdentityId)(identityId).pipe(
+      const id = yield* decodeIdentityId(identityId).pipe(
         Effect.mapError(invalidInput)
       );
 
-      const value = yield* Schema.decodeUnknownEffect(
-        InputDeliveryReferenceSchema
-      )(reference).pipe(Effect.mapError(invalidInput));
+      const value = yield* decodeInputDeliveryReferenceSchema(reference).pipe(Effect.mapError(invalidInput));
 
       const prefix = `input:${value.sessionId}:${value.requestId}:`;
 
@@ -497,17 +509,7 @@ const makeTransport = Effect.gen(function* () {
           AND substring(delivery_key FROM char_length(${prefix}) + 1) ~ '^[0-9]+$'
         ORDER BY sequence LIMIT 6`;
 
-      const chunks = yield* Schema.decodeUnknownEffect(
-        Schema.Array(
-          Schema.Struct({
-            key: Schema.String,
-            payload: MessagePayloadSchema,
-            status: Schema.String,
-            sentAtMs: Schema.NullOr(Schema.Finite),
-            providerMessageId: Schema.NullOr(Schema.String),
-          })
-        )
-      )(rows).pipe(Effect.mapError(invalidInput));
+      const chunks = yield* decodeSchema_Array_Schema_Struct_key_Schema_String_paylo(rows).pipe(Effect.mapError(invalidInput));
 
       if (chunks.length === 0 || chunks.length > 5) return null;
       let deliveredAtMs = 0;
@@ -555,7 +557,7 @@ const makeTransport = Effect.gen(function* () {
     drainOutbox: Effect.fn("ChannelTransport.drainOutbox")(function* (
       identityId: string
     ) {
-      const id = yield* Schema.decodeUnknownEffect(IdentityId)(identityId).pipe(
+      const id = yield* decodeIdentityId(identityId).pipe(
         Effect.mapError(invalidInput)
       );
 

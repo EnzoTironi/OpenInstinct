@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { channelProviderSchema } from "@shared/identity/channel-auth";
 import { Effect, Redacted, Schema, Stream } from "effect";
+const decodeSchema_fromJsonString_Schema_Json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Json));
 
 const maximumBodyBytes = 256 * 1024;
 
@@ -85,7 +86,7 @@ export const readVerifiedWebhook = Effect.fn("readVerifiedWebhook")(function* (
     return yield* new WebhookRejected({ status: 401 });
   }
 
-  return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Json))(
+  return yield* decodeSchema_fromJsonString_Schema_Json(
     body.toString("utf8")
   ).pipe(Effect.mapError(() => new WebhookRejected({ status: 400 })));
 });

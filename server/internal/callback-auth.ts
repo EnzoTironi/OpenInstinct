@@ -11,6 +11,8 @@ import {
   Stream,
 } from "effect";
 import { routeAuth, vercelOidc } from "eve/channels/auth";
+const decodeSchema_String_check_Schema_isPattern_d_10_u = Schema.decodeUnknownEffect(Schema.String.check(Schema.isPattern(/^\d{10}$/u)));
+const decodeSchema_String_check_Schema_isPattern_a_f0_9_64_u = Schema.decodeUnknownEffect(Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u)));
 
 export const internalCallbackBodies = {
   "/internal/channel-input/respond": Schema.Struct({
@@ -68,15 +70,17 @@ export const internalCallbackOrigin = Config.string("BETTER_AUTH_URL").pipe(
   Effect.mapError(() => reject(503))
 );
 
+const decodeCallbackEncryptionKey = Schema.decodeUnknownEffect(
+  Schema.String.check(
+    Schema.isBase64(),
+    Schema.makeFilter((value) => Buffer.from(value, "base64").length === 32)
+  )
+);
+
 const callbackKey = Effect.gen(function* () {
   const installation = yield* ResolvedInstallationSecrets;
 
-  const secret = yield* Schema.decodeUnknownEffect(
-    Schema.String.check(
-      Schema.isBase64(),
-      Schema.makeFilter((value) => Buffer.from(value, "base64").length === 32)
-    )
-  )(Redacted.value(installation.secretEncryptionKey));
+  const secret = yield* decodeCallbackEncryptionKey(Redacted.value(installation.secretEncryptionKey));
 
   return Redacted.make(
     createHmac("sha256", Buffer.from(secret, "base64"))
@@ -176,9 +180,7 @@ export const readVerifiedInternalCallback = Effect.fn(
   if (request.method !== "POST" || url.pathname !== route || url.search)
     return yield* reject(401);
 
-  const timestamp = yield* Schema.decodeUnknownEffect(
-    Schema.String.check(Schema.isPattern(/^\d{10}$/u))
-  )(request.headers.get("x-internal-callback-time")).pipe(
+  const timestamp = yield* decodeSchema_String_check_Schema_isPattern_d_10_u(request.headers.get("x-internal-callback-time")).pipe(
     Effect.mapError(() => reject(401))
   );
 
@@ -187,9 +189,7 @@ export const readVerifiedInternalCallback = Effect.fn(
 
   if (age < -5 || age > 60) return yield* reject(401);
 
-  const encoded = yield* Schema.decodeUnknownEffect(
-    Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
-  )(request.headers.get("x-internal-callback-signature")).pipe(
+  const encoded = yield* decodeSchema_String_check_Schema_isPattern_a_f0_9_64_u(request.headers.get("x-internal-callback-signature")).pipe(
     Effect.mapError(() => reject(401))
   );
 

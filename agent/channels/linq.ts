@@ -28,6 +28,8 @@ import {
   extractImageArtifactMarkdownReferences,
   stripImageArtifactMarkdownReferences,
 } from "../lib/linq-image-artifact/markdown";
+const decodeReactToMessageToolResultSchema = Schema.decodeUnknownResult(reactToMessageToolResultSchema);
+const decodeSendMessageToolResultSchema = Schema.decodeUnknownResult(sendMessageToolResultSchema);
 
 const verifiedPhoneUserSchema = z.object({
   id: z.string().min(1),
@@ -71,9 +73,7 @@ export default linqChannel({
   credentials,
   events: {
     async "action.result"(event, context, session) {
-      const reaction = Schema.decodeUnknownResult(
-        reactToMessageToolResultSchema
-      )(event.result);
+      const reaction = decodeReactToMessageToolResultSchema(event.result);
 
       if (event.status === "completed" && Result.isSuccess(reaction)) {
         if (!context.thread) {
@@ -109,7 +109,7 @@ export default linqChannel({
         return;
       }
 
-      const message = Schema.decodeUnknownResult(sendMessageToolResultSchema)(
+      const message = decodeSendMessageToolResultSchema(
         event.result
       );
 

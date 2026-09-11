@@ -12,6 +12,9 @@ import { channelProviderSchema } from "../../shared/identity/channel-auth";
 import { approvalMessageSchema } from "../lib/approval-message";
 import { authorizeApprovalResponse } from "../lib/approval-response";
 import { resolveModeValue } from "../lib/mode";
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
+const decodeArtifactId = Schema.decodeUnknownEffect(ArtifactId);
+const decodeLimit = Schema.decodeUnknownEffect(ArtifactListSchema.fields.limit);
 
 const toolArtifactId = z.fromJSONSchema(
   Schema.toJsonSchemaDocument(ArtifactId).schema
@@ -20,7 +23,7 @@ const toolArtifactId = z.fromJSONSchema(
 const requireActor = Effect.fn("artifactTools.requireActor")(function* (
   auth: Parameters<typeof requireChannelPrincipal>[1]
 ) {
-  const channel = yield* Schema.decodeUnknownEffect(channelProviderSchema)(
+  const channel = yield* decodeChannelProviderSchema(
     auth?.attributes.conversationChannel
   );
 
@@ -36,7 +39,7 @@ export const artifactRead = defineTool({
       Effect.gen(function* () {
         const identity = yield* requireActor(context.session.auth.current);
 
-        const artifactId = yield* Schema.decodeUnknownEffect(ArtifactId)(
+        const artifactId = yield* decodeArtifactId(
           input.artifactId
         );
 
@@ -60,9 +63,7 @@ export const artifactList = defineTool({
       Effect.gen(function* () {
         const identity = yield* requireActor(context.session.auth.current);
 
-        const limit = yield* Schema.decodeUnknownEffect(
-          ArtifactListSchema.fields.limit
-        )(input.limit);
+        const limit = yield* decodeLimit(input.limit);
 
         return yield* (yield* Artifacts).list({
           identityId: identity.id,
@@ -87,7 +88,7 @@ export const artifactDelete = defineTool({
       Effect.gen(function* () {
         const identity = yield* requireActor(context.session.auth.current);
 
-        const artifactId = yield* Schema.decodeUnknownEffect(ArtifactId)(
+        const artifactId = yield* decodeArtifactId(
           input.artifactId
         );
 

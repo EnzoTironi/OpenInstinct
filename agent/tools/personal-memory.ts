@@ -11,6 +11,7 @@ import { PersonalMemoryError } from "../../server/personal-memory/access";
 import { admitPersonalMemoryFromSession } from "../../server/personal-memory/group-memory-policy";
 import { serverRuntime } from "../../server/runtime";
 import { resolveModeValue } from "../lib/mode";
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
 
 export const inspectStoredPersonalMemory = defineTool({
   description:
@@ -28,9 +29,7 @@ export const inspectStoredPersonalMemory = defineTool({
         // G02: group conversationScope must not inspect personal memory.
         yield* admitPersonalMemoryFromSession(context.session.auth.current);
 
-        const channel = yield* Schema.decodeUnknownEffect(
-          channelProviderSchema
-        )(context.session.auth.current.attributes.conversationChannel);
+        const channel = yield* decodeChannelProviderSchema(context.session.auth.current.attributes.conversationChannel);
 
         const identity = yield* requireChannelPrincipal(
           channel,

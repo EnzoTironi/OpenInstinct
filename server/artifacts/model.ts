@@ -115,11 +115,29 @@ export class ArtifactError extends Schema.TaggedError<ArtifactError>()(
   }
 ) {}
 
+const decodeArtifactInputCache = new WeakMap<
+  object,
+  (input: unknown) => Effect.Effect<unknown, unknown>
+>();
+
 export const decodeArtifactInput = <S extends Schema.Constraint>(
   schema: S,
   input: S["Type"]
-) =>
-  Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
+) => {
+  let decoder = decodeArtifactInputCache.get(schema as object) as
+    | ((input: S["Type"]) => Effect.Effect<S["Type"], unknown>)
+    | undefined;
+
+  if (!decoder) {
+    const built = Schema.decodeUnknownEffect(schema, {
+      onExcessProperty: "error",
+    });
+    decodeArtifactInputCache.set(schema as object, built as never);
+    decoder = built as (input: S["Type"]) => Effect.Effect<S["Type"], unknown>;
+  }
+
+  return decoder(input).pipe(
     // Errors expose a category, never file bytes or source payloads.
     Effect.mapError(() => new ArtifactError({ reason: "invalid_input" }))
   );
+};

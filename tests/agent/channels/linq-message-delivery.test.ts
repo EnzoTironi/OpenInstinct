@@ -18,6 +18,7 @@ import type { LinqChannelConfig } from "eve/channels/linq";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // oxlint-disable-next-line import/no-unassigned-import -- Loads the production module so the mocked channel factory can capture its configuration.
 import "@agent/channels/linq";
+const decodeSendMessageOutputSchema = Schema.decodeUnknownResult(sendMessageOutputSchema);
 
 interface BrowserImage {
   bytes: Uint8Array;
@@ -545,7 +546,7 @@ describe("Linq message delivery", () => {
   it("requires a native link preview to be its own send_message call", () => {
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           kind: "link",
           text: "Read this",
           url: "https://example.com/article",
@@ -557,7 +558,7 @@ describe("Linq message delivery", () => {
   it("accepts typed reply handles for text, attachments, and native links", () => {
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           kind: "message",
           replyTo: { kind: "current" },
           text: "This one.",
@@ -566,7 +567,7 @@ describe("Linq message delivery", () => {
     ).toBe(true);
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           kind: "message",
           replyTo: { id: "task-1", kind: "task" },
           text: "This one.",
@@ -575,7 +576,7 @@ describe("Linq message delivery", () => {
     ).toBe(true);
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           kind: "link",
           replyTo: {
             id: "00000000-0000-4000-8000-000000000003",
@@ -587,7 +588,7 @@ describe("Linq message delivery", () => {
     ).toBe(true);
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           attachments: [
             { kind: "image", url: "https://example.com/image.png" },
           ],
@@ -602,7 +603,7 @@ describe("Linq message delivery", () => {
   it("discriminates native links from message content", () => {
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           attachments: [
             { kind: "image", url: "https://example.com/image.png" },
           ],
@@ -613,12 +614,12 @@ describe("Linq message delivery", () => {
     ).toBe(true);
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({ kind: "message" })
+        decodeSendMessageOutputSchema({ kind: "message" })
       )
     ).toBe(false);
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           kind: "message",
           text: "Read this",
           url: "https://example.com/article",
@@ -627,7 +628,7 @@ describe("Linq message delivery", () => {
     ).toBe(false);
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           link: "https://example.com/article",
         })
       )
@@ -640,7 +641,7 @@ describe("Linq message delivery", () => {
 
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           kind: "link",
           url: maximumLengthLink,
         })
@@ -648,7 +649,7 @@ describe("Linq message delivery", () => {
     ).toBe(true);
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           kind: "link",
           url: `${maximumLengthLink}a`,
         })
@@ -656,7 +657,7 @@ describe("Linq message delivery", () => {
     ).toBe(false);
     expect(
       Result.isSuccess(
-        Schema.decodeUnknownResult(sendMessageOutputSchema)({
+        decodeSendMessageOutputSchema({
           kind: "link",
           url: "http://example.com/article",
         })

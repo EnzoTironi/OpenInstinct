@@ -128,7 +128,7 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
     configuration
   ).pipe(Effect.mapError(malformed));
 
-  const incoming = yield* Schema.decodeUnknownEffect(update)(value).pipe(
+  const incoming = yield* decodeUpdate(value).pipe(
     Effect.mapError(malformed)
   );
 
@@ -192,7 +192,7 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
 
     if (Buffer.byteLength(query.data, "utf8") > 64) return yield* malformed();
 
-    const token = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
+    const token = yield* decodeLoginTokenSchema(
       query.data.slice(8)
     ).pipe(
       Effect.mapError(
@@ -269,6 +269,15 @@ const sendInput = Schema.Struct({
   text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
   reply: Schema.optional(stringId),
 });
+const decodeUpdate = Schema.decodeUnknownEffect(update);
+const decodeLoginTokenSchema = Schema.decodeUnknownEffect(LoginTokenSchema);
+const decodeSchema_String_check_Schema_isPattern_1_9_0_9_A_Za_ = Schema.decodeUnknownEffect(Schema.String.check(Schema.isPattern(/^[1-9][0-9]*:[A-Za-z0-9_-]+$/)));
+const decodeSendInput = Schema.decodeUnknownEffect(sendInput);
+const decodeProviderReferenceSchema = Schema.decodeUnknownEffect(ProviderReferenceSchema);
+const decodeSchema_Struct_ok_Schema_Literal_true_result_Schema = Schema.decodeUnknownEffect(Schema.Struct({
+          ok: Schema.Literal(true),
+          result: Schema.Literal(true),
+        }));
 
 const response = Schema.Union([
   Schema.Struct({
@@ -363,9 +372,7 @@ const makeTelegram = Effect.gen(function* () {
     );
 
     const token = Redacted.value(secret);
-    yield* Schema.decodeUnknownEffect(
-      Schema.String.check(Schema.isPattern(/^[1-9][0-9]*:[A-Za-z0-9_-]+$/))
-    )(token).pipe(
+    yield* decodeSchema_String_check_Schema_isPattern_1_9_0_9_A_Za_(token).pipe(
       Effect.mapError(
         () =>
           new ProviderInputError({
@@ -397,7 +404,7 @@ const makeTelegram = Effect.gen(function* () {
     reply?: string,
     confirmation?: string
   ) {
-    const input = yield* Schema.decodeUnknownEffect(sendInput)({
+    const input = yield* decodeSendInput({
       targetId,
       text,
       reply,
@@ -467,7 +474,7 @@ const makeTelegram = Effect.gen(function* () {
       if (installation.botId !== installationId)
         return yield* new ChannelMediaError({ reason: "wrong_installation" });
 
-      const id = yield* Schema.decodeUnknownEffect(ProviderReferenceSchema)(
+      const id = yield* decodeProviderReferenceSchema(
         fileId
       ).pipe(
         Effect.mapError(
@@ -529,7 +536,7 @@ const makeTelegram = Effect.gen(function* () {
     }),
     sendLoginConfirmation: Effect.fn("Telegram.sendLoginConfirmation")(
       function* (targetId: string, token: string) {
-        const valid = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
+        const valid = yield* decodeLoginTokenSchema(
           token
         ).pipe(Effect.mapError(malformed));
 
@@ -548,7 +555,7 @@ const makeTelegram = Effect.gen(function* () {
     answerCallbackQuery: Effect.fn("Telegram.answerCallbackQuery")(function* (
       callbackQueryId: string
     ) {
-      const id = yield* Schema.decodeUnknownEffect(ProviderReferenceSchema)(
+      const id = yield* decodeProviderReferenceSchema(
         callbackQueryId
       ).pipe(Effect.mapError(malformed));
 
@@ -556,12 +563,7 @@ const makeTelegram = Effect.gen(function* () {
         callback_query_id: id,
       });
 
-      yield* Schema.decodeUnknownEffect(
-        Schema.Struct({
-          ok: Schema.Literal(true),
-          result: Schema.Literal(true),
-        })
-      )(body).pipe(
+      yield* decodeSchema_Struct_ok_Schema_Literal_true_result_Schema(body).pipe(
         Effect.mapError(
           () =>
             new ProviderUncertain({

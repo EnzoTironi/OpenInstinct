@@ -20,6 +20,7 @@ import {
   UnauthenticatedError,
 } from "eve/channels/auth";
 import { eveChannel } from "eve/channels/eve";
+const decodeSendMessageToolResultSchema = Schema.decodeUnknownResult(sendMessageToolResultSchema);
 
 const authenticateLocalDev = localDev();
 
@@ -78,7 +79,7 @@ const channel = eveChannel({
       if (
         event.status === "completed" &&
         Result.isSuccess(
-          Schema.decodeUnknownResult(sendMessageToolResultSchema)(event.result)
+          decodeSendMessageToolResultSchema(event.result)
         )
       ) {
         await finalizeScheduledReportDelivery(session);

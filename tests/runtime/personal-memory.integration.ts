@@ -25,6 +25,21 @@ import { applicationOrigin } from "../../shared/environment/origin";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { channelChallengeSchema } from "../../shared/identity/channel-auth";
 import { runtimeDatabase } from "./database";
+const decodeSchema_fromJsonString_Schema_Struct_status_Schema_ = Schema.decodeUnknownSync(Schema.fromJsonString(
+      Schema.Struct({
+        status: Schema.String,
+        reason: Schema.optionalKey(Schema.String),
+        snapshot: Schema.optionalKey(
+          Schema.Struct({ profile: Schema.Unknown, notes: Schema.Unknown })
+        ),
+      })
+    ));
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
+const decodeSchema_Struct_scope_Schema_String_profile_Schema_U = Schema.decodeUnknownSync(Schema.Struct({
+        scope: Schema.String,
+        profile: Schema.Unknown,
+        notes: Schema.Unknown,
+      }));
 
 const memoryDocumentBackend = createMemoryDocumentBackend(Effect.void);
 
@@ -64,17 +79,7 @@ async function fromProcess(cookie: string) {
 
   assert.equal(code, 0, stderr);
 
-  return Schema.decodeUnknownSync(
-    Schema.fromJsonString(
-      Schema.Struct({
-        status: Schema.String,
-        reason: Schema.optionalKey(Schema.String),
-        snapshot: Schema.optionalKey(
-          Schema.Struct({ profile: Schema.Unknown, notes: Schema.Unknown })
-        ),
-      })
-    )
-  )(output);
+  return decodeSchema_fromJsonString_Schema_Struct_status_Schema_(output);
 }
 
 function memoryContext(
@@ -162,7 +167,7 @@ test("actual account auth, profile store, Eve provider, private tool and export 
 
     assert.equal(started.status, 200);
 
-    const challenge = Schema.decodeUnknownSync(channelChallengeSchema)(
+    const challenge = decodeChannelChallengeSchema(
       await started.json()
     );
 
@@ -293,13 +298,7 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       /attachment/
     );
 
-    const exported = Schema.decodeUnknownSync(
-      Schema.Struct({
-        scope: Schema.String,
-        profile: Schema.Unknown,
-        notes: Schema.Unknown,
-      })
-    )(await response.json());
+    const exported = decodeSchema_Struct_scope_Schema_String_profile_Schema_U(await response.json());
 
     assert.equal(exported.scope, "stored-personal-memory");
     assert.deepEqual(exported.profile, snapshot.profile);

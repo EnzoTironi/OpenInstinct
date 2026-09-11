@@ -9,6 +9,7 @@ import {
 const bodySchema = Schema.Struct({
   organizationId: Schema.optionalKey(Schema.String),
 });
+const decodeBodySchema = Schema.decodeUnknownEffect(bodySchema);
 
 function portalErrorResponse(error: BillingPortalError) {
   const status = Match.value(error.reason).pipe(
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   const rawBody: unknown = await request.json().catch(() => ({}));
 
   return Effect.runPromise(
-    Schema.decodeUnknownEffect(bodySchema)(rawBody).pipe(
+    decodeBodySchema(rawBody).pipe(
       Effect.mapError(
         () =>
           new BillingPortalError({

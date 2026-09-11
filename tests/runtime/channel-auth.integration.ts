@@ -26,6 +26,9 @@ import {
   type channelChallengeRequestSchema,
 } from "../../shared/identity/channel-auth.ts";
 import { runtimeDatabase } from "./database";
+const decodeChannelChallengeSchema = Schema.decodeUnknownSync(channelChallengeSchema);
+const decodeSchema_Struct_user_Schema_Struct_id_Schema_String = Schema.decodeUnknownSync(Schema.Struct({ user: Schema.Struct({ id: Schema.String }) }));
+const decodeChannelConversationEntrySchema = Schema.decodeUnknownSync(channelConversationEntrySchema);
 
 const cookieHeader = (response: Response) =>
   response.headers
@@ -135,7 +138,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
 
     assert.equal(started.status, 200);
 
-    const challenge = Schema.decodeUnknownSync(channelChallengeSchema)(
+    const challenge = decodeChannelChallengeSchema(
       await started.json()
     );
 
@@ -233,9 +236,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
     const sessionResponse = await request("/get-session", "GET", sessionCookie);
     assert.equal(sessionResponse.status, 200);
 
-    const authenticated = Schema.decodeUnknownSync(
-      Schema.Struct({ user: Schema.Struct({ id: Schema.String }) })
-    )(await sessionResponse.json());
+    const authenticated = decodeSchema_Struct_user_Schema_Struct_id_Schema_String(await sessionResponse.json());
 
     assert.equal(authenticated.user.id, identity.userId);
 
@@ -254,7 +255,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
 
     assert.equal(linking.status, 200);
 
-    const linkChallenge = Schema.decodeUnknownSync(channelChallengeSchema)(
+    const linkChallenge = decodeChannelChallengeSchema(
       await linking.json()
     );
 
@@ -313,7 +314,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
 
     assert.equal(kapsoStarted.status, 200);
 
-    const entry = Schema.decodeUnknownSync(channelConversationEntrySchema)(
+    const entry = decodeChannelConversationEntrySchema(
       await kapsoStarted.json()
     );
 

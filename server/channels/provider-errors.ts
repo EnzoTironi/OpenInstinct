@@ -97,6 +97,8 @@ const telegramRetryAfterSchema = Schema.Struct({
     })
   ),
 });
+const decodeSchema_fromJsonString_telegramRetryAfterSchema = Schema.decodeUnknownOption(Schema.fromJsonString(telegramRetryAfterSchema));
+const decodeSchema_fromJsonString_Schema_Json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Json));
 
 const readBoundedChunks = (
   response: HttpClientResponse.HttpClientResponse,
@@ -133,9 +135,7 @@ const readBoundedChunks = (
   );
 
 const retryAfterFromBody = (text: string): number | undefined => {
-  const decoded = Schema.decodeUnknownOption(
-    Schema.fromJsonString(telegramRetryAfterSchema)
-  )(text);
+  const decoded = decodeSchema_fromJsonString_telegramRetryAfterSchema(text);
 
   if (Option.isNone(decoded)) return undefined;
   // Schema.Number already established the domain value at the decode boundary.
@@ -220,9 +220,7 @@ export const requestProviderJson = Effect.fn("requestProviderJson")(
 
     const body = yield* readBoundedChunks(response, channel);
 
-    return yield* Schema.decodeUnknownEffect(
-      Schema.fromJsonString(Schema.Json)
-    )(Buffer.concat(body.chunks, body.size).toString("utf8")).pipe(
+    return yield* decodeSchema_fromJsonString_Schema_Json(Buffer.concat(body.chunks, body.size).toString("utf8")).pipe(
       Effect.mapError(
         () =>
           new ProviderUncertain({

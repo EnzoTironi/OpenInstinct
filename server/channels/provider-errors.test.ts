@@ -19,11 +19,10 @@ import {
   ProviderUncertain,
   requestProviderJson,
 } from "./provider-errors";
+const decodeSchema_Struct_port_Schema_Number = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }));
 
 function fixtureUrl(server: Server, path = "/send") {
-  const address = Schema.decodeUnknownSync(
-    Schema.Struct({ port: Schema.Number })
-  )(server.address());
+  const address = decodeSchema_Struct_port_Schema_Number(server.address());
 
   return `http://127.0.0.1:${String(address.port)}${path}`;
 }

@@ -10,8 +10,23 @@ import {
   channelChallengeRequestSchema,
 } from "@shared/identity/channel-auth";
 import { Effect, Result, Schema } from "effect";
+const decodeChannelChallengeRequestSchema = Schema.decodeEffect(channelChallengeRequestSchema);
+const decodeChannelChallengeIdSchema = Schema.decodeEffect(channelChallengeIdSchema);
+const decodeDeviceBindingSchema = Schema.decodeEffect(deviceBindingSchema);
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+const decodeChannelStartResultJson = Schema.decodeEffect(
+  Schema.fromJsonString(channelStartResultSchema)
+);
+const decodeChannelChallengeStatusJson = Schema.decodeEffect(
+  Schema.fromJsonString(channelChallengeStatusSchema)
+);
+const decodeChannelChallengeCompletionJson = Schema.decodeEffect(
+  Schema.fromJsonString(channelChallengeCompletionSchema)
+);
+const decodeDeviceBoundJson = Schema.decodeEffect(
+  Schema.fromJsonString(deviceBoundSchema)
+);
 
 const localCallbackSchema = Schema.String.check(
   Schema.makeFilter((value) => {
@@ -171,7 +186,9 @@ const requestJson = Effect.fn("channelAuthorization.request")(
   function* <A>(
     path: string,
     init: RequestInit,
-    responseSchema: Schema.Codec<A, unknown>
+    decodeResponse: (
+      body: string
+    ) => Effect.Effect<A, Schema.SchemaError>
   ) {
     const response = yield* Effect.tryPromise({
       try: (signal) =>
@@ -196,9 +213,9 @@ const requestJson = Effect.fn("channelAuthorization.request")(
       catch: () => channelHttpError(0),
     });
 
-    return yield* Schema.decodeEffect(Schema.fromJsonString(responseSchema))(
-      body
-    ).pipe(Effect.mapError(() => invalidChannelChallenge(response.status)));
+    return yield* decodeResponse(body).pipe(
+      Effect.mapError(() => invalidChannelChallenge(response.status))
+    );
   },
   Effect.timeout("10 seconds"),
   Effect.catchTag("TimeoutError", () => Effect.fail(channelHttpError(0)))
@@ -210,7 +227,7 @@ export const startChannelAuthorization = Effect.fn(
   channel: typeof channelProviderSchema.Type,
   purpose: typeof channelChallengeRequestSchema.Type.purpose
 ) {
-  const intent = yield* Schema.decodeEffect(channelChallengeRequestSchema)({
+  const intent = yield* decodeChannelChallengeRequestSchema({
     channel,
     purpose,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
@@ -222,7 +239,7 @@ export const startChannelAuthorization = Effect.fn(
       headers: { "Content-Type": "application/json" },
       body: encodeJson(intent),
     },
-    channelStartResultSchema
+    decodeChannelStartResultJson
   );
 
   if (challenge.channel !== channel) return yield* invalidChannelChallenge(200);
@@ -233,21 +250,21 @@ export const startChannelAuthorization = Effect.fn(
 export const checkChannelAuthorization = Effect.fn(
   "channelAuthorization.status"
 )(function* (id: string) {
-  const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
+  const input = yield* decodeChannelChallengeIdSchema({
     id,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
 
   return yield* requestJson(
     `status?id=${encodeURIComponent(input.id)}`,
     { method: "GET" },
-    channelChallengeStatusSchema
+    decodeChannelChallengeStatusJson
   );
 });
 
 export const completeChannelAuthorization = Effect.fn(
   "channelAuthorization.complete"
 )(function* (id: string) {
-  const input = yield* Schema.decodeEffect(channelChallengeIdSchema)({
+  const input = yield* decodeChannelChallengeIdSchema({
     id,
   }).pipe(Effect.mapError(() => channelHttpError(400)));
 
@@ -258,7 +275,7 @@ export const completeChannelAuthorization = Effect.fn(
       headers: { "Content-Type": "application/json" },
       body: encodeJson(input),
     },
-    channelChallengeCompletionSchema
+    decodeChannelChallengeCompletionJson
   );
 });
 
@@ -282,7 +299,7 @@ export function channelFailureMessage(
 
 export const bindNativeBrowser = Effect.fn("channelAuthorization.bind")(
   function* (input: typeof deviceBindingSchema.Type) {
-    const body = yield* Schema.decodeEffect(deviceBindingSchema)(input).pipe(
+    const body = yield* decodeDeviceBindingSchema(input).pipe(
       Effect.mapError(() => channelHttpError(400))
     );
 
@@ -293,7 +310,7 @@ export const bindNativeBrowser = Effect.fn("channelAuthorization.bind")(
         headers: { "Content-Type": "application/json" },
         body: encodeJson(body),
       },
-      deviceBoundSchema
+      decodeDeviceBoundJson
     );
   }
 );
@@ -302,5 +319,5 @@ export const resumeNativeBrowser = (input: typeof deviceRequestSchema.Type) =>
   requestJson(
     `device?id=${encodeURIComponent(input.id)}&purpose=${input.purpose}`,
     { method: "GET" },
-    deviceBoundSchema
+    decodeDeviceBoundJson
   );

@@ -13,6 +13,8 @@ import {
   validateChannelConsent,
 } from "./channel-consent";
 import { readChannelInputs } from "./channel-input";
+const decodeChannelProviderSchema = Schema.decodeUnknownEffect(channelProviderSchema);
+const decodeMessagePayloadSchema = Schema.decodeUnknownEffect(MessagePayloadSchema);
 
 type ResponseInput =
   (typeof internalCallbackBodies)["/internal/channel-input/respond"]["Type"];
@@ -35,7 +37,7 @@ const readResponseIdentity = Effect.fn("readResponseIdentity")(function* (
   const rows =
     yield* sql`SELECT channel FROM channel_identity WHERE id = ${identityId}`;
 
-  const channel = yield* Schema.decodeUnknownEffect(channelProviderSchema)(
+  const channel = yield* decodeChannelProviderSchema(
     rows[0]?.channel
   );
 
@@ -58,7 +60,7 @@ export const readChannelResponseContext = Effect.fn(
     return yield* new ChannelResponseRejected({ reason: "invalid_source" });
   }
 
-  const payload = yield* Schema.decodeUnknownEffect(MessagePayloadSchema)(
+  const payload = yield* decodeMessagePayloadSchema(
     rows[0]?.payload
   );
 

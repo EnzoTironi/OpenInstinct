@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@vercel/oidc", () => ({ getVercelOidcToken: mocks.getToken }));
 
 import { postInternalRequest } from "@agent/lib/internal-request";
+const decodeSchema_Struct_port_Schema_Number = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }));
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -130,9 +131,7 @@ test("production-local client signs real HTTP requests and refuses redirects", a
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 
-  const address = Schema.decodeUnknownSync(
-    Schema.Struct({ port: Schema.Number })
-  )(server.address());
+  const address = decodeSchema_Struct_port_Schema_Number(server.address());
 
   origin = `http://127.0.0.1:${String(address.port)}`;
   vi.stubEnv("BETTER_AUTH_URL", origin);
