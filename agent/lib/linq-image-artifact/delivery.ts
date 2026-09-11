@@ -113,10 +113,10 @@ function blobMatchesArtifact(
 ): result is Extract<BlobGetResult, { statusCode: 200 }> {
   return Boolean(
     result &&
-      result.statusCode === 200 &&
-      result.blob.size === artifact.byteSize &&
-      result.blob.contentType === artifact.mediaType &&
-      result.stream
+    result.statusCode === 200 &&
+    result.blob.size === artifact.byteSize &&
+    result.blob.contentType === artifact.mediaType &&
+    result.stream
   );
 }
 

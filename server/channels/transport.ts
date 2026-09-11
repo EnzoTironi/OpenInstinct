@@ -615,8 +615,7 @@ const makeEnqueueTaskReport = (deps: {
   Effect.fn("ChannelTransport.enqueueTaskReport")(function* (
     input: typeof enqueueInput.Type
   ) {
-    const { sql, messaging, findIdentity, activeIdentity, enqueueText } =
-      deps;
+    const { sql, messaging, findIdentity, activeIdentity, enqueueText } = deps;
 
     const value = yield* decodeEnqueueInput2(input).pipe(
       Effect.mapError(invalidInput)
