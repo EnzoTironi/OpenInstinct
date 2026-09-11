@@ -20,7 +20,6 @@ type ResponseRow = Pick<
   status: "attempted" | "accepted" | "uncertain";
 };
 
-
 function isActiveIdentity(row: { readonly active: boolean } | undefined) {
   return row?.active === true;
 }
