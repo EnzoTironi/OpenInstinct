@@ -80,38 +80,45 @@ const groupConversationScopePattern =
 
 const decodeGroupScopeParts = Schema.decodeUnknownResult(GroupScopePartsSchema);
 
+const personalMemoryScope = {
+  kind: "personal" as const,
+  conversationScope: null,
+};
+
+function decodeMatchedGroupScope(
+  trimmed: string,
+  match: RegExpExecArray
+): ParsedConversationMemoryScope | null {
+  const decoded = decodeGroupScopeParts({
+    kind: "shared-group",
+    conversationScope: trimmed,
+    channel: match[1],
+    installationId: match[2],
+    chatId: match[3],
+  });
+
+  return Result.getOrElse(decoded, () => null);
+}
+
 export const parseConversationMemoryScope = (
   raw: string | null | undefined
 ): ParsedConversationMemoryScope => {
-  if (raw === null || raw === undefined) {
-    return { kind: "personal", conversationScope: null };
-  }
+  if (raw == null) return personalMemoryScope;
 
   const trimmed = raw.trim();
 
-  if (!trimmed) return { kind: "personal", conversationScope: null };
+  if (!trimmed) return personalMemoryScope;
   const match = groupConversationScopePattern.exec(trimmed);
+  const decoded = match ? decodeMatchedGroupScope(trimmed, match) : null;
 
-  if (match) {
-    const decoded = decodeGroupScopeParts({
-      kind: "shared-group",
-      conversationScope: trimmed,
-      channel: match[1],
-      installationId: match[2],
-      chatId: match[3],
-    });
-
-    const parts = Result.getOrElse(decoded, () => null);
-
-    if (parts) return parts;
-  }
+  if (decoded) return decoded;
 
   // Malformed `group:` prefixes fail closed as shared-group (deny personal).
   if (trimmed.startsWith("group:")) {
     return { kind: "shared-group", conversationScope: trimmed };
   }
 
-  return { kind: "personal", conversationScope: null };
+  return personalMemoryScope;
 };
 
 const SessionMemoryHintsSchema = Schema.Struct({

@@ -82,6 +82,50 @@ export async function readEntitlement(
   return row ? toResolved(row) : freeEntitlement();
 }
 
+function entitlementUpdateFields(input: {
+  plan: BillingPlanId;
+  status: BillingEntitlementStatus;
+  seatCount: number;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
+  currentPeriodEnd?: Date | null;
+}) {
+  return {
+    plan: input.plan,
+    status: input.status,
+    seatCount: input.seatCount,
+    stripeCustomerId: input.stripeCustomerId,
+    stripeSubscriptionId: input.stripeSubscriptionId,
+    stripePriceId: input.stripePriceId,
+    currentPeriodEnd: input.currentPeriodEnd,
+  };
+}
+
+function entitlementInsertFields(input: {
+  subjectType: BillingSubjectType;
+  subjectId: string;
+  plan: BillingPlanId;
+  status: BillingEntitlementStatus;
+  seatCount: number;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
+  currentPeriodEnd?: Date | null;
+}) {
+  return {
+    subjectType: input.subjectType,
+    subjectId: input.subjectId,
+    plan: input.plan,
+    status: input.status,
+    seatCount: input.seatCount,
+    stripeCustomerId: input.stripeCustomerId ?? null,
+    stripeSubscriptionId: input.stripeSubscriptionId ?? null,
+    stripePriceId: input.stripePriceId ?? null,
+    currentPeriodEnd: input.currentPeriodEnd ?? null,
+  };
+}
+
 export async function upsertEntitlement(input: {
   subjectType: BillingSubjectType;
   subjectId: string;
@@ -107,28 +151,13 @@ export async function upsertEntitlement(input: {
     .limit(1);
 
   const seatCount = Math.max(1, input.seatCount ?? 1);
+  const withSeats = { ...input, seatCount };
 
   if (existing[0]) {
     await db
       .update(billingEntitlements)
       .set({
-        plan: input.plan,
-        status: input.status,
-        seatCount,
-        stripeCustomerId:
-          input.stripeCustomerId === undefined
-            ? undefined
-            : input.stripeCustomerId,
-        stripeSubscriptionId:
-          input.stripeSubscriptionId === undefined
-            ? undefined
-            : input.stripeSubscriptionId,
-        stripePriceId:
-          input.stripePriceId === undefined ? undefined : input.stripePriceId,
-        currentPeriodEnd:
-          input.currentPeriodEnd === undefined
-            ? undefined
-            : input.currentPeriodEnd,
+        ...entitlementUpdateFields(withSeats),
         updatedAt: now,
       })
       .where(eq(billingEntitlements.id, existing[0].id));
@@ -139,15 +168,7 @@ export async function upsertEntitlement(input: {
   const id = randomUUID();
   await db.insert(billingEntitlements).values({
     id,
-    subjectType: input.subjectType,
-    subjectId: input.subjectId,
-    plan: input.plan,
-    status: input.status,
-    seatCount,
-    stripeCustomerId: input.stripeCustomerId ?? null,
-    stripeSubscriptionId: input.stripeSubscriptionId ?? null,
-    stripePriceId: input.stripePriceId ?? null,
-    currentPeriodEnd: input.currentPeriodEnd ?? null,
+    ...entitlementInsertFields(withSeats),
     createdAt: now,
     updatedAt: now,
   });
