@@ -5,19 +5,22 @@ export function agentLabel(name: string) {
   return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
 }
 
+const statusBadgeVariant = {
+  cancelled: "secondary",
+  complete: "success",
+  failed: "destructive",
+  ready: "success",
+  starting: "information",
+  working: "information",
+} as const satisfies Record<
+  SubagentStatus,
+  "destructive" | "information" | "secondary" | "success"
+>;
+
 export function StatusIndicator({
   status,
 }: {
   readonly status: SubagentStatus;
 }) {
-  const variant =
-    status === "working" || status === "starting"
-      ? "information"
-      : status === "failed"
-        ? "destructive"
-        : status === "cancelled"
-          ? "secondary"
-          : "success";
-
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={statusBadgeVariant[status]}>{status}</Badge>;
 }

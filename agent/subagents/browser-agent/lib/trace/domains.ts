@@ -8,11 +8,80 @@ export function domainFromUrl(url: string) {
   try {
     const { hostname, protocol } = new URL(url);
 
-    if (protocol !== "http:" && protocol !== "https:") return undefined;
+    if (protocol !== "http:" && protocol !== "https:") {
+      return undefined;
+    }
 
     return hostname || undefined;
   } catch {
     return undefined;
+  }
+}
+
+function hasPageNavigationUrl(data: {
+  parent_frame_id?: unknown;
+  target_type?: string;
+  url?: string;
+}): data is { url: string; parent_frame_id?: unknown; target_type?: string } {
+  return Boolean(data.url) && !data.parent_frame_id;
+}
+
+function isPageTarget(data: { target_type?: string }) {
+  return !data.target_type || data.target_type === "page";
+}
+
+function isPageNavigationEvent(event: {
+  data?: {
+    parent_frame_id?: unknown;
+    target_type?: string;
+    url?: string;
+  };
+  type: string;
+}) {
+  if (event.type !== "page_navigation") {
+    return false;
+  }
+
+  const data = event.data;
+
+  if (!data || !hasPageNavigationUrl(data)) {
+    return false;
+  }
+
+  return isPageTarget(data);
+}
+
+function navigationDomain(event: {
+  data?: { url?: string };
+}): string | undefined {
+  const url = event.data?.url;
+
+  if (!url) {
+    return undefined;
+  }
+
+  return domainFromUrl(url);
+}
+
+function maybeAddNavigationDomain(
+  domains: Set<string>,
+  event: {
+    data?: {
+      parent_frame_id?: unknown;
+      target_type?: string;
+      url?: string;
+    };
+    type: string;
+  }
+) {
+  if (!isPageNavigationEvent(event)) {
+    return;
+  }
+
+  const domain = navigationDomain(event);
+
+  if (domain) {
+    domains.add(domain);
   }
 }
 
@@ -28,18 +97,12 @@ async function collectNavigationDomains(
     { category: ["page"], limit: 1000, since: browser.createdAt },
     { signal }
   )) {
-    if (seen >= maximumTelemetryEvents) break;
+    if (seen >= maximumTelemetryEvents) {
+      break;
+    }
+
     seen += 1;
-
-    if (event.type !== "page_navigation") continue;
-    const data = event.data;
-
-    if (!data?.url || data.parent_frame_id) continue;
-
-    if (data.target_type && data.target_type !== "page") continue;
-    const domain = domainFromUrl(data.url);
-
-    if (domain) domains.add(domain);
+    maybeAddNavigationDomain(domains, event);
   }
 
   return domains;

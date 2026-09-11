@@ -17,33 +17,69 @@ export type SubagentStatus =
   | "starting"
   | "working";
 
-export function collectSubagentSessions(
+function recordSubagentCompletions(
   events: readonly MessageStreamEvent[]
-): readonly SubagentSession[] {
+): Map<string, SubagentCompletedStreamEvent["data"]> {
   const completions = new Map<string, SubagentCompletedStreamEvent["data"]>();
-  const tasks = new Map<string, string>();
-  const sessions = new Map<string, SubagentSession>();
 
   for (const event of events) {
-    if (event.type === "subagent.completed") {
-      completions.set(event.data.callId, event.data);
+    if (event.type !== "subagent.completed") {
       continue;
     }
 
-    if (event.type === "actions.requested") {
-      for (const action of event.data.actions) {
-        if (
-          action.kind === "subagent-call" ||
-          action.kind === "remote-agent-call"
-        ) {
-          tasks.set(action.callId, action.description);
-        }
-      }
-    }
+    completions.set(event.data.callId, event.data);
   }
 
+  return completions;
+}
+
+function recordTaskFromAction(
+  tasks: Map<string, string>,
+  action: { callId: string; description: string; kind: string }
+) {
+  if (action.kind !== "subagent-call" && action.kind !== "remote-agent-call") {
+    return;
+  }
+
+  tasks.set(action.callId, action.description);
+}
+
+function recordTasksFromEvent(
+  tasks: Map<string, string>,
+  event: MessageStreamEvent
+) {
+  if (event.type !== "actions.requested") {
+    return;
+  }
+
+  for (const action of event.data.actions) {
+    recordTaskFromAction(tasks, action);
+  }
+}
+
+function recordSubagentTasks(
+  events: readonly MessageStreamEvent[]
+): Map<string, string> {
+  const tasks = new Map<string, string>();
+
   for (const event of events) {
-    if (event.type !== "subagent.called") continue;
+    recordTasksFromEvent(tasks, event);
+  }
+
+  return tasks;
+}
+
+function recordCalledSessions(
+  events: readonly MessageStreamEvent[],
+  completions: Map<string, SubagentCompletedStreamEvent["data"]>,
+  tasks: Map<string, string>
+): Map<string, SubagentSession> {
+  const sessions = new Map<string, SubagentSession>();
+
+  for (const event of events) {
+    if (event.type !== "subagent.called") {
+      continue;
+    }
 
     const session = {
       ...event.data,
@@ -54,6 +90,16 @@ export function collectSubagentSessions(
     sessions.delete(session.childSessionId);
     sessions.set(session.childSessionId, session);
   }
+
+  return sessions;
+}
+
+export function collectSubagentSessions(
+  events: readonly MessageStreamEvent[]
+): readonly SubagentSession[] {
+  const completions = recordSubagentCompletions(events);
+  const tasks = recordSubagentTasks(events);
+  const sessions = recordCalledSessions(events, completions, tasks);
 
   return [...sessions.values()].toReversed();
 }
@@ -69,42 +115,93 @@ export function getSubagentSubscriptionKey(
     .join("\n");
 }
 
+function findLastMatchingType(
+  events: readonly MessageStreamEvent[],
+  types: ReadonlySet<string>
+) {
+  return events.toReversed().find((event) => types.has(event.type));
+}
+
+const sessionTerminalTypes = new Set(["session.completed", "session.failed"]);
+
+function statusFromSessionTerminal(
+  events: readonly MessageStreamEvent[]
+): SubagentStatus | undefined {
+  const terminal = findLastMatchingType(events, sessionTerminalTypes);
+
+  if (terminal?.type === "session.completed") {
+    return "complete";
+  }
+
+  if (terminal?.type === "session.failed") {
+    return "failed";
+  }
+
+  return undefined;
+}
+
+const turnBoundaryTypes = new Set([
+  "turn.cancelled",
+  "turn.completed",
+  "turn.failed",
+  "turn.started",
+]);
+
+function statusFromTurnBoundary(
+  events: readonly MessageStreamEvent[]
+): SubagentStatus | undefined {
+  const boundary = findLastMatchingType(events, turnBoundaryTypes);
+
+  if (boundary?.type === "turn.failed") {
+    return "failed";
+  }
+
+  if (boundary?.type === "turn.cancelled") {
+    return "cancelled";
+  }
+
+  if (boundary?.type === "turn.completed") {
+    return "ready";
+  }
+
+  if (boundary?.type === "turn.started") {
+    return "working";
+  }
+
+  return undefined;
+}
+
+function hasWaitingSession(events: readonly MessageStreamEvent[]) {
+  return events.some((event) => event.type === "session.waiting");
+}
+
+function isForegroundComplete(session: SubagentSession) {
+  return Boolean(session.completion && !session.completion.backgroundTask);
+}
+
 export function getSubagentStatus(
   events: readonly MessageStreamEvent[],
   session: SubagentSession
 ): SubagentStatus {
-  const terminalSession = events
-    .toReversed()
-    .find((event) =>
-      ["session.completed", "session.failed"].includes(event.type)
-    );
+  const fromTerminal = statusFromSessionTerminal(events);
 
-  if (terminalSession?.type === "session.completed") return "complete";
+  if (fromTerminal) {
+    return fromTerminal;
+  }
 
-  if (terminalSession?.type === "session.failed") return "failed";
+  const fromTurn = statusFromTurnBoundary(events);
 
-  const latestTurnBoundary = events
-    .toReversed()
-    .find((event) =>
-      [
-        "turn.cancelled",
-        "turn.completed",
-        "turn.failed",
-        "turn.started",
-      ].includes(event.type)
-    );
+  if (fromTurn) {
+    return fromTurn;
+  }
 
-  if (latestTurnBoundary?.type === "turn.failed") return "failed";
+  if (hasWaitingSession(events)) {
+    return "ready";
+  }
 
-  if (latestTurnBoundary?.type === "turn.cancelled") return "cancelled";
-
-  if (latestTurnBoundary?.type === "turn.completed") return "ready";
-
-  if (latestTurnBoundary?.type === "turn.started") return "working";
-
-  if (events.some((event) => event.type === "session.waiting")) return "ready";
-
-  if (session.completion && !session.completion.backgroundTask) return "ready";
+  if (isForegroundComplete(session)) {
+    return "ready";
+  }
 
   return "starting";
 }

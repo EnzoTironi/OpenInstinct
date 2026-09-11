@@ -10,56 +10,54 @@ import vault from "@agent/tools/vault";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import { Predicate } from "effect";
 import type { DynamicResolveContext } from "eve/tools";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 
 const groupedTools = [calendar, contacts, gmail, messaging, schedules, vault];
 
-describe("authored mode capability matrix", () => {
-  it("gives interactive turns the authored coordinator capabilities", async () => {
-    expect(await authoredCapabilities("linq-message")).toEqual([
-      "browser-agent",
-      "calendar-check-availability",
-      "calendar-create-event",
-      "calendar-list-events",
-      "contacts-search",
-      "gmail-read-thread",
-      "gmail-search",
-      "gmail-send",
-      "gmail-update",
-      "personal_info__update",
-      "react_to_message",
-      "request_vault_import",
-      "request_vault_setup",
-      "schedules-answer",
-      "schedules-create",
-      "schedules-list",
-      "schedules-update",
-      "send_message",
-      "workstreams__find",
-      "workstreams__forget",
-      "workstreams__read",
-      "workstreams__save",
-    ]);
-  });
+it("gives interactive turns the authored coordinator capabilities", async () => {
+  expect(await authoredCapabilities("linq-message")).toEqual([
+    "browser-agent",
+    "calendar-check-availability",
+    "calendar-create-event",
+    "calendar-list-events",
+    "contacts-search",
+    "gmail-read-thread",
+    "gmail-search",
+    "gmail-send",
+    "gmail-update",
+    "personal_info__update",
+    "react_to_message",
+    "request_vault_import",
+    "request_vault_setup",
+    "schedules-answer",
+    "schedules-create",
+    "schedules-list",
+    "schedules-update",
+    "send_message",
+    "workstreams__find",
+    "workstreams__forget",
+    "workstreams__read",
+    "workstreams__save",
+  ]);
+});
 
-  it("gives scheduled workers only authored read and execution capabilities", async () => {
-    expect(await authoredCapabilities("scheduled-worker")).toEqual([
-      "browser-agent",
-      "calendar-check-availability",
-      "calendar-list-events",
-      "contacts-search",
-      "gmail-read-thread",
-      "gmail-search",
-    ]);
-  });
+it("gives scheduled workers only authored read and execution capabilities", async () => {
+  expect(await authoredCapabilities("scheduled-worker")).toEqual([
+    "browser-agent",
+    "calendar-check-availability",
+    "calendar-list-events",
+    "contacts-search",
+    "gmail-read-thread",
+    "gmail-search",
+  ]);
+});
 
-  it("limits authored scheduled reporting tools to delivery or resuming its own run", async () => {
-    expect(await authoredCapabilities("scheduled-result")).toEqual([
-      "request_vault_setup",
-      "schedules-answer",
-      "send_message",
-    ]);
-  });
+it("limits authored scheduled reporting tools to delivery or resuming its own run", async () => {
+  expect(await authoredCapabilities("scheduled-result")).toEqual([
+    "request_vault_setup",
+    "schedules-answer",
+    "send_message",
+  ]);
 });
 
 async function authoredCapabilities(authenticator: string) {
@@ -85,12 +83,9 @@ async function authoredCapabilities(authenticator: string) {
       scope: {
         key: "personal-info-key",
         namespace: "openinstinct-personal-info-v1",
-        value: accessScopeForUser("user-1").workspaceId,
-      },
-      slot: "personal_info",
-    },
-    turn: { id: "turn-1", input: [], sequence: 1 },
-  });
+        value: accessScopeForUser("user-1").workspaceId },
+      slot: "personal_info" },
+    turn: { id: "turn-1", input: [], sequence: 1 } });
 
   if (personalInfoTools) {
     capabilities.push(
@@ -104,12 +99,9 @@ async function authoredCapabilities(authenticator: string) {
       scope: {
         key: "workstreams-key",
         namespace: "workstreams",
-        value: "personal:workspace",
-      },
-      slot: "workstreams",
-    },
-    turn: { id: "turn-1", input: [], sequence: 1 },
-  });
+        value: "personal:workspace" },
+      slot: "workstreams" },
+    turn: { id: "turn-1", input: [], sequence: 1 } });
 
   if (workstreamTools)
     capabilities.push(
@@ -135,11 +127,7 @@ function dynamicContext(authenticator: string) {
           attributes: { workspaceId: accessScopeForUser("user-1").workspaceId },
           authenticator,
           principalId: "user-1",
-          principalType: "user",
-        },
-        initiator: null,
-      },
-      id: "session-1",
-    },
-  } satisfies DynamicResolveContext;
+          principalType: "user" },
+        initiator: null },
+      id: "session-1" } } satisfies DynamicResolveContext;
 }

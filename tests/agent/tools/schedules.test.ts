@@ -3,16 +3,14 @@ import type {
   getScheduledAgentRunInput,
   getScheduledAgentRunInputForReport,
   listScheduledAgentJobs,
-  updateScheduledAgentJob,
-} from "@db/services/scheduled-agent-jobs";
+  updateScheduledAgentJob } from "@db/services/scheduled-agent-jobs";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import { Predicate } from "effect";
 import type {
   DynamicResolveContext,
   ToolContext,
-  ToolDefinition,
-} from "eve/tools";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+  ToolDefinition } from "eve/tools";
+import { beforeEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { isToolSchema } from "../../../node_modules/eve/dist/src/tools/schema.js";
@@ -22,332 +20,304 @@ const services = vi.hoisted(() => ({
   getInput: vi.fn<typeof getScheduledAgentRunInput>(),
   getInputForReport: vi.fn<typeof getScheduledAgentRunInputForReport>(),
   list: vi.fn<typeof listScheduledAgentJobs>(),
-  update: vi.fn<typeof updateScheduledAgentJob>(),
-}));
+  update: vi.fn<typeof updateScheduledAgentJob>() }));
 
 vi.mock("@db/services/scheduled-agent-jobs", () => ({
   createScheduledAgentJob: services.create,
   getScheduledAgentRunInput: services.getInput,
   getScheduledAgentRunInputForReport: services.getInputForReport,
   listScheduledAgentJobs: services.list,
-  updateScheduledAgentJob: services.update,
-}));
+  updateScheduledAgentJob: services.update }));
 
 import messaging from "@agent/tools/messaging";
 import schedules, {
   createSchedule,
   listSchedules,
-  updateSchedule,
-} from "@agent/tools/schedules";
+  updateSchedule } from "@agent/tools/schedules";
 
-describe("schedule tools", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null)));
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null)));
+});
 
-  it("lets interactive and reporting turns resume scheduled input", async () => {
-    const resolve = schedules.events["turn.started"];
-    expect(resolve).toBeDefined();
+it("lets interactive and reporting turns resume scheduled input", async () => {
+  const resolve = schedules.events["turn.started"];
+  expect(resolve).toBeDefined();
 
-    if (!resolve) return;
+  if (!resolve) return;
 
-    expect(await resolve({}, dynamicContext("scheduled-worker"))).toBeNull();
-    expect(await resolve({}, resumedWorkerContext())).toBeNull();
-    expect(
-      await resolve({}, dynamicContext("scheduled-result"))
-    ).not.toBeNull();
-    const interactiveTools = await resolve({}, dynamicContext("linq"));
+  expect(await resolve({}, dynamicContext("scheduled-worker"))).toBeNull();
+  expect(await resolve({}, resumedWorkerContext())).toBeNull();
+  expect(
+    await resolve({}, dynamicContext("scheduled-result"))
+  ).not.toBeNull();
+  const interactiveTools = await resolve({}, dynamicContext("linq"));
 
-    const answer =
-      interactiveTools && !("execute" in interactiveTools)
-        ? interactiveTools["schedules-answer"]
-        : null;
+  const answer =
+    interactiveTools && !("execute" in interactiveTools)
+      ? interactiveTools["schedules-answer"]
+      : null;
 
-    if (!answer) {
-      throw new Error("Expected the schedules-answer tool.");
-    }
+  if (!answer) {
+    throw new Error("Expected the schedules-answer tool.");
+  }
 
-    services.getInput.mockResolvedValue({
-      leaseToken: "00000000-0000-4000-8000-000000000003",
-      runId: "00000000-0000-4000-8000-000000000002",
-    });
-    await answer.execute(
-      {
-        answer: "DCA",
-        runId: "00000000-0000-4000-8000-000000000002",
-      },
-      toolContext("schedules-answer", "linq")
-    );
-    expect(services.getInput).toHaveBeenCalledExactlyOnceWith(
-      {
-        userId: "user-1",
-        workspaceId: accessScopeForUser("user-1").workspaceId,
-      },
-      {
-        conversationChannel: "linq",
-        conversationId: "linq:dm:chat-1",
-      },
-      "00000000-0000-4000-8000-000000000002"
-    );
+  services.getInput.mockResolvedValue({
+    leaseToken: "00000000-0000-4000-8000-000000000003",
+    runId: "00000000-0000-4000-8000-000000000002" });
+  await answer.execute(
+    {
+      answer: "DCA",
+      runId: "00000000-0000-4000-8000-000000000002" },
+    toolContext("schedules-answer", "linq")
+  );
+  expect(services.getInput).toHaveBeenCalledExactlyOnceWith(
+    {
+      userId: "user-1",
+      workspaceId: accessScopeForUser("user-1").workspaceId },
+    {
+      conversationChannel: "linq",
+      conversationId: "linq:dm:chat-1" },
+    "00000000-0000-4000-8000-000000000002"
+  );
 
-    expect(fetch).toHaveBeenCalledWith(
-      new URL("https://example.com/internal/scheduled-run/respond"),
-      expect.objectContaining({ method: "POST" })
-    );
+  expect(fetch).toHaveBeenCalledWith(
+    new URL("https://example.com/internal/scheduled-run/respond"),
+    expect.objectContaining({ method: "POST" })
+  );
 
-    services.getInputForReport.mockResolvedValue({
-      leaseToken: "00000000-0000-4000-8000-000000000003",
-      runId: "00000000-0000-4000-8000-000000000002",
-    });
-    const reportTools = await resolve({}, dynamicContext("scheduled-result"));
+  services.getInputForReport.mockResolvedValue({
+    leaseToken: "00000000-0000-4000-8000-000000000003",
+    runId: "00000000-0000-4000-8000-000000000002" });
+  const reportTools = await resolve({}, dynamicContext("scheduled-result"));
 
-    const reportAnswer =
-      reportTools && !("execute" in reportTools)
-        ? reportTools["schedules-answer"]
-        : null;
+  const reportAnswer =
+    reportTools && !("execute" in reportTools)
+      ? reportTools["schedules-answer"]
+      : null;
 
-    if (!reportAnswer) {
-      throw new Error("Expected the schedules-answer reporting tool.");
-    }
+  if (!reportAnswer) {
+    throw new Error("Expected the schedules-answer reporting tool.");
+  }
 
-    await reportAnswer.execute(
+  await reportAnswer.execute(
+    {
+      answer: "LGA",
+      runId: "00000000-0000-4000-8000-000000000002" },
+    scheduledReportToolContext()
+  );
+  expect(services.getInputForReport).toHaveBeenCalledExactlyOnceWith(
+    "00000000-0000-4000-8000-000000000002",
+    "00000000-0000-4000-8000-000000000004"
+  );
+
+  await expect(
+    reportAnswer.execute(
       {
         answer: "LGA",
-        runId: "00000000-0000-4000-8000-000000000002",
-      },
-      scheduledReportToolContext()
-    );
-    expect(services.getInputForReport).toHaveBeenCalledExactlyOnceWith(
-      "00000000-0000-4000-8000-000000000002",
-      "00000000-0000-4000-8000-000000000004"
-    );
+        runId: "00000000-0000-4000-8000-000000000002" },
+      toolContext("schedules-answer", "scheduled-result")
+    )
+  ).rejects.toThrow("This reporting turn cannot resume that run.");
+  expect(services.getInput).toHaveBeenCalledOnce();
+});
 
-    await expect(
-      reportAnswer.execute(
-        {
-          answer: "LGA",
-          runId: "00000000-0000-4000-8000-000000000002",
-        },
-        toolContext("schedules-answer", "scheduled-result")
-      )
-    ).rejects.toThrow("This reporting turn cannot resume that run.");
-    expect(services.getInput).toHaveBeenCalledOnce();
-  });
+it("creates a schedule without a multiplexed action field", async () => {
+  const job = scheduledJob();
+  services.create.mockResolvedValue(job);
 
-  it("creates a schedule without a multiplexed action field", async () => {
-    const job = scheduledJob();
-    services.create.mockResolvedValue(job);
+  const result = await createSchedule.execute(
+    {
+      missedRunPolicy: "run_latest",
+      prompt: "Send the morning summary.",
+      timing: {
+        frequency: "daily",
+        kind: "calendar",
+        localTime: "09:00",
+        timezone: "America/New_York" } },
+    toolContext("schedules-create")
+  );
 
-    const result = await createSchedule.execute(
-      {
-        missedRunPolicy: "run_latest",
-        prompt: "Send the morning summary.",
-        timing: {
-          frequency: "daily",
-          kind: "calendar",
-          localTime: "09:00",
-          timezone: "America/New_York",
-        },
-      },
-      toolContext("schedules-create")
-    );
+  expect(inputProperties(createSchedule.inputSchema)).toEqual([
+    "missedRunPolicy",
+    "prompt",
+    "timing",
+  ]);
+  expect(services.create).toHaveBeenCalledExactlyOnceWith(
+    {
+      userId: "user-1",
+      workspaceId: accessScopeForUser("user-1").workspaceId },
+    {
+      conversationChannel: "linq",
+      conversationId: "linq:dm:chat-1",
+      missedRunPolicy: "run_latest",
+      prompt: "Send the morning summary.",
+      replyAnchorMessageId: "message-1",
+      timing: {
+        frequency: "daily",
+        kind: "calendar",
+        localTime: "09:00",
+        timezone: "America/New_York" } }
+  );
+  expect(result).toEqual(scheduleSummary(job));
+});
 
-    expect(inputProperties(createSchedule.inputSchema)).toEqual([
-      "missedRunPolicy",
-      "prompt",
-      "timing",
-    ]);
-    expect(services.create).toHaveBeenCalledExactlyOnceWith(
-      {
-        userId: "user-1",
-        workspaceId: accessScopeForUser("user-1").workspaceId,
-      },
-      {
-        conversationChannel: "linq",
-        conversationId: "linq:dm:chat-1",
-        missedRunPolicy: "run_latest",
-        prompt: "Send the morning summary.",
-        replyAnchorMessageId: "message-1",
-        timing: {
-          frequency: "daily",
-          kind: "calendar",
-          localTime: "09:00",
-          timezone: "America/New_York",
-        },
+it("lists schedules through a dedicated empty-input tool", async () => {
+  const job = scheduledJob();
+  services.list.mockResolvedValue([job]);
+
+  const result = await listSchedules.execute(
+    {},
+    toolContext("schedules-list")
+  );
+
+  expect(inputProperties(listSchedules.inputSchema)).toEqual([]);
+  expect(services.list).toHaveBeenCalledExactlyOnceWith(
+    {
+      userId: "user-1",
+      workspaceId: accessScopeForUser("user-1").workspaceId },
+    {
+      conversationChannel: "linq",
+      conversationId: "linq:dm:chat-1" }
+  );
+  expect(result).toEqual([scheduleListSummary(job)]);
+});
+
+it("updates a schedule without carrying an action discriminator", async () => {
+  const job = scheduledJob();
+  services.update.mockResolvedValue(job);
+
+  const result = await updateSchedule.execute(
+    {
+      id: job.id,
+      status: "paused" },
+    toolContext("schedules-update")
+  );
+
+  expect(inputProperties(updateSchedule.inputSchema)).toEqual([
+    "id",
+    "prompt",
+    "status",
+    "timing",
+  ]);
+  expect(services.update).toHaveBeenCalledExactlyOnceWith(
+    {
+      userId: "user-1",
+      workspaceId: accessScopeForUser("user-1").workspaceId },
+    {
+      conversationChannel: "linq",
+      conversationId: "linq:dm:chat-1" },
+    job.id,
+    { status: "paused" }
+  );
+  expect(result).toEqual(scheduleSummary(job));
+});
+
+it("omits messaging capabilities outside their valid turns", async () => {
+  const resolveMessaging = messaging.events["turn.started"];
+  expect(resolveMessaging).toBeDefined();
+
+  if (!resolveMessaging) return;
+
+  expect(
+    await resolveMessaging({}, dynamicContext("scheduled-worker"))
+  ).toBeNull();
+  expect(await resolveMessaging({}, resumedWorkerContext())).toBeNull();
+
+  const reportMessaging = await resolveMessaging(
+    {},
+    dynamicContext("scheduled-result", "channel:linq")
+  );
+
+  expect(Object.keys(reportMessaging ?? {})).toEqual(["send_message"]);
+
+  const debugMessaging = await resolveMessaging(
+    {},
+    dynamicContext("test", "http")
+  );
+
+  const interactiveMessaging = await resolveMessaging(
+    {},
+    dynamicContext("test", "channel:linq")
+  );
+
+  expect(Object.keys(debugMessaging ?? {}).toSorted()).toEqual([
+    "react_to_message",
+    "send_message",
+  ]);
+  expect(Object.keys(interactiveMessaging ?? {}).toSorted()).toEqual([
+    "react_to_message",
+    "send_message",
+  ]);
+
+  const reportSend =
+    Predicate.isObject(reportMessaging) &&
+    !("execute" in reportMessaging) &&
+    "send_message" in reportMessaging
+      ? reportMessaging.send_message
+      : undefined;
+
+  const interactiveSend =
+    Predicate.isObject(interactiveMessaging) &&
+    !("execute" in interactiveMessaging) &&
+    "send_message" in interactiveMessaging
+      ? interactiveMessaging.send_message
+      : undefined;
+
+  const debugSend =
+    Predicate.isObject(debugMessaging) &&
+    !("execute" in debugMessaging) &&
+    "send_message" in debugMessaging
+      ? debugMessaging.send_message
+      : undefined;
+
+  const reply = {
+    kind: "message",
+    replyTo: { kind: "current" as const },
+    text: "This one." };
+
+  await Promise.all(
+    [interactiveSend, debugSend, reportSend].map(async (tool) => {
+      const schema = tool?.inputSchema;
+
+      if (!isToolSchema(schema)) {
+        throw new Error("Expected authored send_message schemas.");
       }
-    );
-    expect(result).toEqual(scheduleSummary(job));
-  });
 
-  it("lists schedules through a dedicated empty-input tool", async () => {
-    const job = scheduledJob();
-    services.list.mockResolvedValue([job]);
+      const result = await schema["~standard"].validate(reply);
+      expect(result.issues).toBeUndefined();
+      expect(result).toEqual({ value: reply });
+    })
+  );
+});
 
-    const result = await listSchedules.execute(
-      {},
-      toolContext("schedules-list")
-    );
+it("owns web schedules by their Eve session", async () => {
+  const job = scheduledJob({
+    conversationChannel: "eve",
+    conversationId: "session-1" });
 
-    expect(inputProperties(listSchedules.inputSchema)).toEqual([]);
-    expect(services.list).toHaveBeenCalledExactlyOnceWith(
-      {
-        userId: "user-1",
-        workspaceId: accessScopeForUser("user-1").workspaceId,
-      },
-      {
-        conversationChannel: "linq",
-        conversationId: "linq:dm:chat-1",
-      }
-    );
-    expect(result).toEqual([scheduleListSummary(job)]);
-  });
+  services.create.mockResolvedValue(job);
 
-  it("updates a schedule without carrying an action discriminator", async () => {
-    const job = scheduledJob();
-    services.update.mockResolvedValue(job);
+  await createSchedule.execute(
+    {
+      missedRunPolicy: "run_latest",
+      prompt: "Send the morning summary.",
+      timing: {
+        frequency: "daily",
+        kind: "calendar",
+        localTime: "09:00",
+        timezone: "America/New_York" } },
+    toolContext("schedules-create", "test", "eve")
+  );
 
-    const result = await updateSchedule.execute(
-      {
-        id: job.id,
-        status: "paused",
-      },
-      toolContext("schedules-update")
-    );
-
-    expect(inputProperties(updateSchedule.inputSchema)).toEqual([
-      "id",
-      "prompt",
-      "status",
-      "timing",
-    ]);
-    expect(services.update).toHaveBeenCalledExactlyOnceWith(
-      {
-        userId: "user-1",
-        workspaceId: accessScopeForUser("user-1").workspaceId,
-      },
-      {
-        conversationChannel: "linq",
-        conversationId: "linq:dm:chat-1",
-      },
-      job.id,
-      { status: "paused" }
-    );
-    expect(result).toEqual(scheduleSummary(job));
-  });
-
-  it("omits messaging capabilities outside their valid turns", async () => {
-    const resolveMessaging = messaging.events["turn.started"];
-    expect(resolveMessaging).toBeDefined();
-
-    if (!resolveMessaging) return;
-
-    expect(
-      await resolveMessaging({}, dynamicContext("scheduled-worker"))
-    ).toBeNull();
-    expect(await resolveMessaging({}, resumedWorkerContext())).toBeNull();
-
-    const reportMessaging = await resolveMessaging(
-      {},
-      dynamicContext("scheduled-result", "channel:linq")
-    );
-
-    expect(Object.keys(reportMessaging ?? {})).toEqual(["send_message"]);
-
-    const debugMessaging = await resolveMessaging(
-      {},
-      dynamicContext("test", "http")
-    );
-
-    const interactiveMessaging = await resolveMessaging(
-      {},
-      dynamicContext("test", "channel:linq")
-    );
-
-    expect(Object.keys(debugMessaging ?? {}).toSorted()).toEqual([
-      "react_to_message",
-      "send_message",
-    ]);
-    expect(Object.keys(interactiveMessaging ?? {}).toSorted()).toEqual([
-      "react_to_message",
-      "send_message",
-    ]);
-
-    const reportSend =
-      Predicate.isObject(reportMessaging) &&
-      !("execute" in reportMessaging) &&
-      "send_message" in reportMessaging
-        ? reportMessaging.send_message
-        : undefined;
-
-    const interactiveSend =
-      Predicate.isObject(interactiveMessaging) &&
-      !("execute" in interactiveMessaging) &&
-      "send_message" in interactiveMessaging
-        ? interactiveMessaging.send_message
-        : undefined;
-
-    const debugSend =
-      Predicate.isObject(debugMessaging) &&
-      !("execute" in debugMessaging) &&
-      "send_message" in debugMessaging
-        ? debugMessaging.send_message
-        : undefined;
-
-    const reply = {
-      kind: "message",
-      replyTo: { kind: "current" as const },
-      text: "This one.",
-    };
-
-    await Promise.all(
-      [interactiveSend, debugSend, reportSend].map(async (tool) => {
-        const schema = tool?.inputSchema;
-
-        if (!isToolSchema(schema)) {
-          throw new Error("Expected authored send_message schemas.");
-        }
-
-        const result = await schema["~standard"].validate(reply);
-        expect(result.issues).toBeUndefined();
-        expect(result).toEqual({ value: reply });
-      })
-    );
-  });
-
-  it("owns web schedules by their Eve session", async () => {
-    const job = scheduledJob({
+  expect(services.create).toHaveBeenCalledWith(
+    {
+      userId: "user-1",
+      workspaceId: accessScopeForUser("user-1").workspaceId },
+    expect.objectContaining({
       conversationChannel: "eve",
-      conversationId: "session-1",
-    });
-
-    services.create.mockResolvedValue(job);
-
-    await createSchedule.execute(
-      {
-        missedRunPolicy: "run_latest",
-        prompt: "Send the morning summary.",
-        timing: {
-          frequency: "daily",
-          kind: "calendar",
-          localTime: "09:00",
-          timezone: "America/New_York",
-        },
-      },
-      toolContext("schedules-create", "test", "eve")
-    );
-
-    expect(services.create).toHaveBeenCalledWith(
-      {
-        userId: "user-1",
-        workspaceId: accessScopeForUser("user-1").workspaceId,
-      },
-      expect.objectContaining({
-        conversationChannel: "eve",
-        conversationId: "session-1",
-      })
-    );
-  });
+      conversationId: "session-1" })
+  );
 });
 
 function dynamicContext(authenticator: string, kind = "channel:scheduled-run") {
@@ -360,13 +330,9 @@ function dynamicContext(authenticator: string, kind = "channel:scheduled-run") {
           attributes: {},
           authenticator,
           principalId: "user-1",
-          principalType: "user",
-        },
-        initiator: null,
-      },
-      id: "session-1",
-    },
-  } satisfies DynamicResolveContext;
+          principalType: "user" },
+        initiator: null },
+      id: "session-1" } } satisfies DynamicResolveContext;
 }
 
 function resumedWorkerContext() {
@@ -382,11 +348,7 @@ function resumedWorkerContext() {
           attributes: {},
           authenticator: "scheduled-worker",
           principalId: "user-1",
-          principalType: "user" as const,
-        },
-      },
-    },
-  } satisfies DynamicResolveContext;
+          principalType: "user" as const } } } } satisfies DynamicResolveContext;
 }
 
 function toolContext(
@@ -417,19 +379,14 @@ function toolContext(
             conversationId: "linq:dm:chat-1",
             linqMessageId: "message-1",
             linqThreadId: "linq:dm:chat-1",
-            workspaceId: accessScopeForUser("user-1").workspaceId,
-          },
+            workspaceId: accessScopeForUser("user-1").workspaceId },
           authenticator,
           principalId: "user-1",
-          principalType: "user",
-        },
-        initiator: null,
-      },
+          principalType: "user" },
+        initiator: null },
       id: "session-1",
-      turn: { id: "turn-1", sequence: 0 },
-    },
-    toolName,
-  } satisfies ToolContext;
+      turn: { id: "turn-1", sequence: 0 } },
+    toolName } satisfies ToolContext;
 }
 
 function scheduledReportToolContext() {
@@ -449,12 +406,7 @@ function scheduledReportToolContext() {
             scheduleId: "00000000-0000-4000-8000-000000000001",
             scheduledReportLeaseToken: "00000000-0000-4000-8000-000000000004",
             scheduledReportSequence: "1",
-            scheduledRunId: "00000000-0000-4000-8000-000000000002",
-          },
-        },
-      },
-    },
-  } satisfies ToolContext;
+            scheduledRunId: "00000000-0000-4000-8000-000000000002" } } } } } satisfies ToolContext;
 }
 
 function inputProperties(schema: ToolDefinition["inputSchema"]) {
@@ -471,8 +423,7 @@ function scheduledJob(
     conversationId: string;
   } = {
     conversationChannel: "linq",
-    conversationId: "linq:dm:chat-1",
-  }
+    conversationId: "linq:dm:chat-1" }
 ): Awaited<ReturnType<typeof listScheduledAgentJobs>>[number] {
   return {
     createdAt: new Date("2026-09-01T12:00:00.000Z"),
@@ -492,11 +443,9 @@ function scheduledJob(
       frequency: "daily",
       kind: "calendar",
       localTime: "09:00",
-      timezone: "America/New_York",
-    },
+      timezone: "America/New_York" },
     updatedAt: new Date("2026-09-01T12:00:00.000Z"),
-    workspaceId: accessScopeForUser("user-1").workspaceId,
-  };
+    workspaceId: accessScopeForUser("user-1").workspaceId };
 }
 
 function scheduleSummary(job: ReturnType<typeof scheduledJob>) {
@@ -508,8 +457,7 @@ function scheduleSummary(job: ReturnType<typeof scheduledJob>) {
     nextRunAt: job.nextRunAt?.toISOString() ?? null,
     prompt: job.prompt,
     status: job.status,
-    timing: job.timing,
-  };
+    timing: job.timing };
 }
 
 function scheduleListSummary(job: ReturnType<typeof scheduledJob>) {
