@@ -38,27 +38,52 @@ const profileSelection = Effect.gen(function* () {
     postal_code AS "postalCode", region`;
 });
 
+function invalidUserProfileInput() {
+  return new UserProfileError({ reason: "invalid_input" });
+}
+
+function invalidStoredUserProfile() {
+  return new UserProfileError({ reason: "invalid_stored_profile" });
+}
+
+function parseStoredUserProfile(row: UserProfile) {
+  return parseUserProfile(userProfileSchema.parse(row));
+}
+
+function profileColumnValues(patch: UserProfilePatch, normalized: UserProfile) {
+  const entries: [string, unknown][] = [];
+
+  for (const [key, column] of columns) {
+    if (patch[key] === undefined) continue;
+    entries.push([column, normalized[key]]);
+  }
+
+  return Object.fromEntries(entries);
+}
+
+const readUserProfileInTransaction = Effect.fn("readUserProfileInTransaction")(
+  function* <E, R>(authorize: Effect.Effect<AccessScope, E, R>) {
+    const sql = yield* PgClient.PgClient;
+    const scope = yield* authorize;
+    const selection = yield* profileSelection;
+
+    const rows = yield* sql<UserProfile>`SELECT ${selection} FROM user_profiles
+      WHERE workspace_id = ${scope.workspaceId}`;
+
+    return yield* Effect.try({
+      try: () => parseUserProfile(rows[0] ?? emptyUserProfile),
+      catch: invalidStoredUserProfile,
+    });
+  }
+);
+
 // Every operation owns the transaction retaining authority locks through storage I/O.
 export const readUserProfile = Effect.fn("readUserProfile")(function* <E, R>(
   authorize: Effect.Effect<AccessScope, E, R>
 ) {
   const sql = yield* PgClient.PgClient;
 
-  return yield* sql.withTransaction(
-    Effect.gen(function* () {
-      const scope = yield* authorize;
-      const selection = yield* profileSelection;
-
-      const rows =
-        yield* sql<UserProfile>`SELECT ${selection} FROM user_profiles
-      WHERE workspace_id = ${scope.workspaceId}`;
-
-      return yield* Effect.try({
-        try: () => parseUserProfile(rows[0] ?? emptyUserProfile),
-        catch: () => new UserProfileError({ reason: "invalid_stored_profile" }),
-      });
-    })
-  );
+  return yield* sql.withTransaction(readUserProfileInTransaction(authorize));
 });
 
 export const replaceUserProfile = Effect.fn("replaceUserProfile")(function* <
@@ -67,10 +92,43 @@ export const replaceUserProfile = Effect.fn("replaceUserProfile")(function* <
 >(authorize: Effect.Effect<AccessScope, E, R>, input: UserProfile) {
   const profile = yield* Effect.try({
     try: () => parseUserProfile(input),
-    catch: () => new UserProfileError({ reason: "invalid_input" }),
+    catch: invalidUserProfileInput,
   });
 
   return yield* patchUserProfile(authorize, profile);
+});
+
+const patchUserProfileInTransaction = Effect.fn(
+  "patchUserProfileInTransaction"
+)(function* <E, R>(
+  authorize: Effect.Effect<AccessScope, E, R>,
+  input: UserProfilePatch
+) {
+  const sql = yield* PgClient.PgClient;
+  const scope = yield* authorize;
+
+  const patch = yield* Effect.try({
+    try: () => userProfilePatchSchema.parse(input),
+    catch: invalidUserProfileInput,
+  });
+
+  const normalized = yield* Effect.try({
+    try: () => parseUserProfile({ ...emptyUserProfile, ...patch }),
+    catch: invalidUserProfileInput,
+  });
+
+  const values = profileColumnValues(patch, normalized);
+  const selection = yield* profileSelection;
+
+  const rows = yield* sql<UserProfile>`INSERT INTO user_profiles
+      ${sql.insert({ workspace_id: scope.workspaceId, ...values })}
+      ON CONFLICT (workspace_id) DO UPDATE SET ${sql.update(values)}, updated_at = clock_timestamp()
+      RETURNING ${selection}`;
+
+  return yield* Effect.try({
+    try: () => parseStoredUserProfile(rows[0] ?? emptyUserProfile),
+    catch: invalidStoredUserProfile,
+  });
 });
 
 export const patchUserProfile = Effect.fn("patchUserProfile")(function* <E, R>(
@@ -80,36 +138,6 @@ export const patchUserProfile = Effect.fn("patchUserProfile")(function* <E, R>(
   const sql = yield* PgClient.PgClient;
 
   return yield* sql.withTransaction(
-    Effect.gen(function* () {
-      const scope = yield* authorize;
-
-      const patch = yield* Effect.try({
-        try: () => userProfilePatchSchema.parse(input),
-        catch: () => new UserProfileError({ reason: "invalid_input" }),
-      });
-
-      const normalized = yield* Effect.try({
-        try: () => parseUserProfile({ ...emptyUserProfile, ...patch }),
-        catch: () => new UserProfileError({ reason: "invalid_input" }),
-      });
-
-      const values = Object.fromEntries(
-        columns.flatMap(([key, column]) =>
-          patch[key] === undefined ? [] : [[column, normalized[key]]]
-        )
-      );
-
-      const selection = yield* profileSelection;
-
-      const rows = yield* sql<UserProfile>`INSERT INTO user_profiles
-      ${sql.insert({ workspace_id: scope.workspaceId, ...values })}
-      ON CONFLICT (workspace_id) DO UPDATE SET ${sql.update(values)}, updated_at = clock_timestamp()
-      RETURNING ${selection}`;
-
-      return yield* Effect.try({
-        try: () => parseUserProfile(userProfileSchema.parse(rows[0])),
-        catch: () => new UserProfileError({ reason: "invalid_stored_profile" }),
-      });
-    })
+    patchUserProfileInTransaction(authorize, input)
   );
 });

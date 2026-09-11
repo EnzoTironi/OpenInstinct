@@ -57,6 +57,52 @@ async function dispatchDueWork(to: ScheduleToFn) {
   ]);
 }
 
+async function ensureScheduledChannelOwner(
+  claim: Awaited<ReturnType<typeof claimReadyScheduledAgentRuns>>[number]
+) {
+  const channel = claim.job.conversationChannel;
+  const needsOwner = channel === "telegram" || channel === "kapso";
+
+  if (!needsOwner) return;
+
+  await serverRuntime.runPromise(
+    requireScheduledChannelOwner({
+      ...claim.job,
+      conversationChannel: channel,
+    })
+  );
+}
+
+function releaseErrorMessage(cause: unknown) {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+async function releaseFailedScheduledRun(
+  to: ScheduleToFn,
+  claim: Awaited<ReturnType<typeof claimReadyScheduledAgentRuns>>[number],
+  leaseToken: string,
+  cause: unknown
+) {
+  console.warn("[scheduled-run] worker dispatch failed", {
+    cause,
+    jobId: claim.job.id,
+    runId: claim.run.id,
+  });
+
+  const status = await releaseScheduledAgentRun(
+    claim.run.id,
+    leaseToken,
+    releaseErrorMessage(cause)
+  );
+
+  if (status !== "dead_letter") return;
+
+  await dispatchRecoverableReport(to, {
+    conversationChannel: claim.job.conversationChannel,
+    runId: claim.run.id,
+  });
+}
+
 async function executeScheduledRun(
   to: ScheduleToFn,
   claim: Awaited<ReturnType<typeof claimReadyScheduledAgentRuns>>[number]
@@ -72,16 +118,7 @@ async function executeScheduledRun(
   });
 
   try {
-    const channel = claim.job.conversationChannel;
-
-    if (channel === "telegram" || channel === "kapso") {
-      await serverRuntime.runPromise(
-        requireScheduledChannelOwner({
-          ...claim.job,
-          conversationChannel: channel,
-        })
-      );
-    }
+    await ensureScheduledChannelOwner(claim);
 
     const session = await to(scheduledRunChannel, {
       restart: claim.run.workerSessionId !== null,
@@ -106,24 +143,7 @@ async function executeScheduledRun(
       sessionId: session.id,
     });
   } catch (error) {
-    console.warn("[scheduled-run] worker dispatch failed", {
-      cause: error,
-      jobId: claim.job.id,
-      runId: claim.run.id,
-    });
-
-    const status = await releaseScheduledAgentRun(
-      claim.run.id,
-      leaseToken,
-      error instanceof Error ? error.message : String(error)
-    );
-
-    if (status === "dead_letter") {
-      await dispatchRecoverableReport(to, {
-        conversationChannel: claim.job.conversationChannel,
-        runId: claim.run.id,
-      });
-    }
+    await releaseFailedScheduledRun(to, claim, leaseToken, error);
   }
 }
 

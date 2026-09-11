@@ -120,6 +120,93 @@ export function VaultSectionBackButton({
   );
 }
 
+function filterVaultItems(
+  items: readonly VaultItem[],
+  normalizedQuery: string
+): readonly VaultItem[] {
+  if (!normalizedQuery) return items;
+
+  return items.filter((item) =>
+    `${item.label}\n${item.account}`
+      .toLocaleLowerCase()
+      .includes(normalizedQuery)
+  );
+}
+
+function VaultSearchField({
+  searchId,
+  title,
+  query,
+  onQueryChange,
+}: {
+  readonly searchId: string;
+  readonly title: string;
+  readonly query: string;
+  readonly onQueryChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Label className="sr-only" htmlFor={searchId}>
+        Search {title.toLocaleLowerCase()}
+      </Label>
+      <InputGroup>
+        <InputGroupAddon>
+          <SearchIcon />
+        </InputGroupAddon>
+        <InputGroupInput
+          id={searchId}
+          onChange={(event) => {
+            onQueryChange(event.target.value);
+          }}
+          placeholder="Search by name or account"
+          type="search"
+          value={query}
+        />
+      </InputGroup>
+    </div>
+  );
+}
+
+function VaultEmptyState({
+  query,
+  title,
+}: {
+  readonly query: string;
+  readonly title: string;
+}) {
+  const trimmed = query.trim();
+
+  if (trimmed) {
+    return (
+      <p className="type-supporting-body py-10 text-center text-muted-foreground">
+        No matches for “{trimmed}”
+      </p>
+    );
+  }
+
+  return (
+    <p className="type-supporting-body py-10 text-center text-muted-foreground">
+      No saved {title.toLocaleLowerCase()} yet.
+    </p>
+  );
+}
+
+function VaultItemResults({
+  visibleItems,
+  query,
+  title,
+}: {
+  readonly visibleItems: readonly VaultItem[];
+  readonly query: string;
+  readonly title: string;
+}) {
+  if (visibleItems.length > 0) {
+    return <VaultItemList items={visibleItems} />;
+  }
+
+  return <VaultEmptyState query={query} title={title} />;
+}
+
 export function VaultItemBrowser({
   items,
   searchId,
@@ -132,40 +219,21 @@ export function VaultItemBrowser({
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(VAULT_DIALOG_PAGE_SIZE);
   const normalizedQuery = query.trim().toLocaleLowerCase();
-
-  const filteredItems = normalizedQuery
-    ? items.filter((item) =>
-        `${item.label}\n${item.account}`
-          .toLocaleLowerCase()
-          .includes(normalizedQuery)
-      )
-    : items;
-
+  const filteredItems = filterVaultItems(items, normalizedQuery);
   const visibleItems = filteredItems.slice(0, visibleCount);
 
   return (
     <>
       {items.length > 0 ? (
-        <div>
-          <Label className="sr-only" htmlFor={searchId}>
-            Search {title.toLocaleLowerCase()}
-          </Label>
-          <InputGroup>
-            <InputGroupAddon>
-              <SearchIcon />
-            </InputGroupAddon>
-            <InputGroupInput
-              id={searchId}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setVisibleCount(VAULT_DIALOG_PAGE_SIZE);
-              }}
-              placeholder="Search by name or account"
-              type="search"
-              value={query}
-            />
-          </InputGroup>
-        </div>
+        <VaultSearchField
+          query={query}
+          searchId={searchId}
+          title={title}
+          onQueryChange={(value) => {
+            setQuery(value);
+            setVisibleCount(VAULT_DIALOG_PAGE_SIZE);
+          }}
+        />
       ) : (
         <div />
       )}
@@ -186,17 +254,11 @@ export function VaultItemBrowser({
           }
         }}
       >
-        {visibleItems.length > 0 ? (
-          <VaultItemList items={visibleItems} />
-        ) : query.trim() ? (
-          <p className="type-supporting-body py-10 text-center text-muted-foreground">
-            No matches for “{query.trim()}”
-          </p>
-        ) : (
-          <p className="type-supporting-body py-10 text-center text-muted-foreground">
-            No saved {title.toLocaleLowerCase()} yet.
-          </p>
-        )}
+        <VaultItemResults
+          query={query}
+          title={title}
+          visibleItems={visibleItems}
+        />
       </section>
     </>
   );

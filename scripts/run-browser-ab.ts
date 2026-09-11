@@ -601,21 +601,27 @@ async function resolveCommit(reference: string) {
   ).trim();
 }
 
-async function cleanup() {
-  if (keepResources) return;
+function terminateChildProcess(child: ChildProcess) {
+  if (!child.pid) return;
 
-  for (const child of processes.toReversed()) {
-    if (child.pid && child.exitCode === null) {
-      try {
-        process.kill(-child.pid, "SIGTERM");
-      } catch (error) {
-        const parsed = nodeErrorSchema.safeParse(error);
+  if (child.exitCode !== null) return;
 
-        if (!parsed.success || parsed.data.code !== "ESRCH") throw error;
-      }
-    }
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch (error) {
+    ignoreMissingProcessError(error);
   }
+}
 
+function ignoreMissingProcessError(cause: unknown) {
+  const parsed = nodeErrorSchema.safeParse(cause);
+
+  if (parsed.success && parsed.data.code === "ESRCH") return;
+
+  throw cause;
+}
+
+async function stopComposeProjects() {
   for (const project of composeProjects.toReversed()) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- teardown is deliberately ordered to avoid interleaved Docker cleanup
     await run(
@@ -624,7 +630,9 @@ async function cleanup() {
       { cwd: project.cwd }
     ).catch(() => undefined);
   }
+}
 
+async function dropLocalDatabases() {
   for (const database of localDatabases.toReversed()) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- teardown is deliberately ordered to avoid interleaved database cleanup
     await run(
@@ -638,7 +646,9 @@ async function cleanup() {
       { cwd: repositoryRoot }
     ).catch(() => undefined);
   }
+}
 
+async function removeWorktrees() {
   for (const name of ["candidate", "baseline"]) {
     const path = join(temporaryRoot, name);
     // oxlint-disable-next-line eslint/no-await-in-loop -- git worktree removals share repository metadata and must be serialized
@@ -646,81 +656,156 @@ async function cleanup() {
       cwd: repositoryRoot,
     }).catch(() => undefined);
   }
+}
 
+async function cleanup() {
+  if (keepResources) return;
+
+  for (const child of processes.toReversed()) {
+    terminateChildProcess(child);
+  }
+
+  await stopComposeProjects();
+  await dropLocalDatabases();
+  await removeWorktrees();
   await rm(temporaryRoot, { force: true, recursive: true });
 }
 
-function parseArguments(args: string[]) {
-  const positional: string[] = [];
-  let suite: "all" | "live" | "smoke" = "smoke";
-  let repetitions = 1;
-  let maxConcurrency = 9;
-  let taskTimeoutMs = 15 * 60_000;
-  let keep = false;
-  let label: string | undefined;
+interface ParsedBrowserAbArguments {
+  baselineRef: string;
+  candidateRef: string;
+  keep: boolean;
+  label: string | undefined;
+  maxConcurrency: number;
+  repetitions: number;
+  suite: "all" | "live" | "smoke";
+  taskTimeoutMs: number;
+}
 
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
+interface ParseState {
+  positional: string[];
+  suite: "all" | "live" | "smoke";
+  repetitions: number;
+  maxConcurrency: number;
+  taskTimeoutMs: number;
+  keep: boolean;
+  label: string | undefined;
+  index: number;
+  args: string[];
+}
 
-    if (argument === "--keep") {
-      keep = true;
-      continue;
-    }
+function requireSuiteValue(
+  value: string | undefined
+): "all" | "live" | "smoke" {
+  if (value === "all" || value === "live" || value === "smoke") return value;
 
-    if (argument === "--suite") {
-      const value = args[++index];
+  throw new Error("--suite must be smoke, live, or all.");
+}
 
-      if (value !== "all" && value !== "live" && value !== "smoke") {
-        throw new Error("--suite must be smoke, live, or all.");
-      }
+function requireLabelValue(value: string | undefined) {
+  const trimmed = value?.trim();
 
-      suite = value;
-      continue;
-    }
+  if (!trimmed) throw new Error("--label requires a non-empty value.");
 
-    if (argument === "--label") {
-      const value = args[++index]?.trim();
+  return trimmed;
+}
 
-      if (!value) throw new Error("--label requires a non-empty value.");
-      label = value;
-      continue;
-    }
-
-    if (argument === "--repetitions" || argument === "--max-concurrency") {
-      const value = Number(args[++index]);
-
-      if (!Number.isInteger(value) || value < 1 || value > 20) {
-        throw new Error(`${argument} must be an integer from 1 to 20.`);
-      }
-
-      if (argument === "--repetitions") repetitions = value;
-      else maxConcurrency = value;
-      continue;
-    }
-
-    if (argument === "--task-timeout-minutes") {
-      const value = Number(args[++index]);
-
-      if (!Number.isInteger(value) || value < 1 || value > 60) {
-        throw new Error(
-          "--task-timeout-minutes must be an integer from 1 to 60."
-        );
-      }
-
-      taskTimeoutMs = value * 60_000;
-      continue;
-    }
-
-    if (argument?.startsWith("--")) {
-      throw new Error(`Unknown option: ${argument}`);
-    }
-
-    if (argument) positional.push(argument);
+function requireBoundedInteger(
+  argument: string,
+  value: number,
+  minimum: number,
+  maximum: number
+) {
+  if (Number.isInteger(value) && value >= minimum && value <= maximum) {
+    return value;
   }
 
-  const [baselineRef, candidateRef] = positional;
+  throw new Error(
+    `${argument} must be an integer from ${String(minimum)} to ${String(maximum)}.`
+  );
+}
 
-  if (positional.length !== 2 || !baselineRef || !candidateRef) {
+function applyFlag(state: ParseState, argument: string): boolean {
+  if (argument === "--keep") {
+    state.keep = true;
+
+    return true;
+  }
+
+  if (argument === "--suite") {
+    state.suite = requireSuiteValue(state.args[++state.index]);
+
+    return true;
+  }
+
+  if (argument === "--label") {
+    state.label = requireLabelValue(state.args[++state.index]);
+
+    return true;
+  }
+
+  if (argument === "--repetitions") {
+    state.repetitions = requireBoundedInteger(
+      argument,
+      Number(state.args[++state.index]),
+      1,
+      20
+    );
+
+    return true;
+  }
+
+  if (argument === "--max-concurrency") {
+    state.maxConcurrency = requireBoundedInteger(
+      argument,
+      Number(state.args[++state.index]),
+      1,
+      20
+    );
+
+    return true;
+  }
+
+  if (argument === "--task-timeout-minutes") {
+    const minutes = requireBoundedInteger(
+      argument,
+      Number(state.args[++state.index]),
+      1,
+      60
+    );
+
+    state.taskTimeoutMs = minutes * 60_000;
+
+    return true;
+  }
+
+  return false;
+}
+
+function consumeBrowserAbArgument(state: ParseState) {
+  const argument = state.args[state.index];
+
+  if (applyFlag(state, argument ?? "")) return;
+
+  if (argument?.startsWith("--")) {
+    throw new Error(`Unknown option: ${argument}`);
+  }
+
+  if (argument) state.positional.push(argument);
+}
+
+function finalizeBrowserAbArguments(
+  state: ParseState
+): ParsedBrowserAbArguments {
+  const [baselineRef, candidateRef] = state.positional;
+
+  if (state.positional.length !== 2) {
+    throw new Error(
+      'Usage: pnpm bench:ab <baseline-ref> <candidate-ref> [--label "description"] [--suite smoke|live|all] [--repetitions n] [--max-concurrency n] [--task-timeout-minutes n] [--keep]'
+    );
+  }
+
+  if (!baselineRef || !candidateRef) {
     throw new Error(
       'Usage: pnpm bench:ab <baseline-ref> <candidate-ref> [--label "description"] [--suite smoke|live|all] [--repetitions n] [--max-concurrency n] [--task-timeout-minutes n] [--keep]'
     );
@@ -729,13 +814,33 @@ function parseArguments(args: string[]) {
   return {
     baselineRef,
     candidateRef,
-    keep,
-    label,
-    maxConcurrency,
-    repetitions,
-    suite,
-    taskTimeoutMs,
+    keep: state.keep,
+    label: state.label,
+    maxConcurrency: state.maxConcurrency,
+    repetitions: state.repetitions,
+    suite: state.suite,
+    taskTimeoutMs: state.taskTimeoutMs,
   };
+}
+
+function parseArguments(args: string[]): ParsedBrowserAbArguments {
+  const state: ParseState = {
+    positional: [],
+    suite: "smoke",
+    repetitions: 1,
+    maxConcurrency: 9,
+    taskTimeoutMs: 15 * 60_000,
+    keep: false,
+    label: undefined,
+    index: 0,
+    args,
+  };
+
+  for (; state.index < args.length; state.index += 1) {
+    consumeBrowserAbArgument(state);
+  }
+
+  return finalizeBrowserAbArguments(state);
 }
 
 function shortSha(sha: string) {

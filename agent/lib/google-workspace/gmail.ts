@@ -184,48 +184,80 @@ export async function sendGmail(
     "utf8"
   ).toString("base64url");
 
-  return withGmail(ctx, async (client) => {
-    const existing = await findSentGmailByIdempotencyKey(
+  return withGmail(ctx, (client) =>
+    sendGmailIdempotent(
       client,
+      {
+        raw,
+        threadId: payload.threadId,
+      },
       idempotencyKey,
       ctx.abortSignal
+    )
+  );
+}
+
+async function sendGmailIdempotent(
+  client: ReturnType<typeof gmail>,
+  requestBody: { raw: string; threadId?: string },
+  idempotencyKey: string,
+  signal: AbortSignal
+) {
+  const existing = await findSentGmailByIdempotencyKey(
+    client,
+    idempotencyKey,
+    signal
+  );
+
+  if (existing) return existing;
+
+  return sendOrRecoverGmailMessage(
+    client,
+    requestBody.threadId
+      ? { raw: requestBody.raw, threadId: requestBody.threadId }
+      : { raw: requestBody.raw },
+    idempotencyKey,
+    signal
+  );
+}
+
+function isUncertainGmailSendError(error: unknown): error is object {
+  const status = googleApiErrorStatus(error);
+
+  return status === undefined || status >= 500 || status === 429;
+}
+
+async function sendOrRecoverGmailMessage(
+  client: ReturnType<typeof gmail>,
+  requestBody: { raw: string; threadId?: string },
+  idempotencyKey: string,
+  signal: AbortSignal
+) {
+  try {
+    const { data } = await client.users.messages.send(
+      {
+        requestBody,
+        userId: "me",
+      },
+      { signal }
     );
 
-    if (existing) return existing;
+    return data;
+  } catch (error) {
+    // Uncertain outcomes (timeout / transport / 5xx) must not blind-resend.
+    // Client 4xx failures other than rate limits stay fail-closed unless the
+    // idempotency key already landed (provider accepted before the error surfaced).
+    if (!isUncertainGmailSendError(error)) throw error;
 
-    const requestBody = payload.threadId
-      ? { raw, threadId: payload.threadId }
-      : { raw };
+    const recovered = await findSentGmailByIdempotencyKey(
+      client,
+      idempotencyKey,
+      signal
+    );
 
-    try {
-      const { data } = await client.users.messages.send(
-        {
-          requestBody,
-          userId: "me",
-        },
-        { signal: ctx.abortSignal }
-      );
-
-      return data;
-    } catch (error) {
-      // Uncertain outcomes (timeout / transport / 5xx) must not blind-resend.
-      // Client 4xx failures other than rate limits stay fail-closed unless the
-      // idempotency key already landed (provider accepted before the error surfaced).
-      const status = googleApiErrorStatus(error);
-      const uncertain = status === undefined || status >= 500 || status === 429;
-
-      if (!uncertain) throw error;
-
-      const recovered = await findSentGmailByIdempotencyKey(
-        client,
-        idempotencyKey,
-        ctx.abortSignal
-      );
-
-      if (recovered) return recovered;
-      throw error;
-    }
-  });
+    if (recovered) return recovered;
+    throw error;
+  }
 }
 
 async function findSentGmailByIdempotencyKey(
@@ -285,26 +317,43 @@ function header(part: GmailPart | undefined, name: string) {
   );
 }
 
-function plainText(part: GmailPart | undefined): string {
-  if (!part) return "";
-
+function directPlainText(part: GmailPart) {
   if (part.mimeType === "text/plain" && part.body?.data) {
     return decodeBase64Url(part.body.data);
   }
 
-  for (const child of part.parts ?? []) {
-    const text = plainText(child);
+  return undefined;
+}
 
-    if (text) return text;
-  }
-
+function htmlAsPlainText(part: GmailPart) {
   if (part.mimeType === "text/html" && part.body?.data) {
     return decodeBase64Url(part.body.data)
       .replace(/<[^>]+>/gu, " ")
       .replace(/\s+/gu, " ");
   }
 
-  return "";
+  return undefined;
+}
+
+function firstChildPlainText(part: GmailPart) {
+  for (const child of part.parts ?? []) {
+    const text = plainText(child);
+
+    if (text) return text;
+  }
+
+  return undefined;
+}
+
+function plainText(part: GmailPart | undefined): string {
+  if (!part) return "";
+
+  return (
+    directPlainText(part) ??
+    firstChildPlainText(part) ??
+    htmlAsPlainText(part) ??
+    ""
+  );
 }
 
 function minimizeMessage(message: GmailMessage) {

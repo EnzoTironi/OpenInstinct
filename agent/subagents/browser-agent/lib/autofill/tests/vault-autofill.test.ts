@@ -56,6 +56,51 @@ const scope: AccessScope = {
   workspaceId: "workspace-1",
 };
 
+class MarkingFakeInput {
+  readonly dataset: Record<string, string> = {};
+  disabled = false;
+  form: { querySelectorAll: () => MarkingFakeNodeList } | null = null;
+  readOnly = false;
+  type = "text";
+
+  constructor(readonly value: string) {}
+
+  closest() {
+    return this.form;
+  }
+}
+
+class MarkingFakeNodeList extends Array<MarkingFakeInput> {
+  item(index: number) {
+    return this[index] ?? null;
+  }
+}
+
+function markedFormControlSnapshot() {
+  const controls = new MarkingFakeNodeList(
+    new MarkingFakeInput("4111111111111111"),
+    new MarkingFakeInput("09/31"),
+    new MarkingFakeInput("")
+  );
+
+  const form = { querySelectorAll: () => controls };
+
+  for (const control of controls) control.form = form;
+  const document = { querySelectorAll: () => controls };
+
+  const markedCount = z.number().parse(
+    runInNewContext(nativeAutofillSecretMarkingExpression(0), {
+      document,
+      HTMLInputElement: MarkingFakeInput,
+    })
+  );
+
+  return {
+    markedCount,
+    vaultSecrets: controls.map(({ dataset }) => dataset.vaultSecret),
+  };
+}
+
 const paymentSurface = {
   fields: [
     { score: 100, token: "cc-number" },
@@ -471,50 +516,9 @@ it("builds Chromium contact and birthdate fields from vault claims", () => {
 it.each(["address", "contact", "payment"])(
   "marks every %s form control before native autofill",
   () => {
-    class FakeInput {
-      readonly dataset: Record<string, string> = {};
-      disabled = false;
-      form: { querySelectorAll: () => FakeNodeList } | null = null;
-      readOnly = false;
-      type = "text";
-
-      constructor(readonly value: string) {}
-
-      closest() {
-        return this.form;
-      }
-    }
-
-    class FakeNodeList extends Array<FakeInput> {
-      item(index: number) {
-        return this[index] ?? null;
-      }
-    }
-
-    const controls = new FakeNodeList(
-      new FakeInput("4111111111111111"),
-      new FakeInput("09/31"),
-      new FakeInput("")
-    );
-
-    const form = { querySelectorAll: () => controls };
-
-    for (const control of controls) control.form = form;
-    const document = { querySelectorAll: () => controls };
-
-    const markedCount = z.number().parse(
-      runInNewContext(nativeAutofillSecretMarkingExpression(0), {
-        document,
-        HTMLInputElement: FakeInput,
-      })
-    );
-
-    expect(markedCount).toBe(3);
-    expect(controls.map(({ dataset }) => dataset.vaultSecret)).toEqual([
-      "true",
-      "true",
-      "true",
-    ]);
+    const snapshot = markedFormControlSnapshot();
+    expect(snapshot.markedCount).toBe(3);
+    expect(snapshot.vaultSecrets).toEqual(["true", "true", "true"]);
   }
 );
 

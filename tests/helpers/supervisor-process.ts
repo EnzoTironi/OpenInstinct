@@ -14,6 +14,32 @@ export function waitForSupervisorClose(supervisor: ChildProcess) {
   });
 }
 
+async function readLogSnapshot(path: string) {
+  try {
+    return { contents: await readFile(path, "utf8"), readError: undefined };
+  } catch (error) {
+    return { contents: "", readError: error };
+  }
+}
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function readErrorMessage(cause: unknown) {
+  if (cause instanceof Error) return cause.message;
+
+  return "Unknown read error";
+}
+
+function lastObservation(contents: string, cause: unknown) {
+  if (cause === undefined) {
+    return `Last log contents: ${JSON.stringify(contents)}`;
+  }
+
+  return `Last log read failed: ${readErrorMessage(cause)}`;
+}
+
 export async function waitForSupervisorLogEntry(
   path: string,
   expected: string
@@ -24,27 +50,17 @@ export async function waitForSupervisorLogEntry(
 
   /* oxlint-disable eslint/no-await-in-loop -- This bounded poll must observe each read before scheduling the next retry. */
   while (Date.now() < deadline) {
-    try {
-      contents = await readFile(path, "utf8");
-      readError = undefined;
-    } catch (error) {
-      contents = "";
-      readError = error;
-    }
+    const snapshot = await readLogSnapshot(path);
+    contents = snapshot.contents;
+    readError = snapshot.readError;
 
     if (contents.includes(expected)) return;
-    await new Promise((resolve) => setTimeout(resolve, LOG_POLL_INTERVAL_MS));
+
+    await delay(LOG_POLL_INTERVAL_MS);
   }
   /* oxlint-enable eslint/no-await-in-loop */
 
-  const lastObservation =
-    readError === undefined
-      ? `Last log contents: ${JSON.stringify(contents)}`
-      : `Last log read failed: ${
-          readError instanceof Error ? readError.message : "Unknown read error"
-        }`;
-
   throw new Error(
-    `Timed out after ${String(LOG_WAIT_TIMEOUT_MS)}ms waiting for ${JSON.stringify(expected)} in ${path}. ${lastObservation}`
+    `Timed out after ${String(LOG_WAIT_TIMEOUT_MS)}ms waiting for ${JSON.stringify(expected)} in ${path}. ${lastObservation(contents, readError)}`
   );
 }

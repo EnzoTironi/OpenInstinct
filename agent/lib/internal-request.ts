@@ -38,38 +38,67 @@ const decodeInternalCallbackBodies = {
   ),
 };
 
-export const postInternalRequestEffect = Effect.fn("postInternalRequestEffect")(
-  function* <Route extends InternalCallbackRoute>(
-    route: Route,
-    body: (typeof internalCallbackBodies)[Route]["Type"]
-  ) {
-    const value = yield* decodeInternalCallbackBodies[route](body);
+function rejectInternalCallback() {
+  return new InternalCallbackRejected({ status: 503 });
+}
 
-    const serialized = yield* encodeSchema_fromJsonString_Schema_Unknown(value);
+function readOidcToken() {
+  return getVercelOidcToken();
+}
 
+function isSuccessfulStatus(status: number) {
+  return status >= 200 && status < 300;
+}
+
+const resolveVercelCallbackTransport = Effect.fn(
+  "resolveVercelCallbackTransport"
+)(function* () {
+  const hostname = yield* Config.string("VERCEL_URL");
+  const origin = new URL(`https://${hostname}`).origin;
+
+  const token = yield* Effect.tryPromise({
+    try: readOidcToken,
+    catch: rejectInternalCallback,
+  });
+
+  return {
+    headers: new Headers({
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+      "x-vercel-trusted-oidc-idp-token": token,
+    }),
+    origin,
+  };
+});
+
+const resolveLocalCallbackTransport = Effect.fn(
+  "resolveLocalCallbackTransport"
+)(function* (route: InternalCallbackRoute, serialized: string) {
+  return {
+    headers: yield* internalCallbackHeaders(route, serialized),
+    origin: yield* internalCallbackOrigin,
+  };
+});
+
+const resolveCallbackTransport = Effect.fn("resolveCallbackTransport")(
+  function* (route: InternalCallbackRoute, serialized: string) {
     const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
-    let origin: string;
-    let headers: Headers;
 
     if (Option.isSome(vercel)) {
-      const hostname = yield* Config.string("VERCEL_URL");
-      origin = new URL(`https://${hostname}`).origin;
-
-      const token = yield* Effect.tryPromise({
-        try: () => getVercelOidcToken(),
-        catch: () => new InternalCallbackRejected({ status: 503 }),
-      });
-
-      headers = new Headers({
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-        "x-vercel-trusted-oidc-idp-token": token,
-      });
-    } else {
-      origin = yield* internalCallbackOrigin;
-      headers = yield* internalCallbackHeaders(route, serialized);
+      return yield* resolveVercelCallbackTransport();
     }
 
+    return yield* resolveLocalCallbackTransport(route, serialized);
+  }
+);
+
+const executeInternalHttpRequest = Effect.fn("executeInternalHttpRequest")(
+  function* (
+    route: InternalCallbackRoute,
+    origin: string,
+    headers: Headers,
+    serialized: string
+  ) {
     const http = yield* HttpClient.HttpClient;
     const headerRecord = Object.fromEntries(headers.entries());
 
@@ -78,30 +107,55 @@ export const postInternalRequestEffect = Effect.fn("postInternalRequestEffect")(
       HttpClientRequest.bodyText(serialized, "application/json")
     );
 
-    const response = yield* http.execute(request).pipe(
-      Effect.mapError(() => new InternalCallbackRejected({ status: 503 })),
+    return yield* http.execute(request).pipe(
+      Effect.mapError(rejectInternalCallback),
       Effect.timeout("10 seconds"),
-      Effect.catchTag(
-        "TimeoutError",
-        () => new InternalCallbackRejected({ status: 503 })
-      ),
+      Effect.catchTag("TimeoutError", rejectInternalCallback),
       Effect.provideService(FetchHttpClient.RequestInit, {
         redirect: "error",
       })
     );
+  }
+);
 
+const readInternalResponseJson = Effect.fn("readInternalResponseJson")(
+  function* (response: { readonly text: Effect.Effect<string, unknown> }) {
     const bodyText = yield* response.text.pipe(
-      Effect.mapError(() => new InternalCallbackRejected({ status: 503 }))
+      Effect.mapError(rejectInternalCallback)
     );
 
-    const bodyJson = yield* decodeJsonUnknown(bodyText).pipe(
-      Effect.mapError(() => new InternalCallbackRejected({ status: 503 }))
+    return yield* decodeJsonUnknown(bodyText).pipe(
+      Effect.mapError(rejectInternalCallback)
     );
+  }
+);
+
+function asAsyncJson<T>(bodyJson: T) {
+  return async () => bodyJson;
+}
+
+export const postInternalRequestEffect = Effect.fn("postInternalRequestEffect")(
+  function* <Route extends InternalCallbackRoute>(
+    route: Route,
+    body: (typeof internalCallbackBodies)[Route]["Type"]
+  ) {
+    const value = yield* decodeInternalCallbackBodies[route](body);
+    const serialized = yield* encodeSchema_fromJsonString_Schema_Unknown(value);
+    const transport = yield* resolveCallbackTransport(route, serialized);
+
+    const response = yield* executeInternalHttpRequest(
+      route,
+      transport.origin,
+      transport.headers,
+      serialized
+    );
+
+    const bodyJson = yield* readInternalResponseJson(response);
 
     return {
-      ok: response.status >= 200 && response.status < 300,
+      ok: isSuccessfulStatus(response.status),
       status: response.status,
-      json: async () => bodyJson,
+      json: asAsyncJson(bodyJson),
     };
   }
 );

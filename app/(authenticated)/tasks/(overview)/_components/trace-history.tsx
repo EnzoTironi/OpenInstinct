@@ -34,12 +34,14 @@ const traceStatusSchema = z.enum([
   "success",
 ]);
 
+type TraceRow = BrowserTracePage["traces"][number];
+
 function statusLabel(status: string) {
   const parsed = traceStatusSchema.safeParse(status);
 
-  return parsed.success
-    ? statusLabels[parsed.data]
-    : { label: status, variant: "secondary" as const };
+  if (parsed.success) return statusLabels[parsed.data];
+
+  return { label: status, variant: "secondary" as const };
 }
 
 function formatDuration(durationMs: number | null) {
@@ -56,6 +58,186 @@ function formatDuration(durationMs: number | null) {
   return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60)}m`;
 }
 
+function historyErrorMessage(
+  cause: unknown,
+  hasData: boolean,
+  initialError?: string
+): string | undefined {
+  if (cause instanceof Error) return cause.message;
+
+  if (cause) return "Unable to load browser traces";
+
+  if (hasData) return undefined;
+
+  return initialError;
+}
+
+function emptyTracesMessage(isFetching: boolean): string {
+  if (isFetching) return "Loading browser traces…";
+
+  return "No browser traces yet. Give the agent a browser task from the chat.";
+}
+
+function TraceDomainsCell({
+  domains,
+}: {
+  readonly domains: readonly string[];
+}) {
+  if (domains.length === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  return domains.join(", ");
+}
+
+function TraceHistoryRow({ trace }: { readonly trace: TraceRow }) {
+  const status = statusLabel(trace.status);
+
+  return (
+    <TableRow>
+      <TableCell className="truncate" title={trace.task}>
+        <Button
+          nativeButton={false}
+          render={<Link href={`/tasks/${trace.sessionId}`} />}
+          size="none"
+          variant="link"
+        >
+          {trace.task}
+        </Button>
+      </TableCell>
+      <TableCell>
+        <Badge variant={status.variant}>{status.label}</Badge>
+      </TableCell>
+      <TableCell className="truncate">
+        {formatDuration(trace.durationMs)}
+      </TableCell>
+      <TableCell className="truncate" title={trace.domains.join(", ")}>
+        <TraceDomainsCell domains={trace.domains} />
+      </TableCell>
+      <TableCell
+        className="truncate text-muted-foreground"
+        title={trace.resultMessage ?? undefined}
+      >
+        {trace.resultMessage ?? "—"}
+      </TableCell>
+      <TableCell
+        className="truncate text-muted-foreground"
+        suppressHydrationWarning
+      >
+        {new Date(trace.startedAt).toLocaleString()}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function TraceHistoryBody({
+  traces,
+  isFetching,
+}: {
+  readonly traces: readonly TraceRow[];
+  readonly isFetching: boolean;
+}) {
+  if (traces.length === 0) {
+    return (
+      <TableRow>
+        <TableCell colSpan={6} variant="empty">
+          {emptyTracesMessage(isFetching)}
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return (
+    <>
+      {traces.map((trace) => (
+        <TraceHistoryRow key={trace.sessionId} trace={trace} />
+      ))}
+    </>
+  );
+}
+
+function TraceHistoryToolbar({
+  traces,
+  isFetching,
+  onRefresh,
+}: {
+  readonly traces: readonly TraceRow[];
+  readonly isFetching: boolean;
+  readonly onRefresh: () => void;
+}) {
+  const succeeded = traces.filter((trace) => trace.status === "success").length;
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 type-label">
+      {traces.length > 0 ? (
+        <>
+          <span>{String(traces.length)} loaded</span>
+          <Badge variant="success">{String(succeeded)} succeeded</Badge>
+        </>
+      ) : null}
+      <Button
+        disabled={isFetching}
+        onClick={onRefresh}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        <RefreshCwIcon className={isFetching ? "animate-spin" : undefined} />
+        Refresh
+      </Button>
+    </div>
+  );
+}
+
+function LoadOlderButton({
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+}: {
+  readonly hasNextPage: boolean;
+  readonly isFetchingNextPage: boolean;
+  readonly onLoadMore: () => void;
+}) {
+  if (!hasNextPage) return null;
+
+  return (
+    <Button
+      className="justify-self-center"
+      disabled={isFetchingNextPage}
+      onClick={onLoadMore}
+      type="button"
+      variant="outline"
+    >
+      {isFetchingNextPage ? "Loading…" : "Load older traces"}
+    </Button>
+  );
+}
+
+function buildQueryOptions(initialPage?: BrowserTracePage) {
+  const queryOptions = {
+    getNextPageParam: (page: BrowserTracePage) => page.nextCursor ?? undefined,
+    initialCursor: null,
+    staleTime: 30 * 1000,
+  };
+
+  if (!initialPage) return queryOptions;
+
+  return {
+    ...queryOptions,
+    initialData: { pageParams: [null], pages: [initialPage] },
+  };
+}
+
+function uniqueTraces(pages: BrowserTracePage[] | undefined): TraceRow[] {
+  return [
+    ...new Map(
+      (pages ?? [])
+        .flatMap((page) => page.traces)
+        .map((trace) => [trace.sessionId, trace])
+    ).values(),
+  ];
+}
+
 export function TraceHistory({
   initialError,
   initialPage,
@@ -63,64 +245,31 @@ export function TraceHistory({
   readonly initialError?: string;
   readonly initialPage?: BrowserTracePage;
 }) {
-  const queryOptions = {
-    getNextPageParam: (page: BrowserTracePage) => page.nextCursor ?? undefined,
-    initialCursor: null,
-    staleTime: 30 * 1000,
-  };
-
-  if (initialPage) {
-    Object.assign(queryOptions, {
-      initialData: { pageParams: [null], pages: [initialPage] },
-    });
-  }
-
-  const history = api.traces.list.useInfiniteQuery({}, queryOptions);
-  const pages = history.data?.pages;
-
-  const traces = useMemo(
-    () => [
-      ...new Map(
-        (pages ?? [])
-          .flatMap((page) => page.traces)
-          .map((trace) => [trace.sessionId, trace])
-      ).values(),
-    ],
-    [pages]
+  const history = api.traces.list.useInfiniteQuery(
+    {},
+    buildQueryOptions(initialPage)
   );
 
-  const historyError = history.error
-    ? history.error instanceof Error
-      ? history.error.message
-      : "Unable to load browser traces"
-    : history.data
-      ? undefined
-      : initialError;
+  const traces = useMemo(
+    () => uniqueTraces(history.data?.pages),
+    [history.data?.pages]
+  );
 
-  const succeeded = traces.filter((trace) => trace.status === "success").length;
+  const historyError = historyErrorMessage(
+    history.error,
+    Boolean(history.data),
+    initialError
+  );
 
   return (
     <section aria-label="Browser trace history" className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 type-label">
-        {traces.length > 0 ? (
-          <>
-            <span>{String(traces.length)} loaded</span>
-            <Badge variant="success">{String(succeeded)} succeeded</Badge>
-          </>
-        ) : null}
-        <Button
-          disabled={history.isFetching}
-          onClick={() => void history.refetch()}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <RefreshCwIcon
-            className={history.isFetching ? "animate-spin" : undefined}
-          />
-          Refresh
-        </Button>
-      </div>
+      <TraceHistoryToolbar
+        isFetching={history.isFetching}
+        traces={traces}
+        onRefresh={() => {
+          void history.refetch();
+        }}
+      />
 
       {historyError ? (
         <Alert variant="destructive">
@@ -140,76 +289,17 @@ export function TraceHistory({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {traces.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} variant="empty">
-                {history.isFetching
-                  ? "Loading browser traces…"
-                  : "No browser traces yet. Give the agent a browser task from the chat."}
-              </TableCell>
-            </TableRow>
-          ) : (
-            traces.map((trace) => {
-              const status = statusLabel(trace.status);
-
-              return (
-                <TableRow key={trace.sessionId}>
-                  <TableCell className="truncate" title={trace.task}>
-                    <Button
-                      nativeButton={false}
-                      render={<Link href={`/tasks/${trace.sessionId}`} />}
-                      size="none"
-                      variant="link"
-                    >
-                      {trace.task}
-                    </Button>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                  </TableCell>
-                  <TableCell className="truncate">
-                    {formatDuration(trace.durationMs)}
-                  </TableCell>
-                  <TableCell
-                    className="truncate"
-                    title={trace.domains.join(", ")}
-                  >
-                    {trace.domains.length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      trace.domains.join(", ")
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className="truncate text-muted-foreground"
-                    title={trace.resultMessage ?? undefined}
-                  >
-                    {trace.resultMessage ?? "—"}
-                  </TableCell>
-                  <TableCell
-                    className="truncate text-muted-foreground"
-                    suppressHydrationWarning
-                  >
-                    {new Date(trace.startedAt).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
+          <TraceHistoryBody isFetching={history.isFetching} traces={traces} />
         </TableBody>
       </Table>
 
-      {history.hasNextPage ? (
-        <Button
-          className="justify-self-center"
-          disabled={history.isFetchingNextPage}
-          onClick={() => void history.fetchNextPage()}
-          type="button"
-          variant="outline"
-        >
-          {history.isFetchingNextPage ? "Loading…" : "Load older traces"}
-        </Button>
-      ) : null}
+      <LoadOlderButton
+        hasNextPage={history.hasNextPage}
+        isFetchingNextPage={history.isFetchingNextPage}
+        onLoadMore={() => {
+          void history.fetchNextPage();
+        }}
+      />
     </section>
   );
 }

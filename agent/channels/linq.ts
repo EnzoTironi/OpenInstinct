@@ -142,6 +142,93 @@ function linqPostHelpers(options: {
   return { post, postReply };
 }
 
+function buildLinqLinkContent(
+  url: string,
+  idempotencyKey: string | undefined,
+  replyToMessageId: string | undefined
+): LinqMessageContent {
+  const nativeMessage: LinqMessageContent = {
+    parts: [{ type: "link", value: url }],
+  };
+
+  if (idempotencyKey) {
+    nativeMessage.idempotency_key = idempotencyKey;
+  }
+
+  if (replyToMessageId) {
+    nativeMessage.reply_to = { message_id: replyToMessageId };
+  }
+
+  return nativeMessage;
+}
+
+function isUnavailableReplyTarget(error: unknown): error is object {
+  return unavailableReplyTargetSchema.safeParse(error).success;
+}
+
+async function sendLinqLinkViaClient(input: {
+  readonly chatId: string;
+  readonly client: LinqAPIV3;
+  readonly idempotencyKey: string | undefined;
+  readonly replyToMessageId: string | undefined;
+  readonly url: string;
+}) {
+  return input.client.chats.messages.send(
+    input.chatId,
+    {
+      message: buildLinqLinkContent(
+        input.url,
+        input.idempotencyKey,
+        input.replyToMessageId
+      ),
+    },
+    undefined
+  );
+}
+
+function shouldRetryLinqLinkWithoutReply(
+  cause: unknown,
+  requestedReplyMessageId: string | undefined
+) {
+  return Boolean(requestedReplyMessageId && isUnavailableReplyTarget(cause));
+}
+
+function requireLinqChatId(
+  thread: LinqThread,
+  adapter: ReturnType<LinqActionResultArgs[1]["bot"]["getAdapter"]>
+) {
+  const { chatId, pendingHandle } = adapter.decodeThreadId(thread.id);
+
+  if (pendingHandle) {
+    throw new Error("A Linq reply requires an existing conversation.");
+  }
+
+  if (!chatId) {
+    throw new Error("A Linq reply requires an existing conversation.");
+  }
+
+  return chatId;
+}
+
+async function retryLinqLinkWithoutReply(input: {
+  readonly chatId: string;
+  readonly client: LinqAPIV3;
+  readonly idempotencyKey: string | undefined;
+  readonly sessionId: string;
+  readonly url: string;
+}) {
+  console.warn("[linq] reply target is unavailable", {
+    sessionId: input.sessionId,
+  });
+  await sendLinqLinkViaClient({
+    chatId: input.chatId,
+    client: input.client,
+    idempotencyKey: input.idempotencyKey,
+    replyToMessageId: undefined,
+    url: input.url,
+  });
+}
+
 async function sendLinqLinkMessage(options: {
   readonly url: string;
   readonly thread: LinqThread;
@@ -150,57 +237,95 @@ async function sendLinqLinkMessage(options: {
   readonly requestedReplyMessageId: string | undefined;
   readonly sessionId: string;
 }) {
-  const { chatId, pendingHandle } = options.adapter.decodeThreadId(
-    options.thread.id
-  );
-
-  if (pendingHandle || !chatId) {
-    throw new Error("A Linq reply requires an existing conversation.");
-  }
-
+  const chatId = requireLinqChatId(options.thread, options.adapter);
   const apiKey = await credentials.apiKey();
   const client = new LinqAPIV3({ apiKey });
 
-  const sendLink = (replyToMessageId?: string) => {
-    const nativeMessage: LinqMessageContent = {
-      parts: [{ type: "link", value: options.url }],
-    };
-
-    if (options.idempotencyKey) {
-      nativeMessage.idempotency_key = options.idempotencyKey;
-    }
-
-    if (replyToMessageId) {
-      nativeMessage.reply_to = { message_id: replyToMessageId };
-    }
-
-    return client.chats.messages.send(
-      chatId,
-      { message: nativeMessage },
-      undefined
-    );
-  };
-
   try {
-    await sendLink(options.requestedReplyMessageId);
+    await sendLinqLinkViaClient({
+      chatId,
+      client,
+      idempotencyKey: options.idempotencyKey,
+      replyToMessageId: options.requestedReplyMessageId,
+      url: options.url,
+    });
   } catch (error) {
     if (
-      !options.requestedReplyMessageId ||
-      !unavailableReplyTargetSchema.safeParse(error).success
+      !shouldRetryLinqLinkWithoutReply(error, options.requestedReplyMessageId)
     ) {
       throw error;
     }
 
-    console.warn("[linq] reply target is unavailable", {
+    await retryLinqLinkWithoutReply({
+      chatId,
+      client,
+      idempotencyKey: options.idempotencyKey,
       sessionId: options.sessionId,
+      url: options.url,
     });
-    await sendLink();
   }
 }
 
 type LinqOutgoingAttachments = NonNullable<
   Extract<AdapterPostableMessage, { raw: string }>["attachments"]
 >;
+
+function textWithoutCaller(requestedText: string) {
+  const references = extractImageArtifactMarkdownReferences(requestedText);
+
+  if (references.length === 0) return requestedText;
+
+  return [
+    stripImageArtifactMarkdownReferences(requestedText),
+    "I couldn't attach the image.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function artifactFailureMessage(failedCount: number) {
+  return Match.value(failedCount).pipe(
+    Match.when(0, () => ""),
+    Match.when(1, () => "I couldn't attach one image."),
+    Match.orElse((count) => `I couldn't attach ${String(count)} images.`)
+  );
+}
+
+function withOptionalAttachments(
+  raw: string,
+  attachments: LinqOutgoingAttachments | undefined
+) {
+  const outgoing: Extract<AdapterPostableMessage, { raw: string }> = { raw };
+
+  if (attachments?.length) {
+    outgoing.attachments = attachments;
+  }
+
+  return outgoing;
+}
+
+async function deliverLinqTextWithoutCaller(options: {
+  readonly requestedText: string;
+  readonly attachments: LinqOutgoingAttachments | undefined;
+  readonly post: (
+    content: AdapterPostableMessage
+  ) => Promise<{ readonly id: string }>;
+  readonly postReply: (
+    content: AdapterPostableMessage,
+    replyToMessageId: string
+  ) => Promise<{ readonly id: string }>;
+  readonly requestedReplyMessageId: string | undefined;
+}) {
+  await sendLinqMessage({
+    outgoing: withOptionalAttachments(
+      textWithoutCaller(options.requestedText),
+      options.attachments
+    ),
+    post: options.post,
+    postReply: options.postReply,
+    replyToMessageId: options.requestedReplyMessageId,
+  });
+}
 
 async function deliverLinqTextMessage(options: {
   readonly requestedText: string;
@@ -222,35 +347,7 @@ async function deliverLinqTextMessage(options: {
     options.session.session.auth.initiator;
 
   if (!caller) {
-    const references = extractImageArtifactMarkdownReferences(
-      options.requestedText
-    );
-
-    const text =
-      references.length === 0
-        ? options.requestedText
-        : [
-            stripImageArtifactMarkdownReferences(options.requestedText),
-            "I couldn't attach the image.",
-          ]
-            .filter(Boolean)
-            .join("\n\n");
-
-    const outgoing: Extract<
-      Parameters<typeof options.thread.post>[0],
-      { raw: string }
-    > = { raw: text };
-
-    if (options.attachments?.length) {
-      outgoing.attachments = options.attachments;
-    }
-
-    await sendLinqMessage({
-      outgoing,
-      post: options.post,
-      postReply: options.postReply,
-      replyToMessageId: options.requestedReplyMessageId,
-    });
+    await deliverLinqTextWithoutCaller(options);
 
     return;
   }
@@ -271,22 +368,14 @@ async function deliverLinqTextMessage(options: {
     });
   }
 
-  const failureMessage = Match.value(delivery.failedArtifactIds.length).pipe(
-    Match.when(0, () => ""),
-    Match.when(1, () => "I couldn't attach one image."),
-    Match.orElse((count) => `I couldn't attach ${String(count)} images.`)
-  );
+  const text = [
+    delivery.text,
+    artifactFailureMessage(delivery.failedArtifactIds.length),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
-  const text = [delivery.text, failureMessage].filter(Boolean).join("\n\n");
-
-  const outgoing: Extract<
-    Parameters<typeof options.thread.post>[0],
-    { raw: string }
-  > = { raw: text };
-
-  if (options.attachments?.length) {
-    outgoing.attachments = options.attachments;
-  }
+  const outgoing = withOptionalAttachments(text, options.attachments);
 
   if (delivery.files.length > 0) outgoing.files = delivery.files;
   await sendLinqMessage({
@@ -295,6 +384,44 @@ async function deliverLinqTextMessage(options: {
     postReply: options.postReply,
     replyToMessageId: options.requestedReplyMessageId,
   });
+}
+
+function replyMessageIdForThread(
+  replyTarget: ReturnType<typeof resolveLinqReplyTarget>,
+  threadId: string
+) {
+  if (replyTarget?.conversationId !== threadId) return undefined;
+
+  return replyTarget.messageId;
+}
+
+function reportIdempotencyKey(
+  report: ReturnType<typeof scheduledReportFromSession>
+) {
+  if (!report) return undefined;
+
+  return `scheduled-report:${report.runId}:${String(report.sequence)}`;
+}
+
+async function deliverAttachmentOnlyLinqMessage(options: {
+  readonly attachments: LinqOutgoingAttachments;
+  readonly post: (
+    content: AdapterPostableMessage
+  ) => Promise<{ readonly id: string }>;
+  readonly postReply: (
+    content: AdapterPostableMessage,
+    replyToMessageId: string
+  ) => Promise<{ readonly id: string }>;
+  readonly requestedReplyMessageId: string | undefined;
+  readonly session: LinqActionResultArgs[2];
+}) {
+  await sendLinqMessage({
+    outgoing: { attachments: options.attachments, raw: "" },
+    post: options.post,
+    postReply: options.postReply,
+    replyToMessageId: options.requestedReplyMessageId,
+  });
+  await finalizeScheduledReportDelivery(options.session);
 }
 
 async function handleLinqSendMessageResult(
@@ -317,15 +444,12 @@ async function handleLinqSendMessageResult(
     session.session.auth
   );
 
-  const requestedReplyMessageId =
-    replyTarget?.conversationId === thread.id
-      ? replyTarget.messageId
-      : undefined;
+  const requestedReplyMessageId = replyMessageIdForThread(
+    replyTarget,
+    thread.id
+  );
 
-  const idempotencyKey = report
-    ? `scheduled-report:${report.runId}:${String(report.sequence)}`
-    : undefined;
-
+  const idempotencyKey = reportIdempotencyKey(report);
   const adapter = context.bot.getAdapter("linq");
 
   if (message.kind === "link") {
@@ -357,12 +481,15 @@ async function handleLinqSendMessageResult(
 
   if (!requestedText) {
     if (attachments?.length) {
-      await sendLinqMessage({
-        outgoing: { attachments, raw: "" },
+      await deliverAttachmentOnlyLinqMessage({
+        attachments,
         post,
         postReply,
-        replyToMessageId: requestedReplyMessageId,
+        requestedReplyMessageId,
+        session,
       });
+
+      return;
     }
 
     await finalizeScheduledReportDelivery(session);
