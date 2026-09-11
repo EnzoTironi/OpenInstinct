@@ -68,6 +68,72 @@ const textType = Schema.Literals([
   "application/json",
 ]);
 
+const headAscii = (head: Buffer, start: number, end: number) =>
+  head.subarray(start, end).toString("ascii");
+
+function sniffedImageOrPdf(
+  head: Buffer,
+  imageType: ReturnType<typeof sniffBrowserImageMediaType>
+): string | undefined {
+  if (imageType === "image/png") return imageType;
+
+  if (imageType === "image/jpeg") return imageType;
+
+  if (headAscii(head, 0, 5) === "%PDF-") return "application/pdf";
+
+  return undefined;
+}
+
+function sniffedAudioType(head: Buffer): string | undefined {
+  if (headAscii(head, 0, 4) === "OggS") return "audio/ogg";
+
+  if (headAscii(head, 0, 4) === "RIFF" && headAscii(head, 8, 12) === "WAVE") {
+    return "audio/wav";
+  }
+
+  return undefined;
+}
+
+function sniffedMediaTypeFrom(
+  head: Buffer,
+  imageType: ReturnType<typeof sniffBrowserImageMediaType>,
+  claimed: string | undefined
+): string | undefined {
+  const imageOrPdf = sniffedImageOrPdf(head, imageType);
+
+  if (imageOrPdf) return imageOrPdf;
+
+  const audio = sniffedAudioType(head);
+
+  if (audio) return audio;
+
+  if (Schema.is(textType)(claimed)) return claimed;
+
+  return undefined;
+}
+
+function claimMatchesMediaType(claimed: string | undefined, mediaType: string) {
+  if (claimed === "application/octet-stream") return true;
+
+  if (claimed === mediaType) return true;
+
+  if (mediaType === "audio/ogg" && claimed === "application/ogg") return true;
+
+  if (mediaType === "audio/wav" && claimed === "audio/x-wav") return true;
+
+  return false;
+}
+
+function byteLimitForMediaType(mediaType: string) {
+  if (mediaType.startsWith("image/")) return mediaLimits.imageBytes;
+
+  if (mediaType.startsWith("audio/")) return mediaLimits.audioBytes;
+
+  if (Schema.is(textType)(mediaType)) return mediaLimits.textBytes;
+
+  return mediaLimits.totalBytes;
+}
+
 export const identifyMedia = Effect.fn("identifyMedia")(function* (
   bytes: Uint8Array,
   reference: MediaReference
@@ -83,57 +149,15 @@ export const identifyMedia = Effect.fn("identifyMedia")(function* (
 
   const claimed = reference.mediaType.split(";")[0]?.trim().toLowerCase();
   const imageType = sniffBrowserImageMediaType(bytes);
-
-  const ascii = (start: number, end: number) =>
-    head.subarray(start, end).toString("ascii");
-
-  const sniffedMediaType = (): string | undefined => {
-    if (imageType === "image/png" || imageType === "image/jpeg") {
-      return imageType;
-    }
-
-    if (ascii(0, 5) === "%PDF-") {
-      return "application/pdf";
-    }
-
-    if (ascii(0, 4) === "OggS") {
-      return "audio/ogg";
-    }
-
-    if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WAVE") {
-      return "audio/wav";
-    }
-
-    if (Schema.is(textType)(claimed)) {
-      return claimed;
-    }
-
-    return undefined;
-  };
-
-  const mediaType = sniffedMediaType();
+  const mediaType = sniffedMediaTypeFrom(head, imageType, claimed);
 
   if (!mediaType)
     return yield* new ChannelMediaError({ reason: "unsupported_type" });
 
-  const allowedClaim =
-    claimed === "application/octet-stream" ||
-    claimed === mediaType ||
-    (mediaType === "audio/ogg" && claimed === "application/ogg") ||
-    (mediaType === "audio/wav" && claimed === "audio/x-wav");
-
-  if (!allowedClaim)
+  if (!claimMatchesMediaType(claimed, mediaType))
     return yield* new ChannelMediaError({ reason: "invalid_media" });
 
-  const limit = mediaType.startsWith("image/")
-    ? mediaLimits.imageBytes
-    : mediaType.startsWith("audio/")
-      ? mediaLimits.audioBytes
-      : Schema.is(textType)(mediaType)
-        ? mediaLimits.textBytes
-        : mediaLimits.totalBytes;
-
-  if (bytes.length > limit)
+  if (bytes.length > byteLimitForMediaType(mediaType))
     return yield* new ChannelMediaError({ reason: "too_large" });
 
   return mediaType;

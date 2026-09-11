@@ -43,6 +43,30 @@ const telegramMentionPattern = (botUsername: string) => {
 };
 
 /** UTF-16 entity offsets match Telegram Bot API text indexing. */
+function entityMentionsBot(
+  text: string,
+  name: string,
+  entity: {
+    readonly type: string;
+    readonly offset: number;
+    readonly length: number;
+    readonly user?: { readonly id: number };
+  },
+  botId: string
+) {
+  if (entity.type === "mention") {
+    const slice = text.slice(entity.offset, entity.offset + entity.length);
+
+    return slice.replace(/^@/, "").toLowerCase() === name.toLowerCase();
+  }
+
+  if (entity.type !== "text_mention") return false;
+
+  if (entity.user === undefined) return false;
+
+  return String(entity.user.id) === botId;
+}
+
 export const telegramTextMentionsBot = (
   text: string | undefined,
   botUsername: string,
@@ -64,23 +88,9 @@ export const telegramTextMentionsBot = (
 
   if (!entities?.length) return false;
 
-  for (const entity of entities) {
-    if (entity.type === "mention") {
-      const slice = text.slice(entity.offset, entity.offset + entity.length);
-
-      if (slice.replace(/^@/, "").toLowerCase() === name.toLowerCase())
-        return true;
-    }
-
-    if (
-      entity.type === "text_mention" &&
-      entity.user !== undefined &&
-      String(entity.user.id) === botId
-    )
-      return true;
-  }
-
-  return false;
+  return entities.some((entity) =>
+    entityMentionsBot(text, name, entity, botId)
+  );
 };
 
 const GroupIdentityBindingSchema = Schema.Struct({

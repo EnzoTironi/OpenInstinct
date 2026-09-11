@@ -48,45 +48,55 @@ export function isBrowserImageArtifactUrl(value: string) {
   return z.uuid().safeParse(decodeURIComponent(parsed[1])).success;
 }
 
+const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const;
+
+const jpegSignature = [0xff, 0xd8, 0xff] as const;
+
+function bytesMatch(
+  bytes: Uint8Array,
+  offset: number,
+  signature: readonly number[]
+) {
+  if (bytes.length < offset + signature.length) return false;
+
+  return signature.every((value, index) => bytes[offset + index] === value);
+}
+
+function asciiSlice(bytes: Uint8Array, start: number, end: number) {
+  return new TextDecoder("ascii").decode(bytes.subarray(start, end));
+}
+
+function isPngBytes(bytes: Uint8Array) {
+  return bytesMatch(bytes, 0, pngSignature);
+}
+
+function isJpegBytes(bytes: Uint8Array) {
+  return bytesMatch(bytes, 0, jpegSignature);
+}
+
+function isGifBytes(bytes: Uint8Array) {
+  if (bytes.length < 6) return false;
+  const signature = asciiSlice(bytes, 0, 6);
+
+  return signature === "GIF87a" || signature === "GIF89a";
+}
+
+function isWebpBytes(bytes: Uint8Array) {
+  if (bytes.length < 12) return false;
+
+  return (
+    asciiSlice(bytes, 0, 4) === "RIFF" && asciiSlice(bytes, 8, 12) === "WEBP"
+  );
+}
+
 export function sniffBrowserImageMediaType(bytes: Uint8Array) {
-  if (
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47 &&
-    bytes[4] === 0x0d &&
-    bytes[5] === 0x0a &&
-    bytes[6] === 0x1a &&
-    bytes[7] === 0x0a
-  ) {
-    return "image/png" as const;
-  }
+  if (isPngBytes(bytes)) return "image/png" as const;
 
-  if (
-    bytes.length >= 3 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xd8 &&
-    bytes[2] === 0xff
-  ) {
-    return "image/jpeg" as const;
-  }
+  if (isJpegBytes(bytes)) return "image/jpeg" as const;
 
-  if (bytes.length >= 6) {
-    const signature = new TextDecoder("ascii").decode(bytes.subarray(0, 6));
+  if (isGifBytes(bytes)) return "image/gif" as const;
 
-    if (signature === "GIF87a" || signature === "GIF89a") {
-      return "image/gif" as const;
-    }
-  }
-
-  if (
-    bytes.length >= 12 &&
-    new TextDecoder("ascii").decode(bytes.subarray(0, 4)) === "RIFF" &&
-    new TextDecoder("ascii").decode(bytes.subarray(8, 12)) === "WEBP"
-  ) {
-    return "image/webp" as const;
-  }
+  if (isWebpBytes(bytes)) return "image/webp" as const;
 
   return undefined;
 }

@@ -27,6 +27,37 @@ class EveRoutingUnavailable extends Schema.TaggedError<EveRoutingUnavailable>()(
   { message: Schema.String }
 ) {}
 
+function toRewriteSections(
+  rewrites: Awaited<ReturnType<NonNullable<NextConfig["rewrites"]>>>
+): EveNextRewriteSections {
+  if (Array.isArray(rewrites)) {
+    return { beforeFiles: [], afterFiles: rewrites, fallback: [] };
+  }
+
+  return rewrites;
+}
+
+function isEveNativeRoute(route: {
+  readonly source: string;
+  readonly destination: string;
+}) {
+  return route.source === eveRoute && route.destination.endsWith(eveRoute);
+}
+
+function channelProxyRewrites(destination: string) {
+  return ["telegram", "kapso"].map((channel) => ({
+    source: `/api/channels/${channel}`,
+    destination: `${destination}/channels/${channel}`,
+  }));
+}
+
+function scheduledRunProxyRewrites(destination: string) {
+  return ["report", "respond"].map((operation) => ({
+    source: `/internal/scheduled-run/${operation}`,
+    destination: `${destination}/internal/scheduled-run/${operation}`,
+  }));
+}
+
 const resolveCompanionRewrites = Effect.fn("resolveCompanionRewrites")(
   function* (
     frameworkRewrites: NonNullable<NextConfig["rewrites"]> | undefined
@@ -42,15 +73,10 @@ const resolveCompanionRewrites = Effect.fn("resolveCompanionRewrites")(
       Promise.resolve(frameworkRewrites())
     );
 
-    const sections: EveNextRewriteSections = Array.isArray(rewrites)
-      ? { beforeFiles: [], afterFiles: rewrites, fallback: [] }
-      : rewrites;
+    const sections = toRewriteSections(rewrites);
+    const native = sections.beforeFiles?.find(isEveNativeRoute);
 
-    const native = sections.beforeFiles?.find(
-      (route) => route.source === eveRoute
-    );
-
-    if (!native?.destination.endsWith(eveRoute)) {
+    if (!native) {
       return yield* new EveRoutingUnavailable({
         message:
           "Eve's generated route is missing or unsupported. Check the installed Eve routing configuration.",
@@ -63,14 +89,8 @@ const resolveCompanionRewrites = Effect.fn("resolveCompanionRewrites")(
       ...sections,
       beforeFiles: [
         ...(sections.beforeFiles ?? []),
-        ...["telegram", "kapso"].map((channel) => ({
-          source: `/api/channels/${channel}`,
-          destination: `${destination}/channels/${channel}`,
-        })),
-        ...["report", "respond"].map((operation) => ({
-          source: `/internal/scheduled-run/${operation}`,
-          destination: `${destination}/internal/scheduled-run/${operation}`,
-        })),
+        ...channelProxyRewrites(destination),
+        ...scheduledRunProxyRewrites(destination),
       ],
     };
   }
