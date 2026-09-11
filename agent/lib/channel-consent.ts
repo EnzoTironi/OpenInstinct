@@ -130,6 +130,139 @@ export function channelConsentRevision(request: InputRequest): string {
   return createHash("sha256").update(serialized).digest("hex");
 }
 
+function rejectedConsent(
+  reason: Extract<ChannelConsentDecision, { status: "rejected" }>["reason"]
+): ChannelConsentDecision {
+  return { status: "rejected", reason };
+}
+
+function nonActionOrReject(
+  intent: "clarify" | "conversation",
+  referenceCount: number
+): ChannelConsentDecision {
+  if (referenceCount === 0) {
+    return { status: "non_action", intent };
+  }
+
+  return rejectedConsent("invalid_candidate");
+}
+
+function findUniquePendingRequest(
+  snapshot: ChannelConsentSnapshot,
+  requestId: string
+) {
+  const matches = snapshot.pending.filter(
+    (request) => request.requestId === requestId
+  );
+
+  const [request] = matches;
+
+  if (!request) return rejectedConsent("stale_request");
+
+  if (matches.length !== 1) return rejectedConsent("ambiguous_reference");
+
+  return { request };
+}
+
+function approvalOptionId(intent: ActionIntent) {
+  return intent === "approve" ? "approve" : "cancel";
+}
+
+function hasExactApprovalOption(
+  request: ChannelConsentSnapshot["pending"][number],
+  optionId: string
+) {
+  return (
+    request.kind === "tool-approval" &&
+    request.options?.filter((option) => option.id === optionId).length === 1
+  );
+}
+
+function validatedConsentDecision(input: {
+  readonly candidate: {
+    readonly intent: ActionIntent;
+  };
+  readonly delivery: {
+    readonly providerMessageIds: readonly string[];
+    readonly receiptId: string;
+  };
+  readonly request: ChannelConsentSnapshot["pending"][number];
+  readonly source: ChannelConsentSource;
+  readonly target: {
+    readonly requestId: string;
+    readonly revision: string;
+  };
+}): ChannelConsentDecision {
+  const optionId = approvalOptionId(input.candidate.intent);
+
+  return {
+    status: "validated",
+    intent: input.candidate.intent,
+    binding: {
+      ...input.source,
+      requestId: input.request.requestId,
+      revision: input.target.revision,
+      deliveryReceiptId: input.delivery.receiptId,
+      deliveryProviderMessageIds: [...input.delivery.providerMessageIds],
+    },
+    response: parseInputResponse({
+      requestId: input.request.requestId,
+      optionId,
+    }),
+  };
+}
+
+function validateActionConsent(
+  source: ChannelConsentSource,
+  candidate: {
+    readonly intent: ActionIntent;
+    readonly references: readonly {
+      readonly requestId: string;
+      readonly revision: string;
+    }[];
+  },
+  snapshot: ChannelConsentSnapshot
+): ChannelConsentDecision {
+  const [target] = candidate.references;
+
+  if (candidate.references.length !== 1 || !target) {
+    return rejectedConsent("ambiguous_reference");
+  }
+
+  const pending = findUniquePendingRequest(snapshot, target.requestId);
+
+  if ("status" in pending) return pending;
+  const { request } = pending;
+
+  if (channelConsentRevision(request) !== target.revision) {
+    return rejectedConsent("stale_revision");
+  }
+
+  const optionId = approvalOptionId(candidate.intent);
+
+  if (!hasExactApprovalOption(request, optionId)) {
+    return rejectedConsent("unsupported_request");
+  }
+
+  const deliveryResult = resolveConsentDelivery(
+    source,
+    target,
+    snapshot.deliveries
+  );
+
+  if (Result.isFailure(deliveryResult)) {
+    return rejectedConsent(deliveryResult.failure);
+  }
+
+  return validatedConsentDecision({
+    candidate,
+    delivery: deliveryResult.success,
+    request,
+    source,
+    target,
+  });
+}
+
 /**
  * Validates references, not the semantic truth of a model's interpretation.
  * The caller must revalidate live authority and atomically fence consumption before dispatch.
@@ -146,71 +279,32 @@ export function validateChannelConsent(
     snapshot
   );
 
-  if (sourceRejection) return { status: "rejected", reason: sourceRejection };
+  if (sourceRejection) return rejectedConsent(sourceRejection);
   const decoded = decodeCandidate(interpretation.candidate);
 
-  if (Result.isFailure(decoded))
-    return { status: "rejected", reason: "invalid_candidate" };
+  if (Result.isFailure(decoded)) return rejectedConsent("invalid_candidate");
   const candidate = decoded.success;
 
   if (candidate.intent === "clarify" || candidate.intent === "conversation") {
-    return candidate.references.length === 0
-      ? { status: "non_action", intent: candidate.intent }
-      : { status: "rejected", reason: "invalid_candidate" };
+    return nonActionOrReject(candidate.intent, candidate.references.length);
   }
-
-  const [target] = candidate.references;
-
-  if (candidate.references.length !== 1 || !target) {
-    return { status: "rejected", reason: "ambiguous_reference" };
-  }
-
-  const matches = snapshot.pending.filter(
-    (request) => request.requestId === target.requestId
-  );
-
-  const [request] = matches;
-
-  if (!request) return { status: "rejected", reason: "stale_request" };
-
-  if (matches.length !== 1)
-    return { status: "rejected", reason: "ambiguous_reference" };
-
-  if (channelConsentRevision(request) !== target.revision) {
-    return { status: "rejected", reason: "stale_revision" };
-  }
-
-  const optionId = candidate.intent === "approve" ? "approve" : "cancel";
 
   if (
-    request.kind !== "tool-approval" ||
-    request.options?.filter((option) => option.id === optionId).length !== 1
+    candidate.intent !== "approve" &&
+    candidate.intent !== "cancel" &&
+    candidate.intent !== "correct"
   ) {
-    return { status: "rejected", reason: "unsupported_request" };
+    return rejectedConsent("invalid_candidate");
   }
 
-  const deliveryResult = resolveConsentDelivery(
+  return validateActionConsent(
     source,
-    target,
-    snapshot.deliveries
-  );
-
-  if (Result.isFailure(deliveryResult))
-    return { status: "rejected", reason: deliveryResult.failure };
-  const delivery = deliveryResult.success;
-
-  return {
-    status: "validated",
-    intent: candidate.intent,
-    binding: {
-      ...source,
-      requestId: request.requestId,
-      revision: target.revision,
-      deliveryReceiptId: delivery.receiptId,
-      deliveryProviderMessageIds: [...delivery.providerMessageIds],
+    {
+      intent: candidate.intent,
+      references: candidate.references,
     },
-    response: parseInputResponse({ requestId: request.requestId, optionId }),
-  };
+    snapshot
+  );
 }
 
 function isInvalidConsentSource(source: ChannelConsentSource) {
