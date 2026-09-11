@@ -36,45 +36,72 @@ async function resolveInstallationSecretsWithRetry() {
   }
 }
 
-async function resolveInstallationSecrets() {
-  const configured = configuredInstallationSecrets();
-
-  if (configured) return configured;
-
-  if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error(
-      "Installation secrets are unavailable. Connect a private Vercel Blob store or set both BETTER_AUTH_SECRET and SECRET_ENCRYPTION_KEY."
-    );
+function requireBlobStoreConfigured() {
+  if (env.BLOB_STORE_ID || env.BLOB_READ_WRITE_TOKEN) {
+    return;
   }
 
-  const pathname = installationSecretsPathname();
-  const existing = await readInstallationSecrets(pathname);
+  throw new Error(
+    "Installation secrets are unavailable. Connect a private Vercel Blob store or set both BETTER_AUTH_SECRET and SECRET_ENCRYPTION_KEY."
+  );
+}
 
-  if (existing) return existing;
-
-  const generated = installationSecretsSchema.parse({
+function generateInstallationSecrets() {
+  return installationSecretsSchema.parse({
     betterAuthSecret: randomBytes(32).toString("base64"),
     secretEncryptionKey: randomBytes(32).toString("base64"),
     version: 1,
   });
+}
+
+async function putGeneratedInstallationSecrets(
+  pathname: string,
+  generated: ReturnType<typeof generateInstallationSecrets>
+) {
+  await put(pathname, JSON.stringify(generated), {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: false,
+    cacheControlMaxAge: 365 * 24 * 60 * 60,
+    contentType: "application/json",
+    maximumSizeInBytes: maximumInstallationSecretsBytes,
+  });
+}
+
+async function createOrReadInstallationSecrets(pathname: string) {
+  const generated = generateInstallationSecrets();
 
   try {
-    await put(pathname, JSON.stringify(generated), {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: false,
-      cacheControlMaxAge: 365 * 24 * 60 * 60,
-      contentType: "application/json",
-      maximumSizeInBytes: maximumInstallationSecretsBytes,
-    });
+    await putGeneratedInstallationSecrets(pathname, generated);
 
     return generated;
   } catch (error) {
     const winner = await readInstallationSecrets(pathname);
 
-    if (winner) return winner;
+    if (winner) {
+      return winner;
+    }
+
     throw error;
   }
+}
+
+async function resolveInstallationSecrets() {
+  const configured = configuredInstallationSecrets();
+
+  if (configured) {
+    return configured;
+  }
+
+  requireBlobStoreConfigured();
+  const pathname = installationSecretsPathname();
+  const existing = await readInstallationSecrets(pathname);
+
+  if (existing) {
+    return existing;
+  }
+
+  return createOrReadInstallationSecrets(pathname);
 }
 
 function configuredInstallationSecrets() {
