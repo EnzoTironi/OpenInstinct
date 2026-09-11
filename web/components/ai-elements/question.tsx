@@ -113,14 +113,14 @@ function updateQuestionText(value: QuestionValue, text: string): QuestionValue {
 function updateQuestionSelection(
   value: QuestionValue,
   optionValue: string,
-  selectionMode: QuestionProps["selectionMode"]
+  selectionMode: QuestionProps["selectionMode"] = "single"
 ): QuestionValue {
   return {
     ...value,
     selectedValues: getSelectedValues(
       value.selectedValues,
       optionValue,
-      selectionMode
+      selectionMode ?? "single"
     ),
   };
 }
