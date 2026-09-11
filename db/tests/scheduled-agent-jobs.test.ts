@@ -10,6 +10,67 @@ import * as schema from "../schema";
 
 const databases: PGlite[] = [];
 
+const SCHEDULED_JOB_MIGRATIONS = [
+  "0000_fluffy_the_spike.sql",
+  "0001_better-auth.sql",
+  "0002_heavy_celestials.sql",
+  "0003_unusual_fabian_cortez.sql",
+  "0004_kind_manta.sql",
+  "0005_brave_kang.sql",
+  "0006_illegal_tattoo.sql",
+  "0007_known_fenris.sql",
+  "0008_black_sandman.sql",
+  "0009_cold_power_man.sql",
+  "0010_rapid_cerise.sql",
+  "0011_faulty_unicorn.sql",
+  "0012_harsh_domino.sql",
+  "0029_org-workspace-rbac.sql",
+  "0030_org-sso-audit-erasure.sql",
+] as const;
+
+const applyScheduledJobMigrations = async (client: PGlite) => {
+  for (const migration of SCHEDULED_JOB_MIGRATIONS) {
+    await applyMigration(client, migration);
+  }
+};
+
+function assertWorkerLease<
+  T extends { readonly run: { readonly leaseToken?: string | null } },
+>(
+  claim: T | null | undefined,
+  message: string
+): asserts claim is T & {
+  readonly run: { readonly leaseToken: string };
+} {
+  if (!claim?.run.leaseToken) throw new Error(message);
+}
+
+function assertReportLease<
+  T extends { readonly run: { readonly reportLeaseToken?: string | null } },
+>(
+  report: T | null | undefined,
+  message: string
+): asserts report is T & {
+  readonly run: { readonly reportLeaseToken: string };
+} {
+  if (!report?.run.reportLeaseToken) throw new Error(message);
+}
+
+function assertPresent<T>(
+  value: T | null | undefined,
+  message: string
+): asserts value is T {
+  if (value === null || value === undefined) throw new Error(message);
+}
+
+const firstDefined = <T>(values: readonly (T | undefined | null)[]) => {
+  for (const value of values) {
+    if (value !== undefined && value !== null) return value;
+  }
+
+  return undefined;
+};
+
 afterEach(async () => {
   vi.restoreAllMocks();
   vi.resetModules();
@@ -20,25 +81,7 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
   const client = new PGlite();
   databases.push(client);
 
-  for (const migration of [
-    "0000_fluffy_the_spike.sql",
-    "0001_better-auth.sql",
-    "0002_heavy_celestials.sql",
-    "0003_unusual_fabian_cortez.sql",
-    "0004_kind_manta.sql",
-    "0005_brave_kang.sql",
-    "0006_illegal_tattoo.sql",
-    "0007_known_fenris.sql",
-    "0008_black_sandman.sql",
-    "0009_cold_power_man.sql",
-    "0010_rapid_cerise.sql",
-    "0011_faulty_unicorn.sql",
-    "0012_harsh_domino.sql",
-    "0029_org-workspace-rbac.sql",
-    "0030_org-sso-audit-erasure.sql",
-  ]) {
-    await applyMigration(client, migration);
-  }
+  await applyScheduledJobMigrations(client);
 
   const pgliteDatabase = drizzle(client, { schema });
   // SAFETY: PGlite implements the query-builder surface exercised by this service while retaining the shared Drizzle schema.
@@ -111,7 +154,7 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     now: dueAt,
   });
 
-  if (!claim?.run.leaseToken) throw new Error("Expected one leased run.");
+  assertWorkerLease(claim, "Expected one leased run.");
   expect(claim).toMatchObject({
     job: { id: created.id, ...aliceConversation },
     run: { attempts: 1, scheduledFor: dueAt, startedAt: null },
@@ -218,9 +261,10 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     new Date("2026-09-01T13:01:30.000Z")
   );
 
-  if (!questionReport?.run.reportLeaseToken) {
-    throw new Error("Expected the pending question to be reportable.");
-  }
+  assertReportLease(
+    questionReport,
+    "Expected the pending question to be reportable."
+  );
 
   expect(
     await jobs.getScheduledAgentRunInputForReport(
@@ -255,9 +299,10 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     new Date("2026-09-01T13:07:00.000Z")
   );
 
-  if (!retriedQuestionReport?.run.reportLeaseToken) {
-    throw new Error("Expected the unanswered question to be reportable again.");
-  }
+  assertReportLease(
+    retriedQuestionReport,
+    "Expected the unanswered question to be reportable again."
+  );
 
   await jobs.finalizeScheduledReport(
     claim.run.id,
@@ -319,9 +364,10 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     now: new Date("2026-09-01T19:08:00.000Z"),
   });
 
-  if (!recoveredWorker?.run.leaseToken) {
-    throw new Error("Expected the interrupted worker to be reclaimed.");
-  }
+  assertWorkerLease(
+    recoveredWorker,
+    "Expected the interrupted worker to be reclaimed."
+  );
 
   expect(recoveredWorker.run).toMatchObject({
     attempts: 2,
@@ -410,11 +456,10 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
 
   expect(competingClaims.filter(Boolean)).toHaveLength(1);
 
-  const currentReportLease = competingClaims.find(
-    (candidate) => candidate !== undefined
-  )?.run.reportLeaseToken;
+  const currentReportLease =
+    firstDefined(competingClaims)?.run.reportLeaseToken;
 
-  if (!currentReportLease) throw new Error("Expected one report lease.");
+  assertPresent(currentReportLease, "Expected one report lease.");
   await jobs.finalizeScheduledReport(
     claim.run.id,
     "00000000-0000-4000-8000-000000000099",
@@ -485,9 +530,7 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
   let retryAt = recoveredAt;
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    if (!latestClaim?.run.leaseToken) {
-      throw new Error("Expected a leased run.");
-    }
+    assertWorkerLease(latestClaim, "Expected a leased run.");
 
     await jobs.releaseScheduledAgentRun(
       latestClaim.run.id,
@@ -527,7 +570,7 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     })
     .returning();
 
-  if (!acceptedRun) throw new Error("Expected an accepted worker run.");
+  assertPresent(acceptedRun, "Expected an accepted worker run.");
   expect(
     await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 300_000,
@@ -548,7 +591,7 @@ it("materializes one occurrence, leases its worker, and persists reporting", asy
     })
     .returning();
 
-  if (!exhaustedRun) throw new Error("Expected an exhausted worker run.");
+  assertPresent(exhaustedRun, "Expected an exhausted worker run.");
   expect(
     await jobs.claimReadyScheduledAgentRuns({
       leaseForMs: 300_000,
