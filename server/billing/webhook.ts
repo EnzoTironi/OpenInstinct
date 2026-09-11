@@ -76,59 +76,75 @@ function readStripeId(field: unknown): string | null {
   return stripeIdFromRef(decoded.value);
 }
 
-async function applySubscription(subscription: Stripe.Subscription) {
-  const metadata = subscription.metadata;
-  const plan = parsePlan(metadata.instinctPlan);
-  const subjectType = parseSubjectType(metadata.instinctSubjectType);
-  const subjectId = metadata.instinctSubjectId;
+function subscriptionSeatCount(subscription: Stripe.Subscription) {
   const quantity = subscription.items.data[0]?.quantity ?? 1;
-  const seatFromMeta = Number(metadata.instinctSeatCount ?? quantity);
 
-  const seatCount = Math.max(
-    1,
-    Number.isFinite(seatFromMeta) ? seatFromMeta : 1
+  const seatFromMeta = Number(
+    subscription.metadata.instinctSeatCount ?? quantity
   );
 
-  let resolvedType = subjectType;
-  let resolvedId = subjectId;
+  if (Number.isFinite(seatFromMeta)) return Math.max(1, seatFromMeta);
 
-  if (!resolvedType || !resolvedId) {
-    const existing = await findEntitlementByStripeSubscription(subscription.id);
+  return 1;
+}
 
-    if (existing) {
-      resolvedType = existing.subjectType;
-      resolvedId = existing.subjectId;
-    }
+function defaultPlanForSubject(subjectType: BillingSubjectType): BillingPlanId {
+  if (subjectType === "organization") return "org";
+
+  return "pro";
+}
+
+async function resolveSubscriptionSubject(subscription: Stripe.Subscription) {
+  const metadata = subscription.metadata;
+  const resolvedType = parseSubjectType(metadata.instinctSubjectType);
+  const resolvedId = metadata.instinctSubjectId;
+
+  if (resolvedType && resolvedId) {
+    return { subjectType: resolvedType, subjectId: resolvedId };
   }
 
-  if (!resolvedType || !resolvedId) return;
+  const existing = await findEntitlementByStripeSubscription(subscription.id);
 
-  const effectivePlan: BillingPlanId =
-    plan ?? (resolvedType === "organization" ? "org" : "pro");
+  if (!existing) return null;
 
+  return {
+    subjectType: existing.subjectType,
+    subjectId: existing.subjectId,
+  };
+}
+
+async function applySubscription(subscription: Stripe.Subscription) {
+  const subject = await resolveSubscriptionSubject(subscription);
+
+  if (!subject) return;
+
+  const plan = parsePlan(subscription.metadata.instinctPlan);
   const status = mapSubscriptionStatus(subscription.status);
   const priceId = subscription.items.data[0]?.price.id ?? null;
-  const customerId = readStripeId(subscription.customer);
   const itemPeriodEnd = subscription.items.data[0]?.current_period_end;
-  const periodEnd = itemPeriodEnd ? new Date(itemPeriodEnd * 1000) : null;
 
   await upsertEntitlement({
-    subjectType: resolvedType,
-    subjectId: resolvedId,
-    plan: status === "canceled" ? "free" : effectivePlan,
+    subjectType: subject.subjectType,
+    subjectId: subject.subjectId,
+    plan:
+      status === "canceled"
+        ? "free"
+        : (plan ?? defaultPlanForSubject(subject.subjectType)),
     status,
-    seatCount,
-    stripeCustomerId: customerId,
+    seatCount: subscriptionSeatCount(subscription),
+    stripeCustomerId: readStripeId(subscription.customer),
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
-    currentPeriodEnd: periodEnd,
+    currentPeriodEnd: itemPeriodEnd ? new Date(itemPeriodEnd * 1000) : null,
   });
 }
 
 function checkoutSeatCount(metadata: Stripe.Metadata) {
   const seatRaw = Number(metadata.instinctSeatCount ?? 1);
 
-  return Math.max(1, Number.isFinite(seatRaw) ? seatRaw : 1);
+  if (Number.isFinite(seatRaw)) return Math.max(1, seatRaw);
+
+  return 1;
 }
 
 function checkoutSubjects(metadata: Stripe.Metadata) {
@@ -136,19 +152,19 @@ function checkoutSubjects(metadata: Stripe.Metadata) {
   const subjectType = parseSubjectType(metadata.instinctSubjectType);
   const subjectId = metadata.instinctSubjectId;
 
-  if (!plan || !subjectType || !subjectId || plan === "free") {
-    return undefined;
-  }
+  if (!plan) return undefined;
+
+  if (!subjectType) return undefined;
+
+  if (!subjectId) return undefined;
+
+  if (plan === "free") return undefined;
 
   return { plan, subjectId, subjectType };
 }
 
-async function syncCheckoutSubscription(
-  subscriptionId: string | null | undefined
-) {
-  if (!subscriptionId) {
-    return;
-  }
+async function syncCheckoutSubscription(subscriptionId: string | undefined) {
+  if (!subscriptionId) return;
 
   const stripe = await Effect.runPromise(requireStripe());
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -156,16 +172,12 @@ async function syncCheckoutSubscription(
 }
 
 async function applyCheckoutSession(session: Stripe.Checkout.Session) {
-  if (session.mode !== "subscription") {
-    return;
-  }
+  if (session.mode !== "subscription") return;
 
   const metadata = session.metadata ?? {};
   const subjects = checkoutSubjects(metadata);
 
-  if (!subjects) {
-    return;
-  }
+  if (!subjects) return;
 
   const subscriptionId = readStripeId(session.subscription);
 
@@ -179,87 +191,110 @@ async function applyCheckoutSession(session: Stripe.Checkout.Session) {
     stripeSubscriptionId: subscriptionId,
   });
 
-  await syncCheckoutSubscription(subscriptionId);
+  await syncCheckoutSubscription(subscriptionId ?? undefined);
 }
+
+function stripeNotConfigured(message: string) {
+  return new BillingWebhookError({
+    reason: "stripe_not_configured",
+    message,
+  });
+}
+
+function invalidSignature(message: string) {
+  return new BillingWebhookError({
+    reason: "invalid_signature",
+    message,
+  });
+}
+
+async function processStripeEvent(event: Stripe.Event) {
+  switch (event.type) {
+    case "checkout.session.completed": {
+      // SAFETY: Stripe event.type discriminates Checkout.Session for this case.
+      await applyCheckoutSession(event.data.object);
+
+      return;
+    }
+
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted": {
+      // SAFETY: Stripe event.type discriminates Subscription for these cases.
+      await applySubscription(event.data.object);
+
+      return;
+    }
+
+    default:
+      return;
+  }
+}
+
+function mapStripeNotConfigured(error: { message: string }) {
+  return stripeNotConfigured(error.message);
+}
+
+function unableToReadWebhookBody() {
+  return invalidSignature("Unable to read webhook body.");
+}
+
+function signatureVerificationFailed() {
+  return invalidSignature("Stripe signature verification failed.");
+}
+
+function webhookHandlerFailed() {
+  return new BillingWebhookError({
+    reason: "unhandled",
+    message: "Webhook handler failed while updating entitlements.",
+  });
+}
+
+const loadStripeWebhookClients = Effect.fn("loadStripeWebhookClients")(
+  function* () {
+    const stripe = yield* requireStripe().pipe(
+      Effect.mapError(mapStripeNotConfigured)
+    );
+
+    const secret = yield* stripeWebhookSecret().pipe(
+      Effect.mapError(mapStripeNotConfigured)
+    );
+
+    return { stripe, secret } as const;
+  }
+);
+
+const readSignedStripeEvent = Effect.fn("readSignedStripeEvent")(function* (
+  request: Request,
+  stripe: Stripe,
+  secret: string
+) {
+  const signature = request.headers.get("stripe-signature");
+
+  if (!signature) {
+    return yield* invalidSignature("Missing stripe-signature header.");
+  }
+
+  const payload = yield* Effect.tryPromise({
+    try: request.text.bind(request),
+    catch: unableToReadWebhookBody,
+  });
+
+  return yield* Effect.try({
+    try: () => stripe.webhooks.constructEvent(payload, signature, secret),
+    catch: signatureVerificationFailed,
+  });
+});
 
 export const handleStripeWebhook = Effect.fn("handleStripeWebhook")(function* (
   request: Request
 ) {
-  const stripe = yield* requireStripe().pipe(
-    Effect.mapError(
-      (error) =>
-        new BillingWebhookError({
-          reason: "stripe_not_configured",
-          message: error.message,
-        })
-    )
-  );
-
-  const secret = yield* stripeWebhookSecret().pipe(
-    Effect.mapError(
-      (error) =>
-        new BillingWebhookError({
-          reason: "stripe_not_configured",
-          message: error.message,
-        })
-    )
-  );
-
-  const signature = request.headers.get("stripe-signature");
-
-  if (!signature) {
-    return yield* new BillingWebhookError({
-      reason: "invalid_signature",
-      message: "Missing stripe-signature header.",
-    });
-  }
-
-  const payload = yield* Effect.tryPromise({
-    try: () => request.text(),
-    catch: () =>
-      new BillingWebhookError({
-        reason: "invalid_signature",
-        message: "Unable to read webhook body.",
-      }),
-  });
-
-  const event = yield* Effect.try({
-    try: () => stripe.webhooks.constructEvent(payload, signature, secret),
-    catch: () =>
-      new BillingWebhookError({
-        reason: "invalid_signature",
-        message: "Stripe signature verification failed.",
-      }),
-  });
+  const { stripe, secret } = yield* loadStripeWebhookClients();
+  const event = yield* readSignedStripeEvent(request, stripe, secret);
 
   yield* Effect.tryPromise({
-    try: async () => {
-      switch (event.type) {
-        case "checkout.session.completed": {
-          // SAFETY: Stripe event.type discriminates Checkout.Session for this case.
-          const session = event.data.object;
-          await applyCheckoutSession(session);
-          break;
-        }
-
-        case "customer.subscription.created":
-        case "customer.subscription.updated":
-        case "customer.subscription.deleted": {
-          // SAFETY: Stripe event.type discriminates Subscription for these cases.
-          const subscription = event.data.object;
-          await applySubscription(subscription);
-          break;
-        }
-
-        default:
-          break;
-      }
-    },
-    catch: () =>
-      new BillingWebhookError({
-        reason: "unhandled",
-        message: "Webhook handler failed while updating entitlements.",
-      }),
+    try: () => processStripeEvent(event),
+    catch: webhookHandlerFailed,
   });
 
   return { received: true as const };

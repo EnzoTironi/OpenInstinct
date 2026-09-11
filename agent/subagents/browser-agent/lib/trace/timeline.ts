@@ -36,16 +36,18 @@ function compactJson(value: Parameters<typeof JSON.stringify>[0]) {
 
 function makeRow(
   event: HookEvent,
-  id: string,
-  at: string,
-  label: string,
-  detail: string
+  row: {
+    readonly at: string;
+    readonly detail: string;
+    readonly id: string;
+    readonly label: string;
+  }
 ): TraceTimelineRow {
   return {
-    at,
-    detail: detail.slice(0, detailCharacterLimit),
-    id,
-    label,
+    at: row.at,
+    detail: row.detail.slice(0, detailCharacterLimit),
+    id: row.id,
+    label: row.label,
     type: event.type,
   };
 }
@@ -97,13 +99,12 @@ function rowsForActionResult(
   const status = result.isError ? "error" : "result";
 
   return [
-    makeRow(
-      event,
+    makeRow(event, {
       id,
       at,
-      `${resultName(result)} → ${status}`,
-      compactJson(result.output)
-    ),
+      label: `${resultName(result)} → ${status}`,
+      detail: compactJson(result.output),
+    }),
   ];
 }
 
@@ -129,7 +130,14 @@ function rowsForSimpleEvent(
 ): TraceTimelineRow[] | null {
   if (!isSimpleTimelineType(event.type)) return null;
 
-  return [makeRow(event, id, at, simpleTimelineLabels[event.type], "")];
+  return [
+    makeRow(event, {
+      id,
+      at,
+      label: simpleTimelineLabels[event.type],
+      detail: "",
+    }),
+  ];
 }
 
 function rowsForTypedEvent(
@@ -139,47 +147,90 @@ function rowsForTypedEvent(
 ): TraceTimelineRow[] {
   switch (event.type) {
     case "message.received":
-      return [makeRow(event, id, at, "Task received", event.data.message)];
+      return [
+        makeRow(event, {
+          id,
+          at,
+          label: "Task received",
+          detail: event.data.message,
+        }),
+      ];
     case "actions.requested":
       return rowsForActionsRequested(event, id, at);
     case "action.result":
       return rowsForActionResult(event, id, at);
     case "message.completed":
-      return [makeRow(event, id, at, "Assistant", event.data.message ?? "")];
+      return [
+        makeRow(event, {
+          id,
+          at,
+          label: "Assistant",
+          detail: event.data.message ?? "",
+        }),
+      ];
     case "result.completed":
       return [
-        makeRow(event, id, at, "Final output", compactJson(event.data.result)),
+        makeRow(event, {
+          id,
+          at,
+          label: "Final output",
+          detail: compactJson(event.data.result),
+        }),
       ];
     case "input.requested":
       return [
-        makeRow(
-          event,
+        makeRow(event, {
           id,
           at,
-          "Input requested",
-          `${String(event.data.requests.length)} pending request(s)`
-        ),
+          label: "Input requested",
+          detail: `${String(event.data.requests.length)} pending request(s)`,
+        }),
       ];
     case "input.resolved":
       return [
-        makeRow(
-          event,
+        makeRow(event, {
           id,
           at,
-          "Input resolved",
-          compactJson(event.data.resolutions)
-        ),
+          label: "Input resolved",
+          detail: compactJson(event.data.resolutions),
+        }),
       ];
     case "authorization.required":
       return [
-        makeRow(event, id, at, "Authorization required", event.data.name),
+        makeRow(event, {
+          id,
+          at,
+          label: "Authorization required",
+          detail: event.data.name,
+        }),
       ];
     case "authorization.completed":
-      return [makeRow(event, id, at, "Authorization", event.data.outcome)];
+      return [
+        makeRow(event, {
+          id,
+          at,
+          label: "Authorization",
+          detail: event.data.outcome,
+        }),
+      ];
     case "step.failed":
-      return [makeRow(event, id, at, "Step failed", event.data.message)];
+      return [
+        makeRow(event, {
+          id,
+          at,
+          label: "Step failed",
+          detail: event.data.message,
+        }),
+      ];
     case "turn.failed":
-      return [makeRow(event, id, at, "Turn failed", event.data.message)];
+      return [
+        makeRow(event, {
+          id,
+          at,
+          label: "Turn failed",
+          detail: event.data.message,
+        }),
+      ];
     default:
       return rowsForSimpleEvent(event, id, at) ?? [];
   }
