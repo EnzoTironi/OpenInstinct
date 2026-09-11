@@ -19,6 +19,8 @@ import {
   type ResolveOutboxUncertainInput,
 } from "./model";
 
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+
 const queues = {
   inbox: {
     table: "channel_inbox",
@@ -81,7 +83,7 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
     const hash =
       lane === "inbox"
         ? createHash("sha256")
-            .update(JSON.stringify([input.sourceMessageId, canonical.hash]))
+            .update(encodeJson([input.sourceMessageId, canonical.hash]))
             .digest("hex")
         : canonical.hash;
 
@@ -423,7 +425,9 @@ export const createQueue = (sql: PgClient.PgClient, lane: Lane) => {
 
     return {
       counts: decodedCounts,
-      uncertain: yield* Effect.forEach(pending, (row) => decodeReceipt(row)),
+      uncertain: yield* Effect.forEach(pending, (row) => decodeReceipt(row), {
+        concurrency: 1,
+      }),
     };
   });
 

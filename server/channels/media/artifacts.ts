@@ -17,48 +17,62 @@ export const loadChannelArtifacts = Effect.fn("loadChannelArtifacts")(
     const artifacts = yield* Artifacts;
     const transport = yield* ChannelTransport;
 
-    const stored: Effect.Success<ReturnType<Artifacts["Service"]["read"]>>[] =
-      [];
+    const stored = yield* Effect.reduce(
+      payload.attachments ?? [],
+      () => ({
+        remaining: mediaLimits.totalBytes,
+        items:
+          // SAFETY: empty array is a valid accumulator for artifact reads.
+          [] as Effect.Success<ReturnType<Artifacts["Service"]["read"]>>[],
+      }),
+      Effect.fn("loadChannelArtifacts.accumulate")(
+        function* (state, reference) {
+          yield* transport.activeIdentity(identity.id, identity.channel);
 
-    let remaining = mediaLimits.totalBytes;
+          const source = {
+            identityId: identity.id,
+            sourceInboxId,
+            mediaId: reference.id,
+          };
 
-    for (const reference of payload.attachments ?? []) {
-      yield* transport.activeIdentity(identity.id, identity.channel);
+          let artifact = yield* artifacts.readForSource(source);
 
-      const source = {
-        identityId: identity.id,
-        sourceInboxId,
-        mediaId: reference.id,
-      };
+          if (!artifact) {
+            const provider =
+              identity.channel === "telegram" ? yield* Telegram : yield* Kapso;
 
-      let artifact = yield* artifacts.readForSource(source);
+            const bytes = yield* provider
+              .downloadMedia(
+                identity.installationId,
+                reference.id,
+                state.remaining
+              )
+              .pipe(
+                Effect.catchTag(
+                  "ProviderInputError",
+                  () => new ChannelMediaError({ reason: "download_failed" })
+                )
+              );
 
-      if (!artifact) {
-        const provider =
-          identity.channel === "telegram" ? yield* Telegram : yield* Kapso;
+            const saved = yield* artifacts.put({ ...source, bytes });
+            artifact = yield* artifacts.read({
+              identityId: identity.id,
+              artifactId: saved.artifactId,
+            });
+          }
 
-        const bytes = yield* provider
-          .downloadMedia(identity.installationId, reference.id, remaining)
-          .pipe(
-            Effect.catchTag(
-              "ProviderInputError",
-              () => new ChannelMediaError({ reason: "download_failed" })
-            )
-          );
+          const remaining = state.remaining - artifact.bytes.byteLength;
 
-        const saved = yield* artifacts.put({ ...source, bytes });
-        artifact = yield* artifacts.read({
-          identityId: identity.id,
-          artifactId: saved.artifactId,
-        });
-      }
+          if (remaining < 0)
+            return yield* new ChannelMediaError({ reason: "too_large" });
 
-      remaining -= artifact.bytes.byteLength;
-
-      if (remaining < 0)
-        return yield* new ChannelMediaError({ reason: "too_large" });
-      stored.push(artifact);
-    }
+          return {
+            remaining,
+            items: [...state.items, artifact],
+          };
+        }
+      )
+    ).pipe(Effect.map((state) => state.items));
 
     return stored;
   }

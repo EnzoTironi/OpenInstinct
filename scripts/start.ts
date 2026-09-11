@@ -1,7 +1,15 @@
 import { fileURLToPath } from "node:url";
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Config, Effect, FileSystem, Layer, Schedule, Schema } from "effect";
+import {
+  Config,
+  Effect,
+  FileSystem,
+  Layer,
+  Predicate,
+  Schedule,
+  Schema,
+} from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 import { FetchHttpClient, HttpClient } from "effect/unstable/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
@@ -113,12 +121,13 @@ const start = Command.make(
 
     const http = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
     yield* Effect.raceFirst(
-      http
-        .get(`http://127.0.0.1:${String(evePort)}/eve/v1/health`)
-        .pipe(
-          Effect.retry(Schedule.spaced("100 millis")),
-          Effect.timeout("30 seconds")
-        ),
+      http.get(`http://127.0.0.1:${String(evePort)}/eve/v1/health`).pipe(
+        Effect.retry({
+          schedule: Schedule.spaced("100 millis"),
+          while: Predicate.isTagged("HttpClientError"),
+        }),
+        Effect.timeout("30 seconds")
+      ),
       eve.exitCode.pipe(
         Effect.flatMap(
           (code) =>

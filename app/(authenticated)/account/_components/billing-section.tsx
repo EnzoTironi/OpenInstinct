@@ -13,6 +13,10 @@ const billingRedirectSchema = Schema.Struct({
   reason: Schema.optionalKey(Schema.String),
 });
 
+const decodeOption_billingRedirectSchema = Schema.decodeUnknownOption(
+  billingRedirectSchema
+);
+
 async function postBilling(
   path: string,
   body: {
@@ -29,7 +33,7 @@ async function postBilling(
 
   if (!response.ok) {
     const raw: unknown = await response.json().catch(() => ({}));
-    const decoded = Schema.decodeUnknownOption(billingRedirectSchema)(raw);
+    const decoded = decodeOption_billingRedirectSchema(raw);
 
     if (
       Option.isSome(decoded) &&
@@ -49,7 +53,7 @@ async function postBilling(
   }
 
   const raw: unknown = await response.json();
-  const decoded = Schema.decodeUnknownOption(billingRedirectSchema)(raw);
+  const decoded = decodeOption_billingRedirectSchema(raw);
 
   if (Option.isNone(decoded) || !decoded.value.url) {
     throw new Error(

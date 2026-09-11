@@ -35,14 +35,22 @@ const TelegramCapability = Schema.Struct({
   ),
 });
 
+const decodeEffect_TelegramCapability =
+  Schema.decodeUnknownEffect(TelegramCapability);
+
 const KapsoCapability = Schema.Struct({
   installationId: InstallationId,
   phoneNumber: Schema.String.check(Schema.isPattern(/^\+[1-9][0-9]{6,14}$/u)),
 });
 
+const decodeEffect_KapsoCapability =
+  Schema.decodeUnknownEffect(KapsoCapability);
+
 const BrowserSecret = Schema.String.check(
   Schema.isPattern(/^[A-Za-z0-9_-]{43}$/u)
 );
+
+const decodeEffect_BrowserSecret = Schema.decodeUnknownEffect(BrowserSecret);
 
 export type ChannelAuthRunEffect = <A, E>(
   program: Effect.Effect<A, E, ChannelAccounts | NativeDeviceAuth>
@@ -94,7 +102,7 @@ const readBrowserSecret = Effect.fn("ChannelAuth.readBrowserSecret")(function* (
     ctx.getSignedCookie(cookie.name, ctx.context.secret)
   );
 
-  return yield* Schema.decodeUnknownEffect(BrowserSecret)(value).pipe(
+  return yield* decodeEffect_BrowserSecret(value).pipe(
     Effect.mapError(() => new ChannelAuthError({ reason: "invalid" }))
   );
 });
@@ -107,8 +115,7 @@ const channelDestination = Effect.fn("ChannelAuth.channelDestination")(
         username: Config.string("TELEGRAM_BOT_USERNAME"),
       });
 
-      const capability =
-        yield* Schema.decodeUnknownEffect(TelegramCapability)(values);
+      const capability = yield* decodeEffect_TelegramCapability(values);
 
       return {
         installationId: capability.installationId,
@@ -122,8 +129,7 @@ const channelDestination = Effect.fn("ChannelAuth.channelDestination")(
       phoneNumber: Config.string("KAPSO_PHONE_NUMBER"),
     });
 
-    const capability =
-      yield* Schema.decodeUnknownEffect(KapsoCapability)(values);
+    const capability = yield* decodeEffect_KapsoCapability(values);
 
     return {
       installationId: capability.installationId,

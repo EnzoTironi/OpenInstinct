@@ -39,6 +39,10 @@ const Envelope = Schema.Struct({ challengeId: Id, ...PreparePrompt.fields });
 
 const EnvelopeJson = Schema.fromJsonString(Envelope);
 
+const decodeEffect_EnvelopeJson = Schema.decodeUnknownEffect(EnvelopeJson);
+
+const encodeEffect_EnvelopeJson = Schema.encodeEffect(EnvelopeJson);
+
 const PromptRow = Schema.Struct({
   ...PromptReceipt.fields,
   ...VerifiedSender.fields,
@@ -190,9 +194,9 @@ export class ChannelAuthPrompts extends Context.Service<
         if (Option.isNone(plaintextOption)) return null;
         const plaintext = plaintextOption.value;
 
-        const envelopeOption = yield* Schema.decodeUnknownEffect(EnvelopeJson)(
-          plaintext
-        ).pipe(Effect.option);
+        const envelopeOption = yield* decodeEffect_EnvelopeJson(plaintext).pipe(
+          Effect.option
+        );
 
         const envelope = Option.getOrNull(envelopeOption);
 
@@ -267,7 +271,7 @@ export class ChannelAuthPrompts extends Context.Service<
             yield* accounts.previewChallenge(request);
             const key = yield* encryptionKey;
 
-            const encoded = yield* Schema.encodeEffect(EnvelopeJson)({
+            const encoded = yield* encodeEffect_EnvelopeJson({
               ...request,
               challengeId: challenge.id,
             }).pipe(Effect.mapError(() => error("invalid_input")));

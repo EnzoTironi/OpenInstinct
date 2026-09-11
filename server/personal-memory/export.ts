@@ -1,9 +1,11 @@
 import { readAuthSession } from "@db/services/auth/session";
 import { accessScopeForUser } from "@shared/identity/access-scope";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { PersonalMemoryError, requirePersonalMemoryWebSession } from "./access";
 import { PersonalMemory } from "./index";
+
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
 export const inspectPersonalMemory = Effect.fn("inspectPersonalMemory")(
   function* (headers: Headers) {
@@ -25,7 +27,7 @@ export const exportPersonalMemory = Effect.fn("exportPersonalMemory")(
   function* (headers: Headers) {
     const snapshot = yield* inspectPersonalMemory(headers);
 
-    return new Response(JSON.stringify(snapshot, null, 2), {
+    return new Response(encodeJson(snapshot), {
       headers: {
         "content-type": "application/json; charset=utf-8",
         "content-disposition":

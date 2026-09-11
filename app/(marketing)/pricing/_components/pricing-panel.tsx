@@ -29,6 +29,10 @@ const checkoutResponseSchema = Schema.Struct({
   reason: Schema.optionalKey(Schema.String),
 });
 
+const decodeOption_checkoutResponseSchema = Schema.decodeUnknownOption(
+  checkoutResponseSchema
+);
+
 function formatPrice(planId: BillingPlanId, amount: number) {
   if (planId === "free") return "Free";
   const dollars = String(amount);
@@ -206,7 +210,7 @@ export function PricingPanel({
 
       if (!response.ok) {
         const raw: unknown = await response.json().catch(() => ({}));
-        const decoded = Schema.decodeUnknownOption(checkoutResponseSchema)(raw);
+        const decoded = decodeOption_checkoutResponseSchema(raw);
         const body = Option.isSome(decoded) ? decoded.value : {};
 
         if (body.reason === "stripe_not_configured") {
@@ -225,7 +229,7 @@ export function PricingPanel({
       }
 
       const raw: unknown = await response.json();
-      const decoded = Schema.decodeUnknownOption(checkoutResponseSchema)(raw);
+      const decoded = decodeOption_checkoutResponseSchema(raw);
       const body = Option.isSome(decoded) ? decoded.value : {};
 
       if (!body.url) {

@@ -14,6 +14,8 @@ import { requirePersonalMemoryWebSession } from "../personal-memory/access";
 import type { PersonalMemoryError } from "../personal-memory/access";
 import { inspectPersonalMemory } from "../personal-memory/export";
 
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+
 /**
  * Account privacy export/delete gates.
  *
@@ -113,7 +115,7 @@ export const exportAccountPrivacyResponse = Effect.fn(
 )(function* (headers: Headers) {
   const body = yield* exportAccountPrivacy(headers);
 
-  return new Response(JSON.stringify(body, null, 2), {
+  return new Response(encodeJson(body), {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "content-disposition":
@@ -129,7 +131,7 @@ export const deleteAccountOnlineDataResponse = Effect.fn(
 )(function* (headers: Headers) {
   const body = yield* deleteAccountOnlineData(headers);
 
-  return new Response(JSON.stringify(body, null, 2), {
+  return new Response(encodeJson(body), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",

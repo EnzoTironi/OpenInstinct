@@ -138,16 +138,19 @@ const makeMessaging = Effect.gen(function* () {
         // The first preparation commits its bounded, single-chunk transcript intents.
         // Identical replays do not recreate delivered or retained-away outbox entries.
         if (current.nativeInput?.content === null) {
-          for (const [index, transcript] of value.transcripts.entries()) {
-            yield* outbox.insert({
-              identityId: value.lease.identityId,
-              key: `transcript:${value.lease.id}:${String(index)}:0`,
-              sourceMessageId: null,
-              payload: {
-                text: `I heard: ${transcript}\nIf this is incorrect, send a correction.`,
-              },
-            });
-          }
+          yield* Effect.forEach(
+            value.transcripts,
+            (transcript, index) =>
+              outbox.insert({
+                identityId: value.lease.identityId,
+                key: `transcript:${value.lease.id}:${String(index)}:0`,
+                sourceMessageId: null,
+                payload: {
+                  text: `I heard: ${transcript}\nIf this is incorrect, send a correction.`,
+                },
+              }),
+            { concurrency: 1, discard: true }
+          );
         }
 
         return yield* Schema.decodeUnknownEffect(

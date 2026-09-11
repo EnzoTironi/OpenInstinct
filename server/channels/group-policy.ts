@@ -99,6 +99,10 @@ const GroupIdentityBindingSchema = Schema.Struct({
   deliveryTargetId: ProviderReferenceSchema,
 });
 
+const decodeEffect_GroupIdentityBindingSchema = Schema.decodeUnknownEffect(
+  GroupIdentityBindingSchema
+);
+
 /**
  * Bind a group conversation to an already-linked private `channel_identity`.
  * Actor authority stays on the sender row; conversation scope is group-keyed.
@@ -114,7 +118,7 @@ export const bindGroupChannelIdentity = Effect.fn("bindGroupChannelIdentity")(
   }) {
     const conversationScope = `group:${input.channel}:${input.installationId}:${input.chatId}`;
 
-    return yield* Schema.decodeUnknownEffect(GroupIdentityBindingSchema)({
+    return yield* decodeEffect_GroupIdentityBindingSchema({
       identityId: input.identityId,
       channel: input.channel,
       installationId: input.installationId,

@@ -36,6 +36,8 @@ const BrowserSession = Schema.Struct({
   session: Schema.Struct({ id: Schema.String }),
 });
 
+const decodeSync_BrowserSession = Schema.decodeUnknownSync(BrowserSession);
+
 test("native account linking pins purpose, both proofs and one browser session without merging accounts", async () => {
   const databaseUrl = await Effect.runPromise(
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
@@ -206,7 +208,7 @@ test("native account linking pins purpose, both proofs and one browser session w
 
     return {
       cookie,
-      ...Schema.decodeUnknownSync(BrowserSession)(await sessionResponse.json()),
+      ...decodeSync_BrowserSession(await sessionResponse.json()),
     };
   };
 

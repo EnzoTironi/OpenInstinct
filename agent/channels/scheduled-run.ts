@@ -23,12 +23,17 @@ const scheduledRunTargetSchema = Schema.Struct({
   runId: Schema.String.check(Schema.isUUID()),
 });
 
+const decodeEffect_scheduledRunTargetSchema_strict = Schema.decodeUnknownEffect(
+  scheduledRunTargetSchema,
+  {
+    onExcessProperty: "error",
+  }
+);
+
 export default defineChannel({
   async receive(input, { from }) {
     const target = await Effect.runPromise(
-      Schema.decodeUnknownEffect(scheduledRunTargetSchema, {
-        onExcessProperty: "error",
-      })(input.target)
+      decodeEffect_scheduledRunTargetSchema_strict(input.target)
     );
 
     const source = from(`scheduled-run:${target.runId}`);
@@ -68,9 +73,10 @@ export default defineChannel({
               )
             );
 
-            const channel = yield* Effect.tryPromise(() =>
-              getScheduledReportChannel(input.runId)
-            );
+            const channel = yield* Effect.tryPromise({
+              try: () => getScheduledReportChannel(input.runId),
+              catch: () => new InternalCallbackRejected({ status: 503 }),
+            });
 
             if (channel)
               waitUntil(

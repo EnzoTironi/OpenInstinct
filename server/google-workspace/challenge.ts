@@ -15,6 +15,8 @@ const flowSchema = Schema.Struct({
   callbackURL: Schema.String,
 });
 
+const decodeEffect_flowSchema = Schema.decodeUnknownEffect(flowSchema);
+
 function denyWithoutLiveAuthority(error: BrowserWorkerAccessError) {
   return new GoogleWorkspaceError({
     reason: error.reason === "unavailable" ? "unavailable" : "unauthenticated",
@@ -98,7 +100,7 @@ export const readGoogleWorkspaceChallenge = Effect.fn(
     catch: () => new GoogleWorkspaceError({ reason: "invalid_callback" }),
   });
 
-  const decoded = yield* Schema.decodeUnknownEffect(flowSchema)(payload).pipe(
+  const decoded = yield* decodeEffect_flowSchema(payload).pipe(
     Effect.mapError(
       () => new GoogleWorkspaceError({ reason: "invalid_callback" })
     )

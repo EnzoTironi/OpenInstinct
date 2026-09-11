@@ -2,7 +2,10 @@ import { Effect, Schema } from "effect";
 import { defineTool } from "eve/tools";
 
 import { requireChannelPrincipal } from "../../server/channels/principal";
-import { internalCallbackBodies } from "../../server/internal/callback-auth";
+import {
+  InternalCallbackRejected,
+  internalCallbackBodies,
+} from "../../server/internal/callback-auth";
 import { serverRuntime } from "../../server/runtime";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
 import { postInternalRequest } from "../lib/internal-request";
@@ -45,9 +48,11 @@ export default defineTool({
           sourceMessageId: auth?.attributes.sourceMessageId,
         });
 
-        const response = yield* Effect.tryPromise(() =>
-          postInternalRequest("/internal/channel-input/respond", body)
-        );
+        const response = yield* Effect.tryPromise({
+          try: () =>
+            postInternalRequest("/internal/channel-input/respond", body),
+          catch: () => new InternalCallbackRejected({ status: 503 }),
+        });
 
         if (response.status === 202) {
           return { status: "accepted" as const, requestId: input.requestId };

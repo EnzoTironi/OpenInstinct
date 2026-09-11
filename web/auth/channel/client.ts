@@ -11,6 +11,8 @@ import {
 } from "@shared/identity/channel-auth";
 import { Effect, Result, Schema } from "effect";
 
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+
 const localCallbackSchema = Schema.String.check(
   Schema.makeFilter((value) => {
     try {
@@ -36,11 +38,11 @@ const localCallbackSchema = Schema.String.check(
   })
 );
 
+const decodeResult_localCallbackSchema =
+  Schema.decodeUnknownResult(localCallbackSchema);
+
 export function safeCallbackUrl(value: string | undefined) {
-  return Result.getOrElse(
-    Schema.decodeUnknownResult(localCallbackSchema)(value),
-    () => "/"
-  );
+  return Result.getOrElse(decodeResult_localCallbackSchema(value), () => "/");
 }
 
 interface SignOutResult {
@@ -218,7 +220,7 @@ export const startChannelAuthorization = Effect.fn(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(intent),
+      body: encodeJson(intent),
     },
     channelStartResultSchema
   );
@@ -254,7 +256,7 @@ export const completeChannelAuthorization = Effect.fn(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: encodeJson(input),
     },
     channelChallengeCompletionSchema
   );
@@ -289,7 +291,7 @@ export const bindNativeBrowser = Effect.fn("channelAuthorization.bind")(
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: encodeJson(body),
       },
       deviceBoundSchema
     );

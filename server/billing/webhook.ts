@@ -57,6 +57,9 @@ const stripeIdRefSchema = Schema.Union([
   Schema.Struct({ id: Schema.String }),
 ]);
 
+const decodeOption_stripeIdRefSchema =
+  Schema.decodeUnknownOption(stripeIdRefSchema);
+
 function stripeIdFromRef(value: typeof stripeIdRefSchema.Type): string {
   if (Schema.is(Schema.String)(value)) return value;
 
@@ -66,7 +69,7 @@ function stripeIdFromRef(value: typeof stripeIdRefSchema.Type): string {
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Stripe SDK customer/subscription fields are string | expanded object at the webhook boundary.
 function readStripeId(field: unknown): string | null {
   // Stripe expands customer/subscription into objects or leaves string ids.
-  const decoded = Schema.decodeUnknownOption(stripeIdRefSchema)(field);
+  const decoded = decodeOption_stripeIdRefSchema(field);
 
   if (Option.isNone(decoded)) return null;
 

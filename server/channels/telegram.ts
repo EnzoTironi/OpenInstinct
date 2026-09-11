@@ -52,6 +52,10 @@ export const TelegramInstallationSchema = Schema.Struct({
   botUsername: username,
 });
 
+const decodeEffect_TelegramInstallationSchema = Schema.decodeUnknownEffect(
+  TelegramInstallationSchema
+);
+
 export type TelegramInstallation = typeof TelegramInstallationSchema.Type;
 
 const user = Schema.Struct({ id: positiveId, is_bot: Schema.Boolean });
@@ -120,9 +124,9 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
   configuration: TelegramInstallation,
   nowMs: number
 ): Effect.fn.Return<readonly InboundEvent[], ProviderInputError> {
-  const installation = yield* Schema.decodeUnknownEffect(
-    TelegramInstallationSchema
-  )(configuration).pipe(Effect.mapError(malformed));
+  const installation = yield* decodeEffect_TelegramInstallationSchema(
+    configuration
+  ).pipe(Effect.mapError(malformed));
 
   const incoming = yield* Schema.decodeUnknownEffect(update)(value).pipe(
     Effect.mapError(malformed)
@@ -248,7 +252,7 @@ const readInstallation = Config.all({
   botId: Config.string("TELEGRAM_BOT_ID"),
   botUsername: Config.string("TELEGRAM_BOT_USERNAME"),
 }).pipe(
-  Effect.flatMap(Schema.decodeUnknownEffect(TelegramInstallationSchema)),
+  Effect.flatMap(decodeEffect_TelegramInstallationSchema),
   Effect.mapError(
     () =>
       new ProviderInputError({ provider: "telegram", reason: "configuration" })
@@ -287,6 +291,8 @@ const response = Schema.Union([
     ),
   }),
 ]);
+
+const decodeEffect_response = Schema.decodeUnknownEffect(response);
 
 /** Maps Telegram application-level send failures after a 2xx HTTP envelope. */
 export const telegramSendFailure = (failure: {
@@ -333,6 +339,9 @@ const downloadableFile = Schema.Struct({
     ),
   }),
 });
+
+const decodeEffect_downloadableFile =
+  Schema.decodeUnknownEffect(downloadableFile);
 
 const makeTelegram = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
@@ -422,7 +431,7 @@ const makeTelegram = Effect.gen(function* () {
       };
 
     const result = yield* request("sendMessage", body).pipe(
-      Effect.flatMap(Schema.decodeUnknownEffect(response)),
+      Effect.flatMap(decodeEffect_response),
       Effect.catchTag(
         "SchemaError",
         () =>
@@ -467,7 +476,7 @@ const makeTelegram = Effect.gen(function* () {
       );
 
       const metadata = yield* request("getFile", { file_id: id }).pipe(
-        Effect.flatMap(Schema.decodeUnknownEffect(downloadableFile)),
+        Effect.flatMap(decodeEffect_downloadableFile),
         Effect.mapError(
           () => new ChannelMediaError({ reason: "download_failed" })
         )

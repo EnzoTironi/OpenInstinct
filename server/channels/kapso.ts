@@ -34,7 +34,11 @@ import {
 
 const phone = Schema.String.check(Schema.isPattern(/^\+?[1-9][0-9]{5,14}$/));
 
+const decodeEffect_phone = Schema.decodeUnknownEffect(phone);
+
 const phoneId = Schema.String.check(Schema.isPattern(/^[1-9][0-9]{0,31}$/));
+
+const decodeEffect_phoneId = Schema.decodeUnknownEffect(phoneId);
 
 const messageId = Schema.String.check(
   Schema.isPattern(/^wamid\.[A-Za-z0-9_+/=.-]{1,240}$/)
@@ -44,6 +48,10 @@ export const KapsoInstallationSchema = Schema.Struct({
   phoneNumberId: phoneId,
   phoneNumber: phone,
 });
+
+const decodeEffect_KapsoInstallationSchema = Schema.decodeUnknownEffect(
+  KapsoInstallationSchema
+);
 
 export type KapsoInstallation = typeof KapsoInstallationSchema.Type;
 
@@ -109,6 +117,8 @@ const envelope = Schema.Struct({
   }),
 });
 
+const decodeEffect_envelope = Schema.decodeUnknownEffect(envelope);
+
 const batch = Schema.Struct({
   batch: Schema.Literal(true),
   type: Schema.String,
@@ -117,6 +127,8 @@ const batch = Schema.Struct({
     Schema.isMaxLength(100)
   ),
 });
+
+const decodeEffect_batch = Schema.decodeUnknownEffect(batch);
 
 const malformed = () =>
   new ProviderInputError({ provider: "kapso", reason: "malformed" });
@@ -160,7 +172,7 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
 
   if (incoming.type === "system") return null;
 
-  const sender = yield* Schema.decodeUnknownEffect(phone)(incoming.from).pipe(
+  const sender = yield* decodeEffect_phone(incoming.from).pipe(
     Effect.mapError(
       () =>
         new ProviderInputError({
@@ -281,26 +293,22 @@ export const parseKapsoWebhook = Effect.fn("parseKapsoWebhook")(function* (
   configuration: KapsoInstallation,
   nowMs: number
 ): Effect.fn.Return<readonly InboundEvent[], ProviderInputError> {
-  const installation = yield* Schema.decodeUnknownEffect(
-    KapsoInstallationSchema
-  )(configuration).pipe(Effect.mapError(malformed));
+  const installation = yield* decodeEffect_KapsoInstallationSchema(
+    configuration
+  ).pipe(Effect.mapError(malformed));
 
   const marker = yield* Schema.decodeUnknownEffect(
     Schema.Struct({ batch: Schema.optionalKey(Schema.Boolean) })
   )(value).pipe(Effect.mapError(malformed));
 
   const items = marker.batch
-    ? (yield* Schema.decodeUnknownEffect(batch)(value).pipe(
-        Effect.mapError(malformed)
-      )).data
-    : [
-        yield* Schema.decodeUnknownEffect(envelope)(value).pipe(
-          Effect.mapError(malformed)
-        ),
-      ];
+    ? (yield* decodeEffect_batch(value).pipe(Effect.mapError(malformed))).data
+    : [yield* decodeEffect_envelope(value).pipe(Effect.mapError(malformed))];
 
-  const events = yield* Effect.forEach(items, (item) =>
-    normalizeEnvelope(item, installation, nowMs)
+  const events = yield* Effect.forEach(
+    items,
+    (item) => normalizeEnvelope(item, installation, nowMs),
+    { concurrency: 1 }
   );
 
   return events.filter((event) => event !== null);
@@ -310,7 +318,7 @@ const readInstallation = Config.all({
   phoneNumberId: Config.string("KAPSO_PHONE_NUMBER_ID"),
   phoneNumber: Config.string("KAPSO_PHONE_NUMBER"),
 }).pipe(
-  Effect.flatMap(Schema.decodeUnknownEffect(KapsoInstallationSchema)),
+  Effect.flatMap(decodeEffect_KapsoInstallationSchema),
   Effect.mapError(
     () => new ProviderInputError({ provider: "kapso", reason: "configuration" })
   )
@@ -331,6 +339,8 @@ const receipt = Schema.Struct({
     Schema.isLengthBetween(1, 1)
   ),
 });
+
+const decodeEffect_receipt = Schema.decodeUnknownEffect(receipt);
 
 const downloadableMedia = Schema.Struct({
   id: ProviderReferenceSchema,
@@ -354,6 +364,9 @@ const downloadableMedia = Schema.Struct({
     })
   ),
 });
+
+const decodeEffect_downloadableMedia =
+  Schema.decodeUnknownEffect(downloadableMedia);
 
 const makeKapso = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
@@ -406,7 +419,7 @@ const makeKapso = Effect.gen(function* () {
         HttpClientRequest.bodyJsonUnsafe(body)
       )
     ).pipe(
-      Effect.flatMap(Schema.decodeUnknownEffect(receipt)),
+      Effect.flatMap(decodeEffect_receipt),
       Effect.catchTag(
         "SchemaError",
         () =>
@@ -446,7 +459,7 @@ const makeKapso = Effect.gen(function* () {
       if (installation.phoneNumberId !== installationId)
         return yield* new ChannelMediaError({ reason: "wrong_installation" });
 
-      const id = yield* Schema.decodeUnknownEffect(phoneId)(mediaId).pipe(
+      const id = yield* decodeEffect_phoneId(mediaId).pipe(
         Effect.mapError(
           () => new ChannelMediaError({ reason: "invalid_media" })
         )
@@ -468,7 +481,7 @@ const makeKapso = Effect.gen(function* () {
           HttpClientRequest.setHeader("X-API-Key", Redacted.value(key))
         )
       ).pipe(
-        Effect.flatMap(Schema.decodeUnknownEffect(downloadableMedia)),
+        Effect.flatMap(decodeEffect_downloadableMedia),
         Effect.mapError(
           () => new ChannelMediaError({ reason: "download_failed" })
         )

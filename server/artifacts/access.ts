@@ -12,6 +12,8 @@ const sourceRow = Schema.Struct({
   payload: MessagePayloadSchema,
 });
 
+const decodeEffect_sourceRow = Schema.decodeUnknownEffect(sourceRow);
+
 export const artifactAccess = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
   const accounts = yield* ChannelAccounts;
@@ -57,7 +59,7 @@ export const artifactAccess = Effect.gen(function* () {
     FROM channel_inbox WHERE id = ${input.sourceInboxId} AND identity_id = ${input.identityId} FOR SHARE`;
 
     if (!rows[0]) return yield* new ArtifactError({ reason: "source_invalid" });
-    const source = yield* Schema.decodeUnknownEffect(sourceRow)(rows[0]);
+    const source = yield* decodeEffect_sourceRow(rows[0]);
 
     const matches =
       source.payload.attachments?.filter(

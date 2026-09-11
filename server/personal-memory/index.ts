@@ -18,6 +18,8 @@ const bindingSchema = Schema.Struct({
   value: Schema.NonEmptyString,
 });
 
+const decodeEffect_bindingSchema = Schema.decodeUnknownEffect(bindingSchema);
+
 const makePersonalMemory = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
 
@@ -25,9 +27,7 @@ const makePersonalMemory = Effect.gen(function* () {
     function* (scope: AccessScope, memory: MemoryOperationContext["memory"]) {
       yield* requirePersonalMemoryMembership(scope);
 
-      const binding = yield* Schema.decodeUnknownEffect(bindingSchema)(
-        memory.scope
-      ).pipe(
+      const binding = yield* decodeEffect_bindingSchema(memory.scope).pipe(
         Effect.mapError(
           () => new PersonalMemoryError({ reason: "invalid_binding" })
         )

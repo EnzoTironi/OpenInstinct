@@ -17,6 +17,9 @@ const wipeResponseSchema = Schema.Struct({
   limits: Schema.optionalKey(Schema.String),
 });
 
+const decodeOption_wipeResponseSchema =
+  Schema.decodeUnknownOption(wipeResponseSchema);
+
 export function AccountPrivacyWipeSection() {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,7 +52,7 @@ export function AccountPrivacyWipeSection() {
       }
 
       const raw: unknown = await response.json();
-      const decoded = Schema.decodeUnknownOption(wipeResponseSchema)(raw);
+      const decoded = decodeOption_wipeResponseSchema(raw);
       const body = Option.isSome(decoded) ? decoded.value : {};
 
       if (body.status && body.status !== "partial_online_wipe") {

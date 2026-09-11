@@ -133,18 +133,27 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
       } else if (receipt.payload.attachments?.length) {
         const artifacts = yield* Artifacts;
 
-        for (const attachment of receipt.payload.attachments) {
-          const artifact = yield* artifacts.readForSource({
-            identityId: identity.id,
-            sourceInboxId: receipt.id,
-            mediaId: attachment.id,
-          });
+        yield* Effect.forEach(
+          receipt.payload.attachments,
+          Effect.fn("dispatchChannelSession.verifyAttachment")(
+            function* (attachment) {
+              const artifact = yield* artifacts.readForSource({
+                identityId: identity.id,
+                sourceInboxId: receipt.id,
+                mediaId: attachment.id,
+              });
 
-          if (!artifact)
-            return yield* new ChannelDispatchError({
-              reason: "handoff_unknown",
-            });
-        }
+              if (!artifact) {
+                return yield* new ChannelDispatchError({
+                  reason: "handoff_unknown",
+                });
+              }
+
+              return yield* Effect.void;
+            }
+          ),
+          { concurrency: 1, discard: true }
+        );
       }
 
       yield* requireChannelPrincipal(channel, auth);
@@ -198,26 +207,40 @@ export const drainChannelInbox = Effect.fn("drainChannelInbox")(function* (
 ) {
   const messaging = yield* Messaging;
 
-  for (let index = 0; index < 8; index++) {
-    const claim = yield* messaging.claimInbox({
-      identityId: identity.id,
-      leaseSeconds: 150,
-    });
+  let drainStopped = false;
+  yield* Effect.forEach(
+    Array.from({ length: 8 }, (_, index) => index),
+    Effect.fn("drainChannelInbox.attempt")(function* () {
+      if (drainStopped) return;
 
-    if (!claim) return;
-    yield* handoffChannelMessage(
-      identity.channel,
-      {
+      const claim = yield* messaging.claimInbox({
         identityId: identity.id,
-        id: claim.id,
-        leaseToken: claim.leaseToken,
-      },
-      channelPrincipal(identity),
-      context
-    ).pipe(
-      Effect.catchTag("ChannelDispatchError", (error) =>
-        error.reason === "unsupported_media" ? Effect.void : Effect.fail(error)
-      )
-    );
-  }
+        leaseSeconds: 150,
+      });
+
+      if (!claim) {
+        drainStopped = true;
+
+        return;
+      }
+
+      yield* handoffChannelMessage(
+        identity.channel,
+        {
+          identityId: identity.id,
+          id: claim.id,
+          leaseToken: claim.leaseToken,
+        },
+        channelPrincipal(identity),
+        context
+      ).pipe(
+        Effect.catchTag("ChannelDispatchError", (error) =>
+          error.reason === "unsupported_media"
+            ? Effect.void
+            : Effect.fail(error)
+        )
+      );
+    }),
+    { concurrency: 1, discard: true }
+  );
 });

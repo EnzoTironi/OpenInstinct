@@ -86,6 +86,9 @@ const quotaUsageStruct = Schema.Struct({
   }),
 });
 
+const decodeEffect_quotaUsageStruct =
+  Schema.decodeUnknownEffect(quotaUsageStruct);
+
 export interface QuotaUsage {
   user: {
     concurrentTurns: number;
@@ -285,7 +288,7 @@ export function emptyQuotaUsage(): QuotaUsage {
 }
 
 function decodeUsage(usage: QuotaUsage) {
-  return Schema.decodeUnknownEffect(quotaUsageStruct)(usage).pipe(
+  return decodeEffect_quotaUsageStruct(usage).pipe(
     Effect.map((decoded): QuotaUsage => ({
       user: { ...decoded.user },
       installation: { ...decoded.installation },
@@ -310,18 +313,21 @@ export const admitQuota = Effect.fn("admitQuota")(function* (
   const decodedUsage = yield* decodeUsage(usage);
   const decodedDemand = yield* decodeDemand(demand);
 
-  for (const check of checks(limits, decodedUsage, decodedDemand)) {
-    if (check.used + check.requested > check.limit) {
-      return yield* new QuotaAdmissionError({
-        reason: "exceeded",
-        scope: check.scope,
-        resource: check.resource,
-        limit: check.limit,
-        used: check.used,
-        requested: check.requested,
-      });
-    }
-  }
+  yield* Effect.forEach(
+    checks(limits, decodedUsage, decodedDemand),
+    (check) =>
+      check.used + check.requested > check.limit
+        ? new QuotaAdmissionError({
+            reason: "exceeded",
+            scope: check.scope,
+            resource: check.resource,
+            limit: check.limit,
+            used: check.used,
+            requested: check.requested,
+          })
+        : Effect.void,
+    { concurrency: 1, discard: true }
+  );
 
   return decodedDemand;
 });

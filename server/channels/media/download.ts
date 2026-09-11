@@ -9,6 +9,8 @@ import { ChannelMediaError } from "./policy";
 
 const contentLength = Schema.String.check(Schema.isPattern(/^[0-9]+$/u));
 
+const decodeEffect_contentLength = Schema.decodeUnknownEffect(contentLength);
+
 export const downloadMediaBytes = Effect.fn("downloadMediaBytes")(
   function* (
     client: HttpClient.HttpClient,
@@ -28,9 +30,7 @@ export const downloadMediaBytes = Effect.fn("downloadMediaBytes")(
     const declared = response.headers["content-length"];
 
     if (declared !== undefined) {
-      const length = yield* Schema.decodeUnknownEffect(contentLength)(
-        declared
-      ).pipe(
+      const length = yield* decodeEffect_contentLength(declared).pipe(
         Effect.mapError(
           () => new ChannelMediaError({ reason: "download_failed" })
         )

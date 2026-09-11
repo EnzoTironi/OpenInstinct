@@ -16,48 +16,53 @@ const dispatchChannels = Effect.fn("dispatchChannels")(function* (
   const messaging = yield* Messaging;
   yield* dispatchItem("auth-prompts", drainAuthPrompts);
 
-  for (const channel of ["telegram", "kapso"] as const) {
-    const candidates = yield* transport.inboxCandidates(channel, 25);
-    yield* Effect.forEach(
-      candidates,
-      (identity) =>
-        dispatchItem(
-          identity.id,
-          Effect.gen(function* () {
-            const claim = yield* messaging.claimInbox({
-              identityId: identity.id,
-              leaseSeconds: 150,
-            });
+  yield* Effect.forEach(
+    ["telegram", "kapso"] as const,
+    Effect.fn("dispatchChannels.channel")(function* (channel) {
+      const candidates = yield* transport.inboxCandidates(channel, 25);
+      yield* Effect.forEach(
+        candidates,
+        (identity) =>
+          dispatchItem(
+            identity.id,
+            Effect.gen(function* () {
+              const claim = yield* messaging.claimInbox({
+                identityId: identity.id,
+                leaseSeconds: 150,
+              });
 
-            if (!claim) return;
-            // The destination validates this lease and loads its stored payload.
-            yield* Effect.tryPromise({
-              try: () =>
-                to(channel === "telegram" ? telegram : kapso, {
-                  identityId: identity.id,
-                  id: claim.id,
-                  leaseToken: claim.leaseToken,
-                }).send("", { auth: channelPrincipal(identity) }),
-              catch: () => new Error("Channel handoff could not be confirmed."),
-            }).pipe(
-              Effect.catch(() =>
-                Effect.logError("Scheduled channel handoff failed", {
-                  inboxId: claim.id,
-                })
-              )
-            );
-          })
-        ),
-      { concurrency: 4, discard: true }
-    );
-    const outbound = yield* transport.outboxCandidates(channel, 25);
-    yield* Effect.forEach(
-      outbound,
-      (identity) =>
-        dispatchItem(identity.id, transport.drainOutbox(identity.id)),
-      { concurrency: 4, discard: true }
-    );
-  }
+              if (!claim) return;
+              // The destination validates this lease and loads its stored payload.
+              yield* Effect.tryPromise({
+                try: () =>
+                  to(channel === "telegram" ? telegram : kapso, {
+                    identityId: identity.id,
+                    id: claim.id,
+                    leaseToken: claim.leaseToken,
+                  }).send("", { auth: channelPrincipal(identity) }),
+                catch: () =>
+                  new Error("Channel handoff could not be confirmed."),
+              }).pipe(
+                Effect.catch(() =>
+                  Effect.logError("Scheduled channel handoff failed", {
+                    inboxId: claim.id,
+                  })
+                )
+              );
+            })
+          ),
+        { concurrency: 4, discard: true }
+      );
+      const outbound = yield* transport.outboxCandidates(channel, 25);
+      yield* Effect.forEach(
+        outbound,
+        (identity) =>
+          dispatchItem(identity.id, transport.drainOutbox(identity.id)),
+        { concurrency: 4, discard: true }
+      );
+    }),
+    { concurrency: 1, discard: true }
+  );
 });
 
 export default defineSchedule({

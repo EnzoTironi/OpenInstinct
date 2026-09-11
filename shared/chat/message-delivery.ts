@@ -71,16 +71,15 @@ const messageOutputSchema = Schema.Union([
 const linkOutputSchema = Schema.Struct({
   kind: Schema.Literal("link"),
   replyTo: Schema.optionalKey(replyReferenceSchema),
-  url: httpsUrlSchema
-    .pipe(
-      Schema.check(
-        Schema.makeFilter((url) => url.trim().length <= 2048, {
-          message: "Native links must not exceed 2048 characters.",
-          toJsonSchema: () => ({ maxLength: 2048 }),
-        })
-      )
-    )
-    .pipe(Schema.decodeTo(Schema.String, SchemaTransformation.trim())),
+  url: httpsUrlSchema.pipe(
+    Schema.check(
+      Schema.makeFilter((url) => url.trim().length <= 2048, {
+        message: "Native links must not exceed 2048 characters.",
+        toJsonSchema: () => ({ maxLength: 2048 }),
+      })
+    ),
+    Schema.decodeTo(Schema.String, SchemaTransformation.trim())
+  ),
 }).annotate({ parseOptions: { onExcessProperty: "error" } });
 
 export const sendMessageOutputSchema = Schema.Union([

@@ -84,6 +84,8 @@ const textSchema = Schema.String.check(
   Schema.makeFilter((text) => text.isWellFormed() && text.trim().length > 0)
 );
 
+const decodeEffect_textSchema = Schema.decodeUnknownEffect(textSchema);
+
 const enqueueInput = Schema.Struct({
   identityId: IdentityId,
   deliveryKey: Schema.String.check(
@@ -101,10 +103,12 @@ const candidateInput = Schema.Struct({
   limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 25 })),
 });
 
+const decodeEffect_candidateInput = Schema.decodeUnknownEffect(candidateInput);
+
 /** Keeps UTF-16 surrogate pairs intact without changing the original text. */
 export const splitChannelText = Effect.fn("ChannelTransport.splitChannelText")(
   function* (text: string) {
-    const value = yield* Schema.decodeUnknownEffect(textSchema)(text).pipe(
+    const value = yield* decodeEffect_textSchema(text).pipe(
       Effect.mapError(invalidInput)
     );
 
@@ -192,7 +196,7 @@ const makeTransport = Effect.gen(function* () {
     channel: Identity["channel"],
     limit: number
   ) {
-    const input = yield* Schema.decodeUnknownEffect(candidateInput)({
+    const input = yield* decodeEffect_candidateInput({
       channel,
       limit,
     }).pipe(Effect.mapError(invalidInput));
@@ -364,19 +368,23 @@ const makeTransport = Effect.gen(function* () {
     yield* activeIdentity(identity.id, identity.channel);
     const chunks = yield* splitChannelText(value.text);
 
-    const payloads = yield* Effect.forEach(chunks, (text) => {
-      const payload: Schema.MutableJsonObject = { text };
+    const payloads = yield* Effect.forEach(
+      chunks,
+      (text) => {
+        const payload: Schema.MutableJsonObject = { text };
 
-      if (value.inputRequest !== undefined)
-        payload.inputRequest = { ...value.inputRequest };
+        if (value.inputRequest !== undefined)
+          payload.inputRequest = { ...value.inputRequest };
 
-      if (value.replyToMessageId !== undefined)
-        payload.replyToMessageId = value.replyToMessageId;
+        if (value.replyToMessageId !== undefined)
+          payload.replyToMessageId = value.replyToMessageId;
 
-      return Schema.decodeUnknownEffect(MessagePayloadSchema)(payload).pipe(
-        Effect.mapError(invalidInput)
-      );
-    });
+        return Schema.decodeUnknownEffect(MessagePayloadSchema)(payload).pipe(
+          Effect.mapError(invalidInput)
+        );
+      },
+      { concurrency: 1 }
+    );
 
     return yield* sql.withTransaction(
       Effect.gen(function* () {
@@ -402,12 +410,15 @@ const makeTransport = Effect.gen(function* () {
         )
           return yield* new PayloadConflict({ id: existing[0].id });
 
-        return yield* Effect.forEach(payloads, (payload, index) =>
-          messaging.enqueue({
-            identityId: value.identityId,
-            deliveryKey: `${value.deliveryKey}:${String(index)}`,
-            payload,
-          })
+        return yield* Effect.forEach(
+          payloads,
+          (payload, index) =>
+            messaging.enqueue({
+              identityId: value.identityId,
+              deliveryKey: `${value.deliveryKey}:${String(index)}`,
+              payload,
+            }),
+          { concurrency: 1 }
         );
       })
     );
@@ -455,7 +466,8 @@ const makeTransport = Effect.gen(function* () {
             deliveryKey: row.key,
             payload,
           });
-        })
+        }),
+        { concurrency: 1 }
       );
     },
     sql.withTransaction
@@ -548,67 +560,89 @@ const makeTransport = Effect.gen(function* () {
       );
 
       let sent = 0;
+      let result: DrainOutboxResult | null = null;
 
-      for (let index = 0; index < 8; index += 1) {
-        const claim = yield* messaging.claimOutbox({
-          identityId: id,
-          leaseSeconds: 30,
-        });
+      yield* Effect.forEach(
+        Array.from({ length: 8 }, (_, index) => index),
+        Effect.fn("ChannelTransport.drainOutbox.attempt")(function* () {
+          if (result) return;
 
-        if (!claim) {
-          const remaining = yield* messaging.inspectOutbox(id);
+          const claim = yield* messaging.claimOutbox({
+            identityId: id,
+            leaseSeconds: 30,
+          });
 
-          const uncertain =
-            remaining.counts.find((count) => count.status === "uncertain")
-              ?.count ?? 0;
+          if (!claim) {
+            const remaining = yield* messaging.inspectOutbox(id);
 
-          if (uncertain > 0)
-            return {
-              state: "uncertain",
-              sent,
-              failed: 0,
-              uncertain,
-            } satisfies DrainOutboxResult;
+            const uncertain =
+              remaining.counts.find((count) => count.status === "uncertain")
+                ?.count ?? 0;
 
-          const blocked = remaining.counts.some(
-            (count) =>
-              count.status === "queued" || count.status === "dispatching"
-          );
+            if (uncertain > 0) {
+              result = {
+                state: "uncertain",
+                sent,
+                failed: 0,
+                uncertain,
+              } satisfies DrainOutboxResult;
 
-          if (blocked)
-            return {
-              state: "blocked",
+              return;
+            }
+
+            const blocked = remaining.counts.some(
+              (count) =>
+                count.status === "queued" || count.status === "dispatching"
+            );
+
+            if (blocked) {
+              result = {
+                state: "blocked",
+                sent,
+                failed: 0,
+                uncertain: 0,
+              } satisfies DrainOutboxResult;
+
+              return;
+            }
+
+            result = {
+              state: sent > 0 ? "sent" : "idle",
               sent,
               failed: 0,
               uncertain: 0,
             } satisfies DrainOutboxResult;
 
-          return {
-            state: sent > 0 ? "sent" : "idle",
-            sent,
-            failed: 0,
-            uncertain: 0,
-          } satisfies DrainOutboxResult;
-        }
+            return;
+          }
 
-        const state = yield* dispatch(claim);
+          const state = yield* dispatch(claim);
 
-        if (state !== "sent")
-          return {
-            state,
-            sent,
-            failed: state === "failed" ? 1 : 0,
-            uncertain: state === "uncertain" ? 1 : 0,
-          } satisfies DrainOutboxResult;
-        sent += 1;
-      }
+          if (state !== "sent") {
+            result = {
+              state,
+              sent,
+              failed: state === "failed" ? 1 : 0,
+              uncertain: state === "uncertain" ? 1 : 0,
+            } satisfies DrainOutboxResult;
 
-      return {
-        state: "limit",
-        sent,
-        failed: 0,
-        uncertain: 0,
-      } satisfies DrainOutboxResult;
+            return;
+          }
+
+          sent += 1;
+        }),
+        { concurrency: 1, discard: true }
+      );
+
+      return (
+        result ??
+        ({
+          state: "limit",
+          sent,
+          failed: 0,
+          uncertain: 0,
+        } satisfies DrainOutboxResult)
+      );
     }),
   };
 });

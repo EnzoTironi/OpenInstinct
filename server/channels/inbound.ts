@@ -13,6 +13,9 @@ export const LoginTokenSchema = Schema.String.check(
   Schema.isPattern(/^[A-Za-z0-9_-]{16,128}$/)
 );
 
+const decodeEffect_LoginTokenSchema =
+  Schema.decodeUnknownEffect(LoginTokenSchema);
+
 const base = {
   channel: Schema.Literals(["telegram", "kapso"]),
   installationId: ProviderReferenceSchema,
@@ -97,9 +100,7 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
   const greeting = command?.[1]?.toLowerCase() === "start" && !command[3];
 
   if (command && !greeting) {
-    const token = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
-      command[3]
-    ).pipe(
+    const token = yield* decodeEffect_LoginTokenSchema(command[3]).pipe(
       Effect.mapError(
         () =>
           new ProviderInputError({

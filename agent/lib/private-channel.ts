@@ -40,46 +40,52 @@ export function privateChannel(channel: Identity["channel"]) {
             const identities = new Map<string, Identity>();
             const prompts: string[] = [];
 
-            for (const event of events) {
-              const sender = {
-                channel: event.channel,
-                installationId: event.installationId,
-                senderId: event.senderId,
-              };
+            yield* Effect.forEach(
+              events,
+              Effect.fn("privateChannel.handleEvent")(function* (event) {
+                const sender = {
+                  channel: event.channel,
+                  installationId: event.installationId,
+                  senderId: event.senderId,
+                };
 
-              if (event.kind === "command") {
-                if (event.command === "start") {
-                  const authPrompts = yield* ChannelAuthPrompts;
+                if (event.kind === "command") {
+                  if (event.command === "start") {
+                    const authPrompts = yield* ChannelAuthPrompts;
 
-                  const prompt = yield* authPrompts.prepare({
-                    token: event.token,
-                    sender,
-                    eventId: event.eventId,
-                  });
+                    const prompt = yield* authPrompts.prepare({
+                      token: event.token,
+                      sender,
+                      eventId: event.eventId,
+                    });
 
-                  prompts.push(prompt.challengeId);
+                    prompts.push(prompt.challengeId);
+                  } else {
+                    yield* accounts.confirmChallenge({
+                      token: event.token,
+                      sender,
+                    });
+                  }
                 } else {
-                  yield* accounts.confirmChallenge({
-                    token: event.token,
-                    sender,
+                  const identity =
+                    yield* accounts.resolveVerifiedSender(sender);
+
+                  yield* messaging.accept({
+                    identityId: identity.id,
+                    eventId: event.eventId,
+                    sourceMessageId: event.messageId,
+                    payload: {
+                      ...event.payload,
+                      sourceOccurredAtMs: DateTime.toEpochMillis(
+                        DateTime.makeUnsafe(event.occurredAt)
+                      ),
+                    },
                   });
+                  identities.set(identity.id, identity);
                 }
-              } else {
-                const identity = yield* accounts.resolveVerifiedSender(sender);
-                yield* messaging.accept({
-                  identityId: identity.id,
-                  eventId: event.eventId,
-                  sourceMessageId: event.messageId,
-                  payload: {
-                    ...event.payload,
-                    sourceOccurredAtMs: DateTime.toEpochMillis(
-                      DateTime.makeUnsafe(event.occurredAt)
-                    ),
-                  },
-                });
-                identities.set(identity.id, identity);
-              }
-            }
+              }),
+              { concurrency: 1, discard: true }
+            );
 
             // Both ordinary inputs and login prompts are durable before ACK.
             context.waitUntil(

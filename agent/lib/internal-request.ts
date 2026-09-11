@@ -21,7 +21,10 @@ export const postInternalRequestEffect = Effect.fn("postInternalRequestEffect")(
       onExcessProperty: "error",
     })(body);
 
-    const serialized = JSON.stringify(value);
+    const serialized = yield* Schema.encodeEffect(
+      Schema.fromJsonString(Schema.Unknown)
+    )(value);
+
     const vercel = yield* Config.option(Config.string("VERCEL_ENV"));
     let origin: string;
     let headers: Headers;

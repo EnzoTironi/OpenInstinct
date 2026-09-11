@@ -9,6 +9,8 @@ const keySchema = Schema.String.check(
   Schema.isTrimmed()
 );
 
+const decodeEffect_keySchema = Schema.decodeUnknownEffect(keySchema);
+
 const contentSchema = Schema.String.check(Schema.isMaxLength(4000));
 
 const versionSchema = Schema.String.check(Schema.isUUID());
@@ -18,10 +20,17 @@ const MemoryDocumentSchema = Schema.Struct({
   version: versionSchema,
 });
 
+const decodeEffect_MemoryDocumentSchema =
+  Schema.decodeUnknownEffect(MemoryDocumentSchema);
+
 const writeInput = Schema.Struct({
   key: keySchema,
   content: contentSchema,
   expectedVersion: Schema.NullOr(versionSchema),
+});
+
+const decodeEffect_writeInput_strict = Schema.decodeUnknownEffect(writeInput, {
+  onExcessProperty: "error",
 });
 
 export class MemoryDocumentConflict extends Schema.TaggedError<MemoryDocumentConflict>()(
@@ -43,7 +52,7 @@ const invalidInput = () => new MemoryDocumentInvalidInput();
 
 const storageError = () => new MemoryDocumentStorageError();
 
-const decodeDocument = Schema.decodeUnknownEffect(MemoryDocumentSchema);
+const decodeDocument = decodeEffect_MemoryDocumentSchema;
 
 const makeDocuments = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
@@ -51,7 +60,7 @@ const makeDocuments = Effect.gen(function* () {
   return {
     read: Effect.fn("MemoryDocuments.read")(
       function* (key: string) {
-        const valid = yield* Schema.decodeUnknownEffect(keySchema)(key).pipe(
+        const valid = yield* decodeEffect_keySchema(key).pipe(
           Effect.mapError(invalidInput)
         );
 
@@ -68,9 +77,9 @@ const makeDocuments = Effect.gen(function* () {
     ),
     write: Effect.fn("MemoryDocuments.write")(
       function* (input: typeof writeInput.Type) {
-        const value = yield* Schema.decodeUnknownEffect(writeInput, {
-          onExcessProperty: "error",
-        })(input).pipe(Effect.mapError(invalidInput));
+        const value = yield* decodeEffect_writeInput_strict(input).pipe(
+          Effect.mapError(invalidInput)
+        );
 
         const version = randomUUID();
 

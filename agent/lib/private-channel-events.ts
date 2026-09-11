@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import type { ChannelEvents } from "eve/channels";
 
 import type { Identity } from "../../server/accounts";
@@ -10,6 +10,8 @@ import { serverRuntime } from "../../server/runtime";
 import { channelConsentRevision } from "./channel-consent";
 import { renderChannelInput } from "./channel-input";
 import { taskReportDeliveryId } from "./task-report";
+
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
 export function privateChannelEvents(channel: Identity["channel"]) {
   const terminal = (
@@ -123,7 +125,7 @@ function enqueueAuthorization(
 
       const key = createHash("sha256")
         .update(
-          JSON.stringify([
+          encodeJson([
             context.session.id,
             event.turnId,
             event.stepIndex,
@@ -158,18 +160,21 @@ function enqueueInput(
 
       const transport = yield* ChannelTransport;
 
-      for (const request of event.requests) {
-        yield* transport.enqueueText({
-          identityId: identity.id,
-          deliveryKey: `input:${context.session.id}:${request.requestId}`,
-          text: renderChannelInput(request),
-          inputRequest: {
-            sessionId: context.session.id,
-            requestId: request.requestId,
-            revision: channelConsentRevision(request),
-          },
-        });
-      }
+      yield* Effect.forEach(
+        event.requests,
+        (request) =>
+          transport.enqueueText({
+            identityId: identity.id,
+            deliveryKey: `input:${context.session.id}:${request.requestId}`,
+            text: renderChannelInput(request),
+            inputRequest: {
+              sessionId: context.session.id,
+              requestId: request.requestId,
+              revision: channelConsentRevision(request),
+            },
+          }),
+        { concurrency: 1, discard: true }
+      );
 
       yield* transport.drainOutbox(identity.id);
     })

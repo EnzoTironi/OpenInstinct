@@ -16,3 +16,11 @@ high-cognitive-complexity = "off"
 prefer-it-effect = "off"
 v4-unstable-import-awareness = "off"
 prefer-platform-fetch = "off"
+# Node fs/child_process in ops scripts — Effect platform wrappers add little here.
+prefer-node-effect-counterparts = "off"
+# Remaining hits are imported or function-local schemas; naive module hoists caused TDZ/self-init.
+hoist-schema-codecs = "off"
+
+# Channel auth poller: Effect.whileLoop here trips oxlint react(exhaustive-effect-dependencies).
+# Keep the Clock-backed while; revisit when whileLoop + react deps coexist cleanly.
+prefer-foreach-over-yield-loop = "off"

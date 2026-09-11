@@ -60,8 +60,10 @@ const originSchema = Schema.String.check(
   })
 );
 
+const decodeEffect_originSchema = Schema.decodeUnknownEffect(originSchema);
+
 export const internalCallbackOrigin = Config.string("BETTER_AUTH_URL").pipe(
-  Effect.flatMap(Schema.decodeUnknownEffect(originSchema)),
+  Effect.flatMap(decodeEffect_originSchema),
   Effect.map((value) => new URL(value).origin),
   Effect.mapError(() => reject(503))
 );

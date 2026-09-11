@@ -24,6 +24,8 @@ const reportSchema = Schema.Struct({
   reportStatus: Schema.String,
 });
 
+const decodeEffect_reportSchema = Schema.decodeUnknownEffect(reportSchema);
+
 class NativeReportInvalid extends Schema.TaggedError<NativeReportInvalid>()(
   "NativeReportInvalid",
   {}
@@ -74,7 +76,7 @@ export const dispatchNativeScheduledReport = Effect.fn(
       AND r.status IN ('completed', 'dead_letter', 'waiting_for_input') FOR UPDATE OF r`;
 
       if (!rows[0]) return false;
-      const report = yield* Schema.decodeUnknownEffect(reportSchema)(rows[0]);
+      const report = yield* decodeEffect_reportSchema(rows[0]);
 
       if (!["pending", "queued"].includes(report.reportStatus)) return true;
       const deliveryKey = `schedulereport:${runId}:${String(report.reportSequence)}`;
@@ -150,10 +152,13 @@ export const dispatchNativeScheduledReport = Effect.fn(
         text,
       });
 
-      for (const [index, receipt] of receipts.entries()) {
-        yield* sql`INSERT INTO scheduled_agent_report_outputs (run_id, report_sequence, chunk_index, outbox_id)
-        VALUES (${runId}, ${report.reportSequence}, ${index}, ${receipt.id})`;
-      }
+      yield* Effect.forEach(
+        receipts,
+        (receipt, index) =>
+          sql`INSERT INTO scheduled_agent_report_outputs (run_id, report_sequence, chunk_index, outbox_id)
+        VALUES (${runId}, ${report.reportSequence}, ${index}, ${receipt.id})`,
+        { concurrency: 1, discard: true }
+      );
 
       yield* sql`UPDATE scheduled_agent_runs SET report_status = 'queued',
       report_lease_token = NULL, report_lease_expires_at = NULL, updated_at = clock_timestamp()

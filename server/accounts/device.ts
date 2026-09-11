@@ -354,7 +354,9 @@ export class NativeDeviceAuth extends Context.Service<
           AND browser_bound_at IS NOT NULL AND confirmed_at IS NULL AND consumed_at IS NULL
           AND cancelled_at IS NULL AND expires_at > clock_timestamp() ORDER BY browser_bound_at DESC LIMIT 10`;
 
-            return yield* Effect.forEach(rows, (row) => select(row.id));
+            return yield* Effect.forEach(rows, (row) => select(row.id), {
+              concurrency: 1,
+            });
           })
         );
       });
