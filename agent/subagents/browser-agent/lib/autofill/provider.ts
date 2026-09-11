@@ -28,6 +28,45 @@ interface VaultAutofillCodec {
   readonly vaultKind: VaultItemKind;
 }
 
+function setIfPresent(
+  values: Map<string, string>,
+  token: string,
+  value: string | undefined
+) {
+  if (!value) return;
+  values.set(token, value);
+}
+
+function applyContactDateOfBirth(
+  values: Map<string, string>,
+  dateOfBirth: string | undefined
+) {
+  if (!dateOfBirth) return;
+  const [year, month, day] = dateOfBirth.split("-");
+
+  if (!(year && month && day)) return;
+  values.set("bday-day", day);
+  values.set("bday-month", month);
+  values.set("bday-year", year);
+}
+
+function contactVaultClaims(secret: string) {
+  const contact = parseContactVaultPayload(secret);
+
+  if (!contact) {
+    throw new Error("The saved contact is incomplete or invalid.");
+  }
+
+  const values = new Map<string, string>();
+
+  setIfPresent(values, "name", contact.fullName);
+  setIfPresent(values, "email", contact.email);
+  setIfPresent(values, "tel", contact.phone);
+  applyContactDateOfBirth(values, contact.dateOfBirth);
+
+  return values;
+}
+
 const codecs: readonly VaultAutofillCodec[] = [
   {
     claims(_item, secret) {
@@ -134,31 +173,7 @@ const codecs: readonly VaultAutofillCodec[] = [
   },
   {
     claims(_item, secret) {
-      const contact = parseContactVaultPayload(secret);
-
-      if (!contact) {
-        throw new Error("The saved contact is incomplete or invalid.");
-      }
-
-      const values = new Map<string, string>();
-
-      if (contact.fullName) values.set("name", contact.fullName);
-
-      if (contact.email) values.set("email", contact.email);
-
-      if (contact.phone) values.set("tel", contact.phone);
-
-      if (contact.dateOfBirth) {
-        const [year, month, day] = contact.dateOfBirth.split("-");
-
-        if (year && month && day) {
-          values.set("bday-day", day);
-          values.set("bday-month", month);
-          values.set("bday-year", year);
-        }
-      }
-
-      return values;
+      return contactVaultClaims(secret);
     },
     matchReason: "Saved contact",
     surfaceKinds: ["contact", "identity"],
