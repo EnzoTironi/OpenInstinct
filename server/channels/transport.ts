@@ -172,19 +172,28 @@ export const splitChannelText = Effect.fn("ChannelTransport.splitChannelText")(
   }
 );
 
-const makeTransport = Effect.gen(function* () {
-  const sql = yield* PgClient.PgClient;
-  const accounts = yield* ChannelAccounts;
-  const messaging = yield* Messaging;
-  const telegram = yield* Telegram;
-  const kapso = yield* Kapso;
+type ServiceOf<S> =
+  S extends Context.Service<infer _I, infer Api> ? Api : never;
 
-  const identityColumns = sql`i.id, i.user_id AS "userId", i.channel,
+type AccountsService = ServiceOf<typeof ChannelAccounts>;
+
+type MessagingService = ServiceOf<typeof Messaging>;
+
+type TelegramService = ServiceOf<typeof Telegram>;
+
+type KapsoService = ServiceOf<typeof Kapso>;
+
+const identityColumnsFor = (sql: PgClient.PgClient) =>
+  sql`i.id, i.user_id AS "userId", i.channel,
     i.installation_id AS "installationId", i.sender_id AS "senderId"`;
 
-  const findIdentity = Effect.fn("ChannelTransport.findIdentity")(function* (
-    identityId: string
-  ) {
+type IdentityColumns = ReturnType<typeof identityColumnsFor>;
+
+const makeFindIdentity = (
+  sql: PgClient.PgClient,
+  identityColumns: IdentityColumns
+) =>
+  Effect.fn("ChannelTransport.findIdentity")(function* (identityId: string) {
     const id = yield* decodeIdentityId(identityId).pipe(
       Effect.mapError(invalidInput)
     );
@@ -198,45 +207,55 @@ const makeTransport = Effect.gen(function* () {
     return yield* decodeIdentitySchema(rows[0]);
   });
 
-  const activeIdentity = Effect.fn("ChannelTransport.activeIdentity")(
-    function* (identityId: string, expectedChannel: Identity["channel"]) {
-      const channel = yield* decodeChannelProviderSchema(expectedChannel).pipe(
-        Effect.mapError(invalidInput)
+const makeActiveIdentity = (
+  sql: PgClient.PgClient,
+  accounts: AccountsService,
+  findIdentity: ReturnType<typeof makeFindIdentity>
+) =>
+  Effect.fn("ChannelTransport.activeIdentity")(function* (
+    identityId: string,
+    expectedChannel: Identity["channel"]
+  ) {
+    const channel = yield* decodeChannelProviderSchema(expectedChannel).pipe(
+      Effect.mapError(invalidInput)
+    );
+
+    const identity = yield* findIdentity(identityId);
+
+    if (identity.channel !== channel)
+      return yield* new ChannelTransportError({ reason: "channel_mismatch" });
+
+    const active = yield* accounts
+      .getActiveIdentity(identity)
+      .pipe(
+        Effect.catchTag(
+          "ChannelAccountError",
+          () => new ChannelTransportError({ reason: "identity_inactive" })
+        )
       );
 
-      const identity = yield* findIdentity(identityId);
+    if (active.id !== identity.id || active.userId !== identity.userId)
+      return yield* new ChannelTransportError({
+        reason: "identity_inactive",
+      });
+    const scope = accessScopeForUser(`better-auth:${active.userId}`);
 
-      if (identity.channel !== channel)
-        return yield* new ChannelTransportError({ reason: "channel_mismatch" });
-
-      const active = yield* accounts
-        .getActiveIdentity(identity)
-        .pipe(
-          Effect.catchTag(
-            "ChannelAccountError",
-            () => new ChannelTransportError({ reason: "identity_inactive" })
-          )
-        );
-
-      if (active.id !== identity.id || active.userId !== identity.userId)
-        return yield* new ChannelTransportError({
-          reason: "identity_inactive",
-        });
-      const scope = accessScopeForUser(`better-auth:${active.userId}`);
-
-      const membership = yield* sql`SELECT 1 FROM workspace_memberships
+    const membership = yield* sql`SELECT 1 FROM workspace_memberships
         WHERE workspace_id = ${scope.workspaceId} AND user_id = ${scope.userId}`;
 
-      if (membership.length !== 1)
-        return yield* new ChannelTransportError({
-          reason: "identity_inactive",
-        });
+    if (membership.length !== 1)
+      return yield* new ChannelTransportError({
+        reason: "identity_inactive",
+      });
 
-      return active;
-    }
-  );
+    return active;
+  });
 
-  const candidates = Effect.fn("ChannelTransport.candidates")(function* (
+const makeCandidates = (
+  sql: PgClient.PgClient,
+  identityColumns: IdentityColumns
+) =>
+  Effect.fn("ChannelTransport.candidates")(function* (
     lane: "inbox" | "outbox",
     channel: Identity["channel"],
     limit: number
@@ -288,7 +307,8 @@ const makeTransport = Effect.gen(function* () {
     return yield* decodeSchema_Array_IdentitySchema(rows);
   });
 
-  const installationMatches = Effect.fn("ChannelTransport.installationMatches")(
+const makeInstallationMatches = () =>
+  Effect.fn("ChannelTransport.installationMatches")(
     function* (identity: Identity) {
       const configured =
         identity.channel === "telegram"
@@ -322,26 +342,130 @@ const makeTransport = Effect.gen(function* () {
     })
   );
 
-  const dispatch = Effect.fn("ChannelTransport.dispatch")(function* (
-    claim: MessageClaim
-  ) {
+const resolveDispatchIdentity = Effect.fn(
+  "ChannelTransport.resolveDispatchIdentity"
+)(function* (
+  claim: MessageClaim,
+  findIdentity: ReturnType<typeof makeFindIdentity>,
+  activeIdentity: ReturnType<typeof makeActiveIdentity>,
+  installationMatches: ReturnType<typeof makeInstallationMatches>
+) {
+  if (claim.payload.attachments?.length || !claim.payload.text)
+    return yield* new ChannelTransportError({
+      reason: "unsupported_payload",
+    });
+  const stored = yield* findIdentity(claim.identityId);
+  const current = yield* activeIdentity(claim.identityId, stored.channel);
+  yield* installationMatches(current);
+
+  return current;
+});
+
+const markSentOutcome = (
+  messaging: MessagingService,
+  lease: {
+    readonly id: string;
+    readonly identityId: string;
+    readonly leaseToken: string;
+  },
+  receipt: { readonly providerMessageId: string }
+) =>
+  messaging
+    .markSent({ lease, receipt: { status: "sent", ...receipt } })
+    .pipe(Effect.as("sent" as const));
+
+const markFailedOutcome = (
+  messaging: MessagingService,
+  lease: {
+    readonly id: string;
+    readonly identityId: string;
+    readonly leaseToken: string;
+  }
+) =>
+  messaging
+    .markOutboxFailed({ lease, reason: "adapter_rejected" })
+    .pipe(Effect.as("failed" as const));
+
+const markDeferredOutcome = (
+  messaging: MessagingService,
+  lease: {
+    readonly id: string;
+    readonly identityId: string;
+    readonly leaseToken: string;
+  },
+  retryAfterSeconds: number
+) =>
+  messaging
+    .scheduleOutboxRetry({ lease, retryAfterSeconds })
+    .pipe(Effect.as("deferred" as const));
+
+const markUncertainOutcome = (
+  messaging: MessagingService,
+  lease: {
+    readonly id: string;
+    readonly identityId: string;
+    readonly leaseToken: string;
+  }
+) =>
+  messaging
+    .markOutboxUncertain({ lease, reason: "handoff_unknown" })
+    .pipe(Effect.as("uncertain" as const));
+
+const providerInputFailure = (
+  messaging: MessagingService,
+  lease: {
+    readonly id: string;
+    readonly identityId: string;
+    readonly leaseToken: string;
+  },
+  reason: "configuration" | "invalid_input"
+) =>
+  messaging
+    .markOutboxFailed({ lease, reason: "adapter_rejected" })
+    .pipe(Effect.andThen(Effect.fail(new ChannelTransportError({ reason }))));
+
+const providerInputReason = (
+  reason: string
+): "configuration" | "invalid_input" =>
+  reason === "configuration" ? "configuration" : "invalid_input";
+
+const outboundTextSender = (
+  channel: Identity["channel"],
+  telegram: TelegramService,
+  kapso: KapsoService
+) => (channel === "telegram" ? telegram.sendText : kapso.sendText);
+
+const requireClaimText = (claim: MessageClaim) => {
+  if (!claim.payload.text) {
+    return Effect.fail(
+      new ChannelTransportError({ reason: "unsupported_payload" })
+    );
+  }
+
+  return Effect.succeed(claim.payload.text);
+};
+
+const makeDispatch = (
+  messaging: MessagingService,
+  telegram: TelegramService,
+  kapso: KapsoService,
+  findIdentity: ReturnType<typeof makeFindIdentity>,
+  activeIdentity: ReturnType<typeof makeActiveIdentity>,
+  installationMatches: ReturnType<typeof makeInstallationMatches>
+) =>
+  Effect.fn("ChannelTransport.dispatch")(function* (claim: MessageClaim) {
     const lease = {
       id: claim.id,
       identityId: claim.identityId,
       leaseToken: claim.leaseToken,
     };
 
-    const identity = yield* Effect.gen(function* () {
-      if (claim.payload.attachments?.length || !claim.payload.text)
-        return yield* new ChannelTransportError({
-          reason: "unsupported_payload",
-        });
-      const stored = yield* findIdentity(claim.identityId);
-      const current = yield* activeIdentity(claim.identityId, stored.channel);
-      yield* installationMatches(current);
-
-      return current;
-    }).pipe(
+    const identity = yield* resolveDispatchIdentity(
+      claim,
+      findIdentity,
+      activeIdentity,
+      installationMatches
+    ).pipe(
       Effect.catchTag("ChannelTransportError", (error) =>
         messaging
           .markOutboxFailed({ lease, reason: "adapter_rejected" })
@@ -352,66 +476,33 @@ const makeTransport = Effect.gen(function* () {
     yield* messaging.checkOutboxLease(lease);
 
     // No SQL transaction spans provider I/O. Only a confirmed receipt can mark sent.
-    const send =
-      identity.channel === "telegram" ? telegram.sendText : kapso.sendText;
+    const send = outboundTextSender(identity.channel, telegram, kapso);
+    const text = yield* requireClaimText(claim);
 
     return yield* send(
       identity.senderId,
-      claim.payload.text ?? "",
+      text,
       claim.payload.replyToMessageId
     ).pipe(
-      Effect.flatMap((receipt) =>
-        messaging
-          .markSent({ lease, receipt: { status: "sent", ...receipt } })
-          .pipe(Effect.as("sent" as const))
-      ),
+      Effect.flatMap((receipt) => markSentOutcome(messaging, lease, receipt)),
       Effect.catchTags({
-        ProviderRejected: () =>
-          messaging
-            .markOutboxFailed({ lease, reason: "adapter_rejected" })
-            .pipe(Effect.as("failed" as const)),
+        ProviderRejected: () => markFailedOutcome(messaging, lease),
         ProviderRetryable: (error) =>
-          messaging
-            .scheduleOutboxRetry({
-              lease,
-              retryAfterSeconds: error.retryAfterSeconds,
-            })
-            .pipe(Effect.as("deferred" as const)),
-        ProviderUncertain: () =>
-          messaging
-            .markOutboxUncertain({ lease, reason: "handoff_unknown" })
-            .pipe(Effect.as("uncertain" as const)),
+          markDeferredOutcome(messaging, lease, error.retryAfterSeconds),
+        ProviderUncertain: () => markUncertainOutcome(messaging, lease),
         ProviderInputError: (error) =>
-          messaging
-            .markOutboxFailed({ lease, reason: "adapter_rejected" })
-            .pipe(
-              Effect.andThen(
-                Effect.fail(
-                  new ChannelTransportError({
-                    reason:
-                      error.reason === "configuration"
-                        ? "configuration"
-                        : "invalid_input",
-                  })
-                )
-              )
-            ),
+          providerInputFailure(
+            messaging,
+            lease,
+            providerInputReason(error.reason)
+          ),
       })
     );
   });
 
-  const enqueueText = Effect.fn("ChannelTransport.enqueueText")(function* (
-    input: typeof enqueueInput.Type
-  ) {
-    const value = yield* decodeEnqueueInput(input).pipe(
-      Effect.mapError(invalidInput)
-    );
-
-    const identity = yield* findIdentity(value.identityId);
-    yield* activeIdentity(identity.id, identity.channel);
-    const chunks = yield* splitChannelText(value.text);
-
-    const payloads = yield* Effect.forEach(
+const buildEnqueuePayloads = Effect.fn("ChannelTransport.buildEnqueuePayloads")(
+  function* (value: typeof enqueueInput.Type, chunks: readonly string[]) {
+    return yield* Effect.forEach(
       chunks,
       (text) => {
         const payload: Schema.MutableJsonObject = { text };
@@ -428,6 +519,26 @@ const makeTransport = Effect.gen(function* () {
       },
       { concurrency: 1 }
     );
+  }
+);
+
+const makeEnqueueText = (
+  sql: PgClient.PgClient,
+  messaging: MessagingService,
+  findIdentity: ReturnType<typeof makeFindIdentity>,
+  activeIdentity: ReturnType<typeof makeActiveIdentity>
+) =>
+  Effect.fn("ChannelTransport.enqueueText")(function* (
+    input: typeof enqueueInput.Type
+  ) {
+    const value = yield* decodeEnqueueInput(input).pipe(
+      Effect.mapError(invalidInput)
+    );
+
+    const identity = yield* findIdentity(value.identityId);
+    yield* activeIdentity(identity.id, identity.channel);
+    const chunks = yield* splitChannelText(value.text);
+    const payloads = yield* buildEnqueuePayloads(value, chunks);
 
     return yield* sql.withTransaction(
       Effect.gen(function* () {
@@ -467,72 +578,157 @@ const makeTransport = Effect.gen(function* () {
     );
   });
 
-  const enqueueTaskReport = Effect.fn("ChannelTransport.enqueueTaskReport")(
-    function* (input: typeof enqueueInput.Type) {
-      const value = yield* decodeEnqueueInput2(input).pipe(
-        Effect.mapError(invalidInput)
-      );
+const enqueueExistingDelivery = Effect.fn(
+  "ChannelTransport.enqueueExistingDelivery"
+)(function* (
+  messaging: MessagingService,
+  identityId: string,
+  row: { readonly key: string; readonly payload: unknown }
+) {
+  const payload = yield* decodeMessagePayloadSchema(row.payload).pipe(
+    Effect.mapError(invalidInput)
+  );
 
-      yield* decodeSchema_String_check_Schema_isPattern_task_report_0(
-        value.deliveryKey
-      ).pipe(Effect.mapError(invalidInput));
-      yield* sql`SELECT id FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
-      const identity = yield* findIdentity(value.identityId);
-      yield* activeIdentity(identity.id, identity.channel);
-      const prefix = `${value.deliveryKey}:`;
+  return yield* messaging.enqueue({
+    identityId,
+    deliveryKey: row.key,
+    payload,
+  });
+});
 
-      const existing = yield* sql<{
-        key: string;
-        payload: unknown;
-      }>`SELECT delivery_key AS key, payload FROM channel_outbox
+const makeEnqueueTaskReport = (
+  sql: PgClient.PgClient,
+  messaging: MessagingService,
+  findIdentity: ReturnType<typeof makeFindIdentity>,
+  activeIdentity: ReturnType<typeof makeActiveIdentity>,
+  enqueueText: ReturnType<typeof makeEnqueueText>
+) =>
+  Effect.fn("ChannelTransport.enqueueTaskReport")(function* (
+    input: typeof enqueueInput.Type
+  ) {
+    const value = yield* decodeEnqueueInput2(input).pipe(
+      Effect.mapError(invalidInput)
+    );
+
+    yield* decodeSchema_String_check_Schema_isPattern_task_report_0(
+      value.deliveryKey
+    ).pipe(Effect.mapError(invalidInput));
+    yield* sql`SELECT id FROM channel_identity WHERE id = ${value.identityId} FOR UPDATE`;
+    const identity = yield* findIdentity(value.identityId);
+    yield* activeIdentity(identity.id, identity.channel);
+    const prefix = `${value.deliveryKey}:`;
+
+    const existing = yield* sql<{
+      key: string;
+      payload: unknown;
+    }>`SELECT delivery_key AS key, payload FROM channel_outbox
         WHERE identity_id = ${value.identityId}
           AND left(delivery_key, char_length(${prefix})) = ${prefix}
         ORDER BY delivery_key LIMIT 6`;
 
-      if (!existing.length) return yield* enqueueText(value);
+    if (!existing.length) return yield* enqueueText(value);
 
-      if (
-        existing.length > 5 ||
-        existing.some((row, index) => row.key !== `${prefix}${String(index)}`)
-      )
-        return yield* invalidInput();
+    if (
+      existing.length > 5 ||
+      existing.some((row, index) => row.key !== `${prefix}${String(index)}`)
+    )
+      return yield* invalidInput();
 
-      return yield* Effect.forEach(
-        existing,
-        Effect.fn("ChannelTransport.enqueueExistingDelivery")(function* (row) {
-          const payload = yield* decodeMessagePayloadSchema(row.payload).pipe(
-            Effect.mapError(invalidInput)
-          );
+    return yield* Effect.forEach(
+      existing,
+      (row) => enqueueExistingDelivery(messaging, value.identityId, row),
+      { concurrency: 1 }
+    );
+  }, sql.withTransaction);
 
-          return yield* messaging.enqueue({
-            identityId: value.identityId,
-            deliveryKey: row.key,
-            payload,
-          });
-        }),
-        { concurrency: 1 }
-      );
-    },
-    sql.withTransaction
+const deliveredChunkMatches = (
+  chunk: {
+    readonly key: string;
+    readonly status: string;
+    readonly sentAtMs: number | null;
+    readonly providerMessageId: string | null;
+    readonly payload: {
+      readonly text?: string;
+      readonly inputRequest?: {
+        readonly sessionId: string;
+        readonly requestId: string;
+        readonly revision: string;
+      };
+    };
+  },
+  prefix: string,
+  index: number,
+  value: typeof InputDeliveryReferenceSchema.Type
+) => {
+  const delivered = chunk.payload.inputRequest;
+
+  return (
+    chunk.key === `${prefix}${String(index)}` &&
+    chunk.status === "sent" &&
+    chunk.sentAtMs !== null &&
+    Boolean(chunk.providerMessageId) &&
+    Boolean(chunk.payload.text) &&
+    delivered?.sessionId === value.sessionId &&
+    delivered.requestId === value.requestId &&
+    delivered.revision === value.revision
   );
+};
+
+const matchedDeliveredChunk = (
+  chunk: {
+    readonly key: string;
+    readonly status: string;
+    readonly sentAtMs: number | null;
+    readonly providerMessageId: string | null;
+    readonly payload: {
+      readonly text?: string;
+      readonly inputRequest?: {
+        readonly sessionId: string;
+        readonly requestId: string;
+        readonly revision: string;
+      };
+    };
+  },
+  prefix: string,
+  index: number,
+  value: typeof InputDeliveryReferenceSchema.Type
+): {
+  readonly sentAtMs: number;
+  readonly text: string;
+  readonly providerMessageId: string;
+} | null => {
+  if (!deliveredChunkMatches(chunk, prefix, index, value)) return null;
+
+  if (
+    chunk.sentAtMs === null ||
+    !chunk.providerMessageId ||
+    !chunk.payload.text
+  )
+    return null;
 
   return {
-    activeIdentity,
-    deliveredInput: Effect.fn("ChannelTransport.deliveredInput")(function* (
-      identityId: string,
-      reference: typeof InputDeliveryReferenceSchema.Type
-    ) {
-      const id = yield* decodeIdentityId(identityId).pipe(
-        Effect.mapError(invalidInput)
-      );
+    sentAtMs: chunk.sentAtMs,
+    text: chunk.payload.text,
+    providerMessageId: chunk.providerMessageId,
+  };
+};
 
-      const value = yield* decodeInputDeliveryReferenceSchema(reference).pipe(
-        Effect.mapError(invalidInput)
-      );
+const makeDeliveredInput = (sql: PgClient.PgClient) =>
+  Effect.fn("ChannelTransport.deliveredInput")(function* (
+    identityId: string,
+    reference: typeof InputDeliveryReferenceSchema.Type
+  ) {
+    const id = yield* decodeIdentityId(identityId).pipe(
+      Effect.mapError(invalidInput)
+    );
 
-      const prefix = `input:${value.sessionId}:${value.requestId}:`;
+    const value = yield* decodeInputDeliveryReferenceSchema(reference).pipe(
+      Effect.mapError(invalidInput)
+    );
 
-      const rows = yield* sql`SELECT delivery_key AS key, payload, status,
+    const prefix = `input:${value.sessionId}:${value.requestId}:`;
+
+    const rows = yield* sql`SELECT delivery_key AS key, payload, status,
         (extract(epoch FROM sent_at) * 1000)::float8 AS "sentAtMs",
         provider_message_id AS "providerMessageId"
         FROM channel_outbox WHERE identity_id = ${id}
@@ -540,146 +736,187 @@ const makeTransport = Effect.gen(function* () {
           AND substring(delivery_key FROM char_length(${prefix}) + 1) ~ '^[0-9]+$'
         ORDER BY sequence LIMIT 6`;
 
-      const chunks =
-        yield* decodeSchema_Array_Schema_Struct_key_Schema_String_paylo(
-          rows
-        ).pipe(Effect.mapError(invalidInput));
+    const chunks =
+      yield* decodeSchema_Array_Schema_Struct_key_Schema_String_paylo(
+        rows
+      ).pipe(Effect.mapError(invalidInput));
 
-      if (chunks.length === 0 || chunks.length > 5) return null;
-      let deliveredAtMs = 0;
-      const text: string[] = [];
-      const providerMessageIds: string[] = [];
+    if (chunks.length === 0 || chunks.length > 5) return null;
+    let deliveredAtMs = 0;
+    const text: string[] = [];
+    const providerMessageIds: string[] = [];
 
-      for (const [index, chunk] of chunks.entries()) {
-        const delivered = chunk.payload.inputRequest;
+    for (const [index, chunk] of chunks.entries()) {
+      const matched = matchedDeliveredChunk(chunk, prefix, index, value);
 
-        if (
-          chunk.key !== `${prefix}${String(index)}` ||
-          chunk.status !== "sent" ||
-          chunk.sentAtMs === null ||
-          !chunk.providerMessageId ||
-          !chunk.payload.text ||
-          delivered?.sessionId !== value.sessionId ||
-          delivered.requestId !== value.requestId ||
-          delivered.revision !== value.revision
-        )
-          return null;
-        deliveredAtMs = Math.max(deliveredAtMs, chunk.sentAtMs);
-        text.push(chunk.payload.text);
-        providerMessageIds.push(chunk.providerMessageId);
-      }
+      if (!matched) return null;
+      deliveredAtMs = Math.max(deliveredAtMs, matched.sentAtMs);
+      text.push(matched.text);
+      providerMessageIds.push(matched.providerMessageId);
+    }
 
-      const receiptId = providerMessageIds[0];
+    const receiptId = providerMessageIds[0];
 
-      if (!receiptId) return null;
+    if (!receiptId) return null;
 
-      return {
-        ...value,
-        identityId: id,
-        deliveredAtMs,
-        text: text.join(""),
-        receiptId,
-        providerMessageIds,
-      };
-    }),
+    return {
+      ...value,
+      identityId: id,
+      deliveredAtMs,
+      text: text.join(""),
+      receiptId,
+      providerMessageIds,
+    };
+  });
+
+const emptyDrainCounts = (
+  state: DrainOutboxResult["state"],
+  sent: number,
+  uncertain = 0
+): DrainOutboxResult => ({
+  state,
+  sent,
+  failed: 0,
+  uncertain,
+});
+
+const idleOrSentState = (sent: number): "sent" | "idle" =>
+  sent > 0 ? "sent" : "idle";
+
+const uncertainOutboxCount = (
+  counts: readonly { readonly status: string; readonly count: number }[]
+) => counts.find((count) => count.status === "uncertain")?.count ?? 0;
+
+const outboxStillBlocked = (
+  counts: readonly { readonly status: string; readonly count: number }[]
+) =>
+  counts.some(
+    (count) => count.status === "queued" || count.status === "dispatching"
+  );
+
+const drainWhenNoClaim = Effect.fn("ChannelTransport.drainWhenNoClaim")(
+  function* (messaging: MessagingService, id: string, sent: number) {
+    const remaining = yield* messaging.inspectOutbox(id);
+    const uncertain = uncertainOutboxCount(remaining.counts);
+
+    if (uncertain > 0) return emptyDrainCounts("uncertain", sent, uncertain);
+
+    if (outboxStillBlocked(remaining.counts))
+      return emptyDrainCounts("blocked", sent);
+
+    return emptyDrainCounts(idleOrSentState(sent), sent);
+  }
+);
+
+const drainResultAfterDispatch = (
+  state: "failed" | "deferred" | "uncertain",
+  sent: number
+): DrainOutboxResult => ({
+  state,
+  sent,
+  failed: state === "failed" ? 1 : 0,
+  uncertain: state === "uncertain" ? 1 : 0,
+});
+
+const makeDrainOutbox = (
+  messaging: MessagingService,
+  dispatch: ReturnType<typeof makeDispatch>
+) =>
+  Effect.fn("ChannelTransport.drainOutbox")(function* (identityId: string) {
+    const id = yield* decodeIdentityId(identityId).pipe(
+      Effect.mapError(invalidInput)
+    );
+
+    let sent = 0;
+    let result: DrainOutboxResult | null = null;
+
+    yield* Effect.forEach(
+      Array.from({ length: 8 }, (_, index) => index),
+      Effect.fn("ChannelTransport.drainOutbox.attempt")(function* () {
+        if (result) return;
+
+        const claim = yield* messaging.claimOutbox({
+          identityId: id,
+          leaseSeconds: 30,
+        });
+
+        if (!claim) {
+          result = yield* drainWhenNoClaim(messaging, id, sent);
+
+          return;
+        }
+
+        const state = yield* dispatch(claim);
+
+        if (state !== "sent") {
+          result = drainResultAfterDispatch(state, sent);
+
+          return;
+        }
+
+        sent += 1;
+      }),
+      { concurrency: 1, discard: true }
+    );
+
+    return (
+      result ??
+      ({
+        state: "limit",
+        sent,
+        failed: 0,
+        uncertain: 0,
+      } satisfies DrainOutboxResult)
+    );
+  });
+
+const makeTransport = Effect.gen(function* () {
+  const sql = yield* PgClient.PgClient;
+  const accounts = yield* ChannelAccounts;
+  const messaging = yield* Messaging;
+  const telegram = yield* Telegram;
+  const kapso = yield* Kapso;
+
+  const identityColumns = identityColumnsFor(sql);
+  const findIdentity = makeFindIdentity(sql, identityColumns);
+  const activeIdentity = makeActiveIdentity(sql, accounts, findIdentity);
+  const candidates = makeCandidates(sql, identityColumns);
+  const installationMatches = makeInstallationMatches();
+
+  const dispatch = makeDispatch(
+    messaging,
+    telegram,
+    kapso,
+    findIdentity,
+    activeIdentity,
+    installationMatches
+  );
+
+  const enqueueText = makeEnqueueText(
+    sql,
+    messaging,
+    findIdentity,
+    activeIdentity
+  );
+
+  const enqueueTaskReport = makeEnqueueTaskReport(
+    sql,
+    messaging,
+    findIdentity,
+    activeIdentity,
+    enqueueText
+  );
+
+  return {
+    activeIdentity,
+    deliveredInput: makeDeliveredInput(sql),
     inboxCandidates: (channel: Identity["channel"], limit: number) =>
       candidates("inbox", channel, limit),
     outboxCandidates: (channel: Identity["channel"], limit: number) =>
       candidates("outbox", channel, limit),
     enqueueText,
     enqueueTaskReport,
-    drainOutbox: Effect.fn("ChannelTransport.drainOutbox")(function* (
-      identityId: string
-    ) {
-      const id = yield* decodeIdentityId(identityId).pipe(
-        Effect.mapError(invalidInput)
-      );
-
-      let sent = 0;
-      let result: DrainOutboxResult | null = null;
-
-      yield* Effect.forEach(
-        Array.from({ length: 8 }, (_, index) => index),
-        Effect.fn("ChannelTransport.drainOutbox.attempt")(function* () {
-          if (result) return;
-
-          const claim = yield* messaging.claimOutbox({
-            identityId: id,
-            leaseSeconds: 30,
-          });
-
-          if (!claim) {
-            const remaining = yield* messaging.inspectOutbox(id);
-
-            const uncertain =
-              remaining.counts.find((count) => count.status === "uncertain")
-                ?.count ?? 0;
-
-            if (uncertain > 0) {
-              result = {
-                state: "uncertain",
-                sent,
-                failed: 0,
-                uncertain,
-              } satisfies DrainOutboxResult;
-
-              return;
-            }
-
-            const blocked = remaining.counts.some(
-              (count) =>
-                count.status === "queued" || count.status === "dispatching"
-            );
-
-            if (blocked) {
-              result = {
-                state: "blocked",
-                sent,
-                failed: 0,
-                uncertain: 0,
-              } satisfies DrainOutboxResult;
-
-              return;
-            }
-
-            result = {
-              state: sent > 0 ? "sent" : "idle",
-              sent,
-              failed: 0,
-              uncertain: 0,
-            } satisfies DrainOutboxResult;
-
-            return;
-          }
-
-          const state = yield* dispatch(claim);
-
-          if (state !== "sent") {
-            result = {
-              state,
-              sent,
-              failed: state === "failed" ? 1 : 0,
-              uncertain: state === "uncertain" ? 1 : 0,
-            } satisfies DrainOutboxResult;
-
-            return;
-          }
-
-          sent += 1;
-        }),
-        { concurrency: 1, discard: true }
-      );
-
-      return (
-        result ??
-        ({
-          state: "limit",
-          sent,
-          failed: 0,
-          uncertain: 0,
-        } satisfies DrainOutboxResult)
-      );
-    }),
+    drainOutbox: makeDrainOutbox(messaging, dispatch),
   };
 });
 
