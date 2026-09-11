@@ -151,9 +151,14 @@ const quotaResourceUnits = {
 } as const satisfies Record<QuotaResource, string>;
 
 const quotaResourceHorizons = {
-  concurrent_turns: "right now",
+  model_tokens: "for today",
+  tool_calls: "for today",
+  proactive_messages: "for today",
   storage_bytes: "for this account",
-} as const satisfies Partial<Record<QuotaResource, string>>;
+  sandbox_seconds: "for today",
+  active_users: "for today",
+  concurrent_turns: "right now",
+} as const satisfies Record<QuotaResource, string>;
 
 export function quotaFailureMessage(error: QuotaAdmissionError) {
   if (error.reason === "invalid_input") {
@@ -170,7 +175,8 @@ function formatQuotaLimitMessage(error: QuotaAdmissionError) {
   const limit = error.limit ?? 0;
   const requested = error.requested ?? 0;
   const unit = quotaResourceUnits[resource];
-  const horizon = quotaResourceHorizons[resource] ?? "for today";
+
+  const horizon = quotaResourceHorizons[resource];
 
   return `This ${scope} has reached its ${unit} limit ${horizon} (${String(used)} used of ${String(limit)}; requested ${String(requested)}). Try again later, upgrade at /pricing, or ask the operator to raise quotas.`;
 }
