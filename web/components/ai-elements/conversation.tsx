@@ -28,6 +28,65 @@ const scrollPositionSchema = z.object({
   scrollTop: z.number(),
 });
 
+const isConversationRenderChild = (value: ConversationProps["children"]) =>
+  z.function().safeParse(value).success;
+
+const parseConversationRenderChild = (
+  children: ConversationProps["children"]
+) => {
+  const parsedRenderer = z
+    .custom<ConversationRenderChild>(isConversationRenderChild)
+    .safeParse(children);
+
+  if (!parsedRenderer.success) return undefined;
+
+  return parsedRenderer.data;
+};
+
+const conversationInitialScroll = (
+  initial: ConversationProps["initial"],
+  scrollRestorationKey: string | undefined
+) => {
+  if (initial !== undefined) return initial;
+
+  if (scrollRestorationKey === undefined) return "smooth";
+
+  return false;
+};
+
+function ConversationScrollRestorationSlot({
+  storageKey,
+}: {
+  readonly storageKey: string | undefined;
+}) {
+  if (storageKey === undefined) return null;
+
+  return <ConversationScrollRestoration storageKey={storageKey} />;
+}
+
+function useConversationRenderChild(
+  children: ConversationProps["children"],
+  scrollRestorationKey: string | undefined
+) {
+  const renderChild = parseConversationRenderChild(children);
+
+  return useCallback(
+    (context: Parameters<ConversationRenderChild>[0]) => {
+      if (!renderChild) return null;
+
+      return (
+        <>
+          {renderChild(context)}
+          <ConversationScrollRestorationSlot
+            storageKey={scrollRestorationKey}
+          />
+        </>
+      );
+    },
+    [renderChild, scrollRestorationKey]
+  );
+}
+
 export const Conversation = ({
   children,
   className,
@@ -35,52 +94,97 @@ export const Conversation = ({
   scrollRestorationKey,
   ...props
 }: ConversationProps) => {
-  const parsedRenderer = z
-    .custom<ConversationRenderChild>(
-      (value) => z.function().safeParse(value).success
-    )
-    .safeParse(children);
+  const renderChild = parseConversationRenderChild(children);
+  const render = useConversationRenderChild(children, scrollRestorationKey);
 
-  const renderChild = parsedRenderer.success ? parsedRenderer.data : undefined;
+  if (renderChild) {
+    return (
+      <StickToBottom
+        className={cn("relative flex-1 overflow-y-hidden", className)}
+        initial={conversationInitialScroll(initial, scrollRestorationKey)}
+        resize="smooth"
+        role="log"
+        {...props}
+      >
+        {render}
+      </StickToBottom>
+    );
+  }
 
   return (
     <StickToBottom
       className={cn("relative flex-1 overflow-y-hidden", className)}
-      initial={
-        initial ?? (scrollRestorationKey === undefined ? "smooth" : false)
-      }
+      initial={conversationInitialScroll(initial, scrollRestorationKey)}
       resize="smooth"
       role="log"
       {...props}
     >
-      {renderChild ? (
-        (context) => (
-          <>
-            {renderChild(context)}
-            {scrollRestorationKey === undefined ? null : (
-              <ConversationScrollRestoration
-                storageKey={scrollRestorationKey}
-              />
-            )}
-          </>
-        )
-      ) : (
-        <>
-          {children}
-          {scrollRestorationKey === undefined ? null : (
-            <ConversationScrollRestoration storageKey={scrollRestorationKey} />
-          )}
-        </>
-      )}
+      {children}
+      <ConversationScrollRestorationSlot storageKey={scrollRestorationKey} />
     </StickToBottom>
   );
 };
 
-function ConversationScrollRestoration({
-  storageKey,
-}: {
-  readonly storageKey: string;
-}) {
+function restoreScrollPosition(
+  scrollElement: HTMLElement,
+  storageKey: string,
+  scrollToBottom: ReturnType<typeof useStickToBottomContext>["scrollToBottom"]
+) {
+  const saved = readScrollPosition(sessionStorage.getItem(storageKey));
+
+  if (saved?.atBottom === false) {
+    scrollElement.scrollTop = saved.scrollTop;
+    requestAnimationFrame(() => {
+      scrollElement.scrollTop = saved.scrollTop;
+    });
+
+    return;
+  }
+
+  scrollElement.scrollTop = scrollElement.scrollHeight;
+  void scrollToBottom({ animation: "instant", ignoreEscapes: true });
+}
+
+function createScrollSaveHandlers(
+  scrollElement: HTMLElement,
+  storageKey: string,
+  state: ReturnType<typeof useStickToBottomContext>["state"]
+) {
+  const saveNow = () => {
+    sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        atBottom: state.isAtBottom || state.isNearBottom,
+        scrollTop: scrollElement.scrollTop,
+      })
+    );
+  };
+
+  let frame: number | undefined;
+
+  const scheduleSave = () => {
+    if (frame !== undefined) return;
+    frame = requestAnimationFrame(() => {
+      frame = undefined;
+      saveNow();
+    });
+  };
+
+  const cleanup = () => {
+    scrollElement.removeEventListener("scroll", scheduleSave);
+    window.removeEventListener("pagehide", saveNow);
+
+    if (frame !== undefined) cancelAnimationFrame(frame);
+    saveNow();
+  };
+
+  scrollElement.addEventListener("scroll", scheduleSave, { passive: true });
+  window.addEventListener("pagehide", saveNow);
+
+  return cleanup;
+}
+
+function useConversationScrollRestoration(storageKey: string) {
   const { scrollRef, scrollToBottom, state } = useStickToBottomContext();
   const restoredKeyRef = useRef<string | undefined>(undefined);
 
@@ -90,52 +194,20 @@ function ConversationScrollRestoration({
     if (scrollElement === null) return undefined;
 
     if (restoredKeyRef.current !== storageKey) {
-      const saved = readScrollPosition(sessionStorage.getItem(storageKey));
-
-      if (saved?.atBottom === false) {
-        scrollElement.scrollTop = saved.scrollTop;
-        requestAnimationFrame(() => {
-          scrollElement.scrollTop = saved.scrollTop;
-        });
-      } else {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-        void scrollToBottom({ animation: "instant", ignoreEscapes: true });
-      }
-
+      restoreScrollPosition(scrollElement, storageKey, scrollToBottom);
       restoredKeyRef.current = storageKey;
     }
 
-    const saveNow = () => {
-      sessionStorage.setItem(
-        storageKey,
-        JSON.stringify({
-          atBottom: state.isAtBottom || state.isNearBottom,
-          scrollTop: scrollElement.scrollTop,
-        })
-      );
-    };
-
-    let frame: number | undefined;
-
-    const scheduleSave = () => {
-      if (frame !== undefined) return;
-      frame = requestAnimationFrame(() => {
-        frame = undefined;
-        saveNow();
-      });
-    };
-
-    scrollElement.addEventListener("scroll", scheduleSave, { passive: true });
-    window.addEventListener("pagehide", saveNow);
-
-    return () => {
-      scrollElement.removeEventListener("scroll", scheduleSave);
-      window.removeEventListener("pagehide", saveNow);
-
-      if (frame !== undefined) cancelAnimationFrame(frame);
-      saveNow();
-    };
+    return createScrollSaveHandlers(scrollElement, storageKey, state);
   }, [scrollRef, scrollToBottom, state, storageKey]);
+}
+
+function ConversationScrollRestoration({
+  storageKey,
+}: {
+  readonly storageKey: string;
+}) {
+  useConversationScrollRestoration(storageKey);
 
   return null;
 }

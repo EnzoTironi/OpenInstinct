@@ -61,34 +61,141 @@ function importedProductionLayer(
   );
 }
 
+const isMockRunnerIdentifier = (name: string) => {
+  if (name === "vi") return true;
+
+  return name === "jest";
+};
+
+const isModuleMockCallee = (callee: ESTree.CallExpression["callee"]) => {
+  if (!("object" in callee)) return false;
+
+  if (!("property" in callee)) return false;
+
+  if (!("computed" in callee)) return false;
+
+  if (callee.object.type !== "Identifier") return false;
+
+  return isMockRunnerIdentifier(callee.object.name);
+};
+
+const moduleMockMethodName = (callee: ESTree.MemberExpression) => {
+  if (callee.computed) {
+    if (!isStringLiteral(callee.property)) return undefined;
+
+    return callee.property.value;
+  }
+
+  if (callee.property.type !== "Identifier") return undefined;
+
+  return callee.property.name;
+};
+
+const moduleMockSourceArgument = (node: ESTree.CallExpression) => {
+  const [source] = node.arguments;
+
+  if (!source) return undefined;
+
+  if (!isStringLiteral(source)) return undefined;
+
+  return source;
+};
+
 function moduleMockSource(
   node: ESTree.CallExpression
 ): ESTree.Node | undefined {
   const callee = node.callee;
 
-  if (
-    !("object" in callee) ||
-    !("property" in callee) ||
-    !("computed" in callee) ||
-    callee.object.type !== "Identifier" ||
-    (callee.object.name !== "vi" && callee.object.name !== "jest")
-  ) {
-    return undefined;
-  }
+  if (!isModuleMockCallee(callee)) return undefined;
 
-  const method = callee.computed
-    ? isStringLiteral(callee.property)
-      ? callee.property.value
-      : undefined
-    : callee.property.type === "Identifier"
-      ? callee.property.name
-      : undefined;
+  const method = moduleMockMethodName(callee);
 
-  if (!method || !moduleMockMethods.has(method)) return undefined;
+  if (!method) return undefined;
 
-  const [source] = node.arguments;
+  if (!moduleMockMethods.has(method)) return undefined;
 
-  return source && isStringLiteral(source) ? source : undefined;
+  return moduleMockSourceArgument(node);
+}
+
+interface LayerImportState {
+  context: {
+    readonly cwd: string;
+    readonly filename: string;
+    report: (input: {
+      readonly node: ESTree.Node;
+      readonly messageId: "forbiddenImport";
+      readonly data: { readonly owner: string; readonly dependency: string };
+    }) => void;
+  };
+  repositoryRoot: string;
+  importer: string;
+  owner: ProductionLayer | undefined;
+}
+
+function checkLayerImport(
+  state: LayerImportState,
+  node: ESTree.Node,
+  source: string
+) {
+  if (!state.owner) return;
+
+  const dependency = importedProductionLayer(
+    state.importer,
+    source,
+    state.repositoryRoot
+  );
+
+  if (!dependency) return;
+
+  if (!forbiddenDependencies[state.owner].has(dependency)) return;
+
+  state.context.report({
+    node,
+    messageId: "forbiddenImport",
+    data: { owner: state.owner, dependency },
+  });
+}
+
+function makeLayerImportHandlers(context: LayerImportState["context"]) {
+  const state: LayerImportState = {
+    context,
+    repositoryRoot: "",
+    importer: "",
+    owner: undefined,
+  };
+
+  return {
+    before: () => {
+      state.repositoryRoot = path.resolve(context.cwd);
+      state.importer = path.resolve(context.filename);
+      state.owner = productionLayerForPath(
+        state.importer,
+        state.repositoryRoot
+      );
+    },
+    ExportAllDeclaration: (node: ESTree.ExportAllDeclaration) => {
+      checkLayerImport(state, node.source, node.source.value);
+    },
+    ExportNamedDeclaration: (node: ESTree.ExportNamedDeclaration) => {
+      if (!node.source) return;
+      checkLayerImport(state, node.source, node.source.value);
+    },
+    ImportDeclaration: (node: ESTree.ImportDeclaration) => {
+      checkLayerImport(state, node.source, node.source.value);
+    },
+    ImportExpression: (node: ESTree.ImportExpression) => {
+      if (!isStringLiteral(node.source)) return;
+      checkLayerImport(state, node.source, node.source.value);
+    },
+    CallExpression: (node: ESTree.CallExpression) => {
+      const source = moduleMockSource(node);
+
+      if (!source) return;
+
+      if (!isStringLiteral(source)) return;
+      checkLayerImport(state, source, source.value);
+    },
+  };
 }
 
 export const noForbiddenLayerImportsRule = defineRule({
@@ -105,55 +212,6 @@ export const noForbiddenLayerImportsRule = defineRule({
     schema: [],
   },
   createOnce(context) {
-    let repositoryRoot = "";
-    let importer = "";
-    let owner: ProductionLayer | undefined;
-
-    const checkImport = (node: ESTree.Node, source: string) => {
-      if (!owner) return;
-
-      const dependency = importedProductionLayer(
-        importer,
-        source,
-        repositoryRoot
-      );
-
-      if (!dependency || !forbiddenDependencies[owner].has(dependency)) return;
-
-      context.report({
-        node,
-        messageId: "forbiddenImport",
-        data: { owner, dependency },
-      });
-    };
-
-    return {
-      before() {
-        repositoryRoot = path.resolve(context.cwd);
-        importer = path.resolve(context.filename);
-        owner = productionLayerForPath(importer, repositoryRoot);
-      },
-      ExportAllDeclaration(node) {
-        checkImport(node.source, node.source.value);
-      },
-      ExportNamedDeclaration(node) {
-        if (node.source) checkImport(node.source, node.source.value);
-      },
-      ImportDeclaration(node) {
-        checkImport(node.source, node.source.value);
-      },
-      ImportExpression(node) {
-        if (isStringLiteral(node.source)) {
-          checkImport(node.source, node.source.value);
-        }
-      },
-      CallExpression(node) {
-        const source = moduleMockSource(node);
-
-        if (source && isStringLiteral(source)) {
-          checkImport(source, source.value);
-        }
-      },
-    };
+    return makeLayerImportHandlers(context);
   },
 });
