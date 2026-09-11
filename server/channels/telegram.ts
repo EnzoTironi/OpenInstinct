@@ -233,6 +233,63 @@ const telegramMessagePayload = (source: typeof message.Type) => {
   };
 };
 
+const telegramHasConflictingSources = (incoming: typeof update.Type) =>
+  incoming.message !== undefined && incoming.callback_query !== undefined;
+
+const telegramUpdateSource = (incoming: typeof update.Type) =>
+  incoming.callback_query?.message ?? incoming.message;
+
+const telegramUpdateSender = (incoming: typeof update.Type) =>
+  incoming.callback_query?.from ?? incoming.message?.from;
+
+const telegramSenderIsIgnored = (
+  sender: NonNullable<ReturnType<typeof telegramUpdateSender>>,
+  installation: TelegramInstallation
+) => {
+  if (sender.is_bot) return true;
+
+  return String(sender.id) === installation.botId;
+};
+
+const telegramCallbackOutsidePrivate = (
+  incoming: typeof update.Type,
+  chatKind: ReturnType<typeof detectTelegramChatKind>
+) => {
+  if (!incoming.callback_query) return false;
+
+  return chatKind !== "private";
+};
+
+const telegramEventsOrEmpty = (event: InboundEvent | null) => {
+  if (event) return [event];
+
+  return [];
+};
+
+const resolveTelegramUpdateActors = (
+  incoming: typeof update.Type,
+  installation: TelegramInstallation
+) => {
+  const source = telegramUpdateSource(incoming);
+  const sender = telegramUpdateSender(incoming);
+
+  if (!source || !sender) return null;
+
+  if (telegramSenderIsIgnored(sender, installation)) return null;
+  const chatKind = detectTelegramChatKind(source.chat.type);
+
+  if (chatKind === "unsupported") return null;
+
+  // Callbacks / login confirmations remain private-only.
+  if (telegramCallbackOutsidePrivate(incoming, chatKind)) return null;
+
+  if (!resolveTelegramGroupAccess(source, sender, installation, chatKind)) {
+    return null;
+  }
+
+  return { source, sender, chatKind } as const;
+};
+
 export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
   value: Schema.Json,
   configuration: TelegramInstallation,
@@ -244,22 +301,11 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
 
   const incoming = yield* decodeUpdate(value).pipe(Effect.mapError(malformed));
 
-  if (incoming.message && incoming.callback_query) return yield* malformed();
-  const source = incoming.callback_query?.message ?? incoming.message;
-  const sender = incoming.callback_query?.from ?? incoming.message?.from;
+  if (telegramHasConflictingSources(incoming)) return yield* malformed();
+  const actors = resolveTelegramUpdateActors(incoming, installation);
 
-  if (!source || !sender || sender.is_bot) return [];
-
-  if (String(sender.id) === installation.botId) return [];
-  const chatKind = detectTelegramChatKind(source.chat.type);
-
-  if (chatKind === "unsupported") return [];
-
-  // Callbacks / login confirmations remain private-only.
-  if (incoming.callback_query && chatKind !== "private") return [];
-
-  if (!resolveTelegramGroupAccess(source, sender, installation, chatKind))
-    return [];
+  if (!actors) return [];
+  const { source, sender, chatKind } = actors;
 
   const occurredAt = yield* validateEventAge("telegram", source.date, nowMs);
 
@@ -291,7 +337,7 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
     installation.botUsername.replace(/^@/, "")
   );
 
-  return event ? [event] : [];
+  return telegramEventsOrEmpty(event);
 });
 
 const readInstallation = Config.all({
@@ -412,41 +458,54 @@ const downloadableFile = Schema.Struct({
 const decodeEffect_downloadableFile =
   Schema.decodeUnknownEffect(downloadableFile);
 
-const makeTelegram = Effect.gen(function* () {
-  const http = yield* HttpClient.HttpClient;
+const telegramConfigurationError = () =>
+  new ProviderInputError({
+    provider: "telegram",
+    reason: "configuration",
+  });
 
-  const request = Effect.fn("Telegram.request")(function* (
+const telegramInvalidTarget = () =>
+  new ProviderInputError({
+    provider: "telegram",
+    reason: "invalid_target",
+  });
+
+const telegramMalformedReceipt = () =>
+  new ProviderUncertain({
+    provider: "telegram",
+    reason: "malformed_receipt",
+  });
+
+const telegramInvalidMedia = () =>
+  new ChannelMediaError({ reason: "invalid_media" });
+
+const telegramDownloadFailed = () =>
+  new ChannelMediaError({ reason: "download_failed" });
+
+const telegramMediaTooLarge = () =>
+  new ChannelMediaError({ reason: "too_large" });
+
+const telegramWrongInstallation = () =>
+  new ChannelMediaError({ reason: "wrong_installation" });
+
+const makeTelegramRequest = (http: HttpClient.HttpClient) =>
+  Effect.fn("Telegram.request")(function* (
     method: "sendMessage" | "answerCallbackQuery" | "getFile",
     body: Schema.Json
   ) {
     const installation = yield* readInstallation;
 
     const secret = yield* Config.redacted("TELEGRAM_BOT_TOKEN").pipe(
-      Effect.mapError(
-        () =>
-          new ProviderInputError({
-            provider: "telegram",
-            reason: "configuration",
-          })
-      )
+      Effect.mapError(telegramConfigurationError)
     );
 
     const token = Redacted.value(secret);
     yield* decodeSchema_String_check_Schema_isPattern_1_9_0_9_A_Za_(token).pipe(
-      Effect.mapError(
-        () =>
-          new ProviderInputError({
-            provider: "telegram",
-            reason: "configuration",
-          })
-      )
+      Effect.mapError(telegramConfigurationError)
     );
 
     if (token.split(":")[0] !== installation.botId) {
-      return yield* new ProviderInputError({
-        provider: "telegram",
-        reason: "configuration",
-      });
+      return yield* telegramConfigurationError();
     }
 
     return yield* requestProviderJson(
@@ -458,7 +517,35 @@ const makeTelegram = Effect.gen(function* () {
     );
   });
 
-  const send = Effect.fn("Telegram.send")(function* (
+type TelegramRequest = ReturnType<typeof makeTelegramRequest>;
+
+const applyTelegramReply = (
+  body: Schema.MutableJsonObject,
+  reply: string | undefined
+) => {
+  if (!reply) return;
+
+  body.reply_parameters = {
+    message_id: Number(reply),
+    allow_sending_without_reply: false,
+  };
+};
+
+const applyTelegramConfirmation = (
+  body: Schema.MutableJsonObject,
+  confirmation: string | undefined
+) => {
+  if (!confirmation) return;
+
+  body.reply_markup = {
+    inline_keyboard: [
+      [{ text: "Confirm sign-in", callback_data: confirmation }],
+    ],
+  };
+};
+
+const makeTelegramSend = (request: TelegramRequest) =>
+  Effect.fn("Telegram.send")(function* (
     targetId: string,
     text: string,
     reply?: string,
@@ -468,15 +555,7 @@ const makeTelegram = Effect.gen(function* () {
       targetId,
       text,
       reply,
-    }).pipe(
-      Effect.mapError(
-        () =>
-          new ProviderInputError({
-            provider: "telegram",
-            reason: "invalid_target",
-          })
-      )
-    );
+    }).pipe(Effect.mapError(telegramInvalidTarget));
 
     const body: Schema.MutableJsonObject = {
       chat_id: input.targetId,
@@ -484,29 +563,12 @@ const makeTelegram = Effect.gen(function* () {
       link_preview_options: { is_disabled: true },
     };
 
-    if (input.reply)
-      body.reply_parameters = {
-        message_id: Number(input.reply),
-        allow_sending_without_reply: false,
-      };
-
-    if (confirmation)
-      body.reply_markup = {
-        inline_keyboard: [
-          [{ text: "Confirm sign-in", callback_data: confirmation }],
-        ],
-      };
+    applyTelegramReply(body, input.reply);
+    applyTelegramConfirmation(body, confirmation);
 
     const result = yield* request("sendMessage", body).pipe(
       Effect.flatMap(decodeEffect_response),
-      Effect.catchTag(
-        "SchemaError",
-        () =>
-          new ProviderUncertain({
-            provider: "telegram",
-            reason: "malformed_receipt",
-          })
-      )
+      Effect.catchTag("SchemaError", telegramMalformedReceipt)
     );
 
     if (!result.ok) {
@@ -514,125 +576,142 @@ const makeTelegram = Effect.gen(function* () {
     }
 
     if (String(result.result.chat.id) !== input.targetId) {
-      return yield* new ProviderUncertain({
-        provider: "telegram",
-        reason: "malformed_receipt",
-      });
+      return yield* telegramMalformedReceipt();
     }
 
     return { providerMessageId: String(result.result.message_id) };
   });
 
+type TelegramSend = ReturnType<typeof makeTelegramSend>;
+
+const telegramFileIdMismatch = (fileId: string, id: string) => fileId !== id;
+
+const telegramFileTooLarge = (fileSize: number | undefined, maxBytes: number) =>
+  fileSize !== undefined && fileSize > maxBytes;
+
+const telegramBytesMismatch = (
+  fileSize: number | undefined,
+  bytesLength: number
+) => fileSize !== undefined && bytesLength !== fileSize;
+
+const makeTelegramDownloadMedia = (
+  http: HttpClient.HttpClient,
+  request: TelegramRequest
+) =>
+  Effect.fn("Telegram.downloadMedia")(function* (
+    installationId: string,
+    fileId: string,
+    maxBytes: number
+  ) {
+    const installation = yield* readInstallation;
+
+    if (installation.botId !== installationId) {
+      return yield* telegramWrongInstallation();
+    }
+
+    const id = yield* decodeProviderReferenceSchema(fileId).pipe(
+      Effect.mapError(telegramInvalidMedia)
+    );
+
+    const metadata = yield* request("getFile", { file_id: id }).pipe(
+      Effect.flatMap(decodeEffect_downloadableFile),
+      Effect.mapError(telegramDownloadFailed)
+    );
+
+    if (telegramFileIdMismatch(metadata.result.file_id, id)) {
+      return yield* telegramInvalidMedia();
+    }
+
+    if (telegramFileTooLarge(metadata.result.file_size, maxBytes)) {
+      return yield* telegramMediaTooLarge();
+    }
+
+    const secret = yield* Config.redacted("TELEGRAM_BOT_TOKEN").pipe(
+      Effect.mapError(telegramDownloadFailed)
+    );
+
+    const bytes = yield* downloadMediaBytes(
+      http,
+      HttpClientRequest.get(
+        `https://api.telegram.org/file/bot${Redacted.value(secret)}/${metadata.result.file_path}`
+      ),
+      maxBytes
+    );
+
+    if (telegramBytesMismatch(metadata.result.file_size, bytes.length)) {
+      return yield* telegramInvalidMedia();
+    }
+
+    return bytes;
+  });
+
+const makeTelegramParse = () =>
+  Effect.fn("Telegram.parse")(function* (value: Schema.Json) {
+    return yield* parseTelegramUpdate(
+      value,
+      yield* readInstallation,
+      yield* Clock.currentTimeMillis
+    );
+  });
+
+const makeTelegramSendText = (send: TelegramSend) =>
+  Effect.fn("Telegram.sendText")(function* (
+    targetId: string,
+    text: string,
+    reply?: string
+  ) {
+    return yield* send(targetId, text, reply);
+  });
+
+const makeTelegramSendLoginConfirmation = (send: TelegramSend) =>
+  Effect.fn("Telegram.sendLoginConfirmation")(function* (
+    targetId: string,
+    token: string
+  ) {
+    const valid = yield* decodeLoginTokenSchema(token).pipe(
+      Effect.mapError(malformed)
+    );
+
+    const data = `confirm:${valid}`;
+
+    if (Buffer.byteLength(data, "utf8") > 64) return yield* malformed();
+
+    return yield* send(
+      targetId,
+      "Confirm this sign-in only if you requested it in your browser.",
+      undefined,
+      data
+    );
+  });
+
+const makeTelegramAnswerCallbackQuery = (request: TelegramRequest) =>
+  Effect.fn("Telegram.answerCallbackQuery")(function* (
+    callbackQueryId: string
+  ) {
+    const id = yield* decodeProviderReferenceSchema(callbackQueryId).pipe(
+      Effect.mapError(malformed)
+    );
+
+    const body = yield* request("answerCallbackQuery", {
+      callback_query_id: id,
+    });
+
+    yield* decodeSchema_Struct_ok_Schema_Literal_true_result_Schema(body).pipe(
+      Effect.mapError(telegramMalformedReceipt)
+    );
+  });
+
+const makeTelegram = Effect.gen(function* () {
+  const http = yield* HttpClient.HttpClient;
+  const request = makeTelegramRequest(http);
+  const send = makeTelegramSend(request);
+
   return {
-    downloadMedia: Effect.fn("Telegram.downloadMedia")(function* (
-      installationId: string,
-      fileId: string,
-      maxBytes: number
-    ) {
-      const installation = yield* readInstallation;
-
-      if (installation.botId !== installationId)
-        return yield* new ChannelMediaError({ reason: "wrong_installation" });
-
-      const id = yield* decodeProviderReferenceSchema(fileId).pipe(
-        Effect.mapError(
-          () => new ChannelMediaError({ reason: "invalid_media" })
-        )
-      );
-
-      const metadata = yield* request("getFile", { file_id: id }).pipe(
-        Effect.flatMap(decodeEffect_downloadableFile),
-        Effect.mapError(
-          () => new ChannelMediaError({ reason: "download_failed" })
-        )
-      );
-
-      if (metadata.result.file_id !== id)
-        return yield* new ChannelMediaError({ reason: "invalid_media" });
-
-      if (
-        metadata.result.file_size !== undefined &&
-        metadata.result.file_size > maxBytes
-      )
-        return yield* new ChannelMediaError({ reason: "too_large" });
-
-      const secret = yield* Config.redacted("TELEGRAM_BOT_TOKEN").pipe(
-        Effect.mapError(
-          () => new ChannelMediaError({ reason: "download_failed" })
-        )
-      );
-
-      const bytes = yield* downloadMediaBytes(
-        http,
-        HttpClientRequest.get(
-          `https://api.telegram.org/file/bot${Redacted.value(secret)}/${metadata.result.file_path}`
-        ),
-        maxBytes
-      );
-
-      if (
-        metadata.result.file_size !== undefined &&
-        bytes.length !== metadata.result.file_size
-      )
-        return yield* new ChannelMediaError({ reason: "invalid_media" });
-
-      return bytes;
-    }),
-    parse: Effect.fn("Telegram.parse")(function* (value: Schema.Json) {
-      return yield* parseTelegramUpdate(
-        value,
-        yield* readInstallation,
-        yield* Clock.currentTimeMillis
-      );
-    }),
-    sendText: Effect.fn("Telegram.sendText")(function* (
-      targetId: string,
-      text: string,
-      reply?: string
-    ) {
-      return yield* send(targetId, text, reply);
-    }),
-    sendLoginConfirmation: Effect.fn("Telegram.sendLoginConfirmation")(
-      function* (targetId: string, token: string) {
-        const valid = yield* decodeLoginTokenSchema(token).pipe(
-          Effect.mapError(malformed)
-        );
-
-        const data = `confirm:${valid}`;
-
-        if (Buffer.byteLength(data, "utf8") > 64) return yield* malformed();
-
-        return yield* send(
-          targetId,
-          "Confirm this sign-in only if you requested it in your browser.",
-          undefined,
-          data
-        );
-      }
-    ),
-    answerCallbackQuery: Effect.fn("Telegram.answerCallbackQuery")(function* (
-      callbackQueryId: string
-    ) {
-      const id = yield* decodeProviderReferenceSchema(callbackQueryId).pipe(
-        Effect.mapError(malformed)
-      );
-
-      const body = yield* request("answerCallbackQuery", {
-        callback_query_id: id,
-      });
-
-      yield* decodeSchema_Struct_ok_Schema_Literal_true_result_Schema(
-        body
-      ).pipe(
-        Effect.mapError(
-          () =>
-            new ProviderUncertain({
-              provider: "telegram",
-              reason: "malformed_receipt",
-            })
-        )
-      );
-    }),
+    downloadMedia: makeTelegramDownloadMedia(http, request),
+    parse: makeTelegramParse(),
+    sendText: makeTelegramSendText(send),
+    sendLoginConfirmation: makeTelegramSendLoginConfirmation(send),
+    answerCallbackQuery: makeTelegramAnswerCallbackQuery(request),
   };
 });
 

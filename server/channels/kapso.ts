@@ -175,6 +175,140 @@ const kapsoInboundAttachment = (
   }
 };
 
+const isSelfKapsoSender = (senderId: string, installation: KapsoInstallation) =>
+  senderId === digits(installation.phoneNumber);
+
+const kapsoDestinationMismatch = (
+  to: string | undefined,
+  installation: KapsoInstallation
+) => to !== undefined && digits(to) !== digits(installation.phoneNumber);
+
+const kapsoPrivateConversationMismatch = (
+  phoneNumber: string | undefined,
+  senderId: string
+) => phoneNumber !== undefined && digits(phoneNumber) !== senderId;
+
+const kapsoIsInboundLiveMessage = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>
+) => {
+  if (incoming.kapso.direction !== "inbound") return false;
+
+  if (incoming.kapso.status === "received") return true;
+
+  return incoming.kapso.status === "delivered";
+};
+
+const kapsoIsAllowedOrigin = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>
+) => {
+  // Documented live origins; direction/status still exclude Business App sends.
+  // https://docs.kapso.ai/docs/platform/webhooks/advanced#message-origin
+  // History imports, missing and future origins must never become login commands.
+  if (incoming.kapso.origin === "cloud_api") return true;
+
+  return incoming.kapso.origin === "business_app";
+};
+
+const kapsoAttachmentMediaType = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>,
+  attachment: NonNullable<ReturnType<typeof kapsoInboundAttachment>>
+) =>
+  attachment.mime_type ??
+  incoming.kapso.media_data?.content_type ??
+  "application/octet-stream";
+
+const kapsoAttachmentName = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>,
+  attachment: NonNullable<ReturnType<typeof kapsoInboundAttachment>>
+) => attachment.filename ?? incoming.kapso.media_data?.filename;
+
+const kapsoMessagePayload = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>,
+  attachment: ReturnType<typeof kapsoInboundAttachment>
+) => {
+  const text =
+    incoming.type === "text" ? incoming.text?.body : attachment?.caption;
+
+  if (!attachment) {
+    return {
+      text,
+      attachments: [] as const,
+      replyToMessageId: incoming.context?.id,
+    };
+  }
+
+  return {
+    text,
+    attachments: [
+      {
+        id: attachment.id,
+        mediaType: kapsoAttachmentMediaType(incoming, attachment),
+        name: kapsoAttachmentName(incoming, attachment),
+      },
+    ],
+    replyToMessageId: incoming.context?.id,
+  };
+};
+
+const kapsoChatId = (
+  chatKind: ReturnType<typeof detectKapsoChatKind>,
+  incoming: NonNullable<(typeof envelope.Type)["message"]>,
+  item: typeof envelope.Type,
+  senderId: string
+) => {
+  if (chatKind !== "group") return senderId;
+
+  return (
+    incoming.group_id ??
+    item.conversation.id ??
+    item.conversation.phone_number ??
+    senderId
+  );
+};
+
+const kapsoUnsupportedIdentity = () =>
+  new ProviderInputError({
+    provider: "kapso",
+    reason: "unsupported_identity",
+  });
+
+const kapsoWrongInstallation = () =>
+  new ProviderInputError({
+    provider: "kapso",
+    reason: "wrong_installation",
+  });
+
+const authorizeKapsoGroupSender = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>,
+  installation: KapsoInstallation,
+  senderId: string
+) => {
+  const mentionSignals = extractKapsoGroupMentionSignals({
+    installationPhoneDigits: digits(installation.phoneNumber),
+    mentions: incoming.mentions,
+    mentionedIds: incoming.mentioned_ids,
+    kapso: incoming.kapso,
+    contextFromMe: incoming.context?.from_me === true,
+  });
+
+  if (!evaluateGroupMentionPolicy(mentionSignals)) return null;
+
+  return senderId;
+};
+
+const authorizeKapsoPrivateSender = (
+  item: typeof envelope.Type,
+  senderId: string
+) => {
+  if (
+    kapsoPrivateConversationMismatch(item.conversation.phone_number, senderId)
+  ) {
+    return Effect.fail(kapsoWrongInstallation());
+  }
+
+  return Effect.succeed(senderId);
+};
+
 const authorizeKapsoSender = Effect.fn("Kapso.authorizeSender")(function* (
   item: typeof envelope.Type,
   incoming: NonNullable<(typeof envelope.Type)["message"]>,
@@ -182,51 +316,46 @@ const authorizeKapsoSender = Effect.fn("Kapso.authorizeSender")(function* (
   chatKind: ReturnType<typeof detectKapsoChatKind>
 ): Effect.fn.Return<string | null, ProviderInputError> {
   const sender = yield* decodeEffect_phone(incoming.from).pipe(
-    Effect.mapError(
-      () =>
-        new ProviderInputError({
-          provider: "kapso",
-          reason: "unsupported_identity",
-        })
-    )
+    Effect.mapError(kapsoUnsupportedIdentity)
   );
 
   const senderId = digits(sender);
 
-  if (senderId === digits(installation.phoneNumber)) return null;
+  if (isSelfKapsoSender(senderId, installation)) return null;
 
-  if (
-    incoming.to !== undefined &&
-    digits(incoming.to) !== digits(installation.phoneNumber)
-  ) {
-    return yield* new ProviderInputError({
-      provider: "kapso",
-      reason: "wrong_installation",
-    });
+  if (kapsoDestinationMismatch(incoming.to, installation)) {
+    return yield* kapsoWrongInstallation();
   }
 
   if (chatKind === "group") {
-    const mentionSignals = extractKapsoGroupMentionSignals({
-      installationPhoneDigits: digits(installation.phoneNumber),
-      mentions: incoming.mentions,
-      mentionedIds: incoming.mentioned_ids,
-      kapso: incoming.kapso,
-      contextFromMe: incoming.context?.from_me === true,
-    });
-
-    if (!evaluateGroupMentionPolicy(mentionSignals)) return null;
-  } else if (
-    item.conversation.phone_number !== undefined &&
-    digits(item.conversation.phone_number) !== senderId
-  ) {
-    return yield* new ProviderInputError({
-      provider: "kapso",
-      reason: "wrong_installation",
-    });
+    return authorizeKapsoGroupSender(incoming, installation, senderId);
   }
 
-  return senderId;
+  return yield* authorizeKapsoPrivateSender(item, senderId);
 });
+
+const kapsoShouldSkipIncoming = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>
+) => {
+  if (!kapsoIsInboundLiveMessage(incoming)) return true;
+
+  if (!kapsoIsAllowedOrigin(incoming)) return true;
+
+  return incoming.type === "system";
+};
+
+const kapsoRequireAttachment = (
+  incoming: NonNullable<(typeof envelope.Type)["message"]>,
+  attachment: ReturnType<typeof kapsoInboundAttachment>
+) => {
+  if (attachment === null) return Effect.succeed(null);
+
+  if (incoming.type !== "text" && attachment === undefined) {
+    return malformed();
+  }
+
+  return Effect.succeed(attachment);
+};
 
 const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
   item: typeof envelope.Type,
@@ -237,25 +366,9 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
 
   const incoming = item.message;
 
-  if (
-    incoming?.kapso.direction !== "inbound" ||
-    (incoming.kapso.status !== "received" &&
-      incoming.kapso.status !== "delivered")
-  )
-    return null;
-
-  // Documented live origins; direction/status still exclude Business App sends.
-  // https://docs.kapso.ai/docs/platform/webhooks/advanced#message-origin
-  // History imports, missing and future origins must never become login commands.
-  if (
-    incoming.kapso.origin !== "cloud_api" &&
-    incoming.kapso.origin !== "business_app"
-  )
-    return null;
+  if (!incoming || kapsoShouldSkipIncoming(incoming)) return null;
   // Groups stay closed unless provider mention / reply-to-business signals exist.
   const chatKind = detectKapsoChatKind(item.conversation);
-
-  if (incoming.type === "system") return null;
 
   const senderId = yield* authorizeKapsoSender(
     item,
@@ -272,29 +385,12 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
     nowMs
   );
 
-  const attachment = kapsoInboundAttachment(incoming);
+  const attachment = yield* kapsoRequireAttachment(
+    incoming,
+    kapsoInboundAttachment(incoming)
+  );
 
   if (attachment === null) return null;
-
-  if (incoming.type !== "text" && attachment === undefined)
-    return yield* malformed();
-
-  const payload = {
-    text: incoming.type === "text" ? incoming.text?.body : attachment?.caption,
-    attachments: attachment
-      ? [
-          {
-            id: attachment.id,
-            mediaType:
-              attachment.mime_type ??
-              incoming.kapso.media_data?.content_type ??
-              "application/octet-stream",
-            name: attachment.filename ?? incoming.kapso.media_data?.filename,
-          },
-        ]
-      : [],
-    replyToMessageId: incoming.context?.id,
-  };
 
   return yield* normalizeInbound(
     {
@@ -305,15 +401,9 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       senderId,
       occurredAt,
       chatKind,
-      chatId:
-        chatKind === "group"
-          ? (incoming.group_id ??
-            item.conversation.id ??
-            item.conversation.phone_number ??
-            senderId)
-          : senderId,
+      chatId: kapsoChatId(chatKind, incoming, item, senderId),
     },
-    payload
+    kapsoMessagePayload(incoming, attachment)
   );
 });
 
@@ -406,6 +496,94 @@ const downloadableMedia = Schema.Struct({
 const decodeEffect_downloadableMedia =
   Schema.decodeUnknownEffect(downloadableMedia);
 
+const kapsoMediaIdMismatch = (metadataId: string, id: string) =>
+  metadataId !== id;
+
+const kapsoMediaTooLarge = (fileSize: string, maxBytes: number) =>
+  Number(fileSize) > maxBytes;
+
+const kapsoMediaBytesMismatch = (bytesLength: number, fileSize: string) =>
+  bytesLength !== Number(fileSize);
+
+const kapsoInvalidMedia = () =>
+  new ChannelMediaError({ reason: "invalid_media" });
+
+const kapsoDownloadFailed = () =>
+  new ChannelMediaError({ reason: "download_failed" });
+
+const kapsoWrongInstallationMedia = () =>
+  new ChannelMediaError({ reason: "wrong_installation" });
+
+const kapsoMediaTooLargeError = () =>
+  new ChannelMediaError({ reason: "too_large" });
+
+const requireKapsoInstallationMatch = (
+  installationId: string,
+  phoneNumberId: string
+) => {
+  if (phoneNumberId !== installationId) {
+    return Effect.fail(kapsoWrongInstallationMedia());
+  }
+
+  return Effect.void;
+};
+
+const makeKapsoDownloadMedia = (http: HttpClient.HttpClient) =>
+  Effect.fn("Kapso.downloadMedia")(function* (
+    installationId: string,
+    mediaId: string,
+    maxBytes: number
+  ) {
+    const installation = yield* readInstallation;
+    yield* requireKapsoInstallationMatch(
+      installationId,
+      installation.phoneNumberId
+    );
+
+    const id = yield* decodeEffect_phoneId(mediaId).pipe(
+      Effect.mapError(kapsoInvalidMedia)
+    );
+
+    const key = yield* Config.redacted("KAPSO_API_KEY").pipe(
+      Effect.mapError(kapsoDownloadFailed)
+    );
+
+    const metadata = yield* requestProviderJson(
+      http,
+      "kapso",
+      HttpClientRequest.get(
+        `https://api.kapso.ai/meta/whatsapp/v24.0/${id}`
+      ).pipe(
+        HttpClientRequest.setUrlParam("phone_number_id", installationId),
+        HttpClientRequest.setHeader("X-API-Key", Redacted.value(key))
+      )
+    ).pipe(
+      Effect.flatMap(decodeEffect_downloadableMedia),
+      Effect.mapError(kapsoDownloadFailed)
+    );
+
+    if (kapsoMediaIdMismatch(metadata.id, id)) {
+      return yield* kapsoInvalidMedia();
+    }
+
+    if (kapsoMediaTooLarge(metadata.file_size, maxBytes)) {
+      return yield* kapsoMediaTooLargeError();
+    }
+
+    // The provider-issued URL embeds its authorization. Never forward the API key.
+    const bytes = yield* downloadMediaBytes(
+      http,
+      HttpClientRequest.get(metadata.download_url),
+      maxBytes
+    );
+
+    if (kapsoMediaBytesMismatch(bytes.length, metadata.file_size)) {
+      return yield* kapsoInvalidMedia();
+    }
+
+    return bytes;
+  });
+
 const makeKapso = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
 
@@ -487,62 +665,7 @@ const makeKapso = Effect.gen(function* () {
   });
 
   return {
-    downloadMedia: Effect.fn("Kapso.downloadMedia")(function* (
-      installationId: string,
-      mediaId: string,
-      maxBytes: number
-    ) {
-      const installation = yield* readInstallation;
-
-      if (installation.phoneNumberId !== installationId)
-        return yield* new ChannelMediaError({ reason: "wrong_installation" });
-
-      const id = yield* decodeEffect_phoneId(mediaId).pipe(
-        Effect.mapError(
-          () => new ChannelMediaError({ reason: "invalid_media" })
-        )
-      );
-
-      const key = yield* Config.redacted("KAPSO_API_KEY").pipe(
-        Effect.mapError(
-          () => new ChannelMediaError({ reason: "download_failed" })
-        )
-      );
-
-      const metadata = yield* requestProviderJson(
-        http,
-        "kapso",
-        HttpClientRequest.get(
-          `https://api.kapso.ai/meta/whatsapp/v24.0/${id}`
-        ).pipe(
-          HttpClientRequest.setUrlParam("phone_number_id", installationId),
-          HttpClientRequest.setHeader("X-API-Key", Redacted.value(key))
-        )
-      ).pipe(
-        Effect.flatMap(decodeEffect_downloadableMedia),
-        Effect.mapError(
-          () => new ChannelMediaError({ reason: "download_failed" })
-        )
-      );
-
-      if (metadata.id !== id)
-        return yield* new ChannelMediaError({ reason: "invalid_media" });
-
-      if (Number(metadata.file_size) > maxBytes)
-        return yield* new ChannelMediaError({ reason: "too_large" });
-
-      // The provider-issued URL embeds its authorization. Never forward the API key.
-      const bytes = yield* downloadMediaBytes(
-        http,
-        HttpClientRequest.get(metadata.download_url),
-        maxBytes
-      );
-
-      if (bytes.length !== Number(metadata.file_size))
-        return yield* new ChannelMediaError({ reason: "invalid_media" });
-
-      return bytes;
-    }),
+    downloadMedia: makeKapsoDownloadMedia(http),
     parse: Effect.fn("Kapso.parse")(function* (value: Schema.Json) {
       return yield* parseKapsoWebhook(
         value,
