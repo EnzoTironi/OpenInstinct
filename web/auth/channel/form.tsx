@@ -251,15 +251,67 @@ interface PollOutcome {
   readonly failures: number;
 }
 
+interface PollStatusSetters {
+  readonly setError: (error: string | undefined) => void;
+  readonly setStatus: (status: ChannelAuthorizationStatus) => void;
+}
+
+interface PollFailureOptions extends PollStatusSetters {
+  readonly expiresAtMs: number;
+  readonly failure: ChannelAuthorizationError;
+  readonly failures: number;
+  readonly now: number;
+  readonly purpose: Purpose;
+}
+
+interface PollTickOptions extends PollStatusSetters {
+  readonly challengeId: string;
+  readonly expiresAtMs: number;
+  readonly purpose: Purpose;
+}
+
+interface PollOutcomeOptions extends PollStatusSetters {
+  readonly expiresAtMs: number;
+  readonly failures: number;
+  readonly now: number;
+  readonly purpose: Purpose;
+  readonly result: Result.Result<
+    { readonly status: ChannelAuthorizationStatus },
+    ChannelAuthorizationError
+  >;
+}
+
+interface PendingPollOptions extends PollStatusSetters {
+  readonly challenge: Challenge | typeof deviceBoundSchema.Type;
+  readonly controller: AbortController;
+  readonly purpose: Purpose;
+}
+
+interface PendingAuthorizationEffectOptions extends PollStatusSetters {
+  readonly challenge: Challenge | typeof deviceBoundSchema.Type;
+  readonly purpose: Purpose;
+  readonly status: ChannelAuthorizationStatus;
+}
+
+interface CompleteAuthorizationOptions {
+  readonly action: ReturnType<typeof useAuthorizationRequest>;
+  readonly callbackUrl: string;
+  readonly challenge: Challenge | typeof deviceBoundSchema.Type;
+  readonly onRestart: () => void;
+  readonly purpose: Purpose;
+  readonly router: ReturnType<typeof useRouter>;
+  readonly setStatus: (status: ChannelAuthorizationStatus) => void;
+  readonly status: ChannelAuthorizationStatus;
+}
+
 function handlePollSuccess(
   status: ChannelAuthorizationStatus,
-  setStatus: (status: ChannelAuthorizationStatus) => void,
-  setError: (error: string | undefined) => void
+  setters: PollStatusSetters
 ) {
-  setError(undefined);
+  setters.setError(undefined);
 
   if (status !== "pending") {
-    setStatus(status);
+    setters.setStatus(status);
 
     return { done: true, delay: 0, failures: 0 } satisfies PollOutcome;
   }
@@ -267,21 +319,20 @@ function handlePollSuccess(
   return { done: false, delay: 2000, failures: 0 } satisfies PollOutcome;
 }
 
-function handlePollFailure(
-  failure: ChannelAuthorizationError,
-  failures: number,
-  now: number,
-  expiresAtMs: number,
-  purpose: Purpose,
-  setStatus: (status: ChannelAuthorizationStatus) => void,
-  setError: (error: string | undefined) => void
-) {
-  const next = channelPollFailure(failure, failures, now, expiresAtMs);
+function handlePollFailure(options: PollFailureOptions) {
+  const next = channelPollFailure(
+    options.failure,
+    options.failures,
+    options.now,
+    options.expiresAtMs
+  );
 
-  setError(pollErrorMessage(failure, purpose, next.status));
+  options.setError(
+    pollErrorMessage(options.failure, options.purpose, next.status)
+  );
 
   if (next.status !== "pending") {
-    setStatus(next.status);
+    options.setStatus(next.status);
 
     return {
       done: true,
@@ -297,13 +348,7 @@ function handlePollFailure(
   } satisfies PollOutcome;
 }
 
-function createPollTick(
-  challengeId: string,
-  expiresAtMs: number,
-  purpose: Purpose,
-  setStatus: (status: ChannelAuthorizationStatus) => void,
-  setError: (error: string | undefined) => void
-) {
+function createPollTick(options: PollTickOptions) {
   let failures = 0;
 
   const tick: Effect.Effect<void> = Effect.suspend(() =>
@@ -311,27 +356,27 @@ function createPollTick(
   );
 
   function* pollTickBody() {
-    if ((yield* Clock.currentTimeMillis) >= expiresAtMs) {
-      setStatus("expired");
+    if ((yield* Clock.currentTimeMillis) >= options.expiresAtMs) {
+      options.setStatus("expired");
 
       return;
     }
 
-    const result = yield* checkChannelAuthorization(challengeId).pipe(
+    const result = yield* checkChannelAuthorization(options.challengeId).pipe(
       Effect.result
     );
 
     const now = yield* Clock.currentTimeMillis;
 
-    const outcome = pollOutcome(
-      result,
+    const outcome = pollOutcome({
+      expiresAtMs: options.expiresAtMs,
       failures,
       now,
-      purpose,
-      expiresAtMs,
-      setStatus,
-      setError
-    );
+      purpose: options.purpose,
+      result,
+      setError: options.setError,
+      setStatus: options.setStatus,
+    });
 
     if (outcome.done) {
       return;
@@ -347,31 +392,23 @@ function createPollTick(
   });
 }
 
-function pollOutcome(
-  result: Result.Result<
-    { readonly status: ChannelAuthorizationStatus },
-    ChannelAuthorizationError
-  >,
-  failures: number,
-  now: number,
-  purpose: Purpose,
-  expiresAtMs: number,
-  setStatus: (status: ChannelAuthorizationStatus) => void,
-  setError: (error: string | undefined) => void
-) {
-  if (Result.isSuccess(result)) {
-    return handlePollSuccess(result.success.status, setStatus, setError);
+function pollOutcome(options: PollOutcomeOptions) {
+  if (Result.isSuccess(options.result)) {
+    return handlePollSuccess(options.result.success.status, {
+      setError: options.setError,
+      setStatus: options.setStatus,
+    });
   }
 
-  return handlePollFailure(
-    result.failure,
-    failures,
-    now,
-    expiresAtMs,
-    purpose,
-    setStatus,
-    setError
-  );
+  return handlePollFailure({
+    expiresAtMs: options.expiresAtMs,
+    failure: options.result.failure,
+    failures: options.failures,
+    now: options.now,
+    purpose: options.purpose,
+    setError: options.setError,
+    setStatus: options.setStatus,
+  });
 }
 
 function scheduleExpiry(
@@ -397,23 +434,17 @@ function expireAuthorization(
   };
 }
 
-function startPendingPoll(
-  challenge: Challenge | typeof deviceBoundSchema.Type,
-  purpose: Purpose,
-  controller: AbortController,
-  setStatus: (status: ChannelAuthorizationStatus) => void,
-  setError: (error: string | undefined) => void
-) {
-  const poll = createPollTick(
-    challenge.id,
-    Date.parse(challenge.expiresAt),
-    purpose,
-    setStatus,
-    setError
-  );
+function startPendingPoll(options: PendingPollOptions) {
+  const poll = createPollTick({
+    challengeId: options.challenge.id,
+    expiresAtMs: Date.parse(options.challenge.expiresAt),
+    purpose: options.purpose,
+    setError: options.setError,
+    setStatus: options.setStatus,
+  });
 
-  void Effect.runPromise(poll, { signal: controller.signal }).catch(
-    reportPollTransportError(controller, setError)
+  void Effect.runPromise(poll, { signal: options.controller.signal }).catch(
+    reportPollTransportError(options.controller, options.setError)
   );
 }
 
@@ -439,91 +470,76 @@ function cleanupAuthorizationEffect(
 }
 
 function pendingAuthorizationEffect(
-  challenge: Challenge | typeof deviceBoundSchema.Type,
-  purpose: Purpose,
-  status: ChannelAuthorizationStatus,
-  setStatus: (status: ChannelAuthorizationStatus) => void,
-  setError: (error: string | undefined) => void
+  options: PendingAuthorizationEffectOptions
 ) {
   return () => {
-    if (status !== "pending" && status !== "confirmed") {
+    if (options.status !== "pending" && options.status !== "confirmed") {
       return undefined;
     }
 
     const controller = new AbortController();
-    const timer = scheduleExpiry(challenge.expiresAt, controller, setStatus);
 
-    if (status === "pending") {
-      startPendingPoll(challenge, purpose, controller, setStatus, setError);
+    const timer = scheduleExpiry(
+      options.challenge.expiresAt,
+      controller,
+      options.setStatus
+    );
+
+    if (options.status === "pending") {
+      startPendingPoll({
+        challenge: options.challenge,
+        controller,
+        purpose: options.purpose,
+        setError: options.setError,
+        setStatus: options.setStatus,
+      });
     }
 
     return cleanupAuthorizationEffect(timer, controller);
   };
 }
 
-function createCompleteHandler(
-  status: ChannelAuthorizationStatus,
-  challenge: Challenge | typeof deviceBoundSchema.Type,
-  purpose: Purpose,
-  callbackUrl: string,
-  action: ReturnType<typeof useAuthorizationRequest>,
-  onRestart: () => void,
-  router: ReturnType<typeof useRouter>,
-  setStatus: (status: ChannelAuthorizationStatus) => void
-) {
+function createCompleteHandler(options: CompleteAuthorizationOptions) {
   return () => {
-    completePendingAuthorization(
-      status,
-      challenge,
-      purpose,
-      callbackUrl,
-      action,
-      onRestart,
-      router,
-      setStatus
-    );
+    completePendingAuthorization(options);
   };
 }
 
-function completePendingAuthorization(
-  status: ChannelAuthorizationStatus,
-  challenge: Challenge | typeof deviceBoundSchema.Type,
-  purpose: Purpose,
-  callbackUrl: string,
-  action: ReturnType<typeof useAuthorizationRequest>,
-  onRestart: () => void,
-  router: ReturnType<typeof useRouter>,
-  setStatus: (status: ChannelAuthorizationStatus) => void
-) {
-  if (status !== "confirmed") {
+function completePendingAuthorization(options: CompleteAuthorizationOptions) {
+  if (options.status !== "confirmed") {
     return;
   }
 
-  if (new Date() >= new Date(challenge.expiresAt)) {
-    setStatus("expired");
+  if (new Date() >= new Date(options.challenge.expiresAt)) {
+    options.setStatus("expired");
 
     return;
   }
 
-  action.run(
-    completeChannelAuthorization(challenge.id),
-    finishCompletedAuthorization(purpose, callbackUrl, onRestart, router)
+  options.action.run(
+    completeChannelAuthorization(options.challenge.id),
+    finishCompletedAuthorization({
+      callbackUrl: options.callbackUrl,
+      onRestart: options.onRestart,
+      purpose: options.purpose,
+      router: options.router,
+    })
   );
 }
 
-function finishCompletedAuthorization(
-  purpose: Purpose,
-  callbackUrl: string,
-  onRestart: () => void,
-  router: ReturnType<typeof useRouter>
-) {
+function finishCompletedAuthorization(options: {
+  readonly callbackUrl: string;
+  readonly onRestart: () => void;
+  readonly purpose: Purpose;
+  readonly router: ReturnType<typeof useRouter>;
+}) {
   return () => {
-    if (purpose === "link") {
-      onRestart();
+    if (options.purpose === "link") {
+      options.onRestart();
     }
 
-    router.replace(safeCallbackUrl(callbackUrl));
-    router.refresh();
+    options.router.replace(safeCallbackUrl(options.callbackUrl));
+    options.router.refresh();
   };
 }
 
@@ -546,13 +562,13 @@ export function PendingAuthorization({
   const action = useAuthorizationRequest();
 
   useEffect(() => {
-    return pendingAuthorizationEffect(
+    return pendingAuthorizationEffect({
       challenge,
       purpose,
-      status,
+      setError,
       setStatus,
-      setError
-    )();
+      status,
+    })();
   }, [challenge, status, purpose]);
 
   return (
@@ -565,16 +581,16 @@ export function PendingAuthorization({
         error={
           action.error ? channelFailureMessage(action.error, purpose) : error
         }
-        onContinue={createCompleteHandler(
-          status,
-          challenge,
-          purpose,
-          callbackUrl,
+        onContinue={createCompleteHandler({
           action,
+          callbackUrl,
+          challenge,
           onRestart,
+          purpose,
           router,
-          setStatus
-        )}
+          setStatus,
+          status,
+        })}
         onRestart={onRestart}
       />
       <LinkUnauthorized

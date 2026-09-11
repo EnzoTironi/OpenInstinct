@@ -23,7 +23,8 @@
     "react-doctor/duplicate-jsx-subtree": "off",
     "react-doctor/no-static-element-interactions": "off",
     "react-doctor/require-pnpm-hardening": "off",
-    "react-doctor/no-locale-format-in-render": "off"
+    "react-doctor/no-locale-format-in-render": "off",
+    "react-doctor/no-multi-component-file": "off"
   },
   "ignore": {
     "files": [
