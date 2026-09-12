@@ -8,6 +8,8 @@ const publicExact = new Set([
   "/welcome",
   "/pricing",
   "/docs",
+  "/icon",
+  "/favicon.ico",
   "/api/channels/telegram",
   "/api/channels/kapso",
   "/eve/v1/health",
@@ -46,5 +48,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|fonts|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|fonts|favicon.ico|icon$).*)"],
 };

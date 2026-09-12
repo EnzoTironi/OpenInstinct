@@ -18,6 +18,16 @@ beforeEach(() => {
 });
 
 describe("auth proxy matcher", () => {
+  it("does not match the generated document icon", () => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        nextConfig: {},
+        url: "/icon",
+      })
+    ).toBe(false);
+  });
+
   it("does not match public fonts", () => {
     expect(
       unstable_doesMiddlewareMatch({
@@ -74,6 +84,18 @@ describe("auth proxy matcher", () => {
     expect(response.headers.get("location")).toBe(
       "https://example.com/welcome"
     );
+  });
+
+  it("allows the document icon and favicon without a browser session", async () => {
+    const responses = await Promise.all(
+      (["/icon", "/favicon.ico"] as const).map((path) =>
+        proxy(new NextRequest(`https://example.com${path}`))
+      )
+    );
+    for (const response of responses) {
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    }
+    expect(getAuthSession).not.toHaveBeenCalled();
   });
 
   it("allows the schedule dispatcher without a browser session in development", async () => {

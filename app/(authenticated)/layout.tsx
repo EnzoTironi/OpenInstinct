@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@web/components/ui/logo";
 import {
@@ -18,6 +19,10 @@ import {
   AuthenticatedMobileHeader,
   AuthenticatedNavigation,
 } from "./_components/authenticated-navigation";
+
+export const metadata: Metadata = {
+  title: "Companion",
+};
 
 export default async function AuthenticatedLayout({
   children,

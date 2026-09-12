@@ -9,9 +9,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(applicationOrigin()),
-  title: "OpenInstinct",
+  title: "Companion",
   description:
-    "A self-hosted personal agent with private credentials and Kernel-powered browser execution.",
+    "Companion by Instinct — your assistant in Telegram, WhatsApp, and the web.",
+  icons: {
+    icon: [{ url: "/icon", type: "image/png" }, { url: "/favicon.ico" }],
+  },
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

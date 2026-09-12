@@ -90,6 +90,7 @@ const enqueueInput = Schema.Struct({
   text: textSchema,
   inputRequest: Schema.optionalKey(InputDeliveryReferenceSchema),
   replyToMessageId: Schema.optionalKey(ProviderReferenceSchema),
+  deliveryTargetId: Schema.optionalKey(ProviderReferenceSchema),
 });
 const candidateInput = Schema.Struct({
   channel: channelProviderSchema,
@@ -269,8 +270,12 @@ const makeTransport = Effect.gen(function* () {
     // No SQL transaction spans provider I/O. Only a confirmed receipt can mark sent.
     const send =
       identity.channel === "telegram" ? telegram.sendText : kapso.sendText;
+    const targetId =
+      identity.channel === "telegram" && claim.payload.deliveryTargetId
+        ? claim.payload.deliveryTargetId
+        : identity.senderId;
     return yield* send(
-      identity.senderId,
+      targetId,
       claim.payload.text ?? "",
       claim.payload.replyToMessageId
     ).pipe(
@@ -328,6 +333,8 @@ const makeTransport = Effect.gen(function* () {
         payload.inputRequest = { ...value.inputRequest };
       if (value.replyToMessageId !== undefined)
         payload.replyToMessageId = value.replyToMessageId;
+      if (value.deliveryTargetId !== undefined)
+        payload.deliveryTargetId = value.deliveryTargetId;
       return Schema.decodeUnknownEffect(MessagePayloadSchema)(payload).pipe(
         Effect.mapError(invalidInput)
       );

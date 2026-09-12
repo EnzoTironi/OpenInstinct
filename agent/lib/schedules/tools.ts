@@ -21,7 +21,10 @@ export function scheduleOwner(context: ToolContext) {
       : Schema.decodeUnknownSync(
           conversationChannel === "linq"
             ? Schema.String.check(Schema.isStartsWith("linq:"))
-            : Schema.String.check(Schema.isUUID())
+            : Schema.Union([
+                Schema.String.check(Schema.isUUID()),
+                Schema.String.check(Schema.isStartsWith("group:")),
+              ])
         )(auth.attributes.conversationId);
   return { conversation: { conversationChannel, conversationId }, scope };
 }

@@ -6,6 +6,8 @@ import {
   detectTelegramChatKind,
   evaluateGroupMentionPolicy,
   extractKapsoGroupMentionSignals,
+  groupBindingFromPayload,
+  groupConversationMatchesIdentity,
   telegramTextMentionsBot,
 } from "./group-policy";
 
@@ -77,6 +79,42 @@ test("bindGroupChannelIdentity scopes conversation to group chat", async () => {
     conversationScope: "group:telegram:123456:-100123",
     deliveryTargetId: "-100123",
   });
+});
+
+test("groupConversationMatchesIdentity accepts only this install's group scope", () => {
+  const identity = { channel: "telegram" as const, installationId: "123456" };
+  expect(
+    groupConversationMatchesIdentity("group:telegram:123456:-100123", identity)
+  ).toBe(true);
+  expect(
+    groupConversationMatchesIdentity("group:telegram:999:-100123", identity)
+  ).toBe(false);
+  expect(
+    groupConversationMatchesIdentity(
+      "11111111-1111-4111-8111-111111111111",
+      identity
+    )
+  ).toBe(false);
+});
+
+test("groupBindingFromPayload requires matching scope and delivery target", () => {
+  expect(
+    groupBindingFromPayload({
+      conversationScope: "group:telegram:123456:-100123",
+      deliveryTargetId: "-100123",
+    })
+  ).toEqual({
+    conversationScope: "group:telegram:123456:-100123",
+    chatKind: "group",
+    chatId: "-100123",
+  });
+  expect(
+    groupBindingFromPayload({
+      conversationScope: "group:telegram:123456:-100123",
+      deliveryTargetId: "789012",
+    })
+  ).toBeUndefined();
+  expect(groupBindingFromPayload({})).toBeUndefined();
 });
 
 test("kapso mention extract requires explicit provider signals", () => {

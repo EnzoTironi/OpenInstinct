@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { ChannelAuthForm } from "@web/auth/channel/form";
 import { safeCallbackUrl } from "@web/auth/channel/client";
 import { getAuthSession } from "@db/services/auth/session";
+
+export const metadata: Metadata = {
+  title: "Sign in | Companion",
+  description:
+    "Sign in to Companion through Telegram or WhatsApp. No phone number to type.",
+};
 
 export default async function SignInPage({
   searchParams,

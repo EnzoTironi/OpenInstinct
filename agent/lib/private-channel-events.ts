@@ -2,12 +2,69 @@ import { renderChannelInput } from "./channel-input";
 import { taskReportDeliveryId } from "./task-report";
 import { channelConsentRevision } from "./channel-consent";
 import { createHash } from "node:crypto";
-import { Effect } from "effect";
-import type { ChannelEvents } from "eve/channels";
+import { Effect, Option, Schema } from "effect";
+import type { ChannelEvents, ChannelSendOptions } from "eve/channels";
 import type { Identity } from "../../server/accounts";
 import { ChannelTransport } from "../../server/channels/transport";
 import { serverRuntime } from "../../server/runtime";
 import { requireChannelPrincipal } from "../../server/channels/principal";
+
+const groupDeliveryAttributesSchema = Schema.Struct({
+  groupChatId: Schema.optionalKey(
+    Schema.String.check(Schema.isMinLength(1), Schema.isTrimmed())
+  ),
+  sourceMessageId: Schema.optionalKey(
+    Schema.String.check(Schema.isMinLength(1), Schema.isTrimmed())
+  ),
+});
+
+function telegramGroupDelivery(
+  channel: Identity["channel"],
+  auth: ChannelSendOptions["auth"]
+) {
+  if (channel !== "telegram" || !auth) return undefined;
+  const attributes = Option.getOrUndefined(
+    Schema.decodeUnknownOption(groupDeliveryAttributesSchema)(auth.attributes)
+  );
+  if (!attributes?.groupChatId) return undefined;
+  if (!attributes.sourceMessageId) {
+    return { deliveryTargetId: attributes.groupChatId };
+  }
+  return {
+    deliveryTargetId: attributes.groupChatId,
+    replyToMessageId: attributes.sourceMessageId,
+  };
+}
+
+function enqueueDeliveredText(
+  enqueue: ChannelTransport["Service"]["enqueueText"],
+  channel: Identity["channel"],
+  auth: ChannelSendOptions["auth"],
+  input: {
+    readonly identityId: string;
+    readonly deliveryKey: string;
+    readonly text: string;
+    readonly inputRequest?: {
+      readonly sessionId: string;
+      readonly requestId: string;
+      readonly revision: string;
+    };
+  }
+) {
+  const delivery = telegramGroupDelivery(channel, auth);
+  if (!delivery) return enqueue(input);
+  if (!delivery.replyToMessageId) {
+    return enqueue({
+      ...input,
+      deliveryTargetId: delivery.deliveryTargetId,
+    });
+  }
+  return enqueue({
+    ...input,
+    deliveryTargetId: delivery.deliveryTargetId,
+    replyToMessageId: delivery.replyToMessageId,
+  });
+}
 
 export function privateChannelEvents(channel: Identity["channel"]) {
   const terminal = (
@@ -24,7 +81,7 @@ export function privateChannelEvents(channel: Identity["channel"]) {
           null;
         const identity = yield* requireChannelPrincipal(channel, auth);
         const transport = yield* ChannelTransport;
-        yield* transport.enqueueText({
+        yield* enqueueDeliveredText(transport.enqueueText, channel, auth, {
           identityId: identity.id,
           deliveryKey: `turn-status:${context.session.id}:${event.turnId}`,
           text: "This turn ended before completion.",
@@ -54,7 +111,7 @@ export function privateChannelEvents(channel: Identity["channel"]) {
           const enqueue = reportId
             ? transport.enqueueTaskReport
             : transport.enqueueText;
-          yield* enqueue({
+          yield* enqueueDeliveredText(enqueue, channel, auth, {
             identityId: identity.id,
             deliveryKey:
               reportId ??
@@ -118,7 +175,7 @@ function enqueueAuthorization(
           ])
         )
         .digest("hex");
-      yield* transport.enqueueText({
+      yield* enqueueDeliveredText(transport.enqueueText, channel, auth, {
         identityId: identity.id,
         deliveryKey: `authorization:${key}`,
         text,
@@ -135,13 +192,12 @@ function enqueueInput(
   if (context.session.parent) return Promise.resolve();
   return serverRuntime.runPromise(
     Effect.gen(function* () {
-      const identity = yield* requireChannelPrincipal(
-        channel,
-        context.session.auth.current ?? context.session.auth.initiator ?? null
-      );
+      const auth =
+        context.session.auth.current ?? context.session.auth.initiator ?? null;
+      const identity = yield* requireChannelPrincipal(channel, auth);
       const transport = yield* ChannelTransport;
       for (const request of event.requests) {
-        yield* transport.enqueueText({
+        yield* enqueueDeliveredText(transport.enqueueText, channel, auth, {
           identityId: identity.id,
           deliveryKey: `input:${context.session.id}:${request.requestId}`,
           text: renderChannelInput(request),

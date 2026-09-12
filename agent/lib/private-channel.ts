@@ -8,6 +8,7 @@ import {
   dispatchAuthPrompt,
   dispatchItem,
 } from "../../server/channels/dispatch";
+import { bindGroupChannelIdentity } from "../../server/channels/group-policy";
 import { Telegram } from "../../server/channels/telegram";
 import { Kapso } from "../../server/channels/kapso";
 import { readVerifiedWebhook } from "../../server/channels/webhook";
@@ -58,16 +59,35 @@ export function privateChannel(channel: Identity["channel"]) {
                 }
               } else {
                 const identity = yield* accounts.resolveVerifiedSender(sender);
+                const group =
+                  event.chatKind === "group"
+                    ? yield* bindGroupChannelIdentity({
+                        identityId: identity.id,
+                        channel: event.channel,
+                        installationId: event.installationId,
+                        senderId: event.senderId,
+                        chatId: event.chatId,
+                      })
+                    : undefined;
+                const occurredAtMs = DateTime.toEpochMillis(
+                  DateTime.makeUnsafe(event.occurredAt)
+                );
+                const payload = group
+                  ? {
+                      ...event.payload,
+                      sourceOccurredAtMs: occurredAtMs,
+                      deliveryTargetId: group.deliveryTargetId,
+                      conversationScope: group.conversationScope,
+                    }
+                  : {
+                      ...event.payload,
+                      sourceOccurredAtMs: occurredAtMs,
+                    };
                 yield* messaging.accept({
                   identityId: identity.id,
                   eventId: event.eventId,
                   sourceMessageId: event.messageId,
-                  payload: {
-                    ...event.payload,
-                    sourceOccurredAtMs: DateTime.toEpochMillis(
-                      DateTime.makeUnsafe(event.occurredAt)
-                    ),
-                  },
+                  payload,
                 });
                 identities.set(identity.id, identity);
               }

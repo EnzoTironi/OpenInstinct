@@ -91,6 +91,37 @@ const GroupIdentityBindingSchema = Schema.Struct({
  * Actor authority stays on the sender row; conversation scope is group-keyed.
  * No database writes — G02/G03 own persistence and shared memory.
  */
+export const groupConversationMatchesIdentity = (
+  conversationId: string,
+  identity: {
+    readonly channel: "telegram" | "kapso";
+    readonly installationId: string;
+  }
+): boolean => {
+  const match = /^group:(telegram|kapso):([^:\s]{1,256}):([^:\s]{1,256})$/.exec(
+    conversationId
+  );
+  return (
+    match?.[1] === identity.channel && match[2] === identity.installationId
+  );
+};
+
+export const groupBindingFromPayload = (payload: {
+  readonly conversationScope?: string;
+  readonly deliveryTargetId?: string;
+}) => {
+  if (!payload.conversationScope || !payload.deliveryTargetId) return undefined;
+  const match = /^group:(telegram|kapso):([^:\s]{1,256}):([^:\s]{1,256})$/.exec(
+    payload.conversationScope
+  );
+  if (!match || match[3] !== payload.deliveryTargetId) return undefined;
+  return {
+    conversationScope: payload.conversationScope,
+    chatKind: "group" as const,
+    chatId: payload.deliveryTargetId,
+  };
+};
+
 export const bindGroupChannelIdentity = Effect.fn("bindGroupChannelIdentity")(
   function* (input: {
     readonly identityId: string;
