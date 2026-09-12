@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { expect, it } from "vitest";
 
-import { cardCopy, connectCopy } from "./copy";
+import { cardCopy, connectCopy, offerCopy, quarantineCardMessage } from "./copy";
 import { cardCounts, parseMailbox } from "./mailbox";
 
 function datedMbox() {
@@ -58,6 +58,13 @@ it("does parse a Portuguese mbox into people and threads", async () => {
   );
   expect(connectCopy).toBe(
     "Vou ler sua caixa para mostrar com quem você fala. Não vou mandar e-mail. Não vou alterar a agenda."
+  );
+  expect(offerCopy).toBe(
+    "Registrar as pessoas com quem você falou nos últimos 30 dias"
+  );
+  const digest = "a".repeat(64);
+  expect(quarantineCardMessage(cardCopy(3, 3, 1, 0), digest)).toBe(
+    `${cardCopy(3, 3, 1, 0)}\n\n${digest}\n\n${offerCopy}`
   );
 });
 

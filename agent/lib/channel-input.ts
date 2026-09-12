@@ -8,7 +8,13 @@ import {
   type InputRequest,
   type MessageStreamEvent,
 } from "eve/client";
+import { z } from "zod";
 import { quarantineCardMessage } from "../../server/operon/copy";
+
+const emailRegisterApprovalInput = z.object({
+  card: z.string().min(1),
+  viewedDigest: z.string().length(64),
+});
 
 export const channelQuestionSchema = ASK_QUESTION_INPUT_SCHEMA.refine(
   (input) =>
@@ -21,10 +27,11 @@ export function renderChannelInput(request: InputRequest) {
     const toolName = request.action.toolName;
     switch (toolName) {
       case "email-register": {
-        const card = request.action.input.card;
-        const viewedDigest = request.action.input.viewedDigest;
+        const { card, viewedDigest } = emailRegisterApprovalInput.parse(
+          request.action.input
+        );
         return approvalMessageSchema.parse(
-          quarantineCardMessage(String(card), String(viewedDigest))
+          quarantineCardMessage(card, viewedDigest)
         );
       }
       default:
