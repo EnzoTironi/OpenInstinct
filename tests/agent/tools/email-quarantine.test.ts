@@ -21,17 +21,21 @@ const pendingControls = vi.hoisted(() => {
   };
 });
 
-vi.mock("eve/context", () => ({
-  defineState<T>(_name: string, initial: () => T) {
-    pendingControls.set(initial());
-    return {
-      get: () => pendingControls.get() as T,
-      update(update: (current: T) => T) {
-        pendingControls.set(update(pendingControls.get() as T));
-      },
-    };
-  },
-}));
+vi.mock("eve/context", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("eve/context")>();
+  return {
+    ...actual,
+    defineState<T>(_name: string, initial: () => T) {
+      pendingControls.set(initial());
+      return {
+        get: () => pendingControls.get() as T,
+        update(update: (current: T) => T) {
+          pendingControls.set(update(pendingControls.get() as T));
+        },
+      };
+    },
+  };
+});
 
 import {
   emailConnect,
@@ -124,6 +128,26 @@ it("does reject register without a matching pending digest", async () => {
         approvalMessage: "Eve inventou outro texto para o humano.",
         viewedDigest: "b".repeat(64),
         card,
+      },
+      { ...toolContext(), toolName: "email-register" }
+    )
+  ).rejects.toMatchObject({ reason: "stale_digest" });
+});
+
+it("does reject register when the viewed card does not match pending", async () => {
+  pendingControls.set({
+    sessionId: "session-1",
+    workspaceId: "workspace-1",
+    proposalId: "proposal-1",
+    digest,
+    card,
+  });
+  await expect(
+    emailRegister.execute(
+      {
+        approvalMessage: "Eve inventou outro texto para o humano.",
+        viewedDigest: digest,
+        card: "4 conversas em quarentena, 4 pessoas, 1 empresas, 0 nomes em conflito.",
       },
       { ...toolContext(), toolName: "email-register" }
     )
