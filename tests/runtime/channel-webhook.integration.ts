@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomBytes, randomInt } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
-import { Config, Effect } from "effect";
+import { Config, Effect, Schema } from "effect";
 import type { RouteHandlerArgs } from "eve/channels";
 import { afterEach, test, vi } from "vitest";
 import { privateChannel } from "../../agent/lib/private-channel";
@@ -9,17 +9,36 @@ import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 
-// Exercise HTTP acceptance and real storage without sending provider messages.
-vi.mock("../../server/channels/dispatch", () => ({
-  dispatchItem: () => Effect.void,
-  dispatchAuthPrompt: () => Effect.void,
-}));
+const telegramRequest = Schema.Struct({
+  text: Schema.String,
+  chat_id: Schema.optionalKey(Schema.String),
+  message_id: Schema.optionalKey(Schema.Number),
+  callback_query_id: Schema.optionalKey(Schema.String),
+  show_alert: Schema.optionalKey(Schema.Boolean),
+  reply_markup: Schema.optionalKey(
+    Schema.Struct({
+      inline_keyboard: Schema.Array(
+        Schema.Array(
+          Schema.Struct({
+            text: Schema.String,
+            callback_data: Schema.String,
+          })
+        )
+      ),
+    })
+  ),
+});
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 test("refused Telegram logins are acknowledged without blocking a fresh confirmation", async () => {
-  vi.stubEnv("TELEGRAM_BOT_ID", String(randomInt(100_000_000, 999_999_999)));
+  const botId = String(randomInt(100_000_000, 999_999_999));
+  vi.stubEnv("TELEGRAM_BOT_ID", botId);
   vi.stubEnv("TELEGRAM_BOT_USERNAME", "channel_test_bot");
+  vi.stubEnv("TELEGRAM_BOT_TOKEN", `${botId}:test_token`);
   vi.stubEnv("TELEGRAM_WEBHOOK_SECRET", randomBytes(32).toString("hex"));
   const configuration = await serverRuntime.runPromise(
     Effect.gen(function* () {
@@ -33,6 +52,38 @@ test("refused Telegram logins are acknowledged without blocking a fresh confirma
         secret: Config.string("TELEGRAM_WEBHOOK_SECRET"),
       });
     })
+  );
+  const delivery: { method: string; body: typeof telegramRequest.Type }[] = [];
+  let rejectNextAnswer = false;
+  // Keep parsing, dispatch and storage real; replace only the external HTTP boundary.
+  vi.stubGlobal(
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      assert.equal(url.origin, "https://api.telegram.org");
+      const method = url.pathname.split("/").at(-1);
+      assert.ok(method);
+      const body = Schema.decodeUnknownSync(telegramRequest)(
+        await request.json()
+      );
+      delivery.push({ method, body });
+      if (method === "answerCallbackQuery") {
+        if (rejectNextAnswer) {
+          rejectNextAnswer = false;
+          return Response.json({ ok: false, error_code: 400 }, { status: 400 });
+        }
+        return Response.json({ ok: true, result: true });
+      }
+      assert.ok(method === "sendMessage" || method === "editMessageText");
+      return Response.json({
+        ok: true,
+        result: {
+          message_id: body.message_id ?? delivery.length,
+          chat: { id: Number(body.chat_id), type: "private" },
+        },
+      });
+    }
   );
   const senderId = randomInt(100_000_000, 999_999_999);
   const sender = {
@@ -137,10 +188,36 @@ test("refused Telegram logins are acknowledged without blocking a fresh confirma
       }),
     ]);
     for (const response of refused) assert.equal(response.status, 200);
+    await Promise.all(background);
+    assert.ok(
+      delivery.some(
+        ({ method, body }) =>
+          method === "answerCallbackQuery" &&
+          body.show_alert === true &&
+          body.text.includes("cannot be confirmed")
+      )
+    );
+    assert.ok(
+      delivery.some(
+        ({ method, body }) =>
+          method === "sendMessage" && body.text.includes("start a new request")
+      )
+    );
+    assert.equal(
+      delivery.some(({ method }) => method === "editMessageText"),
+      false
+    );
+    assert.equal(
+      delivery.filter(({ method }) => method === "answerCallbackQuery").length,
+      2
+    );
+    const refusedDeliveryCount = delivery.length;
     assert.equal(
       (await request(expired.token, { secret: "wrong-secret" })).status,
       401
     );
+    await Promise.all(background);
+    assert.equal(delivery.length, refusedDeliveryCount);
 
     const fresh = await issue();
     assert.equal((await request(fresh.token)).status, 200);
@@ -151,14 +228,43 @@ test("refused Telegram logins are acknowledged without blocking a fresh confirma
         const prompts = yield* sql<{
           status: string;
         }>`SELECT status FROM public.channel_auth_prompt WHERE challenge_id = ${fresh.challengeId}`;
-        assert.deepEqual(prompts, [{ status: "queued" }]);
+        assert.deepEqual(prompts, [{ status: "sent" }]);
         const rejectedPrompts =
           yield* sql`SELECT challenge_id FROM public.channel_auth_prompt WHERE challenge_id = ${expired.challengeId}`;
         assert.equal(rejectedPrompts.length, 0);
       })
     );
+    const prompt = delivery.find(({ body }) => Boolean(body.reply_markup));
+    assert.ok(prompt);
+    assert.match(prompt.body.text, /return to that tab to finish signing in/i);
+    assert.deepEqual(prompt.body.reply_markup, {
+      inline_keyboard: [
+        [{ text: "Confirm sign-in", callback_data: `confirm:${fresh.token}` }],
+      ],
+    });
+    // A late/rejected toast must neither undo confirmation nor prevent the visible edit.
+    rejectNextAnswer = true;
     assert.equal((await request(fresh.token, { confirm: true })).status, 200);
     await Promise.all(background);
+    const feedback = delivery.slice(-2);
+    assert.deepEqual(
+      feedback.map(({ method }) => method),
+      ["answerCallbackQuery", "editMessageText"]
+    );
+    const [answer, edit] = feedback;
+    assert.ok(answer && edit);
+    assert.equal(answer.body.show_alert, false);
+    assert.match(answer.body.text, /^Confirmed/);
+    assert.deepEqual(edit.body.reply_markup, { inline_keyboard: [] });
+    assert.match(edit.body.text, /browser tab where you started/);
+    assert.equal((await request(fresh.token, { confirm: true })).status, 200);
+    await Promise.all(background);
+    assert.equal(delivery.at(-1)?.method, "answerCallbackQuery");
+    assert.equal(delivery.at(-1)?.body.show_alert, true);
+    assert.equal(
+      delivery.filter(({ method }) => method === "editMessageText").length,
+      1
+    );
     await serverRuntime.runPromise(
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;

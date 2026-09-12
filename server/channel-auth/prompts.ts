@@ -50,6 +50,7 @@ type Failure = ChannelAuthPromptError | ChannelAccountError | SqlError;
 type ClaimedPrompt = typeof VerifiedSender.Type & {
   readonly lease: typeof PromptLease.Type;
   readonly token: string;
+  readonly purpose: "login" | "link";
 };
 interface Prompts {
   readonly prepare: (
@@ -265,7 +266,8 @@ export class ChannelAuthPrompts extends Context.Service<
               yield* cancel(id, "failed");
               return null;
             }
-            if (!(yield* preview(envelope))) {
+            const challenge = yield* preview(envelope);
+            if (!challenge) {
               yield* cancel(id, "cancelled");
               return null;
             }
@@ -277,6 +279,7 @@ export class ChannelAuthPrompts extends Context.Service<
               lease: { challengeId: id, leaseToken },
               ...envelope.sender,
               token: envelope.token,
+              purpose: challenge.purpose,
             };
           })
         );
