@@ -121,6 +121,7 @@ export const env = createEnv({
     ),
     OPERON_HOME: requiredValue.optional(),
     OPERON_DATABASE_URL: requiredValue.optional(),
+    OPERON_AUTH_SECRET: requiredValue.optional(),
     OPERON_BUILDER_ENABLED: z.enum(["true", "false"]).optional(),
     LINQ_CONNECTOR: requiredValue.optional(),
     LINQ_PHONE_NUMBER: requiredValue
