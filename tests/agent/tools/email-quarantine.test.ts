@@ -2,17 +2,47 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { authorizeApprovalResponse } from "@agent/lib/approval-response";
+import type { ToolContext } from "eve/tools";
+import { beforeEach, expect, it, vi } from "vitest";
+import { cardCopy, connectCopy } from "../../../server/operon/copy";
+
+const pendingControls = vi.hoisted(() => {
+  let value: unknown = null;
+  return {
+    get() {
+      return value;
+    },
+    set(next: unknown) {
+      value = next;
+    },
+    reset() {
+      value = null;
+    },
+  };
+});
+
+vi.mock("eve/context", () => ({
+  defineState<T>(_name: string, initial: () => T) {
+    pendingControls.set(initial());
+    return {
+      get: () => pendingControls.get() as T,
+      update(update: (current: T) => T) {
+        pendingControls.set(update(pendingControls.get() as T));
+      },
+    };
+  },
+}));
+
 import {
   emailConnect,
   emailRegister,
   emailSearch,
   emailSync,
 } from "@agent/tools/email-quarantine";
-import type { ToolContext } from "eve/tools";
-import { expect, it } from "vitest";
-import { cardCopy, connectCopy } from "../../../server/operon/copy";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const digest = "a".repeat(64);
+const card = cardCopy(3, 3, 1, 0);
 
 function toolContext(): ToolContext {
   return {
@@ -38,6 +68,10 @@ function toolContext(): ToolContext {
     toolName: "email-connect",
   };
 }
+
+beforeEach(() => {
+  pendingControls.reset();
+});
 
 it("does gate register on approval and leaves connect, sync, and search open", () => {
   expect(emailConnect.approval).toBeUndefined();
@@ -77,14 +111,46 @@ it("does return the host connect copy", async () => {
 });
 
 it("does reject register without a matching pending digest", async () => {
+  pendingControls.set({
+    sessionId: "session-1",
+    workspaceId: "workspace-1",
+    proposalId: "proposal-1",
+    digest,
+    card,
+  });
   await expect(
     emailRegister.execute(
       {
         approvalMessage: "Eve inventou outro texto para o humano.",
-        viewedDigest: "a".repeat(64),
-        card: cardCopy(3, 3, 1, 0),
+        viewedDigest: "b".repeat(64),
+        card,
       },
       { ...toolContext(), toolName: "email-register" }
     )
   ).rejects.toMatchObject({ reason: "stale_digest" });
+});
+
+it("does not reject matching digest and card because Eve paraphrased", async () => {
+  pendingControls.set({
+    sessionId: "session-1",
+    workspaceId: "workspace-1",
+    proposalId: "proposal-1",
+    digest,
+    card,
+  });
+  const error = await emailRegister
+    .execute(
+      {
+        approvalMessage: "Eve inventou outro texto para o humano.",
+        viewedDigest: digest,
+        card,
+      },
+      { ...toolContext(), toolName: "email-register" }
+    )
+    .then(
+      () => undefined,
+      (error: unknown) => error
+    );
+  expect(error).toBeDefined();
+  expect(error).not.toMatchObject({ reason: "stale_digest" });
 });
