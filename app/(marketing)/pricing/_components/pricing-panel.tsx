@@ -5,6 +5,7 @@ import { Option, Schema } from "effect";
 import { useState } from "react";
 import { billingPlanCatalog, type BillingPlanId } from "@shared/billing/plans";
 import { Button } from "@web/components/ui/button";
+import { Badge } from "@web/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -14,12 +15,15 @@ import {
   CardTitle,
 } from "@web/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
-
-const plans = [
-  billingPlanCatalog.free,
-  billingPlanCatalog.pro,
-  billingPlanCatalog.org,
-] as const;
+import { MarketingFrame } from "../../_components/marketing-shell";
+import {
+  marketingPlanOrder,
+  marketingPriceLabel,
+} from "../../_components/plan-copy";
+import {
+  companionPublicHost,
+  companionPublicOrigin,
+} from "../../public-origin";
 
 const checkoutResponseSchema = Schema.Struct({
   url: Schema.optionalKey(Schema.String),
@@ -27,12 +31,22 @@ const checkoutResponseSchema = Schema.Struct({
   reason: Schema.optionalKey(Schema.String),
 });
 
-function formatPrice(planId: BillingPlanId, amount: number) {
-  if (planId === "free") return "Free";
-  const dollars = String(amount);
-  if (planId === "org") return `$${dollars}/seat · mo`;
-  return `$${dollars}/mo`;
-}
+const faqs = [
+  {
+    question: "Preciso de cartão no Free?",
+    answer:
+      "Não. O Free nunca pede cartão. Pro e Org só cobram quando o Stripe está configurado neste deploy.",
+  },
+  {
+    question: "Onde o produto está hospedado?",
+    answer: `Em ${companionPublicHost}. Começar, entrar, preços e guia usam esse host — não outro domínio de produto.`,
+  },
+  {
+    question: "E se o Checkout pago estiver desligado?",
+    answer:
+      "Os botões de upgrade ficam desligados de propósito. O Free continua. Self-host segue nas cotas de operador — veja o guia.",
+  },
+] as const;
 
 export function PricingPanel({
   signedIn,
@@ -64,21 +78,21 @@ export function PricingPanel({
       if (!response.ok || !body.url) {
         if (body.reason === "stripe_not_configured") {
           setError(
-            "Paid Checkout is disabled on this deployment (Stripe not configured). Free still works."
+            "O Checkout pago está desligado neste deploy (Stripe não configurado). O Free continua valendo."
           );
         } else if (body.reason === "org_required") {
           setError(
-            "Org seats need an organization first. Create one under Account, then retry with that org."
+            "Assentos Org pedem uma organização. Crie uma em Conta e tente de novo com essa org."
           );
         } else {
-          setError(body.error ?? "Unable to start Checkout.");
+          setError(body.error ?? "Não foi possível iniciar o Checkout.");
         }
         return;
       }
       window.location.assign(body.url);
     } catch {
       setError(
-        "Unable to start Checkout. Check your connection and try again."
+        "Não foi possível iniciar o Checkout. Confira a conexão e tente de novo."
       );
     } finally {
       setBusyPlan(null);
@@ -86,155 +100,199 @@ export function PricingPanel({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-4 py-12 sm:px-6 sm:py-16">
-      <header className="space-y-3 text-center">
-        <p className="type-caption text-muted-foreground">Pricing</p>
-        <h1 className="type-page-title">
-          Free to start, more when you’re ready
-        </h1>
-        <p className="type-supporting-body mx-auto max-w-2xl text-muted-foreground">
-          Every plan gets Companion. Start free with no card, then step up for
-          higher personal quotas (Pro) or seat-based team access (Org). List
-          prices are placeholders until Stripe Prices are wired in the
-          dashboard.
-        </p>
-      </header>
+    <main>
+      <MarketingFrame
+        as="section"
+        className="flex flex-col gap-12 py-16 sm:py-24"
+      >
+        <header className="mx-auto flex max-w-2xl flex-col gap-4 text-center">
+          <p className="type-caption text-muted-foreground">Preços</p>
+          <h1 className="type-signal text-4xl tracking-tight sm:text-5xl lg:text-6xl lg:leading-[1.05]">
+            Comece grátis. Suba quando precisar.
+          </h1>
+          <p className="type-body text-lg text-muted-foreground">
+            Todo plano traz o Companion. Free sem cartão. Pro aumenta cotas
+            pessoais. Org vende assentos para times. Os valores listados são
+            placeholders até os Prices do Stripe no dashboard.
+          </p>
+        </header>
 
-      {!stripeConfigured ? (
-        <Alert variant="information">
-          <AlertTitle>Paid upgrades disabled</AlertTitle>
-          <AlertDescription>
-            Stripe Checkout is not configured on this deployment (
-            <code className="type-caption">STRIPE_*</code> unset). Free still
-            works with no card. Upgrade and Customer Portal CTAs stay off so
-            Checkout cannot start broken.
-          </AlertDescription>
-        </Alert>
-      ) : null}
+        {!stripeConfigured ? (
+          <Alert variant="information">
+            <AlertTitle>Upgrade pago desligado</AlertTitle>
+            <AlertDescription>
+              O Stripe Checkout não está configurado neste deploy (
+              <code className="type-caption">STRIPE_*</code> ausente). O Free
+              continua sem cartão. Os CTAs de upgrade e do Customer Portal ficam
+              desligados para o Checkout não abrir quebrado.
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Billing</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTitle>Cobrança</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {plans.map((plan) => {
-          const isCurrent = currentPlan === plan.id;
-          const highlight = plan.id === "pro";
-          return (
-            <Card
-              className={
-                highlight
-                  ? "border-primary/40 shadow-sm ring-1 ring-primary/20"
-                  : undefined
-              }
-              key={plan.id}
-            >
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle>{plan.name}</CardTitle>
-                  {highlight ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 type-caption text-primary">
-                      Popular
-                    </span>
-                  ) : null}
-                </div>
-                <CardDescription>{plan.tagline}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="type-section-title">
-                  {formatPrice(plan.id, plan.placeholderPriceUsdMonthly)}
-                </p>
-                <ul className="space-y-2">
-                  {plan.features.map((feature) => (
-                    <li
-                      className="type-caption text-muted-foreground"
-                      key={feature}
+        <div className="grid gap-4 md:grid-cols-3">
+          {marketingPlanOrder.map((plan) => {
+            const isCurrent = signedIn && currentPlan === plan.id;
+            const highlight = plan.id === "pro";
+            const amount =
+              billingPlanCatalog[plan.id].placeholderPriceUsdMonthly;
+            return (
+              <Card
+                className={highlight ? "ring-1 ring-primary/25" : undefined}
+                key={plan.id}
+              >
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle>{plan.name}</CardTitle>
+                    {highlight ? (
+                      <Badge variant="information">Popular</Badge>
+                    ) : null}
+                  </div>
+                  <CardDescription>{plan.tagline}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1">
+                    <p className="type-signal text-4xl tracking-tight">
+                      {marketingPriceLabel(plan.id, amount)}
+                    </p>
+                    <p className="type-caption text-muted-foreground">
+                      {plan.cadence}
+                    </p>
+                  </div>
+                  <p className="type-caption text-muted-foreground">Inclui:</p>
+                  <ul className="flex flex-col gap-2">
+                    {plan.features.map((feature) => (
+                      <li
+                        className="type-caption text-muted-foreground"
+                        key={feature}
+                      >
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                  {plan.id === "free" ? (
+                    <Button
+                      className="w-full"
+                      nativeButton={false}
+                      render={
+                        <Link href={signedIn ? "/account" : "/get-started"} />
+                      }
+                      variant={isCurrent ? "secondary" : "outline"}
                     >
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-              <CardFooter>
-                {plan.id === "free" ? (
-                  <Button
-                    className="w-full"
-                    render={
-                      <Link href={signedIn ? "/account" : "/get-started"} />
-                    }
-                    variant={signedIn && isCurrent ? "secondary" : "outline"}
-                  >
-                    {signedIn && isCurrent ? "Current plan" : "Start free"}
-                  </Button>
-                ) : !stripeConfigured ? (
-                  <Button className="w-full" disabled variant="secondary">
-                    Checkout unavailable
-                  </Button>
-                ) : !signedIn ? (
-                  <Button
-                    className="w-full"
-                    render={<Link href="/sign-in?callbackUrl=%2Fpricing" />}
-                  >
-                    Sign in to upgrade
-                  </Button>
-                ) : plan.id === "org" ? (
-                  <Button
-                    className="w-full"
-                    render={<Link href="/account#billing" />}
-                    variant={isCurrent ? "secondary" : "default"}
-                  >
-                    {isCurrent ? "Manage seats" : "Org seats via Account"}
-                  </Button>
-                ) : (
-                  <Button
-                    className="w-full"
-                    disabled={busyPlan !== null}
-                    onClick={() => {
-                      void startCheckout("pro");
-                    }}
-                    variant={isCurrent ? "secondary" : "default"}
-                  >
-                    {busyPlan === "pro"
-                      ? "Redirecting…"
-                      : isCurrent
-                        ? "Current plan"
-                        : "Upgrade to Pro"}
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
-
-      <div className="rounded-xl border border-border/60 bg-muted/20 p-6 text-center">
-        <p className="type-label">New here?</p>
-        <p className="type-supporting-body mt-2 text-muted-foreground">
-          Follow the consumer first-run: bind Telegram or WhatsApp, then message
-          Companion. No self-hosting required.
-        </p>
-        <div className="mt-4 flex flex-wrap justify-center gap-3">
-          <Button
-            nativeButton={false}
-            render={<Link href="/docs" />}
-            variant="outline"
-          >
-            Read docs
-          </Button>
-          <Button nativeButton={false} render={<Link href="/get-started" />}>
-            Get started
-          </Button>
+                      {isCurrent ? "Plano atual" : "Começar grátis"}
+                    </Button>
+                  ) : !stripeConfigured ? (
+                    <Button className="w-full" disabled variant="secondary">
+                      Checkout indisponível
+                    </Button>
+                  ) : !signedIn ? (
+                    <Button
+                      className="w-full"
+                      nativeButton={false}
+                      render={<Link href="/sign-in?callbackUrl=%2Fpricing" />}
+                    >
+                      Entrar para assinar
+                    </Button>
+                  ) : plan.id === "org" ? (
+                    <Button
+                      className="w-full"
+                      nativeButton={false}
+                      render={<Link href="/account#billing" />}
+                      variant={isCurrent ? "secondary" : "default"}
+                    >
+                      {isCurrent
+                        ? "Gerenciar assentos"
+                        : "Assentos Org na Conta"}
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      disabled={busyPlan !== null}
+                      onClick={() => {
+                        void startCheckout("pro");
+                      }}
+                      variant={isCurrent ? "secondary" : "default"}
+                    >
+                      {busyPlan === "pro"
+                        ? "Redirecionando…"
+                        : isCurrent
+                          ? "Plano atual"
+                          : "Assinar Pro"}
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
-      </div>
 
-      <p className="text-center type-caption text-muted-foreground">
-        {stripeConfigured
-          ? "Already paying? Manage payment method and cancellation in Account via Stripe Customer Portal. Self-host stays on operator quotas — see docs."
-          : "Paid billing stays off until an operator configures Stripe. Self-host stays on operator quotas — see docs."}
-      </p>
-    </section>
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle>Chegou agora?</CardTitle>
+            <CardDescription>
+              Primeiros passos no host {companionPublicHost}: vincule Telegram
+              ou WhatsApp e fale com o Companion. Sem self-host.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap justify-center gap-3">
+            <Button
+              nativeButton={false}
+              render={<Link href="/docs" />}
+              variant="outline"
+            >
+              Ler o guia
+            </Button>
+            <Button nativeButton={false} render={<Link href="/get-started" />}>
+              Começar
+            </Button>
+          </CardContent>
+        </Card>
+
+        <section aria-labelledby="faq-heading" className="flex flex-col gap-6">
+          <h2
+            className="type-signal text-2xl tracking-tight sm:text-3xl"
+            id="faq-heading"
+          >
+            Perguntas
+          </h2>
+          <dl className="grid gap-4 md:grid-cols-3">
+            {faqs.map((item) => (
+              <Card key={item.question}>
+                <CardHeader>
+                  <dt>
+                    <CardTitle>{item.question}</CardTitle>
+                  </dt>
+                  <dd>
+                    <CardDescription>{item.answer}</CardDescription>
+                  </dd>
+                </CardHeader>
+              </Card>
+            ))}
+          </dl>
+        </section>
+
+        <p className="text-center type-caption text-muted-foreground">
+          {stripeConfigured
+            ? "Já paga? Método e cancelamento ficam em Conta, no Stripe Customer Portal. Self-host segue nas cotas de operador — veja o guia."
+            : "A cobrança paga fica desligada até um operador configurar o Stripe. Self-host segue nas cotas de operador — veja o guia."}{" "}
+          Host:{" "}
+          <a
+            className="underline-offset-4 hover:text-foreground hover:underline"
+            href={companionPublicOrigin}
+          >
+            {companionPublicHost}
+          </a>
+          .
+        </p>
+      </MarketingFrame>
+    </main>
   );
 }

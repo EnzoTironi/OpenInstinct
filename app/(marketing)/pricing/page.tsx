@@ -4,13 +4,23 @@ import { getAuthSession } from "@db/services/auth/session";
 import { readEntitlement } from "@db/services/billing";
 import type { BillingPlanId } from "@shared/billing/plans";
 import { MarketingShell } from "../_components/marketing-shell";
+import { companionCanonicalPath, companionPublicHost } from "../public-origin";
 import { isStripeBillingConfigured } from "../../../server/billing/stripe";
 import { PricingPanel } from "./_components/pricing-panel";
 
+const title = "Preços — Free, Pro, Org | Companion";
+const description = `Comece grátis, sem cartão. Pro sobe cotas pessoais. Org vende assentos. Hospedado em ${companionPublicHost}.`;
+const canonical = companionCanonicalPath("/pricing");
+
 export const metadata: Metadata = {
-  title: "Pricing — Free, Pro, Org | Companion",
-  description:
-    "Start free with no card. Pro raises personal quotas. Org sells seats for teams. Companion by Instinct.",
+  title,
+  description,
+  alternates: { canonical },
+  openGraph: {
+    title,
+    description,
+    url: canonical,
+  },
 };
 
 export default async function PricingPage() {
