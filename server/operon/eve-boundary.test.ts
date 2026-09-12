@@ -17,6 +17,8 @@ it("does keep Eve free of @operon/runtime and a second Better Auth", () => {
   expect(eveTool).not.toContain("@operon/runtime");
   expect(eveTool).not.toContain("better-auth");
   expect(eveTool).not.toContain("betterAuth");
+  expect(eveTool).not.toContain("operon approver session");
+  expect(eveTool).toContain('role: "consumer"');
 });
 
 it("does keep server/operon free of @operon/runtime", () => {
@@ -30,5 +32,14 @@ it("does keep server/operon free of @operon/runtime", () => {
   for (const file of files) {
     const source = readFileSync(join(operonDir, file), "utf8");
     expect(source).not.toContain("@operon/runtime");
+    expect(source).not.toContain("operon approver session");
   }
+});
+
+it("does spawn MCP with the session token instead of operon approver session", () => {
+  const source = readFileSync(join(operonDir, "mcp-client.ts"), "utf8");
+  expect(source).toContain("OPERON_APPROVER_SESSION_TOKEN");
+  expect(source).toContain("sessionToken");
+  expect(source).not.toContain("--host-approver");
+  expect(source).not.toContain("approver session");
 });

@@ -9,21 +9,83 @@ import { Config, ConfigProvider, Effect, Option } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { confirmEmail, searchEmail, syncEmail } from "./email-flow";
 import {
+  APPROVER_SESSION_TOKEN_ENV,
   OperonMcpClient,
+  buildOperonMcpSpawn,
   operonClientLayer,
-  type OperonApprovalRequest,
 } from "./mcp-client";
 
 const scopeA = accessScopeForUser("better-auth:pilot-a");
 const scopeB = accessScopeForUser("better-auth:pilot-b");
 const directories: string[] = [];
 const operonHome = Effect.runSync(Config.option(Config.string("OPERON_HOME")));
+const sessionToken = "companion-session-token";
 afterEach(async () => {
   await Promise.all(
     directories
       .splice(0)
       .map((directory) => rm(directory, { recursive: true, force: true }))
   );
+});
+
+it("does pass the Companion session token as ApproverBinding and does not spawn operon approver session", () => {
+  const spawn = buildOperonMcpSpawn({
+    home: "/opt/operon",
+    databaseUrl: "postgresql://cell/operon",
+    sessionToken,
+    authSecret: "test-auth-secret-0123456789abcdefghijklmnop",
+    role: "consumer",
+    workspaceId: scopeA.workspaceId,
+  });
+  expect(spawn.command).toBe(process.execPath);
+  expect(spawn.args).toEqual([
+    "/opt/operon/packages/cli/dist/bin.js",
+    "mcp",
+    "start",
+    "--agent-tier",
+    "2",
+    "--role",
+    "consumer",
+    "--workspace",
+    scopeA.workspaceId,
+  ]);
+  expect(spawn.args).not.toContain("approver");
+  expect(spawn.args).not.toContain("session");
+  expect(spawn.args).not.toContain("--host-approver");
+  expect(spawn.args.join(" ")).not.toContain("approver session");
+  expect(spawn.env[APPROVER_SESSION_TOKEN_ENV]).toBe(sessionToken);
+  expect(spawn.env.OPERON_DATABASE_URL).toBe("postgresql://cell/operon");
+  expect(spawn.env.OPERON_AUTH_SECRET).toBe(
+    "test-auth-secret-0123456789abcdefghijklmnop"
+  );
+});
+
+it("does refuse builder MCP without an explicit human confirm", async () => {
+  const error = await Effect.runPromise(
+    Effect.gen(function* () {
+      const client = yield* OperonMcpClient;
+      return yield* client
+        .call("operon_review_mapping_proposal", { proposalId: "p1" })
+        .pipe(Effect.flip);
+    }).pipe(
+      Effect.provide(
+        operonClientLayer({
+          scope: scopeA,
+          role: "builder",
+          sessionToken,
+        })
+      ),
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown({
+          OPERON_HOME: "/opt/operon",
+          OPERON_DATABASE_URL: "postgresql://cell/operon",
+          OPERON_BUILDER_ENABLED: "true",
+        })
+      )
+    )
+  );
+  expect(error.error).toBe("OperonUnavailable");
 });
 
 it("fails explicitly when the Operon connection is unconfigured", async () => {
@@ -34,7 +96,13 @@ it("fails explicitly when the Operon connection is unconfigured", async () => {
         .call("operon_derive_identity_keys", { email: "ana@example.test" })
         .pipe(Effect.flip);
     }).pipe(
-      Effect.provide(operonClientLayer({ scope: scopeA, role: "consumer" })),
+      Effect.provide(
+        operonClientLayer({
+          scope: scopeA,
+          role: "consumer",
+          sessionToken,
+        })
+      ),
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromUnknown({})
@@ -54,21 +122,23 @@ describe.skipIf(Option.isNone(operonHome))(
         OPERON_HOME: Option.getOrUndefined(operonHome),
         OPERON_DATABASE_URL: join(directory, "workspaces.db"),
         OPERON_BUILDER_ENABLED: "true",
+        OPERON_AUTH_SECRET: "test-auth-secret-0123456789abcdefghijklmnop",
       });
       function run<A, E>(
         effect: Effect.Effect<A, E, OperonMcpClient>,
         scope: AccessScope,
         role: "consumer" | "builder",
-        approve?: (
-          request: OperonApprovalRequest
-        ) => Promise<Record<string, string | number | string[]>>
+        confirm?: boolean
       ) {
         return Effect.runPromise(
           effect.pipe(
             Effect.provide(
-              approve
-                ? operonClientLayer({ scope, role, approve })
-                : operonClientLayer({ scope, role })
+              operonClientLayer({
+                scope,
+                role,
+                sessionToken,
+                confirm,
+              })
             ),
             Effect.provideService(ConfigProvider.ConfigProvider, config)
           )
@@ -85,14 +155,21 @@ describe.skipIf(Option.isNone(operonHome))(
           dateMs: Date.now(),
         })),
       };
-      const proposal = await run(syncEmail(snapshot), scopeA, "builder");
+      const proposal = await run(
+        syncEmail(snapshot),
+        scopeA,
+        "builder",
+        true
+      );
       expect(proposal.card).toContain("1 pessoas");
-      const replay = await run(syncEmail(snapshot), scopeA, "builder");
+      const replay = await run(syncEmail(snapshot), scopeA, "builder", true);
       expect(replay.proposalId).toBe(proposal.proposalId);
       expect(
         await run(searchEmail("Ana"), scopeA, "consumer")
       ).not.toHaveLength(0);
-      expect(await run(searchEmail("Ana"), scopeB, "consumer")).toHaveLength(0);
+      expect(await run(searchEmail("Ana"), scopeB, "consumer")).toHaveLength(
+        0
+      );
       const pending = {
         workspaceId: scopeA.workspaceId,
         sessionId: "verified-session",
@@ -105,72 +182,9 @@ describe.skipIf(Option.isNone(operonHome))(
         "builder"
       );
       expect(refused).toMatchObject({
-        _tag: "EmailFlowError",
-        reason: "unavailable",
+        _tag: "OperonMcpError",
+        error: "OperonUnavailable",
       });
-      let approvals = 0;
-      const approve = async (request: OperonApprovalRequest) => {
-        expect(request.tool).toBe("operon_review_mapping_proposal");
-        expect(request.arguments).toMatchObject({
-          proposalId: proposal.proposalId,
-          viewedDigest: proposal.digest,
-          verdict: "approve",
-        });
-        approvals += 1;
-        return {
-          userId: scopeA.userId,
-          name: "Pilot",
-          email: "pilot@example.test",
-          roles: ["owner"],
-          sessionId: "verified-session",
-          issuer: "zoen",
-          sessionExpiresAt: Date.now() + 30_000,
-        };
-      };
-      expect(
-        await run(
-          confirmEmail(pending, proposal.digest),
-          scopeA,
-          "builder",
-          approve
-        )
-      ).toMatchObject({ status: "merged", digest: proposal.digest });
-      expect(approvals).toBe(1);
-      expect(await run(searchEmail("Ana"), scopeA, "consumer")).toEqual([
-        expect.objectContaining({
-          email: "ana@example.test",
-          grade: "batch",
-          label: "registrado",
-        }),
-      ]);
-      const registered = await run(
-        Effect.gen(function* () {
-          const client = yield* OperonMcpClient;
-          return yield* client.call("operon_query_objects", {
-            typeId: "Pessoa",
-          });
-        }),
-        scopeA,
-        "consumer"
-      );
-      expect(registered.body).toMatchObject({
-        count: 1,
-        objects: [
-          {
-            id: "ana@example.test",
-            version: 1,
-            properties: { displayName: "Ana" },
-          },
-        ],
-      });
-      expect(
-        await run(
-          confirmEmail(pending, proposal.digest),
-          scopeA,
-          "builder",
-          approve
-        )
-      ).toMatchObject({ status: "merged" });
       const denied = await run(
         Effect.gen(function* () {
           const client = yield* OperonMcpClient;
