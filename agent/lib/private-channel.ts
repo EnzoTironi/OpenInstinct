@@ -5,6 +5,7 @@ import { Messaging, type Lease } from "../../server/messaging";
 import { ChannelAuthPrompts } from "../../server/channel-auth/prompts";
 import { ChannelTransport } from "../../server/channels/transport";
 import {
+  dispatchAuthFeedback,
   dispatchAuthPrompt,
   dispatchItem,
 } from "../../server/channels/dispatch";
@@ -27,14 +28,15 @@ const acceptLoginCommand = Effect.fn("acceptLoginCommand")(
     if (event.command === "confirm") {
       const accounts = yield* ChannelAccounts;
       yield* accounts.confirmChallenge({ token: event.token, sender });
-      return null;
+      return { status: "confirmed" as const };
     }
     const authPrompts = yield* ChannelAuthPrompts;
-    return yield* authPrompts.prepare({
+    const prompt = yield* authPrompts.prepare({
       token: event.token,
       sender,
       eventId: event.eventId,
     });
+    return { status: "prompt" as const, challengeId: prompt.challengeId };
   },
   (operation, event) =>
     operation.pipe(
@@ -44,14 +46,14 @@ const acceptLoginCommand = Effect.fn("acceptLoginCommand")(
           channel: event.channel,
           command: event.command,
           reason: error.reason,
-        }).pipe(Effect.as(null))
+        }).pipe(Effect.as({ status: "refused" as const }))
       ),
       Effect.catchTag("ChannelAuthPromptError", (error) =>
         error.reason === "invalid_input" || error.reason === "conflict"
           ? Effect.logInfo("Channel login prompt refused", {
               channel: event.channel,
               reason: error.reason,
-            }).pipe(Effect.as(null))
+            }).pipe(Effect.as({ status: "refused" as const }))
           : Effect.fail(error)
       )
     )
@@ -79,8 +81,22 @@ export function privateChannel(channel: Identity["channel"]) {
             const prompts: string[] = [];
             for (const event of events) {
               if (event.kind === "command") {
-                const prompt = yield* acceptLoginCommand(event);
-                if (prompt) prompts.push(prompt.challengeId);
+                const result = yield* acceptLoginCommand(event);
+                if (result.status === "prompt") {
+                  prompts.push(result.challengeId);
+                } else {
+                  context.waitUntil(
+                    serverRuntime.runPromise(
+                      dispatchItem(
+                        event.eventId,
+                        dispatchAuthFeedback(
+                          event,
+                          result.status === "confirmed"
+                        )
+                      )
+                    )
+                  );
+                }
               } else {
                 const identity = yield* accounts.resolveVerifiedSender({
                   channel: event.channel,

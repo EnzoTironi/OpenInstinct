@@ -141,7 +141,12 @@ export const parseTelegramUpdate = Effect.fn("parseTelegramUpdate")(function* (
     );
     if (!evaluateGroupMentionPolicy({ mentionedBot, replyToBot })) return [];
   }
-  const occurredAt = yield* validateEventAge("telegram", source.date, nowMs);
+  // A callback is a new click on an older message. Challenge expiry gates auth.
+  const occurredAt = yield* validateEventAge(
+    "telegram",
+    incoming.callback_query ? nowMs / 1000 : source.date,
+    nowMs
+  );
   const coordinates: InboundCoordinates = {
     channel: "telegram",
     installationId: installation.botId,
@@ -297,7 +302,11 @@ const downloadableFile = Schema.Struct({
 const makeTelegram = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
   const request = Effect.fn("Telegram.request")(function* (
-    method: "sendMessage" | "answerCallbackQuery" | "getFile",
+    method:
+      | "sendMessage"
+      | "answerCallbackQuery"
+      | "editMessageText"
+      | "getFile",
     body: Schema.Json
   ) {
     const installation = yield* readInstallation;
@@ -340,7 +349,7 @@ const makeTelegram = Effect.gen(function* () {
     targetId: string,
     text: string,
     reply?: string,
-    confirmation?: string
+    confirmation?: { data: string; purpose: "login" | "link" }
   ) {
     const input = yield* Schema.decodeUnknownEffect(sendInput)({
       targetId,
@@ -368,7 +377,15 @@ const makeTelegram = Effect.gen(function* () {
     if (confirmation)
       body.reply_markup = {
         inline_keyboard: [
-          [{ text: "Confirm sign-in", callback_data: confirmation }],
+          [
+            {
+              text:
+                confirmation.purpose === "login"
+                  ? "Confirm sign-in"
+                  : "Confirm account link",
+              callback_data: confirmation.data,
+            },
+          ],
         ],
       };
     const result = yield* request("sendMessage", body).pipe(
@@ -456,7 +473,7 @@ const makeTelegram = Effect.gen(function* () {
       return yield* send(targetId, text, reply);
     }),
     sendLoginConfirmation: Effect.fn("Telegram.sendLoginConfirmation")(
-      function* (targetId: string, token: string) {
+      function* (targetId: string, token: string, purpose: "login" | "link") {
         const valid = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
           token
         ).pipe(Effect.mapError(malformed));
@@ -464,20 +481,67 @@ const makeTelegram = Effect.gen(function* () {
         if (Buffer.byteLength(data, "utf8") > 64) return yield* malformed();
         return yield* send(
           targetId,
-          "Confirm this sign-in only if you requested it in your browser.",
+          purpose === "login"
+            ? "Confirm this sign-in only if you requested it in your Zoen browser tab. Then return to that tab to finish signing in."
+            : "Confirm linking this Telegram account only if you requested it in your Zoen browser tab. Then return to that tab to finish linking.",
           undefined,
-          data
+          { data, purpose }
         );
       }
     ),
+    editLoginConfirmation: Effect.fn("Telegram.editLoginConfirmation")(
+      function* (targetId: string, messageId: string) {
+        const input = yield* Schema.decodeUnknownEffect(
+          Schema.Struct({ targetId: stringId, messageId: stringId })
+        )({ targetId, messageId }).pipe(Effect.mapError(malformed));
+        const result = yield* request("editMessageText", {
+          chat_id: input.targetId,
+          message_id: Number(input.messageId),
+          text: "Confirmed. Return to the Zoen browser tab where you started this request and finish there. You can close this Telegram chat.",
+          reply_markup: { inline_keyboard: [] },
+        }).pipe(
+          Effect.flatMap(Schema.decodeUnknownEffect(response)),
+          Effect.catchTag(
+            "SchemaError",
+            () =>
+              new ProviderUncertain({
+                provider: "telegram",
+                reason: "malformed_receipt",
+              })
+          )
+        );
+        if (!result.ok) return yield* telegramSendFailure(result);
+        if (
+          String(result.result.chat.id) !== input.targetId ||
+          String(result.result.message_id) !== input.messageId
+        ) {
+          return yield* new ProviderUncertain({
+            provider: "telegram",
+            reason: "malformed_receipt",
+          });
+        }
+        return undefined;
+      }
+    ),
     answerCallbackQuery: Effect.fn("Telegram.answerCallbackQuery")(function* (
-      callbackQueryId: string
+      callbackQueryId: string,
+      text: string,
+      showAlert: boolean
     ) {
-      const id = yield* Schema.decodeUnknownEffect(ProviderReferenceSchema)(
-        callbackQueryId
-      ).pipe(Effect.mapError(malformed));
+      const input = yield* Schema.decodeUnknownEffect(
+        Schema.Struct({
+          callbackQueryId: ProviderReferenceSchema,
+          text: Schema.String.check(
+            Schema.isMinLength(1),
+            Schema.isMaxLength(200)
+          ),
+          showAlert: Schema.Boolean,
+        })
+      )({ callbackQueryId, text, showAlert }).pipe(Effect.mapError(malformed));
       const body = yield* request("answerCallbackQuery", {
-        callback_query_id: id,
+        callback_query_id: input.callbackQueryId,
+        text: input.text,
+        show_alert: input.showAlert,
       });
       yield* Schema.decodeUnknownEffect(
         Schema.Struct({

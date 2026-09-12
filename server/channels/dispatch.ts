@@ -2,6 +2,7 @@ import { Config, Effect } from "effect";
 import { ChannelAuthPrompts } from "../channel-auth/prompts";
 import { Telegram } from "./telegram";
 import { ProviderInputError } from "./provider-errors";
+import type { InboundEvent } from "./inbound";
 
 export const dispatchItem = Effect.fn("dispatchItem")(function* <
   A,
@@ -17,6 +18,38 @@ export const dispatchItem = Effect.fn("dispatchItem")(function* <
     )
   );
 });
+
+export const dispatchAuthFeedback = Effect.fn("dispatchAuthFeedback")(
+  function* (
+    event: Extract<InboundEvent, { kind: "command" }>,
+    confirmed: boolean
+  ) {
+    if (event.channel !== "telegram") return;
+    const provider = yield* Telegram;
+    if (event.command === "start") {
+      yield* provider.sendText(
+        event.chatId,
+        "This request cannot be confirmed here. Return to your original Zoen browser tab to check it or start a new request."
+      );
+      return;
+    }
+    if (!event.callbackQueryId) return;
+    // The database outcome stands even if Telegram can no longer show the toast.
+    yield* dispatchItem(
+      event.eventId,
+      provider.answerCallbackQuery(
+        event.callbackQueryId,
+        confirmed
+          ? "Confirmed. Return to your original Zoen browser tab to finish."
+          : "This request cannot be confirmed here. Return to your original Zoen browser tab to check it or start a new request.",
+        !confirmed
+      )
+    );
+    if (confirmed) {
+      yield* provider.editLoginConfirmation(event.chatId, event.messageId);
+    }
+  }
+);
 
 export const dispatchAuthPrompt = Effect.fn("dispatchAuthPrompt")(function* (
   challengeId: string
@@ -38,7 +71,11 @@ export const dispatchAuthPrompt = Effect.fn("dispatchAuthPrompt")(function* (
       });
     const provider = yield* Telegram;
     yield* prompts.checkLease(claim.lease);
-    return yield* provider.sendLoginConfirmation(claim.senderId, claim.token);
+    return yield* provider.sendLoginConfirmation(
+      claim.senderId,
+      claim.token,
+      claim.purpose
+    );
   });
   yield* send.pipe(
     Effect.flatMap((result) =>

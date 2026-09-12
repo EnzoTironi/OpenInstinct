@@ -662,6 +662,7 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
     parse: unusedAdapterMethod,
     downloadMedia: unusedAdapterMethod,
     sendLoginConfirmation: unusedAdapterMethod,
+    editLoginConfirmation: unusedAdapterMethod,
     answerCallbackQuery: unusedAdapterMethod,
     sendText: () =>
       Effect.fail(
