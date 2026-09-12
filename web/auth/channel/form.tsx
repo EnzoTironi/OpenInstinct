@@ -15,6 +15,7 @@ import type {
 } from "@shared/identity/channel-auth";
 import {
   checkChannelAuthorization,
+  channelAuthorizationPollIntervalMs,
   channelFailureMessage,
   completeChannelAuthorization,
   channelHttpError,
@@ -144,7 +145,7 @@ export function PendingAuthorization({
           const result = yield* checkChannelAuthorization(challenge.id).pipe(
             Effect.result
           );
-          let delay = 2000;
+          let delay = channelAuthorizationPollIntervalMs;
           if (Result.isSuccess(result)) {
             failures = 0;
             setError(undefined);
