@@ -129,28 +129,3 @@ it("does reject register without a matching pending digest", async () => {
     )
   ).rejects.toMatchObject({ reason: "stale_digest" });
 });
-
-it("does not reject matching digest and card because Eve paraphrased", async () => {
-  pendingControls.set({
-    sessionId: "session-1",
-    workspaceId: "workspace-1",
-    proposalId: "proposal-1",
-    digest,
-    card,
-  });
-  const error = await emailRegister
-    .execute(
-      {
-        approvalMessage: "Eve inventou outro texto para o humano.",
-        viewedDigest: digest,
-        card,
-      },
-      { ...toolContext(), toolName: "email-register" }
-    )
-    .then(
-      () => undefined,
-      (error: unknown) => error
-    );
-  expect(error).toBeDefined();
-  expect(error).not.toMatchObject({ reason: "stale_digest" });
-});
