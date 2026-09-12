@@ -10,6 +10,10 @@ import { Kapso } from "./channels/kapso";
 import { ChannelTransport } from "./channels/transport";
 import { ChannelAuthPrompts } from "./channel-auth/prompts";
 import { MemoryDocuments } from "./memory/documents";
+import { PrincipalIssuer } from "./operon/principal";
+import { EmailQcl } from "./operon/qcl";
+import { SourceConnection } from "./operon/source-connection";
+import { OperonBuilderStdio, OperonMcpClientStdio } from "./operon/mcp-client";
 import { PersonalMemory } from "./personal-memory";
 import { BrowserWorkerAccess } from "./browser-worker";
 
@@ -29,11 +33,19 @@ const infrastructure = Layer.mergeAll(
   ResolvedInstallationSecrets.layer
 ).pipe(Layer.provideMerge(database));
 
+const operon = EmailQcl.layer.pipe(
+  Layer.provideMerge(SourceConnection.layer),
+  Layer.provideMerge(PrincipalIssuer.parseableLayer),
+  Layer.provideMerge(OperonMcpClientStdio),
+  Layer.provideMerge(OperonBuilderStdio)
+);
+
 const services = Layer.mergeAll(
   NativeDeviceAuth.layer,
   Artifacts.layer,
   ChannelTransport.layer,
-  ChannelAuthPrompts.layer
+  ChannelAuthPrompts.layer,
+  operon
 ).pipe(Layer.provideMerge(infrastructure));
 
 export const serverRuntime = ManagedRuntime.make(services);

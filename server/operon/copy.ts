@@ -10,6 +10,18 @@ export const notAdmittedLabel = "não admitido";
 
 export const arrivedFromEmailLabel = "chegou do e-mail";
 
+export const builderOffCopy =
+  "Admissão desligada. O Builder Operon está desligado por padrão.";
+
+export const gmailGatewaySeamCopy =
+  "Gmail do gateway é um adaptador nomeado. Ainda não está ligado.";
+
+export const imapSeamCopy = "IMAP local ainda não está ligado.";
+
+export const emptyMailboxCopy = "Caixa vazia.";
+
+export const invalidMailboxCopy = "Caixa inválida.";
+
 export const typeBudget = [
   "Pessoa",
   "Organização",
