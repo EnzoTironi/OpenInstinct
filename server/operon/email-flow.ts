@@ -103,7 +103,7 @@ export const syncEmail = Effect.fn("syncEmail")(function* (
       targetObjectTypeId: "Pessoa",
       propertyMappings: [
         { sourceField: "displayName", targetPropertyName: "displayName" },
-        { sourceField: "sourceField", targetPropertyName: "email" },
+        { sourceField: "email", targetPropertyName: "email" },
       ],
       sourceIds: [ingested.sourceArtifact.sourceId],
     })
@@ -198,7 +198,6 @@ export const searchEmail = Effect.fn("searchEmail")(function* (name: string) {
     string,
     {
       name: string;
-      email: string;
       email: string;
       label: string;
       source: string;

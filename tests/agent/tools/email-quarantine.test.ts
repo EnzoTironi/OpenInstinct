@@ -10,7 +10,7 @@ import {
 } from "@agent/tools/email-quarantine";
 import type { ToolContext } from "eve/tools";
 import { expect, it } from "vitest";
-import { connectCopy } from "../../../server/operon/copy";
+import { cardCopy, connectCopy } from "../../../server/operon/copy";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -56,11 +56,12 @@ it("does keep Eve Consumer and bind register to an explicit confirm", () => {
     join(here, "../../../agent/tools/email-quarantine.ts"),
     "utf8"
   );
-  expect(source).toContain("quarantineCardMessage");
+  expect(source).toContain("viewedProposalMatches");
   expect(source).toContain("stale_digest");
   expect(source).toContain('role: "consumer"');
   expect(source).toContain("confirm: true");
   expect(source).toContain("sessionToken");
+  expect(source).not.toContain("quarantineCardMessage");
   expect(source).not.toContain("operon approver session");
   expect(source).not.toContain("@operon/runtime");
   expect(source).not.toContain("ontologia");
@@ -73,4 +74,17 @@ it("does return the host connect copy", async () => {
   expect(connectCopy).toBe(
     "Vou ler sua caixa para mostrar com quem você fala. Não vou mandar e-mail. Não vou alterar a agenda."
   );
+});
+
+it("does reject register without a matching pending digest", async () => {
+  await expect(
+    emailRegister.execute(
+      {
+        approvalMessage: "Eve inventou outro texto para o humano.",
+        viewedDigest: "a".repeat(64),
+        card: cardCopy(3, 3, 1, 0),
+      },
+      { ...toolContext(), toolName: "email-register" }
+    )
+  ).rejects.toMatchObject({ reason: "stale_digest" });
 });
