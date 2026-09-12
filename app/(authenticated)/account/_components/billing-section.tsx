@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Option, Schema } from "effect";
 import { billingPlanCatalog, type BillingPlanId } from "@shared/billing/plans";
@@ -211,9 +210,6 @@ export function AccountBillingSection({
             : busy === "portal"
               ? "Redirecting…"
               : "Manage billing"}
-        </Button>
-        <Button render={<Link href="/pricing" />} variant="ghost">
-          View pricing
         </Button>
       </div>
     </section>

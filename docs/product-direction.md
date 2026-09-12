@@ -18,6 +18,67 @@ Effect, Eve, Kernel and MCP are implementation choices supporting that promise.
 They should not become the onboarding curriculum. Operational ontology (Worlds)
 lives in [Operon](https://github.com/EnzoTironi/operon), not Companion.
 
+## Founder direction, 2026-09-12
+
+The product vision covers personal life, families, study, professional work and
+small businesses. Companion is both the conversational assistant and an AI FDE:
+it uses Operon tools to organize supplied information, build useful domain
+models and retain governed memory. Operon owns raw sources, document indexing,
+ontology, memory, permissions and operational records. Eve continues to own
+agent turns, sessions and durable execution.
+
+Sharing uses intention-based access: the model interprets the authorized
+purpose and selects an appropriate disclosure. Runtime enforcement binds that
+decision to the actual owner grant, audience, evidence, task revision and output.
+A trusted-person network lets each person's Companion coordinate with accepted
+peers while keeping personal context and organizational authority separate.
+These capabilities are now part of the intended product scope; their delivery
+follows the dependencies in the
+[integration specification](companion-operon-integration.md).
+
+The user can ask Companion to connect a service in conversation. It reuses a
+qualified connector or builds and validates one in the background. Eve owns that
+durable work; Operon owns the versioned artifacts and grants; the Executor-based
+gateway executes the allowed operations. Generated code never grants itself new
+permissions, and sharing an adapter never shares its creator's credentials.
+
+The public product name is Zoen (formerly Companion), as requested by the
+founder on 2026-09-12. The supplied green mascot is the website logo, favicon,
+mockup avatar and profile photo of the selected Telegram bot, `@TryZoenBot`.
+
+The landing uses a rotating hero phrase, plain solid call-to-action buttons,
+original device mockups and a carousel of six connection examples. Optional
+animation respects reduced-motion preferences, and the carousel has manual and
+pause controls. The hero keeps one primary action; public plan selectors and
+pricing navigation are removed. Public copy does not mention credit cards or
+promote web chat in the hero; the invitation stays focused on the messengers.
+The hero has three clickable 44 px messenger icons and no supporting paragraphs
+around the primary button. **Começar** opens a minimal chooser on the same page,
+with WhatsApp, Telegram and iMessage buttons: a bottom sheet on mobile and a
+centered card on desktop. Configured hero icons open their messenger directly,
+without opening the chooser or another browser tab.
+This UI does not qualify new-account intake for a provider; current iMessage
+intake still requires an already verified phone number.
+
+The landing retains the reference's narrative with an original photographic sky
+cycle from night through dawn, day, sunset and nightfall. Original WhatsApp,
+iMessage and Telegram mockups illustrate the intended conversations. Channel
+artwork is a product concept, separate from provider qualification.
+
+The founder explicitly requested a Memorae-inspired landing that promises this
+complete experience before all underlying capabilities are implemented. The
+landing communicates that destination. Engineering status and acceptance
+evidence continue to distinguish implemented behavior from the roadmap. This
+supersedes the earlier restriction on advertising only completed release scope;
+it does not change runtime authorization or real-user qualification criteria.
+
+Public acquisition has one primary action: start a conversation. There is no
+pricing page, plan selection, browser signup or card collection before the first
+request. When a subscription becomes relevant, Companion offers a Stripe link
+inside the existing private conversation; the person sees the amount and decides
+at Checkout. Do not invent a price or treat opening/returning from that link as
+payment. Stripe's verified webhook remains the entitlement authority.
+
 ## The critique of our plan
 
 The architecture is thoughtful, but a list of fifteen implementation packages
@@ -157,8 +218,8 @@ Telegram pilot may precede WhatsApp activation, but is explicitly a limited pilo
 No real-user admission bypasses the required identity, privacy and operations gates.
 
 The following remain expansion work: arbitrary user-installed MCPs/CLIs, general
-personal computers, a marketplace, live voice calls, payments, group/household
-sharing, BYO ChatGPT execution and the Zoen connector. Preserve their architectural
+personal computers, a marketplace, live voice calls, payments,
+BYO ChatGPT execution and the Zoen connector. Preserve their architectural
 fit. Do not build their screens, abstract engines or placeholder source now.
 Existing browser/Google/UI code remains a reuse asset; defer exposure rather than
 destroying useful implementation indiscriminately.
@@ -183,8 +244,9 @@ Implement the smallest complete cross-package slice and test it immediately:
 
 An internal demo may use an explicitly limited feature set, but never fabricated
 provider output, a privileged identity bypass or an implied production guarantee.
-Finish the remaining declared release scope before advertising it. Effect adoption
-is still required across owned application logic; demonstrate it through real
+Use the founder direction above for vision-led marketing; product qualification
+still requires the declared runtime evidence. Effect adoption is required across
+owned application logic; demonstrate it through real
 consumer slices rather than postponing product feedback until a wholesale rewrite.
 
 Before adding or keeping a feature, answer:

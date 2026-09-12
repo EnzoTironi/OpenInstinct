@@ -65,6 +65,9 @@ export const env = createEnv({
     // Required
     DATABASE_URL: databaseUrlSchema,
     KERNEL_API_KEY: requiredValue.optional(),
+    MARKETING_WHATSAPP_NUMBER: requiredValue.optional(),
+    MARKETING_TELEGRAM_USERNAME: requiredValue.optional(),
+    MARKETING_IMESSAGE_NUMBER: requiredValue.optional(),
 
     // Optional overrides with local defaults. Vercel deployments provision
     // installation secrets in their connected private Blob store.

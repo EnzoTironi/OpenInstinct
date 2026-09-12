@@ -8,7 +8,7 @@ import {
   originCheckMiddleware,
 } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
-import { Config, Effect, Schema } from "effect";
+import { Effect, Schema } from "effect";
 import {
   channelChallengeIdSchema,
   channelChallengeRequestSchema,
@@ -17,23 +17,12 @@ import {
   deviceBindingSchema,
   deviceRequestSchema,
   deviceBoundSchema,
-  type channelProviderSchema,
 } from "../../shared/identity/channel-auth.ts";
 import { ChannelAccountError, ChannelAccounts } from "../accounts/index.ts";
 import { NativeDeviceAuth } from "../accounts/device";
+import { channelDestination } from "../channels/destination";
 
 type EndpointContext = Parameters<typeof setSessionCookie>[0];
-const InstallationId = Schema.NonEmptyString.check(Schema.isTrimmed());
-const TelegramCapability = Schema.Struct({
-  installationId: InstallationId,
-  username: Schema.String.check(
-    Schema.isPattern(/^[A-Za-z][A-Za-z0-9_]{4,31}$/u)
-  ),
-});
-const KapsoCapability = Schema.Struct({
-  installationId: InstallationId,
-  phoneNumber: Schema.String.check(Schema.isPattern(/^\+[1-9][0-9]{6,14}$/u)),
-});
 const BrowserSecret = Schema.String.check(
   Schema.isPattern(/^[A-Za-z0-9_-]{43}$/u)
 );
@@ -84,35 +73,6 @@ const readBrowserSecret = Effect.fn("ChannelAuth.readBrowserSecret")(function* (
     Effect.mapError(() => new ChannelAuthError({ reason: "invalid" }))
   );
 });
-const channelDestination = Effect.fn("ChannelAuth.channelDestination")(
-  function* (channel: typeof channelProviderSchema.Type) {
-    if (channel === "telegram") {
-      const values = yield* Config.all({
-        installationId: Config.string("TELEGRAM_BOT_ID"),
-        username: Config.string("TELEGRAM_BOT_USERNAME"),
-      });
-      const capability =
-        yield* Schema.decodeUnknownEffect(TelegramCapability)(values);
-      return {
-        installationId: capability.installationId,
-        url: `https://t.me/${capability.username}`,
-        parameter: "start",
-      };
-    }
-    const values = yield* Config.all({
-      installationId: Config.string("KAPSO_PHONE_NUMBER_ID"),
-      phoneNumber: Config.string("KAPSO_PHONE_NUMBER"),
-    });
-    const capability =
-      yield* Schema.decodeUnknownEffect(KapsoCapability)(values);
-    return {
-      installationId: capability.installationId,
-      url: `https://wa.me/${capability.phoneNumber.slice(1)}`,
-      parameter: "text",
-    };
-  },
-  Effect.mapError(() => new ChannelAuthError({ reason: "unavailable" }))
-);
 const readLinkSession = Effect.fn("ChannelAuth.readLinkSession")(function* (
   ctx: EndpointContext
 ) {
@@ -190,7 +150,13 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
             await execute(
               runEffect,
               Effect.gen(function* () {
-                const destination = yield* channelDestination(ctx.body.channel);
+                const destination = yield* channelDestination(
+                  ctx.body.channel
+                ).pipe(
+                  Effect.mapError(
+                    () => new ChannelAuthError({ reason: "unavailable" })
+                  )
+                );
                 const current =
                   ctx.body.purpose === "link"
                     ? yield* readLinkSession(ctx)

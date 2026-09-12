@@ -23,7 +23,7 @@ Placeholder prices are documentation only. Chargeable amounts come from Stripe
 ## Architecture (ponytail)
 
 ```
-/pricing  or  Account → Upgrade
+Private conversation offer (target) or Account → Upgrade
         │
         ▼
 POST /api/billing/checkout  →  Stripe Checkout (subscription)
@@ -51,7 +51,7 @@ admitQuota(..., admissionLimitsForPlan(plan, seats))
 | Read / upsert                | `db/services/billing.ts`                                   |
 | Checkout / portal / webhook  | `server/billing/*`                                         |
 | HTTP                         | `app/api/billing/{checkout,portal,webhook}`                |
-| UI                           | `/pricing`, Account → Plan and billing                     |
+| UI                           | Account → Plan and billing                                 |
 | Admission bridge             | `server/operations/quotas.ts` → `admissionLimitsForPlan`   |
 
 ## Env / Fly secret **names** (never commit values)
@@ -65,9 +65,12 @@ admitQuota(..., admissionLimitsForPlan(plan, seats))
 | `BETTER_AUTH_URL`       | Public origin for Checkout success/cancel + Portal return |
 
 Optional: leave all Stripe names unset — Free still works; Checkout/Portal return
-503 `stripe_not_configured`. **Product honesty:** `/pricing` and Account billing
-CTAs detect unset `STRIPE_*` and show a clear disabled state (no broken Checkout
-redirect).
+503 `stripe_not_configured`. Account billing controls detect missing configuration
+and show a disabled state. Public pricing was removed on 2026-09-12: the intended
+acquisition flow starts with conversation, then offers a Stripe link in that
+private chat when relevant. The existing authenticated Checkout endpoint is
+implemented; automatic offers and agent delivery are not qualified by this slice.
+Opening Checkout or its return URL never proves payment; the webhook does.
 
 ```sh
 # Names only — values from your secret store:

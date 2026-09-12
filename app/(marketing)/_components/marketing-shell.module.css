@@ -1,0 +1,112 @@
+.landingShell {
+  --merit-family-text:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --merit-family-display:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --background: #1d1c23;
+  --foreground: #fff;
+  --muted-foreground: #c5c2ce;
+  --border: #ffffff29;
+  --primary: #eeeef7;
+  --primary-foreground: #292a3a;
+  --secondary: #ffffff18;
+  --secondary-foreground: #fff;
+  --logo-outline: #fff;
+  --logo-fill: #ffffff17;
+  font-family: var(--merit-family-text);
+}
+.landingShell > header {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 30px);
+  border: 1px solid #ffffff14;
+  border-radius: 100px;
+  background: #17243b66;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 6px 24px #10112514;
+}
+.landingShell > header > div:first-child {
+  height: 60px;
+  padding: 8px 10px 8px 18px;
+  gap: 20px;
+}
+.landingShell > header > div:first-child > div {
+  position: relative;
+  padding-left: 20px;
+}
+.landingShell > header > div:first-child > div::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 24px;
+  transform: translateY(-50%);
+  background: #ffffff30;
+}
+.landingShell > header > div:nth-child(2) {
+  display: none;
+}
+.landingShell > header nav {
+  display: none;
+}
+.landingShell > header a[href="/welcome"] {
+  font-size: 1.55rem;
+  letter-spacing: -0.05em;
+  gap: 10px;
+}
+.landingShell > header [data-slot="logo"] {
+  width: 36px;
+  height: 36px;
+}
+.landingShell > header [data-slot="dialog-trigger"] {
+  border-radius: 50px;
+  min-height: 38px;
+  padding: 8px 20px;
+  background: #f2f3ff;
+  color: #252939;
+}
+.landingShell > header a[href="/sign-in"] {
+  color: #fff;
+  font-size: 0.875rem;
+}
+.landingShell > footer {
+  background: #081627;
+}
+.landingShell > footer > div {
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+.landingShell > footer p {
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+@media (max-width: 540px) {
+  .landingShell > header {
+    top: 16px;
+    max-width: calc(100% - 24px);
+  }
+  .landingShell > header > div:first-child {
+    height: 58px;
+    padding-left: 14px;
+    gap: 16px;
+  }
+  .landingShell > header > div:first-child > div {
+    padding-left: 16px;
+  }
+  .landingShell > header a[href="/welcome"] {
+    font-size: 1.25rem;
+    gap: 9px;
+  }
+  .landingShell > header [data-slot="logo"] {
+    width: 32px;
+    height: 32px;
+  }
+  .landingShell > header [data-slot="dialog-trigger"] {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}

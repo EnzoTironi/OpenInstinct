@@ -1,26 +1,13 @@
-import { ImageResponse } from "next/og";
-import { OpenGraphMark } from "./og-mark";
+import { NextResponse } from "next/server";
+import { applicationOrigin } from "@shared/environment/origin";
 
 export const companionIconSize = {
-  height: 32,
-  width: 32,
+  height: 64,
+  width: 64,
 };
 
 export function companionIconImage() {
-  return new ImageResponse(
-    <div
-      style={{
-        alignItems: "center",
-        background: "#f5f3ed",
-        borderRadius: "6px",
-        display: "flex",
-        height: "100%",
-        justifyContent: "center",
-        width: "100%",
-      }}
-    >
-      <OpenGraphMark color="#deddd7" foreground="#292927" size={24} />
-    </div>,
-    companionIconSize
+  return NextResponse.redirect(
+    new URL("/marketing/zoen-favicon.png", applicationOrigin())
   );
 }

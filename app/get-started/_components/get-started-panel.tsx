@@ -1,70 +1,68 @@
 import Link from "next/link";
-import { ChannelAuthForm } from "@web/auth/channel/form";
-
-const steps = [
-  {
-    title: "Connect a messenger",
-    body: "Choose Telegram or WhatsApp. That creates your Companion account and personal workspace.",
-  },
-  {
-    title: "Confirm in chat",
-    body: "Open the chat, approve the browser request you started, then return to this tab.",
-  },
-  {
-    title: "You’re ready",
-    body: "Message the assistant in that chat, or continue here on the web. No self-hosting required.",
-  },
-] as const;
+import { MessageCircleIcon } from "lucide-react";
+import { Button } from "@web/components/ui/button";
+import { Logo } from "@web/components/ui/logo";
 
 export function GetStartedPanel({
-  callbackUrl,
+  whatsappUrl,
+  telegramUrl,
+  imessageUrl,
 }: {
-  readonly callbackUrl: string;
+  readonly whatsappUrl: string | null;
+  readonly telegramUrl: string | null;
+  readonly imessageUrl: string | null;
 }) {
+  const available = Boolean(whatsappUrl ?? telegramUrl ?? imessageUrl);
   return (
-    <section className="w-full max-w-md space-y-8">
-      <header className="space-y-2">
-        <p className="type-caption text-muted-foreground">Companion</p>
-        <h1 className="type-page-title">Get started in one flow</h1>
+    <section className="w-full max-w-md space-y-8 text-center">
+      <Link
+        className="inline-flex items-center gap-2 type-label"
+        href="/welcome"
+      >
+        <Logo /> Zoen
+      </Link>
+      <header className="space-y-3">
+        <h1 className="type-page-title">Tudo começa com um oi.</h1>
         <p className="type-supporting-body text-muted-foreground">
-          Create your personal account, land in your workspace, and bind
-          Telegram or WhatsApp — no install, no card on Free.
+          {available
+            ? "Abra a conversa e faça seu primeiro pedido. Seu Zoen começa com você."
+            : "A conversa ainda não está disponível por aqui. Volte em breve para conhecer seu Zoen."}
         </p>
       </header>
-
-      <ol className="space-y-4">
-        {steps.map((step, index) => (
-          <li className="flex gap-3" key={step.title}>
-            <span
-              aria-hidden="true"
-              className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border type-label"
-            >
-              {index + 1}
-            </span>
-            <div className="min-w-0 space-y-1">
-              <p className="type-label">{step.title}</p>
-              <p className="type-caption text-muted-foreground">{step.body}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-
-      <div className="space-y-3 rounded-xl border p-4 sm:p-5">
-        <h2 className="type-section-title">Connect your first channel</h2>
-        <ChannelAuthForm purpose="login" callbackUrl={callbackUrl} />
-      </div>
-
+      {available ? (
+        <div className="flex flex-col gap-3">
+          {[
+            { label: "WhatsApp", url: whatsappUrl },
+            { label: "Telegram", url: telegramUrl },
+            { label: "iMessage", url: imessageUrl },
+          ].map(
+            ({ label, url }) =>
+              url && (
+                <Button
+                  key={label}
+                  nativeButton={false}
+                  render={<a aria-label={`Abrir ${label}`} href={url} />}
+                  size="lg"
+                >
+                  <MessageCircleIcon aria-hidden="true" /> Abrir {label}
+                </Button>
+              )
+          )}
+        </div>
+      ) : (
+        <Button
+          nativeButton={false}
+          render={<Link href="/welcome" />}
+          size="lg"
+        >
+          Conhecer o Zoen
+        </Button>
+      )}
       <p className="type-caption text-muted-foreground">
-        Already set up?{" "}
+        Já usa o Zoen?{" "}
         <Link className="underline underline-offset-4" href="/sign-in">
-          Sign in
-        </Link>{" "}
-        with a linked messenger. After signup, home shows your channels and
-        plan. Free needs no card — see{" "}
-        <Link className="underline underline-offset-4" href="/pricing">
-          pricing
+          Acessar minha conta
         </Link>
-        .
       </p>
     </section>
   );

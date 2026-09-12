@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@web/components/ui/button";
+import { OnboardingTrigger } from "../../_components/onboarding";
 import {
   Card,
   CardDescription,
@@ -10,49 +11,28 @@ import {
   MarketingFrame,
   MarketingShell,
 } from "../../_components/marketing-shell";
-import {
-  companionPublicHost,
-  companionPublicOrigin,
-} from "../../public-origin";
+import { companionPublicOrigin } from "../../public-origin";
 
 const steps = [
   {
-    title: "Abra Começar",
-    body: `Visite /get-started no Companion hospedado em ${companionPublicHost}.`,
+    title: "Toque em Começar",
+    body: "Escolha seu mensageiro no painel que abre aqui mesmo. Depois, faça seu primeiro pedido na conversa.",
   },
   {
-    title: "Escolha Telegram ou WhatsApp",
-    body: "Esse messenger cria a conta e o workspace pessoal.",
+    title: "Faça seu primeiro pedido",
+    body: "Mande uma mensagem, um áudio ou algo que você quer organizar. A conversa começa ali mesmo.",
   },
   {
-    title: "Confirme no chat",
-    body: "Aprove o pedido do navegador nesse messenger e volte à aba.",
-  },
-  {
-    title: "Chegue na home",
-    body: "Você vê o status do canal, os próximos passos e o selo do plano Free pessoal.",
-  },
-  {
-    title: "Fale com o Companion",
-    body: "Converse no messenger vinculado ou comece no web. Canais e plano ficam em Conta.",
+    title: "Continue de onde parou",
+    body: "Quando precisar de uma conexão, o Zoen pede na própria conversa. Se quiser assinar depois, você recebe um link do Stripe com o valor antes de pagar.",
   },
 ] as const;
 
 const links = [
   {
-    href: "/get-started",
-    title: "Começar",
-    body: "Crie a conta e vincule um canal num fluxo só.",
-  },
-  {
-    href: "/pricing",
-    title: "Preços",
-    body: "Free, Pro e assentos Org — Free nunca pede cartão.",
-  },
-  {
     href: "/sign-in",
-    title: "Entrar",
-    body: "Quem já vinculou um messenger entra por ele.",
+    title: "Acessar minha conta",
+    body: "Gerencie suas conexões, memória e assinatura quando precisar.",
   },
 ] as const;
 
@@ -64,26 +44,20 @@ export function DocsPanel() {
           <header className="flex flex-col gap-5">
             <p className="type-caption text-muted-foreground">Guia</p>
             <h1 className="type-signal text-4xl tracking-tight sm:text-5xl lg:leading-[1.05]">
-              Primeiros passos — para quem usa, não para quem opera
+              Primeiros passos
             </h1>
             <p className="type-body text-lg text-muted-foreground">
-              Caminho curto no Companion hospedado em{" "}
+              Seu primeiro pedido ao{" "}
               <a
                 className="underline-offset-4 hover:text-foreground hover:underline"
                 href={companionPublicOrigin}
               >
-                {companionPublicHost}
+                Zoen
               </a>{" "}
-              — não é guia de self-host. Entrada nativa por Telegram ou WhatsApp
-              ainda funciona sem o passo web.
+              começa no seu mensageiro.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button
-                nativeButton={false}
-                render={<Link href="/get-started" />}
-              >
-                Começar agora
-              </Button>
+              <OnboardingTrigger>Começar agora</OnboardingTrigger>
               <Button
                 nativeButton={false}
                 render={<Link href="/welcome" />}
@@ -138,15 +112,15 @@ export function DocsPanel() {
             </h2>
             <ul className="type-supporting-body flex flex-col gap-3 text-muted-foreground">
               <li>
-                Free nunca pede cartão. Pago usa Stripe Checkout + Portal.
+                Uma assinatura só começa depois da sua confirmação no Stripe.
               </li>
               <li>
-                Exportar e apagar hoje cobrem só a memória pessoal — não conta
-                inteira, histórico, backups nem identidade de canal.
+                Sua conta permite consultar e apagar a memória pessoal salva.
+                Esse controle cobre a memória pessoal, sem apagar toda a conta.
               </li>
               <li>
-                Não espere templates proativos no WhatsApp até a aprovação
-                UTILITY da Meta.
+                Você pode gerenciar ou cancelar sua assinatura pelo portal do
+                Stripe, acessível na sua conta.
               </li>
             </ul>
           </section>
@@ -164,7 +138,7 @@ export function DocsPanel() {
             <ul className="grid gap-3">
               {links.map((item) => (
                 <li key={item.href}>
-                  <Link className="block" href={item.href}>
+                  <Link className="block" href={item.href} prefetch={false}>
                     <Card className="transition-colors hover:bg-muted/40">
                       <CardHeader>
                         <CardTitle>{item.title}</CardTitle>

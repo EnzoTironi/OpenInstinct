@@ -59,7 +59,7 @@ export const createCustomerPortalSession = Effect.fn(
   if (!customerId) {
     return yield* new BillingPortalError({
       reason: "no_customer",
-      message: "No Stripe customer yet. Upgrade from /pricing first.",
+      message: "Billing management is available after your first subscription.",
     });
   }
 
