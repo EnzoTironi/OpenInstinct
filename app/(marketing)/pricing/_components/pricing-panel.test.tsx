@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { PricingPanel } from "./pricing-panel";
 
 describe("pricing Free CTA", () => {
-  it("labels signed-out Free as Start free, not Current plan", () => {
+  it("labels signed-out Free as Começar grátis, not Plano atual", () => {
     const html = renderToStaticMarkup(
       createElement(PricingPanel, {
         signedIn: false,
@@ -12,12 +12,12 @@ describe("pricing Free CTA", () => {
         stripeConfigured: false,
       })
     );
-    expect(html).toContain("Start free");
+    expect(html).toContain("Começar grátis");
     expect(html).toContain('href="/get-started"');
-    expect(html).not.toContain("Current plan");
+    expect(html).not.toContain("Plano atual");
   });
 
-  it("labels signed-in Free as Current plan", () => {
+  it("labels signed-in Free as Plano atual", () => {
     const html = renderToStaticMarkup(
       createElement(PricingPanel, {
         signedIn: true,
@@ -25,7 +25,7 @@ describe("pricing Free CTA", () => {
         stripeConfigured: false,
       })
     );
-    expect(html).toContain("Current plan");
+    expect(html).toContain("Plano atual");
     expect(html).toContain('href="/account"');
   });
 });
