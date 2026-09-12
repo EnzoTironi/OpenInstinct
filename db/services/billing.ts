@@ -61,18 +61,23 @@ export async function readEntitlement(
   subjectType: BillingSubjectType,
   subjectId: string
 ): Promise<ResolvedEntitlement> {
-  const rows = await db
-    .select()
-    .from(billingEntitlements)
-    .where(
-      and(
-        eq(billingEntitlements.subjectType, subjectType),
-        eq(billingEntitlements.subjectId, subjectId)
+  try {
+    const rows = await db
+      .select()
+      .from(billingEntitlements)
+      .where(
+        and(
+          eq(billingEntitlements.subjectType, subjectType),
+          eq(billingEntitlements.subjectId, subjectId)
+        )
       )
-    )
-    .limit(1);
-  const row = rows[0];
-  return row ? toResolved(row) : freeEntitlement();
+      .limit(1);
+    const row = rows[0];
+    return row ? toResolved(row) : freeEntitlement();
+  } catch {
+    // Missing table or a transient query failure must not take down Account.
+    return freeEntitlement();
+  }
 }
 
 export async function upsertEntitlement(input: {

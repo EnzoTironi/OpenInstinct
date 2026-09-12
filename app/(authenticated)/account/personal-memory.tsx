@@ -7,19 +7,28 @@ import { serverRuntime } from "../../../server/runtime";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { buttonVariants } from "@web/components/ui/button";
 
-export async function PersonalMemorySection() {
-  const result = await serverRuntime.runPromise(
-    inspectPersonalMemory(await headers()).pipe(Effect.result)
+function MemoryUnavailable() {
+  return (
+    <Alert variant="destructive">
+      <AlertTitle>Couldn&apos;t load personal memory</AlertTitle>
+      <AlertDescription>Reload this page to try again.</AlertDescription>
+    </Alert>
   );
+}
+
+export async function PersonalMemorySection() {
+  let result;
+  try {
+    result = await serverRuntime.runPromise(
+      inspectPersonalMemory(await headers()).pipe(Effect.result)
+    );
+  } catch {
+    return <MemoryUnavailable />;
+  }
   if (Result.isFailure(result)) {
     if (result.failure.reason === "unauthenticated")
       redirect("/sign-in?callbackUrl=%2Faccount");
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Couldn&apos;t load personal memory</AlertTitle>
-        <AlertDescription>Reload this page to try again.</AlertDescription>
-      </Alert>
-    );
+    return <MemoryUnavailable />;
   }
   const snapshot = result.success;
   const profile = Object.entries(snapshot.profile).filter(

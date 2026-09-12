@@ -50,6 +50,14 @@ export const MessagePayloadSchema = Schema.Struct({
     ).check(Schema.isMaxLength(10))
   ),
   replyToMessageId: Schema.optionalKey(reference),
+  deliveryTargetId: Schema.optionalKey(reference),
+  conversationScope: Schema.optionalKey(
+    Schema.String.check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(320),
+      Schema.isTrimmed()
+    )
+  ),
 }).check(
   Schema.makeFilter(
     (message) =>
@@ -263,6 +271,8 @@ export function canonicalPayload(payload: MessagePayload) {
       name: attachment.name,
     })),
     replyToMessageId: payload.replyToMessageId,
+    deliveryTargetId: payload.deliveryTargetId,
+    conversationScope: payload.conversationScope,
   };
   return {
     payload: normalized,

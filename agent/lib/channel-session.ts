@@ -12,6 +12,7 @@ import {
   NativeInboxContentSchema,
   type Lease,
 } from "../../server/messaging";
+import { groupBindingFromPayload } from "../../server/channels/group-policy";
 import { ChannelTransport } from "../../server/channels/transport";
 import { loadChannelContent } from "../../server/channels/media/content";
 import { mediaFailureMessage } from "../../server/channels/media/policy";
@@ -31,7 +32,8 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
     const snapshot = receipt.nativeInput;
     const principal = channelPrincipal(
       identity,
-      receipt.sourceMessageId ?? undefined
+      receipt.sourceMessageId ?? undefined,
+      groupBindingFromPayload(receipt.payload)
     );
     if (
       !snapshot ||
@@ -87,11 +89,26 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
               yield* requireChannelPrincipal(channel, auth);
               yield* messaging.checkInboxLease(lease);
               const transport = yield* ChannelTransport;
-              yield* transport.enqueueText({
+              const group = groupBindingFromPayload(receipt.payload);
+              const unsupported = {
                 identityId: identity.id,
                 deliveryKey: `unsupported:${receipt.id}`,
                 text: mediaFailureMessage(error),
-              });
+              };
+              if (identity.channel === "telegram" && group) {
+                const sourceMessageId = receipt.sourceMessageId;
+                yield* transport.enqueueText(
+                  sourceMessageId
+                    ? {
+                        ...unsupported,
+                        deliveryTargetId: group.chatId,
+                        replyToMessageId: sourceMessageId,
+                      }
+                    : { ...unsupported, deliveryTargetId: group.chatId }
+                );
+              } else {
+                yield* transport.enqueueText(unsupported);
+              }
               yield* messaging.markInboxFailed({
                 lease,
                 reason: "adapter_rejected",

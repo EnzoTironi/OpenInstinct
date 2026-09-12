@@ -1,7 +1,9 @@
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import type { ChannelSendOptions } from "eve/channels";
 import type { Identity } from "../accounts";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
+import { groupSessionMemoryAttributes } from "../personal-memory/group-memory-policy";
+import { groupConversationMatchesIdentity } from "./group-policy";
 import { ChannelTransport } from "./transport";
 
 export class ChannelDispatchError extends Schema.TaggedError<ChannelDispatchError>()(
@@ -17,15 +19,29 @@ export class ChannelDispatchError extends Schema.TaggedError<ChannelDispatchErro
 
 export const channelPrincipal = (
   identity: Identity,
-  sourceMessageId?: string
+  sourceMessageId?: string,
+  group?: {
+    readonly conversationScope: string;
+    readonly chatKind: "group";
+    readonly chatId: string;
+  }
 ) => {
   const principalId = `better-auth:${identity.userId}`;
-  const attributes = {
-    channelIdentityId: identity.id,
-    conversationChannel: identity.channel,
-    conversationId: identity.id,
-    workspaceId: accessScopeForUser(principalId).workspaceId,
-  };
+  const workspaceId = accessScopeForUser(principalId).workspaceId;
+  const attributes = group
+    ? {
+        channelIdentityId: identity.id,
+        conversationChannel: identity.channel,
+        conversationId: group.conversationScope,
+        workspaceId,
+        ...groupSessionMemoryAttributes(group),
+      }
+    : {
+        channelIdentityId: identity.id,
+        conversationChannel: identity.channel,
+        conversationId: identity.id,
+        workspaceId,
+      };
   const principal = {
     attributes,
     authenticator: "verified-channel",
@@ -50,12 +66,19 @@ export const requireChannelPrincipal = Effect.fn("requireChannelPrincipal")(
     const transport = yield* ChannelTransport;
     const identity = yield* transport.activeIdentity(identityId, channel);
     const expected = channelPrincipal(identity);
+    const conversationId = Option.getOrUndefined(
+      Schema.decodeUnknownOption(Schema.String)(auth.attributes.conversationId)
+    );
+    const conversationOk =
+      conversationId === identity.id ||
+      (conversationId !== undefined &&
+        groupConversationMatchesIdentity(conversationId, identity));
     if (
       auth.principalType !== "user" ||
       auth.principalId !== expected.principalId ||
       auth.attributes.workspaceId !== expected.attributes.workspaceId ||
       auth.attributes.conversationChannel !== channel ||
-      auth.attributes.conversationId !== identity.id
+      !conversationOk
     )
       return yield* new ChannelDispatchError({ reason: "unauthorized" });
     return identity;

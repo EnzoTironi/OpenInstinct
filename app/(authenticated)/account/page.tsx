@@ -25,7 +25,13 @@ export default async function AccountPage() {
   );
   if (Result.isFailure(result) && result.failure.reason === "unauthenticated")
     redirect("/sign-in?callbackUrl=%2Faccount");
-  const entitlement = await readEntitlement("user", session.user.id);
+  const entitlement = await readEntitlement("user", session.user.id).catch(
+    () => ({
+      plan: "free" as const,
+      status: "active",
+      seatCount: 1,
+    })
+  );
   return (
     <main className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-8 px-4 py-6 sm:p-8">
       <header className="space-y-2">

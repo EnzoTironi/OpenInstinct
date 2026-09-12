@@ -74,7 +74,7 @@ export function AccountBillingSection({
     >
       <div className="space-y-2">
         <h2 id="billing-heading" className="type-section-title">
-          Plan and billing
+          <span id="plan">Plan and billing</span>
         </h2>
         <p className="type-supporting-body text-muted-foreground">
           Current plan: <span className="text-foreground">{catalog.name}</span>

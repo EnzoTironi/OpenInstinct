@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthSession } from "@db/services/auth/session";
 import { safeCallbackUrl } from "@web/auth/channel/client";
 import { GetStartedPanel } from "./_components/get-started-panel";
+
+export const metadata: Metadata = {
+  title: "Get started | Companion",
+  description:
+    "Connect Telegram or WhatsApp and start using Companion in one flow.",
+};
 
 const defaultCallback = "/?welcome=1";
 

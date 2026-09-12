@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import type { Effect } from "effect";
-import type { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 import { authClient } from "@web/auth/client";
 import { api } from "@web/trpc/client";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 
+interface LinkedChannelIdentity {
+  readonly id: string;
+  readonly channel: "telegram" | "kapso";
+  readonly senderId: string;
+}
+
 export function LinkedChannels({
   identities,
 }: {
-  readonly identities: Effect.Success<
-    ReturnType<typeof readLinkedChannelIdentities>
-  >;
+  readonly identities: readonly LinkedChannelIdentity[];
 }) {
   const [selected, setSelected] = useState<string>();
   const [lastAccess, setLastAccess] = useState(false);

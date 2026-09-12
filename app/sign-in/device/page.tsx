@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import { Schema } from "effect";
 import { deviceRequestSchema } from "@shared/identity/channel-auth";
-import { notFound } from "next/navigation";
 import { NativeDeviceForm } from "@web/auth/channel/device";
+import { DeviceSignInUnavailable } from "./_components/unavailable";
+
+export const metadata: Metadata = {
+  title: "Sign in | Companion",
+  description: "Finish Companion sign-in on this browser.",
+};
 
 export default async function DeviceSignInPage({
   searchParams,
@@ -10,7 +16,7 @@ export default async function DeviceSignInPage({
   if (
     !Schema.is(deviceRequestSchema)({ id: params.id, purpose: params.purpose })
   )
-    notFound();
+    return <DeviceSignInUnavailable />;
   const { id, purpose } = Schema.decodeUnknownSync(deviceRequestSchema)({
     id: params.id,
     purpose: params.purpose,

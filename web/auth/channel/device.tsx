@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type {
   deviceBoundSchema,
   deviceRequestSchema,
@@ -54,12 +55,11 @@ export function NativeDeviceForm({
   if (loading) return <output>Checking this browser…</output>;
   if (resumeError)
     return (
-      <div className="space-y-4">
-        <p role="alert">{channelFailureMessage(resumeError, purpose)}</p>
-        {purpose === "link" && resumeError.status === 401 ? (
-          <SignInAgain callbackUrl="/account" />
-        ) : null}
-      </div>
+      <DeviceChallengeRecovery
+        message={channelFailureMessage(resumeError, purpose)}
+        purpose={purpose}
+        showSignInAgain={purpose === "link" && resumeError.status === 401}
+      />
     );
   if (bound)
     return (
@@ -108,6 +108,39 @@ export function NativeDeviceForm({
       {purpose === "link" && action.error?.status === 401 ? (
         <SignInAgain callbackUrl="/account" />
       ) : null}
+      {action.error ? (
+        <Button
+          nativeButton={false}
+          render={<Link href={purpose === "link" ? "/account" : "/sign-in"} />}
+          variant="outline"
+        >
+          Start again
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+export function DeviceChallengeRecovery({
+  message,
+  purpose,
+  showSignInAgain,
+}: {
+  readonly message: string;
+  readonly purpose: typeof deviceRequestSchema.Type.purpose;
+  readonly showSignInAgain: boolean;
+}) {
+  return (
+    <div className="space-y-4">
+      <p role="alert">{message}</p>
+      <Button
+        nativeButton={false}
+        render={<Link href={purpose === "link" ? "/account" : "/sign-in"} />}
+        variant="outline"
+      >
+        Start again
+      </Button>
+      {showSignInAgain ? <SignInAgain callbackUrl="/account" /> : null}
     </div>
   );
 }

@@ -165,9 +165,9 @@ export function PricingPanel({
                     render={
                       <Link href={signedIn ? "/account" : "/get-started"} />
                     }
-                    variant={isCurrent ? "secondary" : "outline"}
+                    variant={signedIn && isCurrent ? "secondary" : "outline"}
                   >
-                    {isCurrent ? "Current plan" : "Start free"}
+                    {signedIn && isCurrent ? "Current plan" : "Start free"}
                   </Button>
                 ) : !stripeConfigured ? (
                   <Button className="w-full" disabled variant="secondary">
