@@ -1,6 +1,6 @@
 import { billingPlanCatalog, type BillingPlanId } from "@shared/billing/plans";
 
-export const marketingPlanCopy = {
+const marketingPlanCopy = {
   free: {
     id: billingPlanCatalog.free.id,
     name: billingPlanCatalog.free.name,
