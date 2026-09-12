@@ -8,10 +8,36 @@ import {
   emailSearch,
   emailSync,
 } from "@agent/tools/email-quarantine";
+import type { ToolContext } from "eve/tools";
 import { expect, it } from "vitest";
 import { connectCopy } from "../../../server/operon/copy";
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+function toolContext(): ToolContext {
+  return {
+    abortSignal: new AbortController().signal,
+    callId: "call-1",
+    async getSandbox() {
+      throw new Error("Sandbox access is outside this focused test.");
+    },
+    getSkill() {
+      throw new Error("Skill access is outside this focused test.");
+    },
+    async getToken() {
+      throw new Error("Token access is outside this focused test.");
+    },
+    requireAuth() {
+      throw new Error("Authorization is outside this focused test.");
+    },
+    session: {
+      auth: { current: null, initiator: null },
+      id: "session-1",
+      turn: { id: "turn-1", sequence: 0 },
+    },
+    toolName: "email-connect",
+  };
+}
 
 it("does gate register on approval and leaves connect, sync, and search open", () => {
   expect(emailConnect.approval).toBeUndefined();
@@ -40,6 +66,11 @@ it("does keep Eve Consumer and bind register to an explicit confirm", () => {
   expect(source).not.toContain("ontologia");
 });
 
-it("does return the host connect copy", () => {
-  expect(emailConnect.execute()).toEqual({ message: connectCopy });
+it("does return the host connect copy", async () => {
+  expect(await emailConnect.execute({}, toolContext())).toEqual({
+    message: connectCopy,
+  });
+  expect(connectCopy).toBe(
+    "Vou ler sua caixa para mostrar com quem você fala. Não vou mandar e-mail. Não vou alterar a agenda."
+  );
 });
