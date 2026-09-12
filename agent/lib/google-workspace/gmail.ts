@@ -65,6 +65,65 @@ export async function searchGmail(
   });
 }
 
+/** Read metadata through the same owner-bound OAuth connection used by Gmail tools. */
+export async function readGmailMailbox(ctx: ToolContext) {
+  return withGmail(ctx, async (client) => {
+    const profile = await client.users.getProfile(
+      { userId: "me" },
+      { signal: ctx.abortSignal }
+    );
+    const blocks: string[] = [];
+    let pageToken: string | undefined;
+    /* oxlint-disable eslint/no-await-in-loop -- Gmail pagination requires the token returned by the preceding page. */
+    do {
+      const page = await client.users.messages.list(
+        { userId: "me", q: "newer_than:30d", maxResults: 100, pageToken },
+        { signal: ctx.abortSignal }
+      );
+      const messages = await Promise.all(
+        (page.data.messages ?? []).flatMap(({ id }) =>
+          id
+            ? [
+                client.users.messages.get(
+                  {
+                    userId: "me",
+                    id,
+                    format: "metadata",
+                    metadataHeaders: [
+                      "From",
+                      "To",
+                      "Cc",
+                      "Date",
+                      "Message-ID",
+                      "References",
+                      "In-Reply-To",
+                    ],
+                  },
+                  { signal: ctx.abortSignal }
+                ),
+              ]
+            : []
+        )
+      );
+      for (const { data } of messages) {
+        const headers = (data.payload?.headers ?? []).flatMap(
+          ({ name, value }) =>
+            name && value ? [`${safeHeader(name)}: ${safeHeader(value)}`] : []
+        );
+        blocks.push(`From zoen-import\n${headers.join("\n")}\n\n`);
+      }
+      pageToken = page.data.nextPageToken ?? undefined;
+    } while (pageToken && blocks.length < 1000);
+    /* oxlint-enable eslint/no-await-in-loop */
+    return {
+      text: blocks.join("\n"),
+      format: "mbox" as const,
+      ownerEmail: profile.data.emailAddress ?? undefined,
+      partial: Boolean(pageToken),
+    };
+  });
+}
+
 export async function readGmailThread(ctx: ToolContext, threadId: string) {
   return withGmail(ctx, async (client) => {
     const { data: thread } = await client.users.threads.get(

@@ -119,6 +119,9 @@ export const env = createEnv({
     STRIPE_PRICE_ORG_SEAT: Schema.toStandardSchemaV1(
       Schema.optional(Schema.NonEmptyString.check(Schema.isTrimmed()))
     ),
+    OPERON_HOME: requiredValue.optional(),
+    OPERON_DATABASE_URL: requiredValue.optional(),
+    OPERON_BUILDER_ENABLED: z.enum(["true", "false"]).optional(),
     LINQ_CONNECTOR: requiredValue.optional(),
     LINQ_PHONE_NUMBER: requiredValue
       .refine(

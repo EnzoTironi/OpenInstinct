@@ -6,6 +6,8 @@ Marca pública atual: **Zoen**, anteriormente Companion. As referências a Compa
 
 Este documento consolida o funcionamento pretendido para pessoas, grupos e negócios. Ele se apoia no código atualizado de Companion `020d4a5`, Operon `a68ab8b` e no recorte de integração de e-mail `b316bce`. Os comportamentos propostos devem ser implementados e avaliados; os cenários de aceitação associados descrevem resultados esperados.
 
+O recorte de e-mail agora usa o runtime real do Operon fixado em `operon.lock`, com persistência por espaço e aprovação vinculada à sessão autenticada. O [guia operacional](ops/operon-runtime.md) descreve o comportamento implementado, os testes entre os repositórios e os limites atuais. A especificação abaixo continua sendo a direção completa do produto.
+
 **A experiência comum.** A pessoa explica o que precisa resolver. Companion entende o pedido, encontra o contexto, organiza o que falta como AI FDE e acompanha o resultado. Operon conserva dados, memória, ontologia, permissões e registros de execução. Uma pessoa pode transitar entre seu espaço pessoal, a família, a faculdade e uma empresa com a mesma identidade, mantendo separadas as informações e as finalidades de cada espaço.
 
 **A promessa de produto.** Um Companion que lembra, organiza, resolve e coordena com as pessoas importantes da sua vida. A landing apresenta essa experiência desejada, conforme a direção do fundador. O acompanhamento de engenharia distingue cada promessa das capacidades já implementadas e mantém critérios de aceitação para fechar a diferença.

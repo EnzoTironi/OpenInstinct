@@ -32,6 +32,7 @@ export default {
         "server/accounts/controls.integration.ts",
         // Live TG group mention e2e (manual /env.local); fixture harness is CI proof.
         "scripts/groups-live-e2e.ts",
+        // In-memory Operon MCP used by email-flow tests.
       ],
       ignoreDependencies: [
         // Type owners referenced by the Eve declaration patch, which Knip does not parse.

@@ -68,6 +68,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/companion_runtime_test
       DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@127.0.0.1:5432/companion_runtime_test
       BETTER_AUTH_URL: http://127.0.0.1:3000
+      OPERON_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/companion_runtime_test
+      OPERON_BUILDER_ENABLED: "true"
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -80,6 +82,10 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build pinned Operon runtime
+        run: |
+          sh scripts/prepare-operon.sh "$RUNNER_TEMP/operon"
+          echo "OPERON_HOME=$RUNNER_TEMP/operon" >> "$GITHUB_ENV"
       - name: Generate ephemeral installation keys
         run: |
           node --input-type=module <<'JS'
@@ -114,5 +120,7 @@ jobs:
           pnpm workflow:migrate
       - name: Verify real Postgres storage
         run: pnpm test:runtime
+      - name: Verify MCP protocol and workspace isolation
+        run: pnpm exec vitest run server/operon/mcp-client.test.ts
       - name: Build web app and agent
         run: pnpm build --force
