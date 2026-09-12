@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { companionCanonicalPath, companionPublicHost } from "../public-origin";
 import { DocsPanel } from "./_components/docs-panel";
 
-const title = "Guia — primeiros passos | Companion";
-const description = `Como começar no Companion hospedado em ${companionPublicHost}: vincular Telegram ou WhatsApp, chegar na home e gerenciar o plano.`;
+const title = "Guia — primeiros passos | Zoen";
+const description = `Como começar no Zoen hospedado em ${companionPublicHost}: vincular Telegram ou WhatsApp, chegar na home e gerenciar o plano.`;
 const canonical = companionCanonicalPath("/docs");
 
 export const metadata: Metadata = {

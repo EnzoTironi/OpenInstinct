@@ -28,12 +28,16 @@ describe("auth proxy matcher", () => {
     ).toBe(false);
   });
 
-  it("does not match public fonts", () => {
+  it.each([
+    "/fonts/vault-variable.woff2",
+    "/marketing/stars.webp",
+    "/marketing/whatsapp.avif",
+  ])("does not match public asset %s", (url) => {
     expect(
       unstable_doesMiddlewareMatch({
         config,
         nextConfig: {},
-        url: "/fonts/vault-variable.woff2",
+        url,
       })
     ).toBe(false);
   });

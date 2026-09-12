@@ -1,32 +1,41 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getAuthSession } from "@db/services/auth/session";
-import { safeCallbackUrl } from "@web/auth/channel/client";
+import { Effect } from "effect";
+import { conversationDestinations } from "../../server/channels/destination";
 import { GetStartedPanel } from "./_components/get-started-panel";
 
 export const metadata: Metadata = {
-  title: "Get started | Companion",
-  description:
-    "Connect Telegram or WhatsApp and start using Companion in one flow.",
+  title: "Começar uma conversa | Zoen",
+  description: "Abra seu mensageiro e faça o primeiro pedido ao Zoen.",
+  robots: { index: false },
 };
-
-const defaultCallback = "/?welcome=1";
 
 export default async function GetStartedPage({
   searchParams,
 }: PageProps<"/get-started">) {
-  if (await getAuthSession(await headers())) redirect("/");
   const params = await searchParams;
-  const callbackValue = params.callbackUrl;
-  const requested = Array.isArray(callbackValue)
-    ? callbackValue[0]
-    : callbackValue;
-  const callbackUrl =
-    requested === undefined ? defaultCallback : safeCallbackUrl(requested);
+  const destinations = await Effect.runPromise(conversationDestinations);
+  const destination =
+    params.channel === "imessage"
+      ? destinations.imessage
+      : params.channel === "telegram"
+        ? destinations.telegram
+        : params.channel === "whatsapp" || params.channel === undefined
+          ? (destinations.whatsapp ??
+            destinations.telegram ??
+            destinations.imessage)
+          : null;
+  if (destination) redirect(destination);
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-4 py-8 text-foreground">
-      <GetStartedPanel callbackUrl={callbackUrl} />
+    <main
+      className="flex min-h-svh items-center justify-center bg-background px-5 py-12 text-foreground"
+      lang="pt-BR"
+    >
+      <GetStartedPanel
+        whatsappUrl={destinations.whatsapp}
+        telegramUrl={destinations.telegram}
+        imessageUrl={destinations.imessage}
+      />
     </main>
   );
 }

@@ -160,7 +160,7 @@ export function quotaFailureMessage(error: QuotaAdmissionError) {
       : resource === "storage_bytes"
         ? "for this account"
         : "for today";
-  return `This ${scope} has reached its ${unit} limit ${horizon} (${String(used)} used of ${String(limit)}; requested ${String(requested)}). Try again later, upgrade at /pricing, or ask the operator to raise quotas.`;
+  return `This ${scope} has reached its ${unit} limit ${horizon} (${String(used)} used of ${String(limit)}; requested ${String(requested)}). Try again later or discuss more usage with your Companion. Subscription management is available in your account.`;
 }
 
 interface Check {

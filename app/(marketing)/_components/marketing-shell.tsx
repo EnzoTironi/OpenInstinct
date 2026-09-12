@@ -4,11 +4,12 @@ import { Logo } from "@web/components/ui/logo";
 import { Button } from "@web/components/ui/button";
 import { Separator } from "@web/components/ui/separator";
 import { cn } from "@web/components/class-names";
-import { companionPublicHost, companionPublicOrigin } from "../public-origin";
+import { companionPublicOrigin } from "../public-origin";
+import styles from "./marketing-shell.module.css";
+import { OnboardingTrigger } from "./onboarding";
 
 const nav = [
   { href: "/welcome", label: "Produto" },
-  { href: "/pricing", label: "Preços" },
   { href: "/docs", label: "Guia" },
 ] as const;
 
@@ -33,18 +34,21 @@ export function MarketingShell({
   active,
 }: {
   readonly children: ReactNode;
-  readonly active?: "product" | "pricing" | "docs";
+  readonly active?: "product" | "docs";
 }) {
   return (
     <div
-      className="flex min-h-svh flex-col bg-background text-foreground"
+      className={cn(
+        "flex min-h-svh flex-col bg-background text-foreground",
+        active === "product" && styles.landingShell
+      )}
       lang="pt-BR"
     >
       <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-md">
         <MarketingFrame className="flex h-16 items-center justify-between gap-4">
           <Link className="flex items-center gap-2 type-label" href="/welcome">
             <Logo />
-            <span>Companion</span>
+            <span>Zoen</span>
           </Link>
           <nav
             aria-label="Marketing"
@@ -64,13 +68,7 @@ export function MarketingShell({
             >
               Entrar
             </Button>
-            <Button
-              nativeButton={false}
-              render={<Link href="/get-started" />}
-              size="sm"
-            >
-              Começar
-            </Button>
+            <OnboardingTrigger size="sm">Começar</OnboardingTrigger>
           </div>
         </MarketingFrame>
         <MarketingFrame className="flex items-center gap-1 pb-3 md:hidden">
@@ -102,16 +100,15 @@ export function MarketingShell({
               href="/welcome"
             >
               <Logo />
-              <span>Companion</span>
+              <span>Zoen</span>
             </Link>
             <p className="type-caption text-muted-foreground">
-              Instinct · Companion para pessoas, profissionais e times.
-              Hospedado em{" "}
+              Sua vida tem companhia. Conheça o{" "}
               <a
                 className="underline-offset-4 hover:text-foreground hover:underline"
                 href={companionPublicOrigin}
               >
-                {companionPublicHost}
+                Zoen
               </a>
               .
             </p>
@@ -120,15 +117,16 @@ export function MarketingShell({
             <Link className="hover:text-foreground" href="/welcome">
               Produto
             </Link>
-            <Link className="hover:text-foreground" href="/pricing">
-              Preços
-            </Link>
             <Link className="hover:text-foreground" href="/docs">
               Guia
             </Link>
-            <Link className="hover:text-foreground" href="/get-started">
+            <OnboardingTrigger
+              className="font-normal hover:text-foreground"
+              size="none"
+              variant="quiet"
+            >
               Começar
-            </Link>
+            </OnboardingTrigger>
             <Link className="hover:text-foreground" href="/sign-in">
               Entrar
             </Link>
@@ -143,12 +141,11 @@ function NavItem({
   active,
   item,
 }: {
-  readonly active?: "product" | "pricing" | "docs";
+  readonly active?: "product" | "docs";
   readonly item: (typeof nav)[number];
 }) {
   const isActive =
     (active === "product" && item.href === "/welcome") ||
-    (active === "pricing" && item.href === "/pricing") ||
     (active === "docs" && item.href === "/docs");
   return (
     <Button

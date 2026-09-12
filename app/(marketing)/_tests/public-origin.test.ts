@@ -6,17 +6,17 @@ import {
 } from "../public-origin";
 
 describe("marketing public origin", () => {
-  it("canonicalizes only to companion.tironi.xyz", () => {
-    expect(companionPublicHost).toBe("companion.tironi.xyz");
-    expect(companionPublicOrigin).toBe("https://companion.tironi.xyz");
+  it("canonicalizes only to zoen.tironi.xyz", () => {
+    expect(companionPublicHost).toBe("zoen.tironi.xyz");
+    expect(companionPublicOrigin).toBe("https://zoen.tironi.xyz");
     expect(companionCanonicalPath("/welcome")).toBe(
-      "https://companion.tironi.xyz/welcome"
-    );
-    expect(companionCanonicalPath("/pricing")).toBe(
-      "https://companion.tironi.xyz/pricing"
+      "https://zoen.tironi.xyz/welcome"
     );
     expect(companionCanonicalPath("/docs")).toBe(
-      "https://companion.tironi.xyz/docs"
+      "https://zoen.tironi.xyz/docs"
+    );
+    expect(companionCanonicalPath("/docs")).toBe(
+      "https://zoen.tironi.xyz/docs"
     );
   });
 });

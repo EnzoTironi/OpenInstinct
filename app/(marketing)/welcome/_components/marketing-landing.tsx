@@ -1,437 +1,421 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
-  Building2Icon,
-  GlobeIcon,
-  LockIcon,
-  MessageCircleIcon,
-  ShieldCheckIcon,
-  SmartphoneIcon,
+  ArrowDownIcon,
+  ArrowUpRightIcon,
+  CheckIcon,
+  FileTextIcon,
+  MicIcon,
+  SearchIcon,
   SparklesIcon,
-  UserIcon,
 } from "lucide-react";
 import { Button } from "@web/components/ui/button";
-import { Badge } from "@web/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@web/components/ui/card";
-import { billingPlanCatalog } from "@shared/billing/plans";
+  ConversationIcons,
+  OnboardingTrigger,
+} from "../../_components/onboarding";
+import { cn } from "@web/components/class-names";
 import {
   MarketingFrame,
   MarketingShell,
 } from "../../_components/marketing-shell";
-import {
-  marketingPlanOrder,
-  marketingPriceLabel,
-} from "../../_components/plan-copy";
-import {
-  companionPublicHost,
-  companionPublicOrigin,
-} from "../../public-origin";
 import { ChatPreview } from "./chat-preview";
-
-const channels = [
-  {
-    title: "Telegram",
-    body: "O Companion mora no chat que você já abre. Sem app novo para aprender.",
-    icon: MessageCircleIcon,
-  },
-  {
-    title: "WhatsApp",
-    body: "O mesmo assistente, no outro messenger. Você escolhe a porta da frente.",
-    icon: SmartphoneIcon,
-  },
-  {
-    title: "Web",
-    body: `Conta, plano e guia em ${companionPublicHost} — o host de produção.`,
-    icon: GlobeIcon,
-  },
-] as const;
-
-const fit = [
-  {
-    title: "Nos chats que você já usa",
-    body: "Telegram e WhatsApp são a porta. O Companion responde onde o trabalho já acontece.",
-  },
-  {
-    title: "Aprende como você trabalha",
-    body: "Contexto no workspace pessoal. Sem ritual de prompt para cada pedido.",
-  },
-  {
-    title: "Nada sensível sem aprovação",
-    body: "Envios e mudanças que pedem a sua voz esperam o ok. Você manda no ritmo.",
-  },
-  {
-    title: "Sobe quando o ritmo aumenta",
-    body: "Free para começar. Pro e Org quando a cota pessoal ou o time pedem mais.",
-  },
-] as const;
+import { SkyBackdrop } from "./sky-backdrop";
+import { RotatingHeadline } from "./rotating-headline";
+import { ConnectionCarousel } from "./connection-carousel";
+import styles from "./marketing-landing.module.css";
 
 const steps = [
+  { icon: MicIcon, title: "Conte", body: "Texto, áudio, foto ou documento." },
   {
-    title: "Comece grátis",
-    body: "Abra Começar. Sem cartão. Uma conta no navegador, no host companion.tironi.xyz.",
+    icon: FileTextIcon,
+    title: "Organize",
+    body: "Ele conecta os pontos por você.",
   },
   {
-    title: "Vincule um canal",
-    body: "Confirme no Telegram ou no WhatsApp. Esse messenger vira a porta da frente.",
+    icon: SearchIcon,
+    title: "Encontre",
+    body: "Sua memória, quando precisar.",
   },
   {
-    title: "Peça algo real",
-    body: "O Companion responde no chat — em geral em minutos, não em um tour de produto.",
-  },
-] as const;
-
-const trust = [
-  {
-    title: "Free nunca pede cartão",
-    body: "Upgrade pago usa Stripe Checkout. Gerencie ou cancele no Customer Portal.",
-    icon: LockIcon,
-  },
-  {
-    title: "Você aprova o que é sensível",
-    body: "O Companion pergunta antes de enviar ou mudar o que precisa da sua voz.",
-    icon: ShieldCheckIcon,
-  },
-  {
-    title: "Privacidade com limite honesto",
-    body: "Exportar e apagar cobrem a memória pessoal hoje — ainda não o histórico inteiro.",
-    icon: UserIcon,
-  },
-] as const;
-
-const audiences = [
-  {
-    title: "Pessoas",
-    body: "Um Companion pessoal no Telegram ou no WhatsApp.",
-    icon: UserIcon,
-  },
-  {
-    title: "Profissionais",
-    body: "Mais cota quando o assistente entra no ritmo do trabalho.",
     icon: SparklesIcon,
+    title: "Resolva",
+    body: "Do pedido ao trabalho feito.",
+  },
+] as const;
+
+const questions = [
+  {
+    question: "O que posso pedir ao Zoen?",
+    answer:
+      "Tudo o que está ocupando espaço na sua cabeça. Guardar uma ideia, encontrar um documento, acompanhar uma entrega, organizar a semana ou combinar um encontro. Conte o que você precisa resolver.",
   },
   {
-    title: "Times",
-    body: "Assentos Org, workspaces compartilhados e cobrança de admin.",
-    icon: Building2Icon,
+    question: "Preciso aprender comandos?",
+    answer:
+      "Escreva como você fala. Mande um áudio no caminho, encaminhe uma mensagem ou compartilhe um documento. Seu Zoen entende o contexto e pergunta quando precisa de um detalhe seu.",
+  },
+  {
+    question: "Ele lembra de uma conversa para outra?",
+    answer:
+      "Seu Zoen aprende com você. Preferências, pessoas, projetos e decisões se conectam para que você possa continuar de onde parou. Você pode perguntar o que ele lembra, corrigir ou pedir para esquecer.",
+  },
+  {
+    question: "Como funciona com minha família e meus amigos?",
+    answer:
+      "Você escolhe suas pessoas de confiança. Com a participação delas, seu Zoen conversa com o Zoen de cada uma para combinar horários, organizar planos e acompanhar mudanças. Cada um cuida dos interesses da sua pessoa.",
+  },
+  {
+    question: "O que ele compartilha em um grupo?",
+    answer:
+      "O necessário para o que vocês estão resolvendo, dentro do que você autorizou. Para combinar um jantar, ele pode compartilhar um horário livre sem contar o que ocupa o resto da sua agenda.",
+  },
+  {
+    question: "Também funciona para o meu negócio?",
+    answer:
+      "Clientes, pedidos, prazos e documentos ganham contexto. Seu Zoen ajuda a acompanhar o trabalho com as ferramentas que você já usa, mesmo que hoje tudo aconteça em conversas e planilhas.",
+  },
+  {
+    question: "E se a ferramenta que eu uso não estiver conectada?",
+    answer:
+      "Peça na conversa. Seu Zoen encontra uma conexão pronta ou constrói a integração em segundo plano. Você conecta sua conta e escolhe o que ele pode fazer. Ele cuida dos detalhes técnicos e avisa quando estiver funcionando.",
+  },
+  {
+    question: "Eu continuo no controle?",
+    answer:
+      "Você define o objetivo e os limites. Pode corrigir, interromper ou mudar de ideia na conversa. Quando uma decisão precisa de você, o Zoen mostra o que está em jogo e pede sua escolha.",
+  },
+  {
+    question: "Como começo?",
+    answer:
+      "Toque em Começar, abra a conversa e faça seu primeiro pedido. Seu Zoen segue com você por ali. Se preferir Telegram, é só escolher essa opção.",
   },
 ] as const;
 
 export function MarketingLanding() {
   return (
     <MarketingShell active="product">
-      <main>
-        <section className="pt-16 pb-20 sm:pt-24 sm:pb-28">
-          <MarketingFrame className="grid items-center gap-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-16">
-            <div className="flex flex-col gap-6">
-              <p className="type-caption text-muted-foreground">
-                Companion by Instinct
-              </p>
-              <h1 className="type-signal max-w-xl text-4xl tracking-tight sm:text-5xl lg:text-6xl lg:leading-[1.05]">
-                Conheça o Companion, seu assistente no trabalho
-              </h1>
-              <p className="type-body max-w-lg text-lg text-muted-foreground">
-                Encaixa no Telegram e no WhatsApp. Aprende como você trabalha —
-                depois trabalha. Para pessoas, profissionais e times.
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  nativeButton={false}
-                  render={<Link href="/get-started" />}
-                  size="lg"
-                >
-                  Começar grátis
-                </Button>
-                <Button
-                  nativeButton={false}
-                  render={<Link href="/pricing" />}
-                  size="lg"
-                  variant="outline"
-                >
-                  Ver preços
-                </Button>
-              </div>
-              <p className="type-caption text-muted-foreground">
-                Telegram · WhatsApp · Sem cartão no Free · {companionPublicHost}
-              </p>
+      <main className={styles.landing} id="conteudo">
+        <SkyBackdrop />
+        <section className={styles.hero} data-sky="0">
+          <MarketingFrame className={styles.heroContent}>
+            <p className="type-supporting-body">
+              Seu dia, seu trabalho, suas pessoas. Um Zoen.
+            </p>
+            <h1 className={cn("type-signal", styles.heroTitle)}>
+              Você não precisa
+              <br />
+              <RotatingHeadline />
+            </h1>
+            <div className={styles.integrations}>
+              <span>Converse no</span>
+              <ConversationIcons />
             </div>
-            <ChatPreview />
-          </MarketingFrame>
-        </section>
-
-        <section
-          aria-labelledby="channels-heading"
-          className="border-y border-border/50 bg-muted/25"
-        >
-          <MarketingFrame className="flex flex-col gap-10 py-16 sm:py-20">
-            <div className="flex max-w-2xl flex-col gap-3">
-              <h2
-                className="type-signal text-3xl tracking-tight sm:text-4xl"
-                id="channels-heading"
-              >
-                Encaixa no seu dia (1), não o contrário
-              </h2>
-              <p className="type-body text-muted-foreground">
-                Integra os messengers que você já usa, com um assistente que
-                trata o trabalho como um contato — não como mais um dashboard.
-              </p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {channels.map((item) => (
-                <Card key={item.title}>
-                  <CardHeader>
-                    <item.icon
-                      aria-hidden="true"
-                      className="size-5 text-primary"
-                    />
-                    <CardTitle>{item.title}</CardTitle>
-                    <CardDescription>{item.body}</CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
+            <div className={styles.actions}>
+              <OnboardingTrigger className={styles.primaryButton} size="lg">
+                Começar agora <ArrowUpRightIcon aria-hidden="true" />
+              </OnboardingTrigger>
             </div>
           </MarketingFrame>
+          <a
+            aria-label="Ver como o Zoen ajuda no dia a dia"
+            className={styles.scrollHint}
+            href="#dia-a-dia"
+          >
+            <ArrowDownIcon aria-hidden="true" />
+          </a>
         </section>
 
-        <section aria-labelledby="fit-heading">
-          <MarketingFrame className="flex flex-col gap-10 py-16 sm:py-24">
-            <div className="flex max-w-2xl flex-col gap-3">
-              <h2
-                className="type-signal text-3xl tracking-tight sm:text-4xl"
-                id="fit-heading"
-              >
-                O que ele faz no trabalho
-              </h2>
-              <p className="type-body text-muted-foreground">
-                Você manda o que precisa ser resolvido. O Companion segue até o
-                fim — e pergunta antes do que é sensível.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {fit.map((item, index) => (
-                <Card key={item.title}>
-                  <CardHeader>
-                    <p className="type-caption text-muted-foreground">
-                      {String(index + 1).padStart(2, "0")}
-                    </p>
-                    <CardTitle className="type-section-title">
-                      {item.title}
-                    </CardTitle>
-                    <CardDescription>{item.body}</CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          </MarketingFrame>
-        </section>
-
-        <section
-          aria-labelledby="audience-heading"
-          className="border-y border-border/50 bg-muted/25"
-        >
-          <MarketingFrame className="flex flex-col gap-10 py-16 sm:py-20">
-            <h2
-              className="type-signal text-3xl tracking-tight sm:text-4xl"
-              id="audience-heading"
-            >
-              Pessoas, profissionais e times
+        <section className={styles.story} data-sky="1" id="dia-a-dia">
+          <MarketingFrame className={styles.storyRow}>
+            <h2 className={cn("type-signal", styles.largeTitle)}>
+              Aquela ideia.
+              <br />
+              Aquele prazo.
+              <br />
+              Onde você
+              <br />
+              <em>salvou mesmo?</em>
             </h2>
-            <div className="grid gap-4 md:grid-cols-3">
-              {audiences.map((item) => (
-                <Card key={item.title}>
-                  <CardHeader>
-                    <item.icon
-                      aria-hidden="true"
-                      className="size-5 text-primary"
-                    />
-                    <CardTitle>{item.title}</CardTitle>
-                    <CardDescription>{item.body}</CardDescription>
-                  </CardHeader>
-                </Card>
+            <Image
+              alt="Lembretes espalhados entre mensagens, notas e abas"
+              className={styles.storyImage}
+              height={2624}
+              sizes="(max-width: 760px) 90vw, 48vw"
+              src="/marketing/scattered-notes.avif"
+              unoptimized
+              width={2192}
+            />
+          </MarketingFrame>
+          <MarketingFrame className={cn(styles.storyRow, styles.reverse)}>
+            <Image
+              alt="Um calendário cheio de compromissos e lembretes"
+              className={styles.storyImage}
+              height={2628}
+              sizes="(max-width: 760px) 90vw, 48vw"
+              src="/marketing/calendar.avif"
+              unoptimized
+              width={2528}
+            />
+            <h2 className={cn("type-signal", styles.largeTitle)}>
+              Você organiza
+              <br />o calendário.
+              <br />
+              <em>
+                A vida continua
+                <br />
+                acontecendo.
+              </em>
+            </h2>
+          </MarketingFrame>
+          <MarketingFrame className={styles.statement}>
+            <h2 className={cn("type-signal", styles.largeTitle)}>
+              O trabalho, a família,
+              <br />
+              as coisas só suas.
+              <br />
+              <em>É muita coisa para uma cabeça.</em>
+            </h2>
+            <p className="type-body">
+              Você merece tempo para pensar no que vem depois.
+            </p>
+          </MarketingFrame>
+        </section>
+
+        <section className={styles.sky} data-sky="2">
+          <MarketingFrame className={styles.skyContent}>
+            <p className={styles.eyebrow}>MAIS ESPAÇO PARA</p>
+            <h2 className={cn("type-signal", styles.lifeTitle)}>Sua vida.</h2>
+            <Image
+              alt=""
+              className={styles.face}
+              height={88}
+              sizes="(max-width: 760px) 60vw, 360px"
+              src="/marketing/companion-face.webp"
+              unoptimized
+              width={88}
+            />
+            <h2 className={cn("type-signal", styles.largeTitle)}>
+              Deixe os detalhes com ele.
+              <br />
+              <em>Fique com os momentos.</em>
+            </h2>
+            <div className={styles.benefits}>
+              <p>
+                <strong>Capture a ideia.</strong>
+                <span>Seu Zoen lembra onde ela leva.</span>
+              </p>
+              <p>
+                <strong>Encontre o próximo passo.</strong>
+                <span>Ele acompanha até estar resolvido.</span>
+              </p>
+              <p>
+                <strong>Esteja presente.</strong>
+                <span>As pequenas pendências ficam com ele.</span>
+              </p>
+            </div>
+          </MarketingFrame>
+        </section>
+
+        <section className={styles.how} data-sky="3" id="como-funciona">
+          <MarketingFrame>
+            <h2 className={cn("type-signal", styles.centeredTitle)}>
+              Começa com uma conversa.
+              <br />
+              <em>Continua com algo resolvido.</em>
+            </h2>
+            <div className={styles.messageExample}>
+              <span>Você</span>
+              <p>“Guarda esse contrato e me avisa antes de vencer.”</p>
+            </div>
+            <div className={styles.steps}>
+              {steps.map((step) => (
+                <div key={step.title}>
+                  <step.icon aria-hidden="true" />
+                  <h3 className="type-section-title">{step.title}</h3>
+                  <p>{step.body}</p>
+                </div>
+              ))}
+            </div>
+            <div className={styles.replyExample}>
+              <span>Zoen</span>
+              <p>
+                Guardei. O contrato vence em 30 de novembro. Vou te lembrar com
+                uma semana de antecedência.
+              </p>
+            </div>
+          </MarketingFrame>
+        </section>
+
+        <section className={styles.conversation} data-sky="3" id="para-voce">
+          <MarketingFrame>
+            <h2 className={cn("type-signal", styles.centeredTitle)}>
+              Do jeito que você fala.
+              <br />
+              <em>No lugar onde já conversa.</em>
+            </h2>
+            <ChatPreview />
+            <div className={styles.ease}>
+              {[
+                "Escreva com suas palavras",
+                "Continue de onde parou",
+                "Peça para ajustar",
+                "Converse pelo seu canal",
+              ].map((item) => (
+                <span key={item}>
+                  <CheckIcon aria-hidden="true" />
+                  {item}
+                </span>
               ))}
             </div>
           </MarketingFrame>
         </section>
 
-        <section aria-labelledby="how-heading">
-          <MarketingFrame className="flex flex-col gap-10 py-16 sm:py-24">
-            <div className="flex max-w-2xl flex-col gap-3">
-              <h2
-                className="type-signal text-3xl tracking-tight sm:text-4xl"
-                id="how-heading"
-              >
-                Do zero à primeira resposta útil
+        <section className={styles.landscapes} data-sky="4">
+          <MarketingFrame>
+            <h2 className={cn("type-signal", styles.centeredTitle)}>
+              Para o que você precisa fazer.
+              <br />
+              <em>E para o que você quer viver.</em>
+            </h2>
+            <div className={styles.landscapeGrid}>
+              <a className={styles.landscape} href="#para-voce">
+                <Image
+                  alt="Ilha flutuante com um escritório"
+                  height={1708}
+                  sizes="(max-width: 760px) 90vw, 44vw"
+                  src="/marketing/office.webp"
+                  unoptimized
+                  width={3252}
+                />
+                <span>
+                  NO TRABALHO<strong>Resolva.</strong>
+                </span>
+              </a>
+              <a className={styles.landscape} href="#pessoas-de-confianca">
+                <Image
+                  alt="Ilha flutuante com um parque"
+                  height={1708}
+                  sizes="(max-width: 760px) 90vw, 44vw"
+                  src="/marketing/park.webp"
+                  unoptimized
+                  width={3252}
+                />
+                <span>
+                  NA SUA VIDA<strong>Esteja presente.</strong>
+                </span>
+              </a>
+            </div>
+          </MarketingFrame>
+        </section>
+
+        <section
+          className={styles.connections}
+          data-sky="4"
+          id="suas-ferramentas"
+        >
+          <MarketingFrame className={styles.connectionContent}>
+            <p className={styles.eyebrow}>
+              AS FERRAMENTAS SÃO SUAS. A CONEXÃO É COM ELE.
+            </p>
+            <h2 className={cn("type-signal", styles.centeredTitle)}>
+              “Conecta isso para mim?”
+              <br />
+              <em>Deixe com seu Zoen.</em>
+            </h2>
+            <p>
+              Sua agenda, seus arquivos, o sistema do seu negócio. Peça na
+              conversa. Ele encontra a conexão ou constrói o que falta em
+              segundo plano. Você continua o seu dia.
+            </p>
+            <ConnectionCarousel />
+            <p className={styles.quiet}>
+              Você escolhe o acesso. Ele cuida dos detalhes.
+            </p>
+          </MarketingFrame>
+        </section>
+
+        <section
+          className={styles.trusted}
+          data-sky="5"
+          id="pessoas-de-confianca"
+        >
+          <MarketingFrame className={styles.trustedGrid}>
+            <div>
+              <p className={styles.eyebrow}>SUA REDE DE CONFIANÇA</p>
+              <h2 className={cn("type-signal", styles.largeTitle)}>
+                Seu Zoen.
+                <br />O Zoen deles.
+                <br />
+                <em>Um plano juntos.</em>
               </h2>
-              <p className="type-body text-muted-foreground">
-                Cadastro → vincular WhatsApp ou Telegram → primeira resposta.
-                Caminho do Companion hospedado — não um guia de operação.
+              <p>
+                Um jantar com a família. A viagem dos amigos. A reunião que
+                nunca encontra horário. Seu Zoen conversa com o Zoen das pessoas
+                que você escolheu e cuida da combinação.
+              </p>
+              <p className={styles.quiet}>
+                Vocês compartilham o plano. Cada pessoa mantém sua privacidade.
               </p>
             </div>
-            <ol className="grid gap-4 md:grid-cols-3">
-              {steps.map((step, index) => (
-                <li key={step.title}>
-                  <Card className="h-full">
-                    <CardHeader>
-                      <p className="type-signal text-3xl text-muted-foreground">
-                        {String(index + 1).padStart(2, "0")}
-                      </p>
-                      <CardTitle>{step.title}</CardTitle>
-                      <CardDescription>{step.body}</CardDescription>
-                    </CardHeader>
-                  </Card>
-                </li>
-              ))}
-            </ol>
-            <div>
+            <figure className={styles.networkMockup}>
+              <Image
+                alt="Mockup de iMessage: seu Zoen e o da Ana combinam um jantar para sexta às 20h, com sua confirmação."
+                height={1536}
+                sizes="(max-width: 760px) 115vw, 520px"
+                src="/marketing/zoen-imessage.webp"
+                unoptimized
+                width={1024}
+              />
+              <figcaption>
+                Só com quem você escolheu para a sua rede.
+              </figcaption>
+            </figure>
+          </MarketingFrame>
+        </section>
+
+        <section className={styles.plans} data-sky="5">
+          <MarketingFrame className={styles.planContent}>
+            <h2 className={cn("type-signal", styles.centeredTitle)}>
+              Comece com um pedido.
+            </h2>
+            <p>Seu Zoen entra no ritmo com você.</p>
+            <div className={styles.actions}>
+              <OnboardingTrigger className={styles.primaryButton} size="lg">
+                Começar agora <ArrowUpRightIcon aria-hidden="true" />
+              </OnboardingTrigger>
+            </div>
+          </MarketingFrame>
+        </section>
+
+        <section className={styles.faq} data-sky="6" id="duvidas">
+          <MarketingFrame className={styles.faqGrid}>
+            <div className={styles.faqIntro}>
+              <p className={styles.eyebrow}>ANTES DO PRIMEIRO OI</p>
+              <h2 className={cn("type-signal", styles.largeTitle)}>
+                Pode perguntar.
+              </h2>
+              <p>Veja como começar com seu Zoen.</p>
               <Button
+                className={styles.glassButton}
                 nativeButton={false}
                 render={<Link href="/docs" />}
                 variant="outline"
               >
-                Ler o guia de primeiros passos
+                Ler o guia <ArrowUpRightIcon aria-hidden="true" />
               </Button>
             </div>
-          </MarketingFrame>
-        </section>
-
-        <section
-          aria-labelledby="trust-heading"
-          className="border-y border-border/50 bg-muted/25"
-        >
-          <MarketingFrame className="flex flex-col gap-10 py-16 sm:py-20">
-            <div className="flex max-w-2xl flex-col gap-3">
-              <h2
-                className="type-signal text-3xl tracking-tight sm:text-4xl"
-                id="trust-heading"
-              >
-                Confiança, sem overclaim
-              </h2>
-              <p className="type-body text-muted-foreground">
-                Privacidade e cobrança batem com o que a Conta faz hoje.
-              </p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {trust.map((item) => (
-                <Card key={item.title}>
-                  <CardHeader>
-                    <item.icon
-                      aria-hidden="true"
-                      className="size-5 text-primary"
-                    />
-                    <CardTitle>{item.title}</CardTitle>
-                    <CardDescription>{item.body}</CardDescription>
-                  </CardHeader>
-                </Card>
+            <div>
+              {questions.map((item) => (
+                <details className={styles.question} key={item.question}>
+                  <summary>
+                    {item.question}
+                    <span aria-hidden="true">+</span>
+                  </summary>
+                  <p>{item.answer}</p>
+                </details>
               ))}
             </div>
-          </MarketingFrame>
-        </section>
-
-        <section aria-labelledby="pricing-teaser-heading">
-          <MarketingFrame className="flex flex-col gap-10 py-16 sm:py-24">
-            <div className="mx-auto flex max-w-2xl flex-col gap-3 text-center">
-              <h2
-                className="type-signal text-3xl tracking-tight sm:text-4xl"
-                id="pricing-teaser-heading"
-              >
-                Escolha um plano para começar
-              </h2>
-              <p className="type-body text-muted-foreground">
-                Todo plano traz o Companion. Comece grátis; suba de cota ou de
-                time quando fizer parte do dia.
-              </p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {marketingPlanOrder.map((plan) => {
-                const amount =
-                  billingPlanCatalog[plan.id].placeholderPriceUsdMonthly;
-                return (
-                  <Card
-                    className={
-                      plan.id === "pro" ? "ring-1 ring-primary/25" : undefined
-                    }
-                    key={plan.id}
-                  >
-                    <CardHeader>
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle>{plan.name}</CardTitle>
-                        {plan.id === "pro" ? (
-                          <Badge variant="information">Popular</Badge>
-                        ) : null}
-                      </div>
-                      <CardDescription>{plan.tagline}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-4">
-                      <p>
-                        <span className="type-signal text-3xl tracking-tight">
-                          {marketingPriceLabel(plan.id, amount)}
-                        </span>
-                        {plan.priceSuffix ? (
-                          <span className="type-caption text-muted-foreground">
-                            {" "}
-                            {plan.priceSuffix}
-                          </span>
-                        ) : null}
-                      </p>
-                      <ul className="flex flex-col gap-2">
-                        {plan.features.slice(0, 3).map((feature) => (
-                          <li
-                            className="type-caption text-muted-foreground"
-                            key={feature}
-                          >
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Button
-                nativeButton={false}
-                render={<Link href="/get-started" />}
-              >
-                Começar grátis
-              </Button>
-              <Button
-                nativeButton={false}
-                render={<Link href="/pricing" />}
-                variant="outline"
-              >
-                Preços completos
-              </Button>
-            </div>
-          </MarketingFrame>
-        </section>
-
-        <section className="border-t border-border/50 bg-muted/25">
-          <MarketingFrame className="flex flex-col items-center gap-5 py-16 text-center sm:py-20">
-            <h2 className="type-signal max-w-xl text-3xl tracking-tight sm:text-4xl">
-              Pronto para o primeiro chat?
-            </h2>
-            <p className="type-body max-w-lg text-muted-foreground">
-              Comece em{" "}
-              <a
-                className="underline-offset-4 hover:text-foreground hover:underline"
-                href={companionPublicOrigin}
-              >
-                {companionPublicHost}
-              </a>
-              . Sem cartão no Free.
-            </p>
-            <Button
-              nativeButton={false}
-              render={<Link href="/get-started" />}
-              size="lg"
-            >
-              Começar grátis
-            </Button>
           </MarketingFrame>
         </section>
       </main>

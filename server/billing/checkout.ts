@@ -193,7 +193,7 @@ export const createCheckoutSession = Effect.fn("createCheckoutSession")(
           client_reference_id: subjectId,
           line_items: [{ price: priceId, quantity: seatCount }],
           success_url: `${origin}/account?billing=success`,
-          cancel_url: `${origin}/pricing?billing=canceled`,
+          cancel_url: `${origin}/account?billing=canceled`,
           metadata: {
             instinctPlan: input.plan,
             instinctSubjectType: subjectType,

@@ -1,61 +1,68 @@
-import { Logo } from "@web/components/ui/logo";
+"use client";
 
-const thread = [
+import Image from "next/image";
+import { useState } from "react";
+import { Button } from "@web/components/ui/button";
+import styles from "./marketing-landing.module.css";
+
+const mockups = [
   {
-    from: "user",
-    text: "Preciso do que chegou no Telegram hoje — só o que pede resposta.",
+    channel: "WhatsApp",
+    image: "zoen-whatsapp",
+    caption: "Um contrato guardado. Um prazo lembrado.",
+    description:
+      "Mockup de WhatsApp: o Zoen guarda um contrato e combina um lembrete antes do vencimento.",
   },
   {
-    from: "companion",
-    text: "Três threads. Duas são urgentes. Quer que eu rascunhe as respostas?",
+    channel: "iMessage",
+    image: "zoen-imessage",
+    caption: "Um jantar combinado. Sem o vai e volta.",
+    description:
+      "Mockup de iMessage: o Zoen encontra um horário com o Zoen da Ana e confirma o jantar.",
   },
   {
-    from: "user",
-    text: "Sim. Me avisa antes de enviar.",
-  },
-  {
-    from: "companion",
-    text: "Combinado. Rascunhos prontos — nada sai sem a sua aprovação.",
+    channel: "Telegram",
+    image: "zoen-telegram",
+    caption: "Os pedidos de amanhã. Tudo no seu horário.",
+    description:
+      "Mockup de Telegram: o Zoen organiza três pedidos e prepara a lista do dia seguinte.",
   },
 ] as const;
 
 export function ChatPreview() {
+  const [active, setActive] = useState<(typeof mockups)[number]>(mockups[0]);
   return (
-    <figure className="mx-auto w-full max-w-md">
-      <div className="rounded-[1.75rem] bg-card p-5 shadow-sm ring-1 ring-foreground/10">
-        <div className="mb-5 flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-full bg-primary/10">
-            <Logo />
-          </span>
-          <div className="min-w-0">
-            <p className="type-label">Companion</p>
-            <p className="type-caption text-muted-foreground">
-              Telegram · WhatsApp
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          {thread.map((message) => {
-            const fromUser = message.from === "user";
-            return (
-              <p
-                className={
-                  fromUser
-                    ? "type-supporting-body ml-8 rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground"
-                    : "type-supporting-body mr-8 rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5"
-                }
-                key={message.text}
-              >
-                {message.text}
-              </p>
-            );
-          })}
-        </div>
-      </div>
-      <figcaption className="sr-only">
-        Exemplo de conversa: o Companion resume o dia e pede aprovação antes de
-        enviar.
-      </figcaption>
-    </figure>
+    <div className={styles.chatDemo}>
+      <fieldset
+        aria-label="Canal da demonstração"
+        className={styles.channelChoices}
+      >
+        {mockups.map((mockup) => (
+          <Button
+            aria-pressed={active === mockup}
+            className={styles.channelChoice}
+            key={mockup.channel}
+            onClick={() => {
+              setActive(mockup);
+            }}
+            variant="plain"
+          >
+            {mockup.channel}
+          </Button>
+        ))}
+      </fieldset>
+      <figure className={styles.mockupStage}>
+        <Image
+          alt={active.description}
+          height={1536}
+          key={active.image}
+          sizes="(max-width: 760px) 115vw, 560px"
+          src={`/marketing/${active.image}.webp`}
+          unoptimized
+          width={1024}
+        />
+        <figcaption aria-live="polite">{active.caption}</figcaption>
+      </figure>
+    </div>
   );
 }

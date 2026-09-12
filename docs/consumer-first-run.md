@@ -4,35 +4,33 @@ Short path for a person using the hosted Companion — not an operator self-host
 guide. Operators stay on [self-host](self-host.md) and
 [hosted Fly (H01)](ops/hosted-fly.md).
 
-Conversation-first native entry (message Telegram/WhatsApp with no web step)
-remains documented in [native onboarding](native-onboarding.md). This page covers
-the **web** first-run that creates the same account, workspace, and channel bind.
+## Flow — updated 2026-09-12
 
-## Flow
+1. Tap **Começar** on the landing to open a compact messenger chooser on the
+   same page: a bottom sheet on mobile and a centered card on desktop. It shows
+   only WhatsApp, Telegram and iMessage buttons. The three 44 px hero icons open
+   their configured messenger directly with one tap, without a chooser or a new
+   tab. An unconfigured icon is disabled; the chooser and direct entry route
+   show a friendly unavailable state instead of a fabricated destination.
+2. Send the first message. Existing WhatsApp/Telegram intake provisions the internal account
+   and personal workspace from the verified sender. There is no browser login,
+   form, plan selection or card before that first conversation.
+3. Continue in that chat. Ask for a connection only when the request needs it.
+4. When a subscription is relevant, the intended experience offers a Stripe link
+   privately, with price and terms visible before payment. This change keeps the
+   existing Checkout service; automatic offer timing and agent delivery remain
+   acceptance work, not a qualified live billing journey.
 
-1. Open **`/get-started`** on the hosted site.
-2. Choose **Telegram** or **WhatsApp**.
-3. Confirm the browser request in that messenger chat.
-4. Return to the tab and continue. Companion creates your account, provisions the
-   personal workspace, and binds that channel in one flow.
-5. You land on **home** with a success state (`/?welcome=1`). Home is the
-   post-signup landing: channel status, next steps, personal plan badge, and
-   conversation entry — without reading ops docs.
-6. Message the assistant in the linked chat or start a web conversation. Manage
-   messengers and plan under **Account**.
-
-Returning users use **`/sign-in`** with an already linked messenger. Linking an
-extra channel uses **Account → Link another channel** (`purpose: "link"`).
-
-## After get-started (home + account)
-
-- **Home** shows linked Telegram/WhatsApp (or an empty-state CTA), next actions,
-  and a **Free · Personal** plan entry that deep-links to Account → Plan.
-- **Account** groups channels, plan/billing entry, and personal memory. Copy
-  treats this as a **personal** workspace; Org seats are a separate team plan,
-  not a rename of the personal account.
-- Hosted Stripe checkout / `/pricing` and Account billing CTAs ship on C-BILL
-  ([consumer billing](consumer-billing.md)).
+The button opens a conversation; it does not send a message on the user's behalf.
+The iMessage button uses the configured `LINQ_PHONE_NUMBER` in an `sms:` link to
+open Messages. Current Linq intake requires an already verified account and
+ignores unknown phone numbers; new-account provisioning through iMessage is not
+implemented by the chooser. The link does not guarantee iMessage delivery.
+`/sign-in` continues to authenticate browser access through the linked messenger.
+Account still owns channel linking, personal memory and subscription management.
+The former `/pricing` address redirects to `/get-started`; it has no price table.
+That direct entry route remains available for existing links and honors an
+explicit messenger choice.
 
 ## Consumer trust (C-TRUST)
 
@@ -52,20 +50,28 @@ copy.
 ## What this is not
 
 - Not Docker, Fly, Alchemy, tunnel, or webhook setup.
-- Not the full billing purchase flow — Free starts here without a card; hosted
-  Free / Pro / Org seats are documented in [consumer billing](consumer-billing.md)
-  (`/pricing`).
+- Not the full billing purchase flow. Billing follows useful conversation;
+  its existing services are documented in [consumer billing](consumer-billing.md).
 - Not org SSO or multi-seat onboarding (C01/C02).
 - Not an account merge between two separately provisioned identities.
-- Public marketing packaging lives at `/welcome`, `/pricing`, and `/docs`
+- Public marketing packaging lives at `/welcome` and `/docs`
   (C-PACK). Unauthenticated `/` redirects to `/welcome`.
 
 ## Acceptance (product)
 
-- A new person can complete signup → workspace → at least one channel bind without
-  reading self-host docs.
-- After confirmation, home shows a clear success state naming the linked
-  messenger family (Telegram and/or WhatsApp), plus ongoing channel/plan status
-  on later visits.
+- A new person reaches a configured messenger with one tap and no browser signup.
+- The first verified WhatsApp/Telegram private message provisions the same account used on return.
+- The iMessage entry opens Messages at the configured number; qualification of
+  first-time iMessage intake remains separate acceptance work.
+- Missing channel configuration never produces a fake chat link.
 - Account makes personal vs org intent obvious and surfaces a plan section.
 - Sign-in still works for people who already completed the flow.
+
+## Zoen public deployment
+
+The public marketing origin is `https://zoen.tironi.xyz`. Use
+`MARKETING_WHATSAPP_NUMBER`, `MARKETING_TELEGRAM_USERNAME` and
+`MARKETING_IMESSAGE_NUMBER` to configure the website conversation links independently
+from the existing channel installation. Each value is validated before becoming a
+link; when an override is absent, the matching channel configuration remains the
+default. These public values do not change bot tokens, installation IDs or webhooks.

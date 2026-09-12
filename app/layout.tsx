@@ -9,11 +9,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(applicationOrigin()),
-  title: "Companion",
-  description:
-    "Companion by Instinct — your assistant in Telegram, WhatsApp, and the web.",
+  title: "Zoen",
+  description: "Zoen — seu assistente no WhatsApp, Telegram e iMessage.",
   icons: {
-    icon: [{ url: "/icon", type: "image/png" }, { url: "/favicon.ico" }],
+    icon: [{ url: "/marketing/zoen-favicon.png", type: "image/png" }],
   },
 };
 
