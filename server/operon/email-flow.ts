@@ -26,6 +26,7 @@ export interface PendingEmailProposal {
   readonly workspaceId: string;
   readonly proposalId: string;
   readonly digest: string;
+  readonly card: string;
 }
 const IngestBody = Schema.Struct({
   sourceArtifact: Schema.Struct({ sourceId: Schema.String }),
