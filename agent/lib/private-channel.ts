@@ -9,12 +9,53 @@ import {
   dispatchItem,
 } from "../../server/channels/dispatch";
 import { bindGroupChannelIdentity } from "../../server/channels/group-policy";
+import type { InboundEvent } from "../../server/channels/inbound";
 import { Telegram } from "../../server/channels/telegram";
 import { Kapso } from "../../server/channels/kapso";
 import { readVerifiedWebhook } from "../../server/channels/webhook";
 import { serverRuntime } from "../../server/runtime";
 import { drainChannelInbox, handoffChannelMessage } from "./channel-session";
 import { privateChannelEvents } from "./private-channel-events";
+
+const acceptLoginCommand = Effect.fn("acceptLoginCommand")(
+  function* (event: Extract<InboundEvent, { kind: "command" }>) {
+    const sender = {
+      channel: event.channel,
+      installationId: event.installationId,
+      senderId: event.senderId,
+    };
+    if (event.command === "confirm") {
+      const accounts = yield* ChannelAccounts;
+      yield* accounts.confirmChallenge({ token: event.token, sender });
+      return null;
+    }
+    const authPrompts = yield* ChannelAuthPrompts;
+    return yield* authPrompts.prepare({
+      token: event.token,
+      sender,
+      eventId: event.eventId,
+    });
+  },
+  (operation, event) =>
+    operation.pipe(
+      // Refused logins are terminal; provider retries must not block later messages.
+      Effect.catchTag("ChannelAccountError", (error) =>
+        Effect.logInfo("Channel login command refused", {
+          channel: event.channel,
+          command: event.command,
+          reason: error.reason,
+        }).pipe(Effect.as(null))
+      ),
+      Effect.catchTag("ChannelAuthPromptError", (error) =>
+        error.reason === "invalid_input" || error.reason === "conflict"
+          ? Effect.logInfo("Channel login prompt refused", {
+              channel: event.channel,
+              reason: error.reason,
+            }).pipe(Effect.as(null))
+          : Effect.fail(error)
+      )
+    )
+);
 
 export function privateChannel(channel: Identity["channel"]) {
   const definition: ChannelDefinition<undefined, void, Lease> = {
@@ -37,28 +78,15 @@ export function privateChannel(channel: Identity["channel"]) {
             const identities = new Map<string, Identity>();
             const prompts: string[] = [];
             for (const event of events) {
-              const sender = {
-                channel: event.channel,
-                installationId: event.installationId,
-                senderId: event.senderId,
-              };
               if (event.kind === "command") {
-                if (event.command === "start") {
-                  const authPrompts = yield* ChannelAuthPrompts;
-                  const prompt = yield* authPrompts.prepare({
-                    token: event.token,
-                    sender,
-                    eventId: event.eventId,
-                  });
-                  prompts.push(prompt.challengeId);
-                } else {
-                  yield* accounts.confirmChallenge({
-                    token: event.token,
-                    sender,
-                  });
-                }
+                const prompt = yield* acceptLoginCommand(event);
+                if (prompt) prompts.push(prompt.challengeId);
               } else {
-                const identity = yield* accounts.resolveVerifiedSender(sender);
+                const identity = yield* accounts.resolveVerifiedSender({
+                  channel: event.channel,
+                  installationId: event.installationId,
+                  senderId: event.senderId,
+                });
                 const group =
                   event.chatKind === "group"
                     ? yield* bindGroupChannelIdentity({
@@ -130,8 +158,16 @@ export function privateChannel(channel: Identity["channel"]) {
                 Effect.succeed(
                   new Response("rejected", { status: error.status })
                 ),
-              ProviderInputError: () =>
-                Effect.succeed(new Response("invalid event", { status: 400 })),
+              ProviderInputError: (error) =>
+                channel === "telegram" &&
+                (error.reason === "invalid_command" ||
+                  error.reason === "stale_event")
+                  ? Effect.logInfo("Telegram update refused", {
+                      reason: error.reason,
+                    }).pipe(Effect.as(new Response("ignored")))
+                  : Effect.succeed(
+                      new Response("invalid event", { status: 400 })
+                    ),
               ChannelAccountError: () =>
                 Effect.succeed(
                   new Response("invalid challenge or identity", { status: 400 })
