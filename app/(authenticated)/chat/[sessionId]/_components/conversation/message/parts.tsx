@@ -1,5 +1,4 @@
 import type { EveMessagePart } from "eve/react";
-import { renderEmailRegisterCard } from "@agent/lib/channel-input";
 import { MessageResponse } from "@web/components/ai-elements/message";
 import {
   Reasoning,
@@ -13,12 +12,15 @@ import {
   ToolInput,
   ToolOutput,
 } from "@web/components/ai-elements/tool";
+import { renderEmailRegisterCard } from "../../../../../../../server/operon/quarantine-card";
 import { AttachmentPart } from "./attachment";
 import { AuthorizationPrompt } from "./authorization";
 import { InputRequestActions, QuestionRequest } from "./input-request";
 import type { RespondToAgentInput } from "./types";
 
-function toolApprovalVisibleInput(part: Extract<EveMessagePart, { type: "dynamic-tool" }>) {
+function toolApprovalVisibleInput(
+  part: Extract<EveMessagePart, { type: "dynamic-tool" }>
+) {
   const inputRequest = part.toolMetadata?.eve?.inputRequest;
   if (inputRequest?.kind !== "tool-approval") return null;
   if (part.toolName === "email-register") {

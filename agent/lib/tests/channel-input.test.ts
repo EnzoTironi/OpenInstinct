@@ -8,13 +8,15 @@ import {
   type MessageStreamEvent,
 } from "eve/client";
 import {
-  approvalOptionLabel,
   channelQuestionSchema,
   pendingChannelInputs,
   readChannelInputStream,
   renderChannelInput,
-  renderEmailRegisterCard,
 } from "../channel-input";
+import {
+  approvalOptionLabel,
+  renderEmailRegisterCard,
+} from "../../../server/operon/quarantine-card";
 import {
   cardCopy,
   offerCopy,
@@ -45,6 +47,10 @@ const request: InputRequest = {
 };
 const card = cardCopy(3, 3, 1, 0);
 const viewedDigest = "a".repeat(64);
+const approveOption = request.options.find((option) => option.id === "approve");
+if (approveOption === undefined) {
+  throw new Error("fixture missing approve option");
+}
 describe("native input responses", () => {
   test("rejects an oversized question in the authored tool input schema", () => {
     expect(askQuestion.inputSchema).toBe(channelQuestionSchema);
@@ -96,10 +102,10 @@ describe("native input responses", () => {
         viewedDigest,
       })
     ).toBe(`${card}\n\n${viewedDigest}`);
-    expect(approvalOptionLabel("email-register", request.options[0]!)).toBe(
+    expect(approvalOptionLabel("email-register", approveOption)).toBe(
       offerCopy
     );
-    expect(approvalOptionLabel("calendar-create-event", request.options[0]!)).toBe(
+    expect(approvalOptionLabel("calendar-create-event", approveOption)).toBe(
       "Aprovar"
     );
   });

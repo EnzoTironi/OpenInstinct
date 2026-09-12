@@ -29,6 +29,7 @@ it("does keep server/operon free of @operon/runtime", () => {
     "mcp-client.ts",
     "principal.ts",
     "public-mail.ts",
+    "quarantine-card.ts",
   ];
   for (const file of files) {
     const source = readFileSync(join(operonDir, file), "utf8");

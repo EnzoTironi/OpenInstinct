@@ -13,7 +13,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import type { InputResponse } from "eve/client";
-import { approvalOptionLabel } from "@agent/lib/channel-input";
+import { approvalOptionLabel } from "../../../../../../../server/operon/quarantine-card";
 import type { RespondToAgentInput } from "./types";
 
 export function QuestionRequest({
