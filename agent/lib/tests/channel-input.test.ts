@@ -47,7 +47,9 @@ const request: InputRequest = {
 };
 const card = cardCopy(3, 3, 1, 0);
 const viewedDigest = "a".repeat(64);
-const approveOption = request.options.find((option) => option.id === "approve");
+const approveOption = (request.options ?? []).find(
+  (option) => option.id === "approve"
+);
 if (approveOption === undefined) {
   throw new Error("fixture missing approve option");
 }
