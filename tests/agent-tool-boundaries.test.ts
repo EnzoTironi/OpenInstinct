@@ -26,6 +26,7 @@ describe("root and worker capability boundaries", () => {
       "device-auth.ts",
       "gmail.ts",
       "messaging.ts",
+      "operon-email.ts",
       "personal-memory.ts",
       "respond-to-approval.ts",
       "schedules.ts",

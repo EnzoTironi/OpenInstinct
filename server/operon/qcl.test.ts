@@ -7,6 +7,7 @@ import {
   gmailGatewaySeamCopy,
   imapSeamCopy,
   offerCopy,
+  progressCopy,
 } from "./copy";
 import { OperonBuilder, OperonMcpClient, unavailableClient } from "./mcp-client";
 import { EmailQcl } from "./qcl";
@@ -66,6 +67,7 @@ it("does run Q→C on a Portuguese mailbox without admitting objects", async () 
   );
   expect(Predicate.isTagged(result, "QclReady")).toBe(true);
   if (!Predicate.isTagged(result, "QclReady")) return;
+  expect(progressCopy).toBe("Entrando conversas…");
   expect(result.card.copy).toBe(
     "3 conversas em quarentena, 3 pessoas, 1 empresas, 0 nomes em conflito."
   );
