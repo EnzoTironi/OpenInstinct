@@ -7,16 +7,26 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { cardCopy, connectCopy } from "../../../server/operon/copy";
 
 const pendingControls = vi.hoisted(() => {
-  let value: unknown = null;
+  const states = new Map<string, unknown>();
+  const pendingKey = "zoen.email.pending-proposal";
   return {
     get() {
-      return value;
+      return states.get(pendingKey) ?? null;
     },
     set(next: unknown) {
-      value = next;
+      states.set(pendingKey, next);
     },
     reset() {
-      value = null;
+      states.set(pendingKey, null);
+    },
+    defineState<T>(name: string, initial: () => T) {
+      if (!states.has(name)) states.set(name, initial());
+      return {
+        get: () => states.get(name) as T,
+        update(update: (current: T) => T) {
+          states.set(name, update(states.get(name) as T));
+        },
+      };
     },
   };
 });
@@ -25,17 +35,17 @@ vi.mock("eve/context", async (importOriginal) => {
   const actual = await importOriginal<typeof import("eve/context")>();
   return {
     ...actual,
-    defineState<T>(_name: string, initial: () => T) {
-      pendingControls.set(initial());
-      return {
-        get: () => pendingControls.get() as T,
-        update(update: (current: T) => T) {
-          pendingControls.set(update(pendingControls.get() as T));
-        },
-      };
-    },
+    defineState: pendingControls.defineState,
   };
 });
+
+vi.mock("../../../server/runtime", () => ({
+  serverRuntime: {
+    runPromise() {
+      return Promise.reject(new Error("confirm-reached"));
+    },
+  },
+}));
 
 import {
   emailConnect,
@@ -47,6 +57,13 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const digest = "a".repeat(64);
 const card = cardCopy(3, 3, 1, 0);
+const pending = {
+  sessionId: "session-1",
+  workspaceId: "workspace-1",
+  proposalId: "proposal-1",
+  digest,
+  card,
+};
 
 function toolContext(): ToolContext {
   return {
@@ -115,13 +132,7 @@ it("does return the host connect copy", async () => {
 });
 
 it("does reject register without a matching pending digest", async () => {
-  pendingControls.set({
-    sessionId: "session-1",
-    workspaceId: "workspace-1",
-    proposalId: "proposal-1",
-    digest,
-    card,
-  });
+  pendingControls.set(pending);
   await expect(
     emailRegister.execute(
       {
@@ -135,13 +146,7 @@ it("does reject register without a matching pending digest", async () => {
 });
 
 it("does reject register when the viewed card does not match pending", async () => {
-  pendingControls.set({
-    sessionId: "session-1",
-    workspaceId: "workspace-1",
-    proposalId: "proposal-1",
-    digest,
-    card,
-  });
+  pendingControls.set(pending);
   await expect(
     emailRegister.execute(
       {
@@ -152,4 +157,24 @@ it("does reject register when the viewed card does not match pending", async () 
       { ...toolContext(), toolName: "email-register" }
     )
   ).rejects.toMatchObject({ reason: "stale_digest" });
+});
+
+it("does not reject matching digest and card because Eve paraphrased", async () => {
+  pendingControls.set(pending);
+  const error = await emailRegister
+    .execute(
+      {
+        approvalMessage: "Eve inventou outro texto para o humano.",
+        viewedDigest: digest,
+        card,
+      },
+      { ...toolContext(), toolName: "email-register" }
+    )
+    .then(
+      () => undefined,
+      (error: unknown) => error
+    );
+  expect(error).toBeInstanceOf(Error);
+  expect(error).not.toMatchObject({ reason: "stale_digest" });
+  expect(String(error)).toContain("confirm-reached");
 });
