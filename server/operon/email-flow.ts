@@ -26,6 +26,19 @@ export interface PendingEmailProposal {
   readonly workspaceId: string;
   readonly proposalId: string;
   readonly digest: string;
+  readonly card: string;
+}
+
+/** Host TOCTOU: the card and digest just shown must be this conversation's pending proposal. */
+export function viewedProposalMatches(
+  pending: PendingEmailProposal | null,
+  viewed: { readonly digest: string; readonly card: string }
+): pending is PendingEmailProposal {
+  return (
+    pending !== null &&
+    pending.digest === viewed.digest &&
+    pending.card === viewed.card
+  );
 }
 const IngestBody = Schema.Struct({
   sourceArtifact: Schema.Struct({ sourceId: Schema.String }),

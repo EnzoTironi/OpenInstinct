@@ -175,6 +175,7 @@ describe.skipIf(Option.isNone(operonHome))(
         sessionId: "verified-session",
         proposalId: proposal.proposalId,
         digest: proposal.digest,
+        card: proposal.card,
       };
       const refused = await run(
         confirmEmail(pending, proposal.digest).pipe(Effect.flip),

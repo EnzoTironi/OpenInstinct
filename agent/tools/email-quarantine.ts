@@ -13,6 +13,7 @@ import {
   EmailFlowError,
   searchEmail,
   syncEmail,
+  viewedProposalMatches,
   type PendingEmailProposal,
 } from "../../server/operon/email-flow";
 import { parseMailbox } from "../../server/operon/mailbox";
@@ -83,6 +84,7 @@ export const emailSync = defineTool({
       sessionId: context.session.id,
       proposalId: result.proposalId,
       digest: result.digest,
+      card: result.card,
     }));
     return {
       ...result,
@@ -122,14 +124,20 @@ export const emailSearch = defineTool({
 export const emailRegister = defineTool({
   approval: { request: always(), response: authorizeApprovalResponse },
   description:
-    "After showing the import card, request human approval for its exact digest. Register only that conversation's pending proposal. An agent cannot supply a reviewer identity.",
+    "Copy card and viewedDigest from the last email-sync. The host shows that card; approvalMessage is not the confirm bind. Register only that conversation's pending proposal after the human confirms. An agent cannot supply a reviewer identity.",
   inputSchema: z.strictObject({
     approvalMessage: approvalMessageSchema,
     viewedDigest: z.string().length(64),
+    card: z.string().min(1),
   }),
   async execute(input, context) {
     const pending = pendingEmail.get();
-    if (!pending || pending.digest !== input.viewedDigest)
+    if (
+      !viewedProposalMatches(pending, {
+        digest: input.viewedDigest,
+        card: input.card,
+      })
+    )
       throw new EmailFlowError({ reason: "stale_digest" });
     const bound = await serverRuntime.runPromise(
       assertOperonConfirm(context, pending, input.viewedDigest),

@@ -24,10 +24,12 @@ it("does keep Eve free of @operon/runtime and a second Better Auth", () => {
 it("does keep server/operon free of @operon/runtime", () => {
   const files = [
     "copy.ts",
+    "email-flow.ts",
     "mailbox.ts",
     "mcp-client.ts",
     "principal.ts",
     "public-mail.ts",
+    "quarantine-card.ts",
   ];
   for (const file of files) {
     const source = readFileSync(join(operonDir, file), "utf8");

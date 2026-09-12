@@ -13,6 +13,15 @@ import {
   readChannelInputStream,
   renderChannelInput,
 } from "../channel-input";
+import {
+  approvalOptionLabel,
+  renderEmailRegisterCard,
+} from "../../../server/operon/quarantine-card";
+import {
+  cardCopy,
+  offerCopy,
+  quarantineCardMessage,
+} from "../../../server/operon/copy";
 
 const request: InputRequest = {
   requestId: "approval-1",
@@ -36,6 +45,14 @@ const request: InputRequest = {
     },
   },
 };
+const card = cardCopy(3, 3, 1, 0);
+const viewedDigest = "a".repeat(64);
+const approveOption = (request.options ?? []).find(
+  (option) => option.id === "approve"
+);
+if (approveOption === undefined) {
+  throw new Error("fixture missing approve option");
+}
 describe("native input responses", () => {
   test("rejects an oversized question in the authored tool input schema", () => {
     expect(askQuestion.inputSchema).toBe(channelQuestionSchema);
@@ -55,6 +72,43 @@ describe("native input responses", () => {
   test("delivers the model-authored proposal without inserting transport commands or tool JSON", () => {
     expect(renderChannelInput(request)).toBe(
       request.action.input.approvalMessage
+    );
+  });
+  test("renders the host quarantine card for email-register, not Eve prose", () => {
+    const approvalMessage = "Eve inventou outro texto para o humano.";
+    const rendered = renderChannelInput({
+      ...request,
+      action: {
+        ...request.action,
+        toolName: "email-register",
+        input: {
+          approvalMessage,
+          card,
+          viewedDigest,
+        },
+      },
+    });
+    expect(rendered).toBe(quarantineCardMessage(card, viewedDigest));
+    expect(rendered).toContain(
+      "3 conversas em quarentena, 3 pessoas, 1 empresas, 0 nomes em conflito."
+    );
+    expect(rendered).toContain(
+      "Registrar as pessoas com quem você falou nos últimos 30 dias"
+    );
+    expect(rendered).toContain(viewedDigest);
+    expect(rendered).not.toBe(approvalMessage);
+    expect(
+      renderEmailRegisterCard({
+        approvalMessage,
+        card,
+        viewedDigest,
+      })
+    ).toBe(`${card}\n\n${viewedDigest}`);
+    expect(approvalOptionLabel("email-register", approveOption)).toBe(
+      offerCopy
+    );
+    expect(approvalOptionLabel("calendar-create-event", approveOption)).toBe(
+      "Aprovar"
     );
   });
   test.each([undefined, "", "  ", "x".repeat(16385)])(

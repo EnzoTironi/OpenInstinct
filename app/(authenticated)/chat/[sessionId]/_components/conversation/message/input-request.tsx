@@ -13,6 +13,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import type { InputResponse } from "eve/client";
+import { approvalOptionLabel } from "../../../../../../../server/operon/quarantine-card";
 import type { RespondToAgentInput } from "./types";
 
 export function QuestionRequest({
@@ -109,10 +110,11 @@ export function InputRequestActions({
   const selectedOption = inputRequest.options?.find(
     (option) => option.id === inputResponse?.optionId
   );
+  const register = part.toolName === "email-register";
 
   return (
     <Alert variant="warning">
-      <AlertTitle>{inputRequest.prompt}</AlertTitle>
+      {register ? null : <AlertTitle>{inputRequest.prompt}</AlertTitle>}
       <AlertDescription>
         {inputResponse ? (
           <p>
@@ -139,7 +141,7 @@ export function InputRequestActions({
                 type="button"
                 variant={option.style === "danger" ? "destructive" : "default"}
               >
-                {option.label}
+                {approvalOptionLabel(part.toolName, option)}
               </Button>
             ))}
           </div>

@@ -2,6 +2,7 @@ import type { EveMessage } from "eve/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AgentMessage } from ".";
+import { cardCopy, offerCopy } from "../../../../../../../server/operon/copy";
 
 describe("agent messages", () => {
   it("renders ordinary assistant text without a delivery tool result", () => {
@@ -138,6 +139,65 @@ describe("agent messages", () => {
     expect(markup).toContain("Cancel");
     expect(markup).not.toContain("send_payment");
     expect(markup).toContain("Exact recipient");
+  });
+
+  it("shows the host quarantine card and register button, not Eve prose", () => {
+    const card = cardCopy(3, 3, 1, 0);
+    const viewedDigest = "a".repeat(64);
+    const message = {
+      id: "turn-q:assistant",
+      metadata: { status: "streaming", turnId: "turn-q" },
+      parts: [
+        {
+          approval: { id: "q-approval" },
+          input: {
+            approvalMessage: "Eve inventou outro texto para o humano.",
+            card,
+            viewedDigest,
+          },
+          state: "approval-requested",
+          stepIndex: 0,
+          toolCallId: "call-q",
+          toolMetadata: {
+            eve: {
+              inputRequest: {
+                kind: "tool-approval",
+                options: [
+                  { id: "approve", label: "Approve", style: "primary" },
+                  { id: "cancel", label: "Cancel", style: "danger" },
+                ],
+                prompt: "Approve this action?",
+                requestId: "q-approval",
+              },
+              kind: "tool-call",
+              name: "email-register",
+            },
+          },
+          toolName: "email-register",
+          type: "dynamic-tool",
+        },
+      ],
+      role: "assistant",
+    } satisfies EveMessage;
+
+    const markup = renderToStaticMarkup(
+      <AgentMessage
+        canRespond
+        isStreaming={false}
+        message={message}
+        onInputResponses={() => undefined}
+        userVisibleOnly
+      />
+    );
+
+    expect(markup).toContain(
+      "3 conversas em quarentena, 3 pessoas, 1 empresas, 0 nomes em conflito."
+    );
+    expect(markup).toContain(viewedDigest);
+    expect(markup).toContain(offerCopy);
+    expect(markup).not.toContain("Eve inventou outro texto para o humano.");
+    expect(markup).not.toContain("Approve this action?");
+    expect(markup).not.toContain("email-register");
   });
   it("shows authorization in the default view and removes the completed challenge", () => {
     const challenge = {

@@ -12,10 +12,24 @@ import {
   ToolInput,
   ToolOutput,
 } from "@web/components/ai-elements/tool";
+import { renderEmailRegisterCard } from "../../../../../../../server/operon/quarantine-card";
 import { AttachmentPart } from "./attachment";
 import { AuthorizationPrompt } from "./authorization";
 import { InputRequestActions, QuestionRequest } from "./input-request";
 import type { RespondToAgentInput } from "./types";
+
+function toolApprovalVisibleInput(
+  part: Extract<EveMessagePart, { type: "dynamic-tool" }>
+) {
+  const inputRequest = part.toolMetadata?.eve?.inputRequest;
+  if (inputRequest?.kind !== "tool-approval") return null;
+  if (part.toolName === "email-register") {
+    return (
+      <MessageResponse>{renderEmailRegisterCard(part.input)}</MessageResponse>
+    );
+  }
+  return <ToolInput input={part.input} />;
+}
 
 export function AgentMessagePart({
   canRespond,
@@ -66,9 +80,7 @@ export function AgentMessagePart({
       if (userVisibleOnly && inputRequest) {
         return (
           <div className="space-y-3">
-            {inputRequest.kind === "tool-approval" ? (
-              <ToolInput input={part.input} />
-            ) : null}
+            {toolApprovalVisibleInput(part)}
             <InputRequestActions
               canRespond={canRespond}
               part={part}
@@ -87,7 +99,14 @@ export function AgentMessagePart({
         >
           <ToolHeader status={part.state} title={part.toolName} />
           <ToolContent>
-            <ToolInput input={part.input} />
+            {part.toolName === "email-register" &&
+            inputRequest?.kind === "tool-approval" ? (
+              <MessageResponse>
+                {renderEmailRegisterCard(part.input)}
+              </MessageResponse>
+            ) : (
+              <ToolInput input={part.input} />
+            )}
             <InputRequestActions
               canRespond={canRespond}
               part={part}

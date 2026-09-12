@@ -123,6 +123,7 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
       sessionId,
       proposalId: result.proposalId,
       digest: result.digest,
+      card: result.card,
     };
     const wrong = await serverRuntime.runPromise(
       assertOperonConfirm(

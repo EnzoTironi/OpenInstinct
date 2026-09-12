@@ -22,3 +22,7 @@ export function cardCopy(
 export function progressWithPercent(percent: number) {
   return `${progressCopy} ${String(percent)}%`;
 }
+
+export function quarantineCardMessage(card: string, digest: string) {
+  return `${card}\n\n${digest}\n\n${offerCopy}`;
+}
