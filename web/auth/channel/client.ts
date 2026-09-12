@@ -109,6 +109,10 @@ export type ChannelAuthorizationStatus =
   | typeof channelChallengeStatusSchema.Type.status
   | "invalid";
 
+// Better Auth resets its attempt counter after an idle window, not periodically.
+// Leave the default ten-second window between successful status requests.
+export const channelAuthorizationPollIntervalMs = 10_000;
+
 const retrySecondsSchema = Schema.String.check(Schema.isPattern(/^\d+$/u));
 const retryDateSchema = Schema.String.check(
   Schema.isPattern(
@@ -174,7 +178,8 @@ const requestJson = Effect.fn("channelAuthorization.request")(
     if (!response.ok)
       return yield* channelHttpError(
         response.status,
-        response.headers.get("Retry-After")
+        response.headers.get("Retry-After") ??
+          response.headers.get("X-Retry-After")
       );
     const body = yield* Effect.tryPromise({
       try: () => response.text(),

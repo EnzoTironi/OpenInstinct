@@ -1,10 +1,11 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { Effect, Schema } from "effect";
+import { describe, expect, it, vi } from "vitest";
 import { ChannelStatus } from "@web/auth/channel/status";
 import {
   channelHttpError,
+  checkChannelAuthorization,
   channelPollFailure,
   invalidChannelChallenge,
   safeCallbackUrl,
@@ -17,6 +18,33 @@ const challenge = Schema.decodeUnknownSync(channelChallengeSchema)({
   deepLink: "https://t.me/assistant_bot?start=example",
   expiresAt: "2026-09-08T12:00:00.000Z",
 });
+
+it.each([
+  { headers: new Headers({ "X-Retry-After": "12" }), expected: "12" },
+  {
+    headers: new Headers({ "Retry-After": "20", "X-Retry-After": "12" }),
+    expected: "20",
+  },
+])(
+  "reads the authentication server's retry headers: $expected seconds",
+  async ({ headers, expected }) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 429, headers }))
+    );
+    try {
+      await expect(
+        Effect.runPromise(checkChannelAuthorization(challenge.id))
+      ).rejects.toMatchObject({
+        status: 429,
+        category: "rate-limit",
+        retryAfter: expected,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);
 
 function renderStatus(
   status: "pending" | "confirmed" | "expired" | "consumed" | "invalid",

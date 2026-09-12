@@ -14,7 +14,8 @@ import {
   ManagedRuntime,
 } from "effect";
 import { Pool } from "pg";
-import { test } from "vitest";
+import { test, vi } from "vitest";
+import { channelAuthorizationPollIntervalMs } from "../../web/auth/channel/client";
 import {
   channelChallengeSchema,
   channelConversationEntrySchema,
@@ -61,6 +62,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
     database: pool,
     secret,
     trustedOrigins: [baseURL],
+    rateLimit: { enabled: true },
     advanced: { disableOriginCheck: false, disableCSRFCheck: false },
     plugins: [
       channelAuthPlugin((program) =>
@@ -148,6 +150,30 @@ test("real BetterAuth router, signed browser challenge and database session", as
     );
     assert.deepEqual(await pending.json(), { status: "pending" });
     assert.equal(pending.headers.get("cache-control"), "no-store");
+    const waitingSince = Date.now();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      for (
+        let at = waitingSince;
+        at < Date.parse(challenge.expiresAt);
+        at += channelAuthorizationPollIntervalMs
+      ) {
+        vi.setSystemTime(at);
+        // oxlint-disable-next-line no-await-in-loop -- Finish each request before advancing the rate-limit clock.
+        const waiting = await request(
+          `/channel-auth/status?id=${challenge.id}`,
+          "GET",
+          browser
+        );
+        assert.equal(
+          waiting.status,
+          200,
+          "Waiting for confirmation must not exhaust the authentication budget"
+        );
+      }
+    } finally {
+      vi.useRealTimers();
+    }
     const premature = await request("/channel-auth/complete", "POST", browser, {
       id: challenge.id,
     });
