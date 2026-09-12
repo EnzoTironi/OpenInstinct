@@ -1,9 +1,10 @@
+import { randomBytes, randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
-import { Clock, Effect, Schema } from "effect";
+import { Effect, Schema } from "effect";
 import type { ToolContext } from "eve/tools";
+import type { AccessScope } from "@shared/identity/access-scope";
 import { admitPersonalMemoryFromSession } from "../personal-memory/group-memory-policy";
 import { authorizePersonalMemoryPrincipal } from "../personal-memory/principal";
-import type { OperonApprovalRequest } from "./mcp-client";
 
 class OperonPrincipalError extends Schema.TaggedError<OperonPrincipalError>()(
   "OperonPrincipalError",
@@ -11,6 +12,11 @@ class OperonPrincipalError extends Schema.TaggedError<OperonPrincipalError>()(
     reason: Schema.Literals(["unauthenticated", "wrong_proposal"]),
   }
 ) {}
+
+export interface CompanionOperonBinding {
+  readonly scope: AccessScope;
+  readonly sessionToken: string;
+}
 
 export const authorizeOperonSession = Effect.fn("authorizeOperonSession")(
   function* (context: Pick<ToolContext, "session">) {
@@ -28,8 +34,66 @@ export const authorizeOperonSession = Effect.fn("authorizeOperonSession")(
   }
 );
 
-/** Called only inside Eve's approved tool execution, once again for each kernel review. */
-export const verifyOperonApproval = Effect.fn("verifyOperonApproval")(
+function betterAuthUserId(scope: AccessScope) {
+  return scope.userId.replace(/^better-auth:/u, "");
+}
+
+function sessionTokenOf(
+  row: unknown
+): Effect.Effect<string, OperonPrincipalError> {
+  return Schema.decodeUnknownEffect(
+    Schema.Struct({ token: Schema.NonEmptyString })
+  )(row).pipe(
+    Effect.map((value) => value.token),
+    Effect.mapError(
+      () => new OperonPrincipalError({ reason: "unauthenticated" })
+    )
+  );
+}
+
+/**
+ * Companion Better Auth session.token for ApproverBinding.
+ *
+ * Context: Operon MCP stdio receives this token as OPERON_APPROVER_SESSION_TOKEN.
+ * Inputs: Eve tool context after the human is bound to a workspace.
+ * Outputs: workspace scope plus the live Better Auth session.token.
+ * Side effects: may insert a session row in Companion's existing user/session tables.
+ * Does not call `operon approver session` and does not start a second Better Auth.
+ */
+export const readCompanionSessionToken = Effect.fn(
+  "readCompanionSessionToken"
+)(function* (context: Pick<ToolContext, "session">) {
+  const scope = yield* authorizeOperonSession(context);
+  const sql = yield* PgClient.PgClient;
+  const userId = betterAuthUserId(scope);
+  const authSessionId = context.session.auth.current?.attributes.authSessionId;
+  const keyed =
+    typeof authSessionId === "string" && authSessionId.length > 0
+      ? yield* sql`SELECT token FROM public.session WHERE id = ${authSessionId}
+        AND "userId" = ${userId} AND "expiresAt" > clock_timestamp()`
+      : [];
+  const rows =
+    keyed.length === 1
+      ? keyed
+      : yield* sql`SELECT token FROM public.session WHERE "userId" = ${userId}
+        AND "expiresAt" > clock_timestamp() ORDER BY "createdAt" DESC LIMIT 1`;
+  if (rows[0] !== undefined) {
+    return {
+      scope,
+      sessionToken: yield* sessionTokenOf(rows[0]),
+    } satisfies CompanionOperonBinding;
+  }
+  const sessionId = randomUUID();
+  const sessionToken = randomBytes(32).toString("base64url");
+  yield* sql`INSERT INTO public.session
+    (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
+    VALUES (${sessionId}, ${sessionToken}, ${userId},
+      clock_timestamp() + interval '7 days', clock_timestamp(), clock_timestamp())`;
+  return { scope, sessionToken } satisfies CompanionOperonBinding;
+});
+
+/** Called only inside Eve's approved tool execution. Digest TOCTOU, not a Principal. */
+export const assertOperonConfirm = Effect.fn("assertOperonConfirm")(
   function* (
     context: Pick<ToolContext, "session">,
     pending: {
@@ -38,43 +102,17 @@ export const verifyOperonApproval = Effect.fn("verifyOperonApproval")(
       readonly proposalId: string;
       readonly digest: string;
     },
-    request: OperonApprovalRequest
+    viewedDigest: string
   ) {
     if (
       context.session.id !== pending.sessionId ||
-      request.tool !== "operon_review_mapping_proposal" ||
-      request.arguments.proposalId !== pending.proposalId ||
-      request.arguments.viewedDigest !== pending.digest ||
-      request.arguments.verdict !== "approve"
+      viewedDigest !== pending.digest
     ) {
       return yield* new OperonPrincipalError({ reason: "wrong_proposal" });
     }
-    const scope = yield* authorizeOperonSession(context);
-    if (scope.workspaceId !== pending.workspaceId)
+    const bound = yield* readCompanionSessionToken(context);
+    if (bound.scope.workspaceId !== pending.workspaceId)
       return yield* new OperonPrincipalError({ reason: "wrong_proposal" });
-    const sql = yield* PgClient.PgClient;
-    const rows = yield* sql`SELECT u.name, u.email, m.role FROM public."user" u
-    JOIN workspace_memberships m ON m.user_id = ('better-auth:' || u.id)
-    WHERE m.workspace_id = ${scope.workspaceId} AND m.user_id = ${scope.userId}`;
-    const row = yield* Schema.decodeUnknownEffect(
-      Schema.Struct({
-        name: Schema.NonEmptyString,
-        email: Schema.NonEmptyString,
-        role: Schema.Literals(["owner", "admin", "member"]),
-      })
-    )(rows[0]).pipe(
-      Effect.mapError(
-        () => new OperonPrincipalError({ reason: "unauthenticated" })
-      )
-    );
-    return {
-      userId: scope.userId,
-      name: row.name,
-      email: row.email,
-      roles: [row.role],
-      sessionId: context.session.id,
-      issuer: "zoen",
-      sessionExpiresAt: (yield* Clock.currentTimeMillis) + 30_000,
-    };
+    return bound;
   }
 );
