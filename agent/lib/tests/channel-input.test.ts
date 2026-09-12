@@ -13,6 +13,7 @@ import {
   readChannelInputStream,
   renderChannelInput,
 } from "../channel-input";
+import { cardCopy, quarantineCardMessage } from "../../../server/operon/copy";
 
 const request: InputRequest = {
   requestId: "approval-1",
@@ -36,6 +37,8 @@ const request: InputRequest = {
     },
   },
 };
+const card = cardCopy(3, 3, 1, 0);
+const viewedDigest = "a".repeat(64);
 describe("native input responses", () => {
   test("rejects an oversized question in the authored tool input schema", () => {
     expect(askQuestion.inputSchema).toBe(channelQuestionSchema);
@@ -56,6 +59,30 @@ describe("native input responses", () => {
     expect(renderChannelInput(request)).toBe(
       request.action.input.approvalMessage
     );
+  });
+  test("renders the host quarantine card for email-register, not Eve prose", () => {
+    const approvalMessage = "Eve inventou outro texto para o humano.";
+    const rendered = renderChannelInput({
+      ...request,
+      action: {
+        ...request.action,
+        toolName: "email-register",
+        input: {
+          approvalMessage,
+          card,
+          viewedDigest,
+        },
+      },
+    });
+    expect(rendered).toBe(quarantineCardMessage(card, viewedDigest));
+    expect(rendered).toContain(
+      "3 conversas em quarentena, 3 pessoas, 1 empresas, 0 nomes em conflito."
+    );
+    expect(rendered).toContain(
+      "Registrar as pessoas com quem você falou nos últimos 30 dias"
+    );
+    expect(rendered).toContain(viewedDigest);
+    expect(rendered).not.toBe(approvalMessage);
   });
   test.each([undefined, "", "  ", "x".repeat(16385)])(
     "refuses an absent or invalid authored proposal",

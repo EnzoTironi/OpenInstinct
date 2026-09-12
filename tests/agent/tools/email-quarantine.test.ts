@@ -9,6 +9,7 @@ import {
   emailSync,
 } from "@agent/tools/email-quarantine";
 import { expect, it } from "vitest";
+import { connectCopy } from "../../../server/operon/copy";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -29,8 +30,16 @@ it("does keep Eve Consumer and bind register to an explicit confirm", () => {
     join(here, "../../../agent/tools/email-quarantine.ts"),
     "utf8"
   );
+  expect(source).toContain("quarantineCardMessage");
+  expect(source).toContain("stale_digest");
   expect(source).toContain('role: "consumer"');
   expect(source).toContain("confirm: true");
   expect(source).toContain("sessionToken");
   expect(source).not.toContain("operon approver session");
+  expect(source).not.toContain("@operon/runtime");
+  expect(source).not.toContain("ontologia");
+});
+
+it("does return the host connect copy", () => {
+  expect(emailConnect.execute()).toEqual({ message: connectCopy });
 });
