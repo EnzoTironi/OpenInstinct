@@ -5,6 +5,9 @@
 # Never logs or echoes secret values.
 set -eu
 
+# Operon snapshots use the same durable Postgres unless a separate DB is set.
+export OPERON_DATABASE_URL="${OPERON_DATABASE_URL:-${DATABASE_URL:?DATABASE_URL is required}}"
+
 if [ -n "${CHATGPT_AUTH_JSON:-}" ]; then
   mkdir -p /root/.eve/auth
   printf %s "$CHATGPT_AUTH_JSON" > /root/.eve/auth/chatgpt.json

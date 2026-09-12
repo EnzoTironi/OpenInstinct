@@ -13,6 +13,7 @@
         "LINQ_*",
         "NODE_ENV",
         "OPEN_INSTINCT_LOW_MEM_BUILD",
+        "OPERON_*",
         "SECRET_ENCRYPTION_KEY",
         "VERCEL_*"
       ],
@@ -28,6 +29,7 @@
         "KERNEL_*",
         "LINQ_*",
         "NODE_ENV",
+        "OPERON_*",
         "SECRET_ENCRYPTION_KEY",
         "VERCEL_*"
       ],
@@ -49,6 +51,7 @@
         "KERNEL_*",
         "LINQ_*",
         "NODE_ENV",
+        "OPERON_*",
         "SECRET_ENCRYPTION_KEY",
         "VERCEL_*",
         "WORKFLOW_*"
@@ -79,6 +82,7 @@
         "KERNEL_*",
         "LINQ_*",
         "NODE_ENV",
+        "OPERON_*",
         "SECRET_ENCRYPTION_KEY",
         "VERCEL_*",
         "WORKFLOW_*"
