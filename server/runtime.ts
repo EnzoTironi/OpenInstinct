@@ -10,17 +10,23 @@ import { Kapso } from "./channels/kapso";
 import { ChannelTransport } from "./channels/transport";
 import { ChannelAuthPrompts } from "./channel-auth/prompts";
 import { MemoryDocuments } from "./memory/documents";
-import { PrincipalIssuer } from "./operon/principal";
-import { EmailQcl } from "./operon/qcl";
-import { SourceConnection } from "./operon/source-connection";
-import { OperonBuilderStdio, OperonMcpClientStdio } from "./operon/mcp-client";
 import { PersonalMemory } from "./personal-memory";
 import { BrowserWorkerAccess } from "./browser-worker";
+import { EmailFlow } from "./operon/email-flow";
+import { OperonMcpClientStdio } from "./operon/mcp-client";
+import { PrincipalIssuer } from "./operon/principal";
+import { SourceConnection } from "./operon/source-connection";
 
 const database = PgClient.layerConfig({
   url: Config.redacted("DATABASE_URL"),
   maxConnections: Config.succeed(10),
 });
+
+const operon = Layer.mergeAll(
+  EmailFlow.layer,
+  SourceConnection.layer,
+  PrincipalIssuer.parseableLayer
+).pipe(Layer.provideMerge(OperonMcpClientStdio));
 
 const infrastructure = Layer.mergeAll(
   ChannelAccounts.layer,
@@ -30,22 +36,15 @@ const infrastructure = Layer.mergeAll(
   PersonalMemory.layer,
   Telegram.layer,
   Kapso.layer,
-  ResolvedInstallationSecrets.layer
+  ResolvedInstallationSecrets.layer,
+  operon
 ).pipe(Layer.provideMerge(database));
-
-const operon = EmailQcl.layer.pipe(
-  Layer.provideMerge(SourceConnection.layer),
-  Layer.provideMerge(PrincipalIssuer.parseableLayer),
-  Layer.provideMerge(OperonMcpClientStdio),
-  Layer.provideMerge(OperonBuilderStdio)
-);
 
 const services = Layer.mergeAll(
   NativeDeviceAuth.layer,
   Artifacts.layer,
   ChannelTransport.layer,
-  ChannelAuthPrompts.layer,
-  operon
+  ChannelAuthPrompts.layer
 ).pipe(Layer.provideMerge(infrastructure));
 
 export const serverRuntime = ManagedRuntime.make(services);
