@@ -7,7 +7,7 @@ import { defineState } from "eve/context";
 import { defineDynamic, defineTool } from "eve/tools";
 import { always } from "eve/tools/approval";
 import { z } from "zod";
-import { connectCopy } from "../../server/operon/copy";
+import { connectCopy, quarantineCardMessage } from "../../server/operon/copy";
 import {
   confirmEmail,
   EmailFlowError,
@@ -83,6 +83,7 @@ export const emailSync = defineTool({
       sessionId: context.session.id,
       proposalId: result.proposalId,
       digest: result.digest,
+      card: result.card,
     }));
     return {
       ...result,
@@ -126,10 +127,20 @@ export const emailRegister = defineTool({
   inputSchema: z.strictObject({
     approvalMessage: approvalMessageSchema,
     viewedDigest: z.string().length(64),
+    card: z.string().min(1),
   }),
   async execute(input, context) {
     const pending = pendingEmail.get();
-    if (!pending || pending.digest !== input.viewedDigest)
+    if (
+      !pending ||
+      pending.digest !== input.viewedDigest ||
+      pending.card !== input.card
+    )
+      throw new EmailFlowError({ reason: "stale_digest" });
+    if (
+      input.approvalMessage !==
+      quarantineCardMessage(input.card, input.viewedDigest)
+    )
       throw new EmailFlowError({ reason: "stale_digest" });
     const bound = await serverRuntime.runPromise(
       assertOperonConfirm(context, pending, input.viewedDigest),

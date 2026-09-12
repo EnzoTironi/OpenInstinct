@@ -8,6 +8,7 @@ import {
   type InputRequest,
   type MessageStreamEvent,
 } from "eve/client";
+import { quarantineCardMessage } from "../../server/operon/copy";
 
 export const channelQuestionSchema = ASK_QUESTION_INPUT_SCHEMA.refine(
   (input) =>
@@ -17,7 +18,18 @@ export const channelQuestionSchema = ASK_QUESTION_INPUT_SCHEMA.refine(
 
 export function renderChannelInput(request: InputRequest) {
   if (request.kind === "tool-approval") {
-    return approvalMessageSchema.parse(request.action.input.approvalMessage);
+    const toolName = request.action.toolName;
+    switch (toolName) {
+      case "email-register": {
+        const card = request.action.input.card;
+        const viewedDigest = request.action.input.viewedDigest;
+        return approvalMessageSchema.parse(
+          quarantineCardMessage(String(card), String(viewedDigest))
+        );
+      }
+      default:
+        return approvalMessageSchema.parse(request.action.input.approvalMessage);
+    }
   }
   return approvalMessageSchema.parse(channelQuestionText(request));
 }
