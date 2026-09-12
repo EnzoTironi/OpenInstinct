@@ -28,6 +28,18 @@ export interface PendingEmailProposal {
   readonly digest: string;
   readonly card: string;
 }
+
+/** Host TOCTOU: the card and digest just shown must be this conversation's pending proposal. */
+export function viewedProposalMatches(
+  pending: PendingEmailProposal | null,
+  viewed: { readonly digest: string; readonly card: string }
+): pending is PendingEmailProposal {
+  return (
+    pending !== null &&
+    pending.digest === viewed.digest &&
+    pending.card === viewed.card
+  );
+}
 const IngestBody = Schema.Struct({
   sourceArtifact: Schema.Struct({ sourceId: Schema.String }),
 });
@@ -91,7 +103,7 @@ export const syncEmail = Effect.fn("syncEmail")(function* (
       targetObjectTypeId: "Pessoa",
       propertyMappings: [
         { sourceField: "displayName", targetPropertyName: "displayName" },
-        { sourceField: "email", targetPropertyName: "email" },
+        { sourceField: "sourceField", targetPropertyName: "email" },
       ],
       sourceIds: [ingested.sourceArtifact.sourceId],
     })
@@ -186,6 +198,7 @@ export const searchEmail = Effect.fn("searchEmail")(function* (name: string) {
     string,
     {
       name: string;
+      email: string;
       email: string;
       label: string;
       source: string;
