@@ -18,8 +18,8 @@ import {
 import { parseMailbox } from "../../server/operon/mailbox";
 import { operonClientLayer } from "../../server/operon/mcp-client";
 import {
-  authorizeOperonSession,
-  verifyOperonApproval,
+  assertOperonConfirm,
+  readCompanionSessionToken,
 } from "../../server/operon/principal";
 import { serverRuntime } from "../../server/runtime";
 
@@ -49,8 +49,8 @@ export const emailSync = defineTool({
     }),
   ]),
   async execute(input, context) {
-    const scope = await serverRuntime.runPromise(
-      authorizeOperonSession(context),
+    const bound = await serverRuntime.runPromise(
+      readCompanionSessionToken(context),
       { signal: context.abortSignal }
     );
     pendingEmail.update(() => null);
@@ -68,12 +68,18 @@ export const emailSync = defineTool({
     );
     const result = await serverRuntime.runPromise(
       syncEmail(snapshot).pipe(
-        Effect.provide(operonClientLayer({ scope, role: "builder" }))
+        Effect.provide(
+          operonClientLayer({
+            scope: bound.scope,
+            role: "consumer",
+            sessionToken: bound.sessionToken,
+          })
+        )
       ),
       { signal: context.abortSignal }
     );
     pendingEmail.update(() => ({
-      workspaceId: scope.workspaceId,
+      workspaceId: bound.scope.workspaceId,
       sessionId: context.session.id,
       proposalId: result.proposalId,
       digest: result.digest,
@@ -95,10 +101,16 @@ export const emailSearch = defineTool({
   execute(input, context) {
     return serverRuntime.runPromise(
       Effect.gen(function* () {
-        const scope = yield* authorizeOperonSession(context);
+        const bound = yield* readCompanionSessionToken(context);
         return {
           hits: yield* searchEmail(input.name).pipe(
-            Effect.provide(operonClientLayer({ scope, role: "consumer" }))
+            Effect.provide(
+              operonClientLayer({
+                scope: bound.scope,
+                role: "consumer",
+                sessionToken: bound.sessionToken,
+              })
+            )
           ),
         };
       }),
@@ -119,23 +131,18 @@ export const emailRegister = defineTool({
     const pending = pendingEmail.get();
     if (!pending || pending.digest !== input.viewedDigest)
       throw new EmailFlowError({ reason: "stale_digest" });
-    const scope = await serverRuntime.runPromise(
-      authorizeOperonSession(context),
+    const bound = await serverRuntime.runPromise(
+      assertOperonConfirm(context, pending, input.viewedDigest),
       { signal: context.abortSignal }
     );
-    if (pending.workspaceId !== scope.workspaceId)
-      throw new EmailFlowError({ reason: "stale_digest" });
     return serverRuntime.runPromise(
       confirmEmail(pending, input.viewedDigest).pipe(
         Effect.provide(
           operonClientLayer({
-            scope,
+            scope: bound.scope,
             role: "builder",
-            approve: (request) =>
-              serverRuntime.runPromise(
-                verifyOperonApproval(context, pending, request),
-                { signal: context.abortSignal }
-              ),
+            sessionToken: bound.sessionToken,
+            confirm: true,
           })
         )
       ),

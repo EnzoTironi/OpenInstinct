@@ -4,6 +4,12 @@ Zoen keeps Eve as the owner of conversations, approvals, and durable tool state.
 Operon runs over private stdio for each authenticated operation. `operon.lock`
 pins the public Operon commit used by both the Docker image and CI.
 
+Companion is the only interactive Better Auth host. The MCP child receives the
+human `session.token` as `OPERON_APPROVER_SESSION_TOKEN`. Operon binds that token
+as ApproverBinding and presents it to Better Auth as `Authorization: Bearer`.
+Companion does not run `operon approver session` and does not start a second
+Better Auth.
+
 ## Running locally
 
 With Node 24, Corepack, and Git installed:
@@ -12,6 +18,7 @@ With Node 24, Corepack, and Git installed:
 sh scripts/prepare-operon.sh /tmp/zoen-operon
 export OPERON_HOME=/tmp/zoen-operon
 export OPERON_DATABASE_URL="$DATABASE_URL"
+export OPERON_AUTH_SECRET="$BETTER_AUTH_SECRET"
 export OPERON_BUILDER_ENABLED=true
 ```
 
@@ -29,15 +36,15 @@ their existing deployment procedure.
 `email-sync` imports metadata from the authorized user's Gmail account, or a
 supplied EML/MBOX export, for the last 30 days. Gmail uses the existing Google
 Workspace OAuth connection and reports a partial result if the 1,000-message cap
-is reached. One person record per email address enters quarantine. Import retries
-reuse the same proposal when the content is unchanged.
+is reached. Eve stays Consumer. One person record per email address enters
+quarantine. Import retries reuse the same proposal when the content is unchanged.
 
 `email-search` can find quarantined people before admission. It labels a person
 as registered only when an admitted object and its admission receipt exist.
-`email-register` requests Eve's approval for the pending proposal digest. The
-private Operon callback then checks the live user, channel or web authority,
-workspace membership, owning conversation, and exact proposal before returning a
-short-lived human principal. Model-provided names and roles confer no authority.
+`email-register` requests Eve's approval for the pending proposal digest. After
+that explicit confirm, the Host may spawn Builder MCP with the same session
+token. The pending Eve digest must still match (TOCTOU). Model-provided names
+and roles confer no authority.
 
 Pending proposal state belongs to the conversation, not a global service. Operon
 snapshots belong to the verified workspace. PostgreSQL serializes processes for
@@ -48,10 +55,9 @@ tools cannot perform Builder writes.
 
 The `Runtime storage and build` CI job builds `operon.lock`, runs real PostgreSQL
 integration tests, then runs the actual MCP SDK against CLI subprocesses. It
-checks workspace separation, concurrent imports, import/admission retries,
-approval identity, and channel revocation. Operon's own CLI tests also kill the
-process after a successful acknowledgement and verify the next process restores
-the acknowledged state.
+checks workspace separation, concurrent imports, the session-token spawn, and
+channel revocation. A later Operon edge PR can accept Companion's token more
+cleanly; rebase the pin then.
 
 This is the email-to-person integration described above. It does not implement
 every scenario in `docs/companion-operon-acceptance.json`. Google consent and

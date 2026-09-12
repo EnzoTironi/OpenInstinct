@@ -6,14 +6,13 @@ import { expect, test } from "vitest";
 import { ChannelAccounts } from "../../server/accounts";
 import { channelPrincipal } from "../../server/channels/principal";
 import {
-  confirmEmail,
   searchEmail,
   syncEmail,
 } from "../../server/operon/email-flow";
 import { operonClientLayer } from "../../server/operon/mcp-client";
 import {
-  authorizeOperonSession,
-  verifyOperonApproval,
+  assertOperonConfirm,
+  readCompanionSessionToken,
 } from "../../server/operon/principal";
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
@@ -44,9 +43,13 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;
         yield* sql`INSERT INTO agent_sessions (session_id, workspace_id, created_by_user_id) VALUES (${sessionId}, ${scope.workspaceId}, ${scope.userId})`;
-        expect(yield* authorizeOperonSession(context)).toEqual(scope);
       })
     );
+    const bound = await serverRuntime.runPromise(
+      readCompanionSessionToken(context)
+    );
+    expect(bound.scope).toEqual(scope);
+    expect(bound.sessionToken.length).toBeGreaterThan(0);
     const snapshot = {
       ownerEmail: "pilot@example.test",
       messages: [
@@ -62,7 +65,14 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
     };
     const result = await serverRuntime.runPromise(
       syncEmail(snapshot).pipe(
-        Effect.provide(operonClientLayer({ scope, role: "builder" }))
+        Effect.provide(
+          operonClientLayer({
+            scope: bound.scope,
+            role: "builder",
+            sessionToken: bound.sessionToken,
+            confirm: true,
+          })
+        )
       )
     );
     await Promise.all(
@@ -79,7 +89,16 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
                 },
               })
             ),
-          }).pipe(Effect.provide(operonClientLayer({ scope, role: "builder" })))
+          }).pipe(
+            Effect.provide(
+              operonClientLayer({
+                scope: bound.scope,
+                role: "builder",
+                sessionToken: bound.sessionToken,
+                confirm: true,
+              })
+            )
+          )
         )
       )
     );
@@ -87,7 +106,13 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
       ["Bia", "Caio"].map((name) =>
         serverRuntime.runPromise(
           searchEmail(name).pipe(
-            Effect.provide(operonClientLayer({ scope, role: "consumer" }))
+            Effect.provide(
+              operonClientLayer({
+                scope: bound.scope,
+                role: "consumer",
+                sessionToken: bound.sessionToken,
+              })
+            )
           )
         )
       )
@@ -99,44 +124,18 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
       proposalId: result.proposalId,
       digest: result.digest,
     };
-    const request = {
-      tool: "operon_review_mapping_proposal",
-      arguments: {
-        proposalId: pending.proposalId,
-        viewedDigest: pending.digest,
-        verdict: "approve",
-      },
-    };
     const wrong = await serverRuntime.runPromise(
-      verifyOperonApproval(context, pending, {
-        ...request,
-        arguments: { ...request.arguments, proposalId: randomUUID() },
-      }).pipe(Effect.flip)
+      assertOperonConfirm(
+        context,
+        { ...pending, proposalId: randomUUID() },
+        randomUUID().replaceAll("-", "")
+      ).pipe(Effect.flip)
     );
     expect(wrong).toMatchObject({ reason: "wrong_proposal" });
-    const verified = await serverRuntime.runPromise(
-      verifyOperonApproval(context, pending, request)
+    const confirmed = await serverRuntime.runPromise(
+      assertOperonConfirm(context, pending, pending.digest)
     );
-    expect(verified).toMatchObject({
-      userId: scope.userId,
-      roles: ["owner"],
-      sessionId,
-    });
-    const approved = await serverRuntime.runPromise(
-      confirmEmail(pending, pending.digest).pipe(
-        Effect.provide(
-          operonClientLayer({
-            scope,
-            role: "builder",
-            approve: (operation) =>
-              serverRuntime.runPromise(
-                verifyOperonApproval(context, pending, operation)
-              ),
-          })
-        )
-      )
-    );
-    expect(approved.status).toBe("merged");
+    expect(confirmed.sessionToken).toBe(bound.sessionToken);
     expect(
       await serverRuntime.runPromise(
         searchEmail("Ana").pipe(
@@ -144,6 +143,7 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
             operonClientLayer({
               scope: accessScopeForUser(`better-auth:${randomUUID()}`),
               role: "consumer",
+              sessionToken: bound.sessionToken,
             })
           )
         )
@@ -156,7 +156,7 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
       })
     );
     const revoked = await serverRuntime.runPromise(
-      verifyOperonApproval(context, pending, request).pipe(Effect.flip)
+      assertOperonConfirm(context, pending, pending.digest).pipe(Effect.flip)
     );
     expect(revoked).toMatchObject({
       _tag: "PersonalMemoryError",
@@ -168,6 +168,7 @@ test("the PostgreSQL bridge checks the native owner, exact confirmation and revo
         const sql = yield* PgClient.PgClient;
         yield* sql`DELETE FROM operon_workspace_state WHERE workspace_id = ${scope.workspaceId}`;
         yield* sql`DELETE FROM agent_sessions WHERE session_id = ${sessionId}`;
+        yield* sql`DELETE FROM public.session WHERE "userId" = ${identity.userId}`;
         yield* sql`DELETE FROM channel_identity WHERE id = ${identity.id}`;
       })
     );
