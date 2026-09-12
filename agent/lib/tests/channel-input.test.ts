@@ -8,12 +8,18 @@ import {
   type MessageStreamEvent,
 } from "eve/client";
 import {
+  approvalOptionLabel,
   channelQuestionSchema,
   pendingChannelInputs,
   readChannelInputStream,
   renderChannelInput,
+  renderEmailRegisterCard,
 } from "../channel-input";
-import { cardCopy, quarantineCardMessage } from "../../../server/operon/copy";
+import {
+  cardCopy,
+  offerCopy,
+  quarantineCardMessage,
+} from "../../../server/operon/copy";
 
 const request: InputRequest = {
   requestId: "approval-1",
@@ -83,6 +89,19 @@ describe("native input responses", () => {
     );
     expect(rendered).toContain(viewedDigest);
     expect(rendered).not.toBe(approvalMessage);
+    expect(
+      renderEmailRegisterCard({
+        approvalMessage,
+        card,
+        viewedDigest,
+      })
+    ).toBe(`${card}\n\n${viewedDigest}`);
+    expect(approvalOptionLabel("email-register", request.options[0]!)).toBe(
+      offerCopy
+    );
+    expect(approvalOptionLabel("calendar-create-event", request.options[0]!)).toBe(
+      "Aprovar"
+    );
   });
   test.each([undefined, "", "  ", "x".repeat(16385)])(
     "refuses an absent or invalid authored proposal",

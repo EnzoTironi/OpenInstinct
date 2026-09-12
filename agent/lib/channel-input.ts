@@ -9,7 +9,7 @@ import {
   type MessageStreamEvent,
 } from "eve/client";
 import { z } from "zod";
-import { quarantineCardMessage } from "../../server/operon/copy";
+import { offerCopy, quarantineCardMessage } from "../../server/operon/copy";
 
 const emailRegisterApprovalInput = z.object({
   card: z.string().min(1),
@@ -22,18 +22,34 @@ export const channelQuestionSchema = ASK_QUESTION_INPUT_SCHEMA.refine(
   "The complete question and option labels must be non-empty, well-formed text within 16384 characters. Ask a shorter question."
 );
 
+export function renderEmailRegisterApproval(input: unknown) {
+  const { card, viewedDigest } = emailRegisterApprovalInput.parse(input);
+  return approvalMessageSchema.parse(
+    quarantineCardMessage(card, viewedDigest)
+  );
+}
+
+export function renderEmailRegisterCard(input: unknown) {
+  const { card, viewedDigest } = emailRegisterApprovalInput.parse(input);
+  return approvalMessageSchema.parse(`${card}\n\n${viewedDigest}`);
+}
+
+export function approvalOptionLabel(
+  toolName: string,
+  option: { readonly id: string; readonly label: string }
+) {
+  if (toolName === "email-register" && option.id === "approve") {
+    return offerCopy;
+  }
+  return option.label;
+}
+
 export function renderChannelInput(request: InputRequest) {
   if (request.kind === "tool-approval") {
     const toolName = request.action.toolName;
     switch (toolName) {
-      case "email-register": {
-        const { card, viewedDigest } = emailRegisterApprovalInput.parse(
-          request.action.input
-        );
-        return approvalMessageSchema.parse(
-          quarantineCardMessage(card, viewedDigest)
-        );
-      }
+      case "email-register":
+        return renderEmailRegisterApproval(request.action.input);
       default:
         return approvalMessageSchema.parse(request.action.input.approvalMessage);
     }
