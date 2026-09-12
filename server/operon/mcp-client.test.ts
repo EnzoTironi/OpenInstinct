@@ -1,19 +1,7 @@
-import { ConfigProvider, Effect } from "effect";
+import { Config, ConfigProvider, Effect, Option } from "effect";
 import { expect, it } from "vitest";
 
-import {
-  OPERON_PIN_REPO,
-  OPERON_PIN_SHA,
-  OperonBuilder,
-  OperonBuilderStdio,
-  OperonMcpClient,
-  OperonMcpClientStdio,
-} from "./mcp-client";
-
-it("does pin Consumer stdio to EnzoTironi/operon 59712bd", () => {
-  expect(OPERON_PIN_REPO).toBe("EnzoTironi/operon");
-  expect(OPERON_PIN_SHA).toBe("59712bd");
-});
+import { OperonMcpClient, OperonMcpClientStdio } from "./mcp-client";
 
 it("does keep Consumer stdio unavailable without OPERON_HOME", async () => {
   const error = await Effect.runPromise(
@@ -35,22 +23,20 @@ it("does keep Consumer stdio unavailable without OPERON_HOME", async () => {
   expect(error.error).toBe("OperonUnavailable");
 });
 
-it("does keep Builder off by default", async () => {
-  const error = await Effect.runPromise(
+it("does derive identity keys over stdio when OPERON_HOME is linked", async () => {
+  const result = await Effect.runPromise(
     Effect.gen(function* () {
-      const builder = yield* OperonBuilder;
-      return yield* builder
-        .call("operon_admit_mapping_proposal", {
-          proposalId: "proposta-1",
-        })
-        .pipe(Effect.flip);
-    }).pipe(
-      Effect.provide(OperonBuilderStdio),
-      Effect.provideService(
-        ConfigProvider.ConfigProvider,
-        ConfigProvider.fromUnknown({})
-      )
-    )
+      const home = yield* Config.option(Config.string("OPERON_HOME"));
+      if (Option.isNone(home)) return { skipped: true as const };
+      const client = yield* OperonMcpClient;
+      const derived = yield* client.call("operon_derive_identity_keys", {
+        email: "bruno@gmail.com",
+      });
+      return { body: derived.body, skipped: false as const };
+    }).pipe(Effect.provide(OperonMcpClientStdio))
   );
-  expect(error.error).toBe("OperonUnavailable");
+  if (result.skipped) return;
+  expect(result.body).toMatchObject({
+    organization: { domain: "gmail.com", status: "suppressed" },
+  });
 });

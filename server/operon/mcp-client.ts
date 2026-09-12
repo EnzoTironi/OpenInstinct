@@ -4,10 +4,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { Config, Context, Effect, Layer, Option, Schema } from "effect";
 
-/** Checkout EnzoTironi/operon at this SHA into OPERON_HOME for Consumer stdio. */
-export const OPERON_PIN_REPO = "EnzoTironi/operon";
-export const OPERON_PIN_SHA = "59712bd";
-
 export class OperonMcpError extends Schema.TaggedError<OperonMcpError>()(
   "OperonMcpError",
   {
@@ -105,17 +101,12 @@ function firstText(content: typeof Schema.Json.Type) {
   return Option.isSome(part) ? part.value.text : "{}";
 }
 
+const decodeJsonText = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Json)
+);
+
 function parseJsonText(text: string): typeof Schema.Json.Type {
-  try {
-    return Option.getOrElse(
-      Schema.decodeUnknownOption(Schema.Json)(JSON.parse(text)),
-      () => ({
-        text,
-      })
-    );
-  } catch {
-    return { text };
-  }
+  return Option.getOrElse(decodeJsonText(text), () => ({ text }));
 }
 
 function parseToolContent(content: typeof Schema.Json.Type) {
