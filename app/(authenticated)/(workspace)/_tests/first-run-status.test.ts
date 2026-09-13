@@ -26,18 +26,18 @@ describe("first-run status", () => {
         identities: [{ channel: "telegram", senderId: "42" }],
       })
     );
-    expect(html).toContain("You&#x27;re set up");
-    expect(html).toContain("Telegram is linked");
+    expect(html).toContain("Tudo pronto.");
+    expect(html).toContain("Telegram está conectado");
     expect(html).toContain('href="/chat"');
-    expect(html).toContain('href="/account"');
+    expect(html).toContain('href="/connections?messengers=1"');
   });
 
   it("prompts to link a channel when welcome arrives without identities", () => {
     const html = renderToStaticMarkup(
       createElement(FirstRunStatus, { welcome: true, identities: [] })
     );
-    expect(html).toContain("Connect a messenger to finish setup");
-    expect(html).toContain('href="/account"');
+    expect(html).toContain("Leve o Zoen com você.");
+    expect(html).toContain('href="/connections?messengers=1"');
   });
 
   it("stays quiet for ordinary visits when channels already exist", () => {

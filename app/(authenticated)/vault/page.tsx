@@ -17,7 +17,12 @@ export default async function Page() {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="type-page-title">Vault</h1>
+      <header className="space-y-3">
+        <h1 className="type-page-title">Seu cofre.</h1>
+        <p className="type-supporting-body text-muted-foreground">
+          As informações que o Zoen usa quando você precisa preencher algo.
+        </p>
+      </header>
       <VaultLogins items={itemsByKind.login ?? []} />
       <VaultCards items={itemsByKind.payment ?? []} />
       <VaultAddresses items={itemsByKind.address ?? []} />

@@ -55,10 +55,10 @@ export function PersonalInfoForm({
   return (
     <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
       <div className="space-y-2">
-        <h1 className="type-page-title">Personal info</h1>
+        <h1 className="type-page-title">Sobre você.</h1>
         <p className="type-body max-w-2xl text-muted-foreground">
-          Your agent and browser worker can use these values directly when
-          completing forms. Keep passwords and payment details in Vault.
+          Os detalhes que ajudam o Zoen a preencher formulários para você.
+          Guarde senhas e dados de pagamento no Cofre.
         </p>
       </div>
 
@@ -75,19 +75,19 @@ export function PersonalInfoForm({
       <form className="space-y-10" onSubmit={submit}>
         <section aria-labelledby="identity-heading" className="space-y-4">
           <h2 className="type-label" id="identity-heading">
-            Identity and contact
+            Identidade e contato
           </h2>
           <div className="grid gap-5 sm:grid-cols-2">
             <ProfileField
               autoComplete="given-name"
               defaultValue={initialProfile.firstName}
-              label="First name"
+              label="Nome"
               name="firstName"
             />
             <ProfileField
               autoComplete="family-name"
               defaultValue={initialProfile.lastName}
-              label="Last name"
+              label="Sobrenome"
               name="lastName"
             />
             <ProfileField
@@ -100,14 +100,14 @@ export function PersonalInfoForm({
             <ProfileField
               autoComplete="tel"
               defaultValue={initialProfile.phone}
-              label="Phone"
+              label="Telefone"
               name="phone"
               type="tel"
             />
             <ProfileField
               autoComplete="bday"
               defaultValue={initialProfile.dateOfBirth}
-              label="Date of birth"
+              label="Data de nascimento"
               name="dateOfBirth"
               type="date"
             />
@@ -116,27 +116,27 @@ export function PersonalInfoForm({
 
         <section aria-labelledby="address-heading" className="space-y-4">
           <h2 className="type-label" id="address-heading">
-            Mailing address
+            Endereço
           </h2>
           <div className="grid gap-5 sm:grid-cols-2">
             <ProfileField
               autoComplete="address-line1"
               className="sm:col-span-2"
               defaultValue={initialProfile.addressLine1}
-              label="Address line 1"
+              label="Endereço"
               name="addressLine1"
             />
             <ProfileField
               autoComplete="address-line2"
               className="sm:col-span-2"
               defaultValue={initialProfile.addressLine2}
-              label="Address line 2"
+              label="Complemento"
               name="addressLine2"
             />
             <ProfileField
               autoComplete="address-level2"
               defaultValue={initialProfile.city}
-              label="City"
+              label="Cidade"
               name="city"
             />
             <ProfileField
@@ -148,13 +148,13 @@ export function PersonalInfoForm({
             <ProfileField
               autoComplete="postal-code"
               defaultValue={initialProfile.postalCode}
-              label="Postal code"
+              label="CEP"
               name="postalCode"
             />
             <ProfileField
               autoComplete="country"
               defaultValue={initialProfile.countryCode}
-              label="Country code"
+              label="Código do país"
               maxLength={2}
               name="countryCode"
               placeholder="US"
@@ -164,7 +164,7 @@ export function PersonalInfoForm({
 
         <div className="flex items-center gap-3 border-t border-border/50 pt-6">
           <Button disabled={updateProfile.isPending} type="submit">
-            {updateProfile.isPending ? "Saving…" : "Save personal info"}
+            {updateProfile.isPending ? "Salvando…" : "Salvar meus dados"}
           </Button>
           <p
             aria-live="polite"

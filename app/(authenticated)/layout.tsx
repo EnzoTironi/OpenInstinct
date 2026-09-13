@@ -1,27 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Logo } from "@web/components/ui/logo";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-} from "@web/components/ui/sidebar";
 import { requireRequestScope } from "@web/auth/request-scope";
 import { TRPCProvider } from "@web/trpc/client";
-import { AuthenticatedAccountControl } from "./_components/account-control";
-import {
-  AuthenticatedMobileHeader,
-  AuthenticatedNavigation,
-} from "./_components/authenticated-navigation";
+import { PanelShell } from "./_components/panel-shell";
+import { HomeOverview } from "./_components/home-overview";
 
 export const metadata: Metadata = {
-  title: "Companion",
+  title: "Seu espaço | Zoen",
 };
 
 export default async function AuthenticatedLayout({
@@ -31,30 +15,7 @@ export default async function AuthenticatedLayout({
 
   return (
     <TRPCProvider>
-      <SidebarProvider>
-        <Sidebar>
-          <SidebarHeader>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton render={<Link href="/" />}>
-                  <Logo />
-                  <span>Zoen</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarHeader>
-          <SidebarContent>
-            <AuthenticatedNavigation />
-          </SidebarContent>
-          <SidebarFooter>
-            <AuthenticatedAccountControl />
-          </SidebarFooter>
-        </Sidebar>
-        <SidebarInset className="h-svh overflow-y-auto">
-          <AuthenticatedMobileHeader />
-          {children}
-        </SidebarInset>
-      </SidebarProvider>
+      <PanelShell background={<HomeOverview />}>{children}</PanelShell>
     </TRPCProvider>
   );
 }

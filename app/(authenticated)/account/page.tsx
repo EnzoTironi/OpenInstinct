@@ -1,13 +1,20 @@
-import { Effect, Result } from "effect";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import {
+  BrainIcon,
+  ChevronRightIcon,
+  CreditCardIcon,
+  KeyRoundIcon,
+  ShieldCheckIcon,
+  SlidersHorizontalIcon,
+  UserRoundIcon,
+  MonitorIcon,
+} from "lucide-react";
 import { getAuthSession } from "@db/services/auth/session";
 import { readEntitlement } from "@db/services/billing";
-import { ChannelAuthForm } from "@web/auth/channel/form";
-import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
-import { serverRuntime } from "../../../server/runtime";
-import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
-import { LinkedChannels } from "./linked-channels";
+import { getGatewayModel } from "@db/services/settings";
+import { requireRequestScope } from "@web/auth/request-scope";
 import { PersonalMemorySection } from "./personal-memory";
 import {
   isStripeBillingConfigured,
@@ -15,81 +22,134 @@ import {
 } from "../../../server/billing/stripe";
 import { AccountBillingSection } from "./_components/billing-section";
 import { AccountPrivacyWipeSection } from "./_components/privacy-wipe-section";
+import { AuthenticatedAccountControl } from "./_components/account-control";
+import { ModelSelector } from "./_components/model-selector";
+import { PanelIntro } from "../_components/panel-intro";
+import styles from "../_components/panel.module.css";
 
-export default async function AccountPage() {
-  const requestHeaders = await headers();
-  const session = await getAuthSession(requestHeaders);
+const sections = [
+  { id: "channels", label: "Seus mensageiros." },
+  { id: "memory", label: "O que fica com você." },
+  { id: "preferences", label: "Do seu jeito." },
+  { id: "plan", label: "Seu plano." },
+  { id: "privacy", label: "Sua privacidade." },
+  { id: "advanced", label: "Sua inteligência." },
+] as const;
+
+const accountLinks = [
+  {
+    href: "/personal-info",
+    label: "Dados pessoais",
+    icon: UserRoundIcon,
+  },
+  { href: "/account?section=memory", label: "Memória", icon: BrainIcon },
+  {
+    href: "/account?section=preferences",
+    label: "Preferências",
+    icon: SlidersHorizontalIcon,
+  },
+];
+const preferenceLinks = [
+  { href: "/personal-info", label: "Dados pessoais", icon: UserRoundIcon },
+  { href: "/vault", label: "Cofre", icon: KeyRoundIcon },
+  { href: "/account?section=plan", label: "Seu plano", icon: CreditCardIcon },
+  { href: "/account?section=advanced", label: "Inteligência", icon: BrainIcon },
+  {
+    href: "/account?section=privacy",
+    label: "Privacidade",
+    icon: ShieldCheckIcon,
+  },
+  { href: "/tasks", label: "Atividade no navegador", icon: MonitorIcon },
+];
+
+export default async function AccountPage({
+  searchParams,
+}: PageProps<"/account">) {
+  const params = await searchParams;
+  const section = sections.find(({ id }) => id === params.section);
+  const session = await getAuthSession(await headers());
   if (!session) redirect("/sign-in?callbackUrl=%2Faccount");
-  const result = await serverRuntime.runPromise(
-    readLinkedChannelIdentities(requestHeaders).pipe(Effect.result)
-  );
-  if (Result.isFailure(result) && result.failure.reason === "unauthenticated")
-    redirect("/sign-in?callbackUrl=%2Faccount");
-  const entitlement = await readEntitlement("user", session.user.id).catch(
-    () => ({
-      plan: "free" as const,
-      status: "active",
-      seatCount: 1,
-    })
-  );
   return (
-    <main className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-8 px-4 py-6 sm:p-8">
-      <header className="space-y-2">
-        <h1 className="type-page-title">Your account</h1>
-        <p className="type-supporting-body text-muted-foreground">
-          Signed in as {session.user.name || "your Companion account"}. This is
-          your personal workspace — messengers, plan, and memory live here.
-        </p>
-      </header>
-      {Result.isFailure(result) ? (
-        <Alert variant="destructive">
-          <AlertTitle>Couldn&apos;t load linked channels</AlertTitle>
-          <AlertDescription>Reload this page to try again.</AlertDescription>
-        </Alert>
+    <div className={styles.page}>
+      {section ? (
+        <>
+          <h1 className="type-page-title">{section.label}</h1>
+          <AccountSection section={section.id} userId={session.user.id} />
+        </>
       ) : (
         <>
-          <section
-            aria-labelledby="linked-channels-heading"
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <h2 id="linked-channels-heading" className="type-section-title">
-                Linked channels
-              </h2>
-              <p className="type-supporting-body text-muted-foreground">
-                Messengers linked here can reach Companion and sign you in to
-                this personal account.
-              </p>
-            </div>
-            <LinkedChannels identities={result.success} />
-          </section>
-          <section
-            aria-labelledby="link-channel-heading"
-            className="space-y-4 rounded-xl border p-4 sm:p-6"
-          >
-            <div className="space-y-2">
-              <h2 id="link-channel-heading" className="type-section-title">
-                Link another channel
-              </h2>
-              <p className="type-supporting-body text-muted-foreground">
-                Add Telegram or WhatsApp to{" "}
-                {session.user.name || "this personal account"}. Confirm the
-                request in that messenger, then return here.
-              </p>
-            </div>
-            <ChannelAuthForm purpose="link" callbackUrl="/account" />
-          </section>
+          <PanelIntro
+            image="/marketing/panel/zoen-friendly.jpg"
+            title="Seu Zoen. Seu espaço."
+          />
+          <AccountLinks links={accountLinks} />
+          <div className={styles.actions}>
+            <AuthenticatedAccountControl />
+          </div>
         </>
       )}
-      <AccountBillingSection
-        plan={entitlement.plan}
-        seatCount={entitlement.seatCount}
-        status={entitlement.status}
-        stripeCheckoutConfigured={isStripeBillingConfigured()}
-        stripePortalConfigured={isStripePortalConfigured()}
-      />
-      <PersonalMemorySection />
-      <AccountPrivacyWipeSection />
-    </main>
+    </div>
+  );
+}
+
+function AccountLinks({ links }: { readonly links: typeof accountLinks }) {
+  return (
+    <nav aria-label="Configurações da conta" className={styles.actionList}>
+      {links.map(({ href, label, icon: Icon }) => (
+        <Link href={href} key={href}>
+          <Icon aria-hidden="true" />
+          {label}
+          <ChevronRightIcon aria-hidden="true" />
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+async function AccountSection({
+  section,
+  userId,
+}: {
+  readonly section: (typeof sections)[number]["id"];
+  readonly userId: string;
+}) {
+  switch (section) {
+    case "channels":
+      return redirect("/connections?messengers=1");
+    case "memory":
+      return <PersonalMemorySection />;
+    case "preferences":
+      return <AccountLinks links={preferenceLinks} />;
+    case "plan":
+      return <AccountPlan userId={userId} />;
+    case "privacy":
+      return <AccountPrivacyWipeSection />;
+    case "advanced":
+      return (
+        <section className={styles.sectionCard}>
+          <h2 className="type-section-title mb-4">Modelo das conversas</h2>
+          <ModelSelector
+            modelId={await getGatewayModel(await requireRequestScope())}
+          />
+        </section>
+      );
+  }
+  return null;
+}
+
+async function AccountPlan({ userId }: { readonly userId: string }) {
+  const entitlement = await readEntitlement("user", userId).catch(() => ({
+    plan: "free" as const,
+    status: "active",
+    seatCount: 1,
+  }));
+  return (
+    <AccountBillingSection
+      plan={entitlement.plan}
+      seatCount={entitlement.seatCount}
+      status={entitlement.status}
+      stripeCheckoutConfigured={isStripeBillingConfigured()}
+      stripePortalConfigured={isStripePortalConfigured()}
+    />
   );
 }

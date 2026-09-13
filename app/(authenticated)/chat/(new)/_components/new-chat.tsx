@@ -3,7 +3,7 @@
 import { useEveAgent } from "eve/react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Button } from "@web/components/ui/button";
+import Link from "next/link";
 import {
   PromptInput,
   PromptInputBody,
@@ -15,7 +15,6 @@ import {
 } from "@web/components/ai-elements/prompt-input";
 import { chatTitle, messageContent } from "../../_lib/message-input";
 import { api } from "@web/trpc/client";
-import { chatStarters } from "../_lib/starters";
 
 export function NewChat({
   initialDraft = "",
@@ -88,13 +87,13 @@ export function NewChat({
       <PromptInput compact onSubmit={handleSubmit}>
         <PromptInputBody>
           <PromptInputTextarea
-            aria-label="Message Companion"
+            aria-label="Mensagem para o Zoen"
             className="min-h-0"
             disabled={sending}
             onChange={(event) => {
               setDraft(event.currentTarget.value);
             }}
-            placeholder="Tell me what you have in mind…"
+            placeholder="O que está na sua cabeça?"
             ref={inputRef}
             value={draft}
           />
@@ -102,7 +101,7 @@ export function NewChat({
         <PromptInputFooter>
           <PromptInputTools />
           <PromptInputSubmit
-            aria-label={sending ? "Sending message" : "Send message"}
+            aria-label={sending ? "Enviando mensagem" : "Enviar mensagem"}
             disabled={sending}
             status={sending ? "submitted" : undefined}
           />
@@ -110,32 +109,16 @@ export function NewChat({
       </PromptInput>
       {sendError ? (
         <p className="type-caption text-destructive" role="alert">
-          We couldn’t open your conversation. Your draft is still here. Check
-          your connection and try again.
+          Não foi possível abrir sua conversa. Seu rascunho continua aqui.
+          Verifique a conexão e tente novamente.
         </p>
       ) : null}
-      <div
-        aria-label="Ideas to get started"
-        className="flex flex-wrap justify-center gap-2"
-      >
-        {chatStarters.map(({ label, text }) => (
-          <Button
-            key={label}
-            disabled={sending}
-            onClick={() => {
-              setDraft(text);
-              inputRef.current?.focus();
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
       <p className="text-center type-caption text-muted-foreground">
-        Choose an idea to edit it before sending.
+        {initialDraft ? (
+          "Ajuste o pedido e envie quando quiser."
+        ) : (
+          <Link href="/recipes">Precisa de uma ideia?</Link>
+        )}
       </p>
     </div>
   );

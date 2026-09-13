@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 
-export interface LinkedChannelSummary {
+interface LinkedChannelSummary {
   readonly channel: "telegram" | "kapso";
   readonly senderId: string;
 }
@@ -14,7 +14,7 @@ function channelLabel(channel: LinkedChannelSummary["channel"]) {
 export function describeLinkedChannels(
   identities: readonly LinkedChannelSummary[]
 ) {
-  if (identities.length === 0) return "No messenger linked yet.";
+  if (identities.length === 0) return "Nenhum mensageiro conectado ainda.";
   const labels: string[] = [];
   for (const identity of identities) {
     const label = channelLabel(identity.channel);
@@ -22,9 +22,9 @@ export function describeLinkedChannels(
   }
   const first = labels.at(0);
   if (first !== undefined && labels.length === 1) {
-    return first + " is linked to your account.";
+    return first + " está conectado à sua conta.";
   }
-  return labels.join(" and ") + " are linked to your account.";
+  return labels.join(" e ") + " estão conectados à sua conta.";
 }
 
 export function FirstRunStatus({
@@ -39,11 +39,11 @@ export function FirstRunStatus({
   if (linked) {
     return (
       <Alert>
-        <AlertTitle>You&apos;re set up</AlertTitle>
+        <AlertTitle>Tudo pronto.</AlertTitle>
         <AlertDescription className="space-y-3">
           <p>
-            {describeLinkedChannels(identities)} Message Companion there, or
-            start on the web. Manage messengers anytime from Account.
+            {describeLinkedChannels(identities)} Fale com o Zoen por lá ou
+            comece por aqui.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -51,15 +51,15 @@ export function FirstRunStatus({
               render={<Link href="/chat" />}
               size="sm"
             >
-              Start a conversation
+              Começar uma conversa
             </Button>
             <Button
               nativeButton={false}
-              render={<Link href="/account" />}
+              render={<Link href="/connections?messengers=1" />}
               size="sm"
               variant="outline"
             >
-              Account and channels
+              Conexões
             </Button>
           </div>
         </AlertDescription>
@@ -68,19 +68,15 @@ export function FirstRunStatus({
   }
   return (
     <Alert>
-      <AlertTitle>Connect a messenger to finish setup</AlertTitle>
+      <AlertTitle>Leve o Zoen com você.</AlertTitle>
       <AlertDescription className="space-y-3">
-        <p>
-          Link Telegram or WhatsApp so Companion can reach you where you already
-          chat. Your personal workspace is ready — this last step binds a
-          messenger.
-        </p>
+        <p>Conecte o Telegram ou o WhatsApp para conversar onde preferir.</p>
         <Button
           nativeButton={false}
-          render={<Link href="/account" />}
+          render={<Link href="/connections?messengers=1" />}
           size="sm"
         >
-          Link a channel
+          Conectar um mensageiro
         </Button>
       </AlertDescription>
     </Alert>

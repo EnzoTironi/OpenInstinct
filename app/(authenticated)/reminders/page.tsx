@@ -1,3 +1,5 @@
+import { PlusIcon } from "lucide-react";
+import styles from "../_components/panel.module.css";
 import { Effect, Result } from "effect";
 import Link from "next/link";
 import { ReminderList } from "./reminder-list";
@@ -13,27 +15,30 @@ export default async function RemindersPage() {
     listReminders(scope).pipe(Effect.result)
   );
   return (
-    <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-6 px-4 py-6 sm:p-8">
-      <header className="space-y-3">
-        <h1 className="type-page-title">Reminders</h1>
-        <p className="type-supporting-body text-muted-foreground">
-          Scheduled requests across your conversations. To change or cancel one,
-          return to its original conversation.
-        </p>
-        <Button
-          nativeButton={false}
-          render={<Link href="/chat?starter=reminder" />}
-          variant="outline"
-        >
-          Create a reminder
-        </Button>
-      </header>
+    <div className={styles.page}>
+      {(Result.isFailure(result) || result.success.reminders.length > 0) && (
+        <header className={styles.pageHeader}>
+          <div>
+            <h1 className="type-page-title">Já está combinado.</h1>
+            <p className={styles.intro}>
+              Ajuste cada pedido na conversa em que ele começou.
+            </p>
+          </div>
+          <Button
+            nativeButton={false}
+            render={<Link href="/chat?starter=reminder" />}
+            variant="outline"
+          >
+            <PlusIcon aria-hidden="true" /> Criar automação
+          </Button>
+        </header>
+      )}
       {Result.isFailure(result) ? (
         <Alert variant="destructive">
-          <AlertTitle>Couldn&apos;t load reminders</AlertTitle>
+          <AlertTitle>Não foi possível carregar as automações</AlertTitle>
           <AlertDescription>
-            Please reload this page to try again. Your schedules have not been
-            changed.
+            Atualize a página para tentar novamente. Seus agendamentos foram
+            preservados.
           </AlertDescription>
         </Alert>
       ) : (
