@@ -57,7 +57,7 @@ const databaseCheck = Effect.gen(function* () {
       })
     )
   )(memory.stdout ?? "");
-  yield* Effect.log(health);
+  return yield* Effect.log(health);
 });
 
 const main = Effect.gen(function* () {
