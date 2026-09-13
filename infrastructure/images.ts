@@ -27,7 +27,7 @@ export const releaseImage = Effect.fn(function* (
   }
   const token = yield* Config.redacted("FLY_API_TOKEN");
   const image = yield* Docker.Image(`${component}Image`, {
-    name: appName,
+    name: `registry.fly.io/${appName}`,
     tag: release,
     registry: { server: "registry.fly.io", username: "x", password: token },
     build: { context, platform: "linux/amd64" },
