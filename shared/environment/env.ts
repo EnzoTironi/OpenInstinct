@@ -3,6 +3,11 @@ import { Schema } from "effect";
 import { z } from "zod";
 import { isE164PhoneNumber } from "@shared/identity/phone-number";
 import { databaseUrlSchema } from "@shared/environment/database-url";
+import {
+  browserModelProviderSchema,
+  browserModelSchema,
+  installationModelProviderSchema,
+} from "@shared/environment/model-provider";
 
 export const betterAuthSecretSchema = z
   .string()
@@ -65,6 +70,15 @@ export const env = createEnv({
     // Required
     DATABASE_URL: databaseUrlSchema,
     KERNEL_API_KEY: requiredValue.optional(),
+    COMPANION_MODEL_PROVIDER: Schema.toStandardSchemaV1(
+      Schema.optional(installationModelProviderSchema)
+    ),
+    COMPANION_BROWSER_MODEL_PROVIDER: Schema.toStandardSchemaV1(
+      Schema.optional(browserModelProviderSchema)
+    ),
+    COMPANION_BROWSER_MODEL: Schema.toStandardSchemaV1(
+      Schema.optional(browserModelSchema)
+    ),
     MARKETING_WHATSAPP_NUMBER: requiredValue.optional(),
     MARKETING_TELEGRAM_USERNAME: requiredValue.optional(),
     MARKETING_IMESSAGE_NUMBER: requiredValue.optional(),

@@ -99,7 +99,7 @@ export function SubagentPanel({
     [sessions]
   );
   const workingCount = [...statuses.values()].filter((status) =>
-    ["starting", t("working")].includes(status)
+    ["starting", "working"].includes(status)
   ).length;
   const doneCount = sessions.length - workingCount;
   const openTask = (childSessionId: string) => {

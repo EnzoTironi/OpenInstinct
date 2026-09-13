@@ -4,7 +4,6 @@ import type { DynamicResolveContext } from "eve/tools";
 import { describe, expect, it } from "vitest";
 import personalInfoMemory from "@agent/memory/personal_info";
 import workstreamMemory from "@agent/memory/workstreams";
-import browserAgent from "@agent/subagents/browser-agent/agent";
 import calendar from "@agent/tools/calendar";
 import contacts from "@agent/tools/contacts";
 import gmail from "@agent/tools/gmail";
@@ -17,7 +16,6 @@ const groupedTools = [calendar, contacts, gmail, messaging, schedules, vault];
 describe("authored mode capability matrix", () => {
   it("gives interactive turns the authored coordinator capabilities", async () => {
     expect(await authoredCapabilities("linq-message")).toEqual([
-      "browser-agent",
       "calendar-check-availability",
       "calendar-create-event",
       "calendar-list-events",
@@ -44,7 +42,6 @@ describe("authored mode capability matrix", () => {
 
   it("gives scheduled workers only authored read and execution capabilities", async () => {
     expect(await authoredCapabilities("scheduled-worker")).toEqual([
-      "browser-agent",
       "calendar-check-availability",
       "calendar-list-events",
       "contacts-search",
@@ -111,11 +108,6 @@ async function authoredCapabilities(authenticator: string) {
     capabilities.push(
       ...Object.keys(workstreamTools).map((name) => `workstreams__${name}`)
     );
-
-  const resolveBrowserAgent = browserAgent.events["turn.started"];
-  if (resolveBrowserAgent && (await resolveBrowserAgent({}, context))) {
-    capabilities.push("browser-agent");
-  }
 
   return capabilities.toSorted();
 }

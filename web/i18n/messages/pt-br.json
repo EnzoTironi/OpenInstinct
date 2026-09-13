@@ -762,6 +762,8 @@
   "Atividade de {name}": "Atividade de {name}",
   "complete": "Concluído",
   "ready": "Pronto",
+  "starting": "Iniciando",
+  "cancelled": "Cancelado",
   "waiting": "Aguardando",
   "This connection link has expired or could not be verified. Return to your conversation and ask to connect Google Workspace again.": "Este link de conexão expirou ou não pôde ser verificado. Volte à conversa e peça para conectar o Google novamente.",
   "This link belongs to a different Companion account, or you need to sign in. Sign in with the account that requested the connection, then retry from that conversation.": "Este link pertence a outra conta Zoen ou você precisa entrar. Entre com a conta que pediu a conexão e tente novamente nessa conversa.",

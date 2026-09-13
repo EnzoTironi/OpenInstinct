@@ -1,12 +1,5 @@
-import { webSearch } from "eve/tools/web_search";
-import { defineDynamic } from "eve/tools";
-import { resolveModeValue } from "../lib/mode";
-export default defineDynamic({
-  events: {
-    "turn.started": (_event, context) =>
-      resolveModeValue(context, {
-        interactive: webSearch,
-        "scheduled-worker": webSearch,
-      }),
-  },
-});
+import { disableTool } from "eve/tools";
+
+// Eve's provider-managed search cannot be selected by a dynamic tool resolver.
+// Public web research uses the browser worker and its model-step authorization.
+export default disableTool();

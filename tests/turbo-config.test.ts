@@ -16,6 +16,8 @@ const applicationEnvironment = [
 ];
 const runtimeEnvironment = [
   "AI_GATEWAY_API_KEY",
+  "COMPANION_*",
+  "OPENROUTER_API_KEY",
   ...applicationEnvironment,
   "WORKFLOW_*",
 ];

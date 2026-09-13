@@ -1,5 +1,6 @@
 import type { SubagentStatus } from "@app/_lib/subagent-sessions";
 import { Badge } from "@web/components/ui/badge";
+import { useI18n } from "@web/i18n/context";
 
 export function agentLabel(name: string) {
   return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
@@ -10,6 +11,7 @@ export function StatusIndicator({
 }: {
   readonly status: SubagentStatus;
 }) {
+  const { t } = useI18n();
   const variant =
     status === "working" || status === "starting"
       ? "information"
@@ -19,5 +21,5 @@ export function StatusIndicator({
           ? "secondary"
           : "success";
 
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant}>{t(status)}</Badge>;
 }
