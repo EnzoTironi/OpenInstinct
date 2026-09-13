@@ -56,10 +56,12 @@ export const requireBrowserWorkerLease = Effect.fn("requireBrowserWorkerLease")(
   function* (scope: AccessScope, runId: string, leaseToken: string) {
     yield* requireBrowserWorkerMembership(scope);
     const sql = yield* PgClient.PgClient;
-    const rows = yield* sql`SELECT id FROM scheduled_agent_runs
-    WHERE id = ${runId} AND status = 'running'
-      AND lease_token = ${leaseToken}
-      AND lease_expires_at > clock_timestamp() FOR SHARE`;
+    const rows = yield* sql`SELECT r.id FROM scheduled_agent_runs r
+    JOIN scheduled_agent_jobs j ON j.id = r.job_id
+    WHERE r.id = ${runId} AND r.status = 'running'
+      AND j.workspace_id = ${scope.workspaceId} AND j.created_by_user_id = ${scope.userId}
+      AND r.lease_token = ${leaseToken}
+      AND r.lease_expires_at > clock_timestamp() FOR SHARE`;
     if (rows.length !== 1)
       return yield* new BrowserWorkerAccessError({ reason: "lease_inactive" });
     return scope;
@@ -75,7 +77,10 @@ export const requireBrowserWorkerScheduleActive = Effect.fn(
     WHERE id = ${scheduleId}
       AND workspace_id = ${scope.workspaceId}
       AND created_by_user_id = ${scope.userId}
-      AND status = 'active' FOR SHARE`;
+      AND (status = 'active' OR (status = 'completed' AND EXISTS (
+        SELECT 1 FROM scheduled_agent_runs r WHERE r.job_id = scheduled_agent_jobs.id
+          AND r.status = 'running' AND r.lease_expires_at > clock_timestamp()
+      ))) FOR SHARE`;
   if (rows.length !== 1)
     return yield* new BrowserWorkerAccessError({ reason: "paused" });
   return scope;

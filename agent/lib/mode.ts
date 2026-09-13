@@ -11,6 +11,8 @@ interface AgentModeContext {
 }
 
 function agentMode(authenticator: string | undefined) {
+  if (authenticator === "a2a" || authenticator === "matrix")
+    return "shared" as const;
   if (authenticator === "scheduled-worker") return "scheduled-worker" as const;
   if (authenticator === "scheduled-result") return "scheduled-report" as const;
   return "interactive" as const;
@@ -23,6 +25,7 @@ function sessionAgentMode(auth: AgentModeContext["session"]["auth"]) {
     return "scheduled-worker" as const;
   }
   const caller = auth.current ?? auth.initiator;
+  if (caller?.attributes.groupBindingId) return "shared" as const;
   return agentMode(caller?.authenticator);
 }
 

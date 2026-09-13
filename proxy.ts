@@ -19,7 +19,14 @@ const publicExact = new Set([
 function isPublicPath(pathname: string) {
   if (publicExact.has(pathname)) return true;
   if (pathname.startsWith("/api/auth/")) return true;
+  if (pathname.startsWith("/_matrix/app/v1/")) return true;
   if (pathname.startsWith("/internal/scheduled-run/")) return true;
+  if (
+    /^\/agents\/[a-z0-9_]{3,30}(?:\/\.well-known\/agent-card\.json)?$/.test(
+      pathname
+    )
+  )
+    return true;
   return false;
 }
 

@@ -12,8 +12,15 @@ export default defineDynamic({
       const caller = context.session.auth.current;
       if (
         caller?.principalType !== "user" ||
-        !["authjs", "verified-channel"].includes(caller.authenticator) ||
-        caller.attributes.chatKind === "group"
+        ![
+          "authjs",
+          "verified-channel",
+          "a2a",
+          "matrix",
+          "scheduled-worker",
+        ].includes(caller.authenticator) ||
+        (caller.attributes.chatKind === "group" &&
+          !caller.attributes.groupBindingId)
       )
         return null;
       const stored = await serverRuntime.runPromise(

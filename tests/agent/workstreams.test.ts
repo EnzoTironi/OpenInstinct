@@ -366,14 +366,16 @@ describe("workstream memory", () => {
   it("disables the slot outside interactive authenticated user turns", async () => {
     expect(workstreamMemory.scope(context("first"))).toBe(alice.workspaceId);
     await Promise.all(
-      ["scheduled-worker", "scheduled-result"].map(async (authenticator) => {
-        const scheduled = context("scheduled", authenticator);
-        expect(workstreamMemory.scope(scheduled)).toBeNull();
-        expect(await workstreamMemory.provider.tools(scheduled)).toBeNull();
-        expect(
-          await workstreamMemory.provider.recall["turn.started"](scheduled)
-        ).toBeNull();
-      })
+      ["scheduled-worker", "scheduled-result", "a2a", "matrix"].map(
+        async (authenticator) => {
+          const scheduled = context("scheduled", authenticator);
+          expect(workstreamMemory.scope(scheduled)).toBeNull();
+          expect(await workstreamMemory.provider.tools(scheduled)).toBeNull();
+          expect(
+            await workstreamMemory.provider.recall["turn.started"](scheduled)
+          ).toBeNull();
+        }
+      )
     );
     const anonymous = {
       ...context("anonymous"),

@@ -25,6 +25,16 @@ class PrincipalScopeError extends Schema.TaggedError<PrincipalScopeError>()(
 export function scopeFromPrincipal(
   input: SessionAuthContext | Extract<ConnectionPrincipal, { type: "user" }>
 ) {
+  if (
+    ("authenticator" in input && input.authenticator === "a2a") ||
+    input.attributes?.agentGrantId ||
+    input.attributes?.groupBindingId
+  ) {
+    throw new PrincipalScopeError({
+      message:
+        "Shared agent executions require an explicitly granted workspace tool.",
+    });
+  }
   const principal = Result.getOrThrowWith(
     decodePrincipal(input),
     () =>

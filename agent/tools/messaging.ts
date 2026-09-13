@@ -67,6 +67,7 @@ export default defineDynamic({
         const tools = { send_message: privateMessageTool(channel) };
         return resolveModeValue(context, {
           interactive: tools,
+          shared: tools,
           "scheduled-report": tools,
         });
       }

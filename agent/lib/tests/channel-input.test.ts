@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { ZodError } from "zod";
 import { ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
-import askQuestion from "../../tools/ask_question";
+import { askQuestion } from "../../tools/ask_question";
 import {
   defaultMessageReducer,
   type InputRequest,

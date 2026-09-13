@@ -23,6 +23,13 @@ import { resolveModeValue } from "../lib/mode";
 function resolvePersonalInfoAccessScope(
   context: Pick<MemoryScopeContext | SessionContext, "session">
 ): AccessScope | null {
+  if (
+    resolveModeValue(context, {
+      interactive: true,
+      "scheduled-worker": true,
+    }) !== true
+  )
+    return null;
   const caller = [
     context.session.auth.current,
     context.session.auth.initiator,

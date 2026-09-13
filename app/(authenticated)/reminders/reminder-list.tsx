@@ -9,6 +9,8 @@ import type { Effect } from "effect";
 import Link from "next/link";
 import type { listReminders } from "../../../server/schedules/queries";
 import { Badge } from "@web/components/ui/badge";
+import { PauseIcon, PlayIcon } from "lucide-react";
+import { api } from "@web/trpc/client";
 
 const jobLabels = {
   active: "Ativa",
@@ -91,11 +93,14 @@ export function ReminderList({ reminders, hasMore }: ReminderPage) {
 }
 
 function ReminderCard({
-  reminder,
+  reminder: original,
 }: {
   readonly reminder: ReminderPage["reminders"][number];
 }) {
   const { t, locale } = useI18n();
+  const update = api.workspaces.schedules.setStatus.useMutation();
+  const reminder = { ...original, ...update.data };
+  const nextRunAt = reminder.nextRunAt ? new Date(reminder.nextRunAt) : null;
   const dateFormatter = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
@@ -108,7 +113,33 @@ function ReminderCard({
         <span className="type-caption text-muted-foreground">
           {channelLabels[reminder.conversationChannel]}
         </span>
+        {reminder.mayManage && reminder.status !== "completed" && (
+          <Button
+            variant="ghost"
+            className="ml-auto"
+            disabled={update.isPending}
+            onClick={() => {
+              update.mutate({
+                id: reminder.id,
+                revision: reminder.revision,
+                status: reminder.status === "active" ? "paused" : "active",
+              });
+            }}
+          >
+            {reminder.status === "active" ? (
+              <PauseIcon aria-hidden="true" />
+            ) : (
+              <PlayIcon aria-hidden="true" />
+            )}
+            {t(reminder.status === "active" ? "Pausar" : "Retomar")}
+          </Button>
+        )}
       </div>
+      {update.error && (
+        <p role="alert" className="type-caption">
+          {t("Não foi possível atualizar. Tente novamente.")}
+        </p>
+      )}
       <p className="type-supporting-body wrap-break-word whitespace-pre-wrap">
         {reminder.prompt}
       </p>
@@ -120,9 +151,9 @@ function ReminderCard({
               : t("Próxima ocorrência: ")}
           </dt>
           <dd className="inline">
-            {reminder.nextRunAt ? (
-              <time dateTime={reminder.nextRunAt.toISOString()}>
-                {dateFormatter.format(reminder.nextRunAt)} UTC
+            {nextRunAt ? (
+              <time dateTime={nextRunAt.toISOString()}>
+                {dateFormatter.format(nextRunAt)} UTC
               </time>
             ) : (
               t("Nenhuma agendada")

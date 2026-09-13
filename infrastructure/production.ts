@@ -24,4 +24,5 @@ export const production = {
     volumeName: "zoen_memory_data",
     sizeGb: 3,
   },
+  matrix: { app: "zoen-matrix-tironi" },
 } as const;

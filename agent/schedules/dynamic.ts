@@ -72,7 +72,7 @@ async function executeScheduledRun(
       restart: claim.run.workerSessionId !== null,
       runId: claim.run.id,
     }).send(scheduledRunPrompt(claim), {
-      auth: scheduledWorkerAuth(claim),
+      auth: await scheduledWorkerAuth(claim),
     });
     const persisted = await setScheduledRunSession(
       claim.run.id,
@@ -126,7 +126,7 @@ function scheduledRunPrompt(
   ].join("\n\n");
 }
 
-function scheduledWorkerAuth(
+async function scheduledWorkerAuth(
   claim: Awaited<ReturnType<typeof claimReadyScheduledAgentRuns>>[number]
 ) {
   const leaseToken = claim.run.leaseToken;
@@ -138,6 +138,9 @@ function scheduledWorkerAuth(
     scheduledRunLeaseToken: leaseToken,
     scheduledRunId: claim.run.id,
     workspaceId: claim.job.workspaceId,
+    workspaceKind: claim.job.workspaceId.startsWith("personal:")
+      ? "personal"
+      : "company",
   };
   return {
     attributes:

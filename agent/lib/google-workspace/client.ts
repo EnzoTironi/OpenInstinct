@@ -12,6 +12,10 @@ import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 import { serverRuntime } from "../../../server/runtime";
 import { getGoogleWorkspaceToken } from "../../../server/google-workspace";
 import { createGoogleWorkspaceChallenge } from "../../../server/google-workspace/challenge";
+import { accessScopeForUser } from "../../../shared/identity/access-scope";
+import { workspaceActorFromPrincipal } from "../../../server/workspaces/access";
+import { getWorkspaceGoogleToken } from "../../../server/workspaces/connections";
+import { readWorkspaceCapabilities } from "../../../server/workspaces/capabilities";
 
 function googleScope(principal: ConnectionPrincipal) {
   if (principal.type !== "user")
@@ -120,7 +124,33 @@ export async function withGoogleAuth<T>(
   ctx: ToolContext,
   execute: (authClient: InstanceType<typeof auth.OAuth2>) => Promise<T>
 ) {
-  const { token } = await ctx.getToken(googleWorkspaceAuth);
+  const principal = ctx.session.auth.current;
+  const isCompany =
+    principal?.principalType === "user" &&
+    principal.attributes.workspaceId !==
+      accessScopeForUser(principal.principalId).workspaceId;
+  const { token } = isCompany
+    ? await serverRuntime.runPromise(
+        Effect.gen(function* () {
+          const actor = yield* workspaceActorFromPrincipal(principal);
+          if (
+            actor.agentGrantId ||
+            actor.groupBindingId ||
+            !(yield* readWorkspaceCapabilities(actor)).enabled.includes(
+              "google"
+            )
+          )
+            return yield* Effect.fail(
+              new ConnectionAuthorizationFailedError("google-workspace", {
+                reason: "permission_denied",
+                retryable: false,
+              })
+            );
+          return Redacted.value(yield* getWorkspaceGoogleToken(actor));
+        }),
+        { signal: ctx.abortSignal }
+      )
+    : await ctx.getToken(googleWorkspaceAuth);
   const authClient = new auth.OAuth2();
   authClient.setCredentials({ access_token: token });
   return Effect.runPromise(

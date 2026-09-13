@@ -10,6 +10,11 @@ import { resolveModeValue } from "@agent/lib/mode";
 
 export function resolveProfileMemoryScope(context: MemoryScopeContext) {
   const caller = context.session.auth.current;
+  if (
+    caller?.authenticator === "a2a" ||
+    caller?.attributes.chatKind === "group"
+  )
+    return null;
   if (caller?.attributes.workspaceKind === "company") return null;
   const workspaceId = z.string().safeParse(caller?.attributes.workspaceId);
   const scope =

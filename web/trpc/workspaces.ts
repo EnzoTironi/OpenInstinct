@@ -1,7 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { Effect, Schema } from "effect";
 import { serverRuntime } from "../../server/runtime";
-import { resolveWorkspaceActor } from "../../server/workspaces/session";
 import {
   createUserWorkspace,
   listUserWorkspaces,
@@ -14,8 +13,14 @@ import {
   GitRevisionSchema,
   WorkspacePathSchema,
 } from "../../server/workspaces/git";
-import { protectedProcedure } from "./init";
+import { workspaceProcedure } from "./workspace-procedure";
+import { workspaceRoomsRouter } from "./workspace-rooms";
+import { workspaceAgentsRouter } from "./workspace-agents";
 import { readWorkspaceCapabilities } from "../../server/workspaces/capabilities";
+import {
+  ReminderStatusSchema,
+  setReminderStatus,
+} from "../../server/schedules/manage";
 import {
   DirectoryProfileSchema,
   UsernameSchema,
@@ -36,18 +41,23 @@ import {
   LearnedMemoryWriteSchema,
 } from "../../server/memory/learned";
 
-const workspaceProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  const actor = await serverRuntime.runPromise(
-    resolveWorkspaceActor(ctx.requestHeaders).pipe(
-      Effect.catchTag("WorkspaceAccessDenied", () =>
-        Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
-      )
-    )
-  );
-  return next({ ctx: { actor } });
-});
-
 export const workspacesRouter = {
+  rooms: workspaceRoomsRouter,
+  ...workspaceAgentsRouter,
+  schedules: {
+    setStatus: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(ReminderStatusSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          setReminderStatus(ctx.actor, input).pipe(
+            Effect.catchTag("ScheduleChanged", () =>
+              Effect.fail(new TRPCError({ code: "CONFLICT" }))
+            )
+          ),
+          { signal }
+        )
+      ),
+  },
   profile: {
     read: workspaceProcedure.query(({ ctx, signal }) =>
       serverRuntime.runPromise(readDirectoryProfile(ctx.actor), { signal })

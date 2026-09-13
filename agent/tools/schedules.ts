@@ -2,6 +2,7 @@ import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
 import { z } from "zod";
 import { requireChannelPrincipal } from "../../server/channels/principal";
 import { serverRuntime } from "../../server/runtime";
+import { workspaceActorFromPrincipal } from "../../server/workspaces/access";
 import { resolveModeValue } from "@agent/lib/mode";
 import { scheduledReportIdentity } from "@agent/lib/schedules/identity";
 import { postInternalRequest } from "@agent/lib/internal-request";
@@ -152,6 +153,14 @@ async function pendingScheduledRun(context: ToolContext, runId: string) {
 
 async function authorizedScheduleOwner(context: ToolContext) {
   const owner = scheduleOwner(context);
+  if (
+    context.session.auth.current?.authenticator === "authjs" ||
+    context.session.auth.current?.attributes.workspaceKind === "company"
+  ) {
+    await serverRuntime.runPromise(
+      workspaceActorFromPrincipal(context.session.auth.current)
+    );
+  }
   const channel = owner.conversation.conversationChannel;
   if (channel === "telegram" || channel === "kapso") {
     await serverRuntime.runPromise(

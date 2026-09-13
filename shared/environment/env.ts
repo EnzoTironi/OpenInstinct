@@ -88,6 +88,25 @@ export const env = createEnv({
     BLOB_READ_WRITE_TOKEN: requiredValue.optional(),
     BLOB_STORE_ID: requiredValue.optional(),
     ZOEN_MEM0_URL: z.url().optional(),
+    ZOEN_MATRIX_URL: z.url().optional(),
+    ZOEN_MATRIX_SERVER_NAME: z
+      .string()
+      .regex(/^[a-z0-9.-]+$/)
+      .optional(),
+    ZOEN_MATRIX_AS_TOKEN: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {
+          disallowEncode: true,
+        })
+      )
+    ),
+    ZOEN_MATRIX_HS_TOKEN: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {
+          disallowEncode: true,
+        })
+      )
+    ),
     ZOEN_MEM0_API_KEY: Schema.toStandardSchemaV1(
       Schema.optional(
         Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {

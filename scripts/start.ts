@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { requireServerPort } from "./server-ports.ts";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Config, Effect, FileSystem, Schedule, Schema } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
@@ -73,6 +74,8 @@ const start = Command.make(
       });
     }
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    yield* requireServerPort("127.0.0.1", evePort);
+    yield* requireServerPort(hostname, port);
     const capacity = Schema.Int.check(Schema.isGreaterThan(0));
     const concurrency = yield* Config.schema(
       capacity,
