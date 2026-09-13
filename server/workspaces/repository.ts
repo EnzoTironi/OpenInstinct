@@ -1,7 +1,16 @@
+import { readAgentGrantCapabilities } from "./bots";
+import {
+  ontologyPath,
+  type OntologyActionSchema,
+} from "@shared/workspaces/ontology";
 import { createHash } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { Context, Effect, Layer, Schema } from "effect";
-import { requireWorkspaceAccess, type WorkspaceActorSchema } from "./access";
+import {
+  requireWorkspaceAccess,
+  WorkspaceAccessDenied,
+  type WorkspaceActorSchema,
+} from "./access";
 import {
   capabilitiesPath,
   WorkspaceCapabilitiesSchema,
@@ -53,6 +62,26 @@ const importSourceSchema = Schema.Struct({
   bytes: Schema.Uint8Array.check(Schema.isMaxLength(10_485_760)),
 });
 
+/** Shared executions never receive the owner's private profile or old versions. */
+const visibleInSharedExecution = (path: string) =>
+  path.startsWith("knowledge/") ||
+  path.startsWith("ontology/") ||
+  path.startsWith("skills/") ||
+  [
+    capabilitiesPath,
+    "agent/SOUL.md",
+    "agent/IDENTITY.md",
+    "agent/AGENTS.md",
+  ].includes(path);
+const visibleToGrant = (path: string, grants: readonly string[] | null) =>
+  grants === null ||
+  path === capabilitiesPath ||
+  (path.startsWith("ontology/")
+    ? grants.includes("ontology")
+    : grants.includes("files"));
+const sharedExecution = (actor: typeof WorkspaceActorSchema.Type) =>
+  !!(actor.agentGrantId ?? actor.groupBindingId);
+
 const makeRepository = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
   const snapshot = Effect.fn("WorkspaceRepository.snapshot")(function* (
@@ -87,13 +116,21 @@ const makeRepository = Effect.gen(function* () {
         paths: readonly string[]
       ) {
         yield* requireWorkspaceAccess(actor);
+        const grants = actor.agentGrantId
+          ? yield* readAgentGrantCapabilities(actor)
+          : null;
         const stored = yield* snapshot(actor.workspaceId);
         if (!stored) return { revision: null, documents: [] };
         const listing = yield* readWorkspaceGit(stored.bundle, stored.head);
         const documents = yield* readWorkspaceGitSelection(
           stored.bundle,
           stored.head,
-          paths.filter((path) => listing.files.includes(path))
+          paths.filter(
+            (path) =>
+              listing.files.includes(path) &&
+              visibleToGrant(path, grants) &&
+              (!sharedExecution(actor) || visibleInSharedExecution(path))
+          )
         );
         return { revision: stored.head, documents };
       },
@@ -103,11 +140,17 @@ const makeRepository = Effect.gen(function* () {
     search: Effect.fn("WorkspaceRepository.search")(
       function* (actor: typeof WorkspaceActorSchema.Type, query: string) {
         yield* requireWorkspaceAccess(actor);
+        const grants = actor.agentGrantId
+          ? yield* readAgentGrantCapabilities(actor)
+          : null;
         const stored = yield* snapshot(actor.workspaceId);
         if (!stored) return { revision: null, matches: [] };
         return {
           revision: stored.head,
-          matches: yield* searchWorkspaceGit(stored.bundle, stored.head, query),
+          matches:
+            grants !== null && !grants.includes("files")
+              ? []
+              : yield* searchWorkspaceGit(stored.bundle, stored.head, query),
         };
       },
       sql.withTransaction,
@@ -120,12 +163,23 @@ const makeRepository = Effect.gen(function* () {
         revision?: string
       ) {
         yield* requireWorkspaceAccess(actor);
+        const grants = actor.agentGrantId
+          ? yield* readAgentGrantCapabilities(actor)
+          : null;
         const stored = yield* snapshot(actor.workspaceId);
         if (!stored) {
           const files: string[] = [];
           return { revision: null, content: null, files };
         }
         const sha = revision ?? stored.head;
+        if (
+          sharedExecution(actor) &&
+          (sha !== stored.head ||
+            (path !== undefined &&
+              (!visibleInSharedExecution(path) ||
+                !visibleToGrant(path, grants))))
+        )
+          return yield* new WorkspaceAccessDenied();
         const published = yield* sql`SELECT revision FROM workspace_revision
           WHERE workspace_id = ${actor.workspaceId} AND revision = ${sha}`;
         if (published.length !== 1)
@@ -137,13 +191,22 @@ const makeRepository = Effect.gen(function* () {
           path === undefined
             ? listing
             : yield* readWorkspaceGit(stored.bundle, sha, path);
-        return { revision: sha, ...value };
+        return {
+          revision: sha,
+          ...value,
+          files: value.files.filter(
+            (filename) =>
+              visibleToGrant(filename, grants) &&
+              (!sharedExecution(actor) || visibleInSharedExecution(filename))
+          ),
+        };
       },
       sql.withTransaction,
       Effect.catchTag(["SqlError", "SchemaError"], unavailable)
     ),
     history: Effect.fn("WorkspaceRepository.history")(
       function* (actor: typeof WorkspaceActorSchema.Type, path: string) {
+        if (sharedExecution(actor)) return yield* new WorkspaceAccessDenied();
         yield* requireWorkspaceAccess(actor);
         const filename =
           yield* Schema.decodeUnknownEffect(WorkspacePathSchema)(path);
@@ -160,6 +223,7 @@ const makeRepository = Effect.gen(function* () {
     ),
     export: Effect.fn("WorkspaceRepository.export")(
       function* (actor: typeof WorkspaceActorSchema.Type) {
+        if (sharedExecution(actor)) return yield* new WorkspaceAccessDenied();
         yield* requireWorkspaceAccess(actor);
         return yield* snapshot(actor.workspaceId);
       },
@@ -168,6 +232,7 @@ const makeRepository = Effect.gen(function* () {
     ),
     source: Effect.fn("WorkspaceRepository.source")(
       function* (actor: typeof WorkspaceActorSchema.Type, revision: string) {
+        if (sharedExecution(actor)) return yield* new WorkspaceAccessDenied();
         yield* requireWorkspaceAccess(actor);
         const sha =
           yield* Schema.decodeUnknownEffect(GitRevisionSchema)(revision);
@@ -188,11 +253,23 @@ const makeRepository = Effect.gen(function* () {
         source:
           | { readonly kind: "editor" | "agent" }
           | {
+              readonly kind: "ontology";
+              readonly action?: Pick<
+                typeof OntologyActionSchema.Type,
+                "actionId" | "entityId"
+              >;
+            }
+          | {
               readonly kind: "import";
               readonly filename: string;
               readonly bytes: Uint8Array;
             } = { kind: "editor" }
       ) {
+        if (
+          actor.agentGrantId ||
+          (raw.path === ontologyPath && source.kind !== "ontology")
+        )
+          return yield* new WorkspaceAccessDenied();
         const input = yield* Schema.decodeUnknownEffect(WorkspaceWriteSchema)(
           raw
         ).pipe(
@@ -229,6 +306,7 @@ const makeRepository = Effect.gen(function* () {
                 kind: source.kind,
                 sha256: sourceSha,
                 filename: original?.filename,
+                action: source.kind === "ontology" ? source.action : undefined,
               },
             })
           )
@@ -255,7 +333,7 @@ const makeRepository = Effect.gen(function* () {
           parent: input.expectedRevision,
           path: input.path,
           content: input.content,
-          message: `${input.content === null ? "Remove" : "Update"} ${input.path}`,
+          message: `${input.content === null ? "Remove" : "Update"} ${input.path}\n\nZoen-Metadata: ${JSON.stringify({ actor: actor.userId, operation: input.operationId, action: source.kind === "ontology" ? source.action : undefined })}`,
         });
         return yield* sql.withTransaction(
           Effect.gen(function* () {

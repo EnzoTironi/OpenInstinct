@@ -11,14 +11,15 @@ providers. PostgreSQL is self-hosted; no managed Postgres product is provisioned
 | Web + Eve                | companion-tironi, gru, 2 shared CPUs / 2 GB                                                                         |
 | PostgreSQL 17 + pgvector | companion-pg-prod, gru, 1 shared CPU / 1 GB, encrypted 10 GB volume                                                 |
 | Private Mem0 API         | zoen-memory-tironi, gru, 1 shared CPU / 1 GB                                                                        |
+| Private Matrix           | zoen-matrix-tironi, gru, 1 shared CPU / 1 GB; Synapse 1.160.0, database zoen_matrix                                 |
 | Memory persistence       | PostgreSQL database zoen_memory, separate login; original encrypted 3 GB volume retained for legacy import/recovery |
 | Backups                  | Private Tigris bucket, pgBackRest client-side AES-256 encryption, continuous WAL archive                            |
 | Domain                   | Cloudflare A + AAAA records and Fly TLS certificate for zoen.tironi.xyz                                             |
 | Infrastructure state     | Alchemy Cloudflare remote state, encrypted with a separate key in Cloudflare Secrets Store                          |
 
-All machines remain running. PostgreSQL and memory have no public service or IP.
-Fly private networking carries database and memory traffic. The memory database
-login cannot connect to the application database. Application credentials are
+All machines remain running. PostgreSQL, memory and Matrix have no public service or IP.
+Fly private networking carries their traffic. The memory and Matrix database
+logins cannot connect to the application database. Application credentials are
 Fly vault secrets; they do not enter Git, image layers or public CI artifacts.
 
 This is one database machine, not automatic high availability. A host outage
@@ -45,9 +46,22 @@ service token and does not need an interactive login.
 
 `ZOEN_RELEASE` must be the full tested Git commit SHA. Alchemy builds and pushes
 Linux amd64 images and deploys their immutable digests. Optional
-`ZOEN_POSTGRES_IMAGE`, `ZOEN_MEMORY_IMAGE`, and `ZOEN_WEB_IMAGE` digest references
+`ZOEN_POSTGRES_IMAGE`, `ZOEN_MEMORY_IMAGE`, `ZOEN_MATRIX_IMAGE`, and `ZOEN_WEB_IMAGE` digest references
 support adoption or a deliberate rollback. Keep the database on PostgreSQL major
 17; a major upgrade requires a separate migration and recovery plan.
+
+Alchemy creates separate `zoen_app` and `zoen_migrator` logins with independent
+vault secrets. The runtime has DML and native workflow queue permissions, no DDL,
+superuser, role creation, database creation, replication or RLS bypass. It cannot
+assume the migrator role. Graphile's private queue tables have an explicit runtime
+policy; the application does not become their owner to bypass RLS.
+
+Before switching the web image, the stack takes an incremental backup and runs
+`scripts/migrate-hosted.ts` in a temporary machine with no public services, DNS
+registration or persistent volume. It checks the ordered migration hashes and
+timestamps before and after applying application and native workflow migrations.
+A mismatch fails the release instead of repairing the journal. The temporary
+machine is removed on success or failure; grants are reconciled before web startup.
 
 ```sh
 cd infrastructure
@@ -80,7 +94,8 @@ The database image supervises PostgreSQL and the cron scheduler. Failed initial
 backups do not take the database offline. The external CI probe checks the
 repository itself, fails if the newest backup is older than 150 minutes, and
 checks WAL archive failures, alerts at 85% disk usage, and probes the private
-Mem0 endpoint through the Fly network. GitHub workflow failure notifications provide the
+Mem0 and Matrix endpoints through the Fly network, and verifies application role
+restrictions. GitHub workflow failure notifications provide the
 alert path. Cron execution on GitHub can be delayed; it is an operational probe,
 not a real-time availability SLA.
 
@@ -93,7 +108,8 @@ ZOEN_RECOVERY_RUN=manual-20260913 pnpm recover:production
 
 `recovery.run.ts` creates an encrypted temporary volume and an isolated machine,
 restores from the encrypted object repository, runs pg_amcheck, reports only
-structural results, and deletes both temporary resources. The machine has no
+structural results, and deletes both temporary resources. The proof requires the
+application, Mem0 and Matrix databases and their restricted roles. The machine has no
 public services and is excluded from application DNS. It cannot archive WAL or
 write backups. An optional `ZOEN_RESTORE_TARGET` timestamp selects point-in-time
 recovery. No step changes the live volume or promotes the test machine.
@@ -109,6 +125,8 @@ recoverable independently of the failed PostgreSQL machine.
 `Checks` builds this exact PostgreSQL image, tests encrypted backup, WAL replay,
 pgvector recovery and role isolation, runs the real Mem0 adapter against pgvector,
 and runs application checks, database integration tests and the production build.
+Runtime tests migrate twice as the migrator, execute as the restricted application
+role, deliver an actual Graphile HTTP job, and exercise a real private Synapse.
 
 `Zoen infrastructure` runs only on main, serializes deployments and requires a
 successful complete Checks run on the exact commit before a production deploy.
@@ -120,6 +138,25 @@ Its protected configuration is supplied by `ZOEN_PRODUCTION_ENV` and
 `ZOEN_FLY_OPERATIONS_TOKEN`; no application secrets are required by its probe.
 Rotate Fly deploy/probe tokens before their 90-day expiry. State and backup
 credentials are never included in uploaded artifacts.
+
+## Matrix operations
+
+The app exposes authenticated room screens; Synapse is private and has no public
+registration, federation or media API. Each room is explicitly bound to one
+workspace. Earlier history is visible only from the member's Matrix join event.
+Zoen is activated by a mention. Each message and tool call checks current workspace
+and room membership. A native Eve job reconciles revoked members every minute;
+web access is denied immediately, including while that reconciliation is pending.
+
+Alchemy retains the homeserver signing seed, application-service tokens and database
+password. Reuse these secrets when restoring the database. Rotating the signing seed
+casually changes homeserver identity. Never expose application-service tokens to
+the browser. The callback `/_matrix/app/v1/transactions/*` requires the homeserver
+token even though it is excluded from browser sign-in middleware.
+
+This release provides team rooms inside Zoen. Federation, end-to-end encryption,
+public Matrix-client sign-in and file attachments are not enabled. See
+[Matrix source and license](matrix/README.md).
 
 ## Alchemy compatibility patch
 

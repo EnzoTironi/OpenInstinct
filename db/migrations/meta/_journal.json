@@ -260,6 +260,27 @@
       "when": 1789284000000,
       "tag": "0036_directory-and-invites",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1789297384512,
+      "tag": "0037_keen_redwing",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789298579179,
+      "tag": "0038_thick_taskmaster",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1789315589190,
+      "tag": "0039_matrix_rooms",
+      "breakpoints": true
     }
   ]
 }

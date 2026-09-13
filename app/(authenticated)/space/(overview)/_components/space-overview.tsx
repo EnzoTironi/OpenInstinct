@@ -34,7 +34,7 @@ export function SpaceOverview() {
   const search = useSearchParams();
   const [category, setCategory] = useState<
     "knowledge" | "agent" | "skills" | "plugins"
-  >("knowledge");
+  >(search.get("tab") === "plugins" ? "plugins" : "knowledge");
   const [path, setPath] = useState<string>();
   const [newFile, setNewFile] = useState(false);
   const [name, setName] = useState("");
@@ -289,6 +289,14 @@ export function SpaceOverview() {
         </form>
       )}
       <div className={styles.bottomLinks}>
+        <PanelLink href="/space/knowledge">
+          <FolderOpenIcon />
+          {t("Conhecimento conectado")}
+        </PanelLink>
+        <PanelLink href="/space/bot">
+          <SparklesIcon />
+          {t("Seu bot")}
+        </PanelLink>
         <PanelLink href="/space/team">
           <UsersIcon />
           {t(active?.organizationId ? "Sua equipe" : "Convites")}

@@ -25,6 +25,7 @@ import {
 function interactiveWorkstreamScope(
   context: Pick<MemoryScopeContext, "session">
 ) {
+  if (resolveModeValue(context, { interactive: true }) !== true) return null;
   const caller = context.session.auth.current;
   if (
     caller?.principalType !== "user" ||

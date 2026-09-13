@@ -70,6 +70,20 @@ export default function companionConfig(
                 ...sections,
                 beforeFiles: [
                   ...(sections.beforeFiles ?? []),
+                  {
+                    source: "/_matrix/app/v1/:path*",
+                    destination: `${destination}/_matrix/app/v1/:path*`,
+                  },
+                  {
+                    source: "/agents/:username",
+                    destination: `${destination}/agents/:username`,
+                  },
+                  {
+                    source: "/agents/:username/.well-known/agent-card.json",
+                    // Eve uses route paths as build entry names; a .json suffix
+                    // selects the JSON loader. Keep the public A2A URL canonical.
+                    destination: `${destination}/agents/:username/agent-card`,
+                  },
                   ...["telegram", "kapso"].map((channel) => ({
                     source: `/api/channels/${channel}`,
                     destination: `${destination}/channels/${channel}`,

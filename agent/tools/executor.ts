@@ -1,3 +1,4 @@
+import { invokeGoogleTool } from "../lib/executor-google";
 import { Effect, Schema } from "effect";
 import { defineDynamic, defineTool } from "eve/tools";
 import { serverRuntime } from "../../server/runtime";
@@ -16,7 +17,7 @@ import {
   WorkspacePathSchema,
   GitRevisionSchema,
 } from "../../server/workspaces/git";
-import { createHash } from "node:crypto";
+import { workspaceOperationId } from "../lib/workspace-operation";
 import { toolInputSchema } from "../lib/tool-input-schema";
 
 export default defineDynamic({
@@ -25,8 +26,15 @@ export default defineDynamic({
       const caller = context.session.auth.current;
       if (
         caller?.principalType !== "user" ||
-        !["authjs", "verified-channel"].includes(caller.authenticator) ||
-        caller.attributes.chatKind === "group"
+        ![
+          "authjs",
+          "verified-channel",
+          "a2a",
+          "matrix",
+          "scheduled-worker",
+        ].includes(caller.authenticator) ||
+        (caller.attributes.chatKind === "group" &&
+          !caller.attributes.groupBindingId)
       )
         return null;
       return {
@@ -61,7 +69,9 @@ export default defineDynamic({
                 const actor = yield* workspaceActorFromPrincipal(
                   execution.session.auth.current ?? undefined
                 );
-                return yield* executeWorkspace(actor, code);
+                return yield* executeWorkspace(actor, code, {
+                  invoke: (call) => invokeGoogleTool(call, execution),
+                });
               }),
               { signal: execution.abortSignal }
             ),
@@ -82,17 +92,18 @@ export default defineDynamic({
                 const actor = yield* workspaceActorFromPrincipal(
                   execution.session.auth.current ?? undefined
                 );
+                if (actor.agentGrantId)
+                  return yield* new WorkspaceAccessDenied();
                 if (
                   !(yield* readWorkspaceCapabilities(actor)).enabled.includes(
                     "files"
                   )
                 )
                   return yield* new WorkspaceAccessDenied();
-                const hash = createHash("sha256")
-                  .update(`${execution.session.id}:${execution.callId}`)
-                  .digest("hex");
-                // RFC 9562 version 8 UUID, derived from the durable tool call identity.
-                const operationId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-8${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+                const operationId = workspaceOperationId(
+                  execution.session.id,
+                  execution.callId
+                );
                 return yield* (yield* WorkspaceRepository).write(
                   actor,
                   { ...input, operationId },

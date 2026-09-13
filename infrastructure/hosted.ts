@@ -10,7 +10,12 @@ import { releaseImage } from "./images.ts";
 import { production } from "./production.ts";
 import { appSecrets, webSecretNames } from "./secrets.ts";
 import { backupSecrets } from "./backups.ts";
-import { PrepareMemoryDatabase } from "./database.ts";
+import {
+  PrepareApplicationDatabase,
+  PrepareMemoryDatabase,
+} from "./database.ts";
+import { MigrateApplication } from "./migrations.ts";
+import { provisionMatrix, deployMatrix } from "./matrix.ts";
 
 export const hosted = Effect.gen(function* () {
   const policy = yield* CompanionStagePolicy;
@@ -35,6 +40,16 @@ export const hosted = Effect.gen(function* () {
     name: memoryName,
     orgSlug: production.organization,
   }).pipe(adopt(prod), retain(true));
+  const matrixSecrets = yield* provisionMatrix({
+    stage: policy.stage,
+    organization: production.organization,
+    region,
+    postgresApp,
+    webApp,
+  });
+  const matrixServerName = prod
+    ? "matrix.zoen.tironi.xyz"
+    : `matrix-${policy.stage}.zoen.invalid`;
 
   const password = yield* Config.redacted("COMPANION_POSTGRES_PASSWORD");
   const pgSecret = yield* Fly.Secret("PostgresPassword", {
@@ -43,6 +58,29 @@ export const hosted = Effect.gen(function* () {
     value: password,
   }).pipe(adopt(prod), retain(true));
   const backupVersion = yield* backupSecrets(postgresApp, policy.stage);
+  const applicationPassword = yield* Random("ApplicationDatabasePassword", {
+    bytes: 32,
+  }).pipe(retain(true));
+  const migrationPassword = yield* Random("MigrationDatabasePassword", {
+    bytes: 32,
+  }).pipe(retain(true));
+  const applicationCredential = yield* Fly.Secret(
+    "ApplicationBootstrapPassword",
+    {
+      app: postgresApp,
+      name: "ZOEN_APPLICATION_DATABASE_PASSWORD",
+      value: applicationPassword.text,
+    }
+  ).pipe(retain(true));
+  const migrationCredential = yield* Fly.Secret("MigrationBootstrapPassword", {
+    app: postgresApp,
+    name: "ZOEN_MIGRATION_DATABASE_PASSWORD",
+    value: migrationPassword.text,
+  }).pipe(retain(true));
+  const applicationCredentialVersion = Output.all(
+    applicationCredential.digest,
+    migrationCredential.digest
+  ).pipe(Output.map((values) => values.join(":")));
   const memoryPassword = yield* Random("MemoryDatabasePassword", {
     bytes: 32,
   }).pipe(retain(true));
@@ -100,14 +138,32 @@ export const hosted = Effect.gen(function* () {
       role: "companion-unmanaged-postgres",
       "zoen.secret": pgSecret.digest.pipe(Output.map((value) => value ?? "")),
       "zoen.backups": backupVersion,
+      "zoen.application-roles": applicationCredentialVersion,
       "zoen.memory-password": memoryBootstrapPassword.digest.pipe(
         Output.map((value) => value ?? "")
       ),
+      "zoen.matrix-password": matrixSecrets.databaseVersion,
       "zoen.upgrade-snapshot": preUpgradeSnapshot
         ? preUpgradeSnapshot.snapshotId
         : "new-installation",
     },
   }).pipe(retain(true));
+
+  const applicationDatabase = yield* PrepareApplicationDatabase({
+    app: pgName,
+    machine: postgres.machineId,
+    release: pgImage,
+    credentialVersion: applicationCredentialVersion,
+  });
+  const matrix = yield* deployMatrix({
+    provision: matrixSecrets,
+    postgresApp: pgName,
+    postgresMachine: postgres.machineId,
+    postgresImage: pgImage,
+    webApp: webName,
+    serverName: matrixServerName,
+    region,
+  });
 
   const memoryDatabase = yield* PrepareMemoryDatabase({
     app: pgName,
@@ -175,7 +231,30 @@ export const hosted = Effect.gen(function* () {
   }).pipe(retain(true));
 
   const webSecrets = yield* appSecrets("Web", webApp, webSecretNames);
+  const databaseUrls = yield* Effect.forEach(
+    ["DATABASE_URL", "DATABASE_URL_UNPOOLED"],
+    (name) =>
+      Fly.Secret(`Web${name}`, {
+        app: webApp,
+        name,
+        value: applicationPassword.text.pipe(
+          Output.map((value) =>
+            Redacted.make(
+              `postgresql://zoen_app:${encodeURIComponent(Redacted.value(value))}@${pgName}.internal:5432/${policy.database}`
+            )
+          )
+        ),
+      }).pipe(adopt(prod), retain(true))
+  );
   const webImage = yield* releaseImage("Web", webName, "..");
+  const migrations = yield* MigrateApplication({
+    app: pgName,
+    primary: postgres.machineId,
+    region,
+    database: policy.database,
+    image: webImage,
+    prepared: applicationDatabase,
+  });
   const web = yield* Fly.Machine("Web", {
     app: webApp,
     name: prod ? production.web.name : "web",
@@ -193,6 +272,8 @@ export const hosted = Effect.gen(function* () {
       COMPANION_PUBLIC_BASE_URL: `https://${hostname}`,
       WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3000",
       ZOEN_MEM0_URL: `http://${memoryName}.internal:8000`,
+      ZOEN_MATRIX_URL: `http://${matrixSecrets.name}.internal:8008`,
+      ZOEN_MATRIX_SERVER_NAME: matrixServerName,
     },
     services: [
       {
@@ -219,7 +300,14 @@ export const hosted = Effect.gen(function* () {
       },
     },
     restart: { policy: "always" },
-    metadata: { "zoen.secrets": webSecrets },
+    metadata: {
+      "zoen.secrets": webSecrets,
+      "zoen.migrated-image": migrations.image,
+      "zoen.matrix": matrixSecrets.webVersion,
+      "zoen.runtime-database": Output.all(
+        ...databaseUrls.map((secret) => secret.digest)
+      ).pipe(Output.map((digests) => JSON.stringify(digests))),
+    },
   }).pipe(retain(true));
   const ipv4 = yield* Fly.IpAssignment("WebIpv4", {
     app: webApp,
@@ -254,6 +342,7 @@ export const hosted = Effect.gen(function* () {
     url: `https://${hostname}`,
     postgres: postgres.machineId,
     memory: memory.machineId,
+    matrix: matrix.machineId,
     web: web.machineId,
   };
 }).pipe(Effect.provide(CompanionStagePolicy.layer));

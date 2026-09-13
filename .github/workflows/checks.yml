@@ -66,9 +66,13 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/companion_runtime_test
-      DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@127.0.0.1:5432/companion_runtime_test
+      DATABASE_URL: postgresql://zoen_app:ci-runtime-password@127.0.0.1:5432/companion_runtime_test
+      DATABASE_URL_UNPOOLED: postgresql://zoen_app:ci-runtime-password@127.0.0.1:5432/companion_runtime_test
       BETTER_AUTH_URL: http://127.0.0.1:3000
+      ZOEN_MATRIX_URL: http://127.0.0.1:8008
+      ZOEN_MATRIX_SERVER_NAME: matrix.zoen.test
+      ZOEN_MATRIX_AS_TOKEN: synthetic-matrix-application-service-token-2026
+      ZOEN_MATRIX_HS_TOKEN: synthetic-matrix-homeserver-token-2026
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -109,10 +113,35 @@ jobs:
             -o APT::Get::List-Cleanup="0"
           sudo apt-get install -y ffmpeg
       - name: Migrate application and workflow databases
+        env:
+          DATABASE_URL_UNPOOLED: postgresql://zoen_migrator:ci-migration-password@127.0.0.1:5432/companion_runtime_test
         run: |
-          pnpm db:migrate
-          pnpm workflow:migrate
-          pnpm workflow:migrate
+          bootstrap() {
+            docker exec -i \
+              -e ZOEN_APPLICATION_DATABASE_PASSWORD=ci-runtime-password \
+              -e ZOEN_MIGRATION_DATABASE_PASSWORD=ci-migration-password \
+              '${{ job.services.postgres.id }}' bash < infrastructure/postgres/bootstrap-application.sh
+          }
+          bootstrap
+          node scripts/migrate-hosted.ts
+          node scripts/migrate-hosted.ts
+          bootstrap
+      - name: Start private Matrix homeserver
+        run: |
+          docker exec -i -e ZOEN_MATRIX_DATABASE_PASSWORD=ci-matrix-password \
+            '${{ job.services.postgres.id }}' bash < infrastructure/postgres/bootstrap-matrix.sh
+          docker build -t zoen-matrix-proof infrastructure/matrix
+          docker run -d --name matrix-proof --network host \
+            -e ZOEN_MATRIX_SERVER_NAME -e ZOEN_MATRIX_AS_TOKEN -e ZOEN_MATRIX_HS_TOKEN \
+            -e ZOEN_MATRIX_SIGNING_SECRET=synthetic-matrix-signing-secret-2026 \
+            -e ZOEN_MATRIX_DATABASE_PASSWORD=ci-matrix-password \
+            -e ZOEN_DATABASE_HOST=127.0.0.1 \
+            -e ZOEN_MATRIX_CALLBACK_URL=http://127.0.0.1:4350 zoen-matrix-proof
+          for attempt in {1..60}; do
+            curl --fail --silent http://127.0.0.1:8008/health && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8008/health
       - name: Verify real Postgres storage
         run: pnpm test:runtime
       - name: Build web app and agent

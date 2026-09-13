@@ -14,7 +14,7 @@ import { ConnectionList } from "./_components/connection-list";
 import styles from "../_components/panel.module.css";
 import connections from "./connections.module.css";
 import { accessScopeForUser } from "@shared/identity/access-scope";
-import { PanelLink } from "../_components/panel-link";
+import { TeamConnections } from "./_components/team-connections";
 
 export default async function ConnectionsPage({
   searchParams,
@@ -27,14 +27,7 @@ export default async function ConnectionsPage({
     return (
       <div className={styles.page}>
         <h1 className="type-page-title">{t("Conexões da equipe")}</h1>
-        <p className="type-body">
-          {t(
-            "Os arquivos, skills e memórias deste espaço já estão conectados. Gmail e mensageiros continuam no seu espaço pessoal."
-          )}
-        </p>
-        <div className={styles.actions}>
-          <PanelLink href="/space">{t("Gerenciar este espaço")}</PanelLink>
-        </div>
+        <TeamConnections />
       </div>
     );
   const requestHeaders = await headers();

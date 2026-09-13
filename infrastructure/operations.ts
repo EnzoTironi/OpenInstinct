@@ -57,6 +57,42 @@ const databaseCheck = Effect.gen(function* () {
       })
     )
   )(memory.stdout ?? "");
+  const matrix = yield* Machines.execMachine({
+    app_name: production.database.app,
+    machine_id: production.database.machine,
+    command: [
+      "wget",
+      "-q",
+      "-T",
+      "15",
+      "-O",
+      "-",
+      `http://${production.matrix.app}.internal:8008/health`,
+    ],
+    timeout: 20,
+  });
+  if (matrix.exit_code !== 0 || matrix.stdout?.trim() !== "OK")
+    return yield* Effect.fail(new Error("Private Matrix health check failed"));
+  const roles = yield* Machines.execMachine({
+    app_name: production.database.app,
+    machine_id: production.database.machine,
+    command: [
+      "psql",
+      "-X",
+      "-U",
+      "postgres",
+      "-d",
+      "open_instinct_prod",
+      "-At",
+      "-c",
+      "SELECT (count(*) = 2 AND bool_and(NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls) AND NOT pg_has_role('zoen_app','zoen_migrator','MEMBER'))::text FROM pg_roles WHERE rolname IN ('zoen_app','zoen_migrator')",
+    ],
+    timeout: 20,
+  });
+  if (roles.exit_code !== 0 || roles.stdout?.trim() !== "true")
+    return yield* Effect.fail(
+      new Error("Application database role isolation failed")
+    );
   return yield* Effect.log(health);
 });
 

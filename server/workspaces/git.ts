@@ -9,7 +9,7 @@ export const workspaceGitLimits = {
 } as const;
 export const WorkspacePathSchema = Schema.String.check(
   Schema.isPattern(
-    /^(?:(?:knowledge|skills|agent)\/[a-zA-Z0-9][a-zA-Z0-9_./-]{0,180}\.md|plugins\/workspace\.json)$/
+    /^(?:(?:knowledge|skills|agent)\/[a-zA-Z0-9][a-zA-Z0-9_./-]{0,180}\.md|(?:plugins|ontology)\/workspace\.json)$/
   ),
   Schema.isPattern(/^(?!.*(?:\/\.|\.\.|\/\/)).*$/)
 );

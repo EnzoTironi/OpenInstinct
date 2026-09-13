@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainIcon, FolderOpenIcon } from "lucide-react";
+import { BrainIcon, FolderOpenIcon, MailIcon, NetworkIcon } from "lucide-react";
 import { api } from "@web/trpc/client";
 import { useI18n } from "@web/i18n/context";
 import {
@@ -19,7 +19,12 @@ export function PluginSettings({ mayManage }: { readonly mayManage: boolean }) {
       <div className={styles.list}>
         {workspacePlugins.map((plugin) => {
           const enabled = settings.data?.enabled.includes(plugin.id) ?? false;
-          const Icon = plugin.id === "files" ? FolderOpenIcon : BrainIcon;
+          const Icon = {
+            files: FolderOpenIcon,
+            memory: BrainIcon,
+            google: MailIcon,
+            ontology: NetworkIcon,
+          }[plugin.id];
           return (
             <button
               key={plugin.id}

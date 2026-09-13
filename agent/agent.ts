@@ -35,7 +35,10 @@ export default defineAgent({
         if (!caller) throw new Error("An authenticated user is required.");
         if (
           caller.authenticator === "authjs" ||
-          caller.authenticator === "verified-channel"
+          caller.authenticator === "verified-channel" ||
+          caller.authenticator === "a2a" ||
+          caller.authenticator === "matrix" ||
+          caller.authenticator === "scheduled-worker"
         ) {
           await serverRuntime.runPromise(workspaceActorFromPrincipal(caller));
         }
@@ -45,7 +48,12 @@ export default defineAgent({
             requireChannelPrincipal(channel, caller)
           );
         }
-        const scope = scopeFromPrincipal(caller);
+        const scope =
+          caller.authenticator === "a2a" || caller.attributes.groupBindingId
+            ? await serverRuntime.runPromise(
+                workspaceActorFromPrincipal(caller)
+              )
+            : scopeFromPrincipal(caller);
         return (
           (await Effect.runPromise(installationModel)) ??
           (await getGatewayModel(scope))

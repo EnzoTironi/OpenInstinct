@@ -4,7 +4,7 @@ import { Config, Effect, Option } from "effect";
 
 /** An explicit digest supports adopting a deployment or rolling back without rebuilding it. */
 export const releaseImage = Effect.fn(function* (
-  component: "Postgres" | "Web" | "Memory",
+  component: "Postgres" | "Web" | "Memory" | "Matrix",
   appName: string,
   context: string
 ) {

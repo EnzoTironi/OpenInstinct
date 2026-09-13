@@ -10,6 +10,8 @@ import { readWorkspaceCapabilities } from "../workspaces/capabilities";
 import { LearnedMemory } from "../memory/learned";
 import { runWorkspaceCode } from "./runtime";
 import type { SandboxToolInvoker } from "../../vendor/executor/core";
+import { readOntology } from "../workspaces/ontology";
+import { readAgentGrantCapabilities } from "../workspaces/bots";
 
 const tools = [
   {
@@ -39,6 +41,33 @@ const tools = [
       "Find this person's private learned memories within the current workspace.",
     input: "{ query: string }",
   },
+  {
+    path: "workspace.ontology.read",
+    plugin: "ontology",
+    description:
+      "Read typed entities, relations, action definitions and source revisions.",
+    input: "{}",
+  },
+  {
+    path: "workspace.google.mail.search",
+    plugin: "google",
+    description:
+      "Find email metadata in this workspace's connected Google account.",
+    input: "{ query: string }",
+  },
+  {
+    path: "workspace.google.calendar.list",
+    plugin: "google",
+    description:
+      "List this workspace's calendar events in an explicit time range.",
+    input: "{ timeMin: string, timeMax: string, timezone: string }",
+  },
+  {
+    path: "workspace.google.contacts.search",
+    plugin: "google",
+    description: "Find contacts in this workspace's connected Google account.",
+    input: "{ query: string }",
+  },
 ] as const;
 
 const Query = Schema.Struct({
@@ -60,16 +89,26 @@ export const readExecutorCatalog = Effect.fn("Executor.catalog")(function* (
   actor: typeof WorkspaceActorSchema.Type
 ) {
   const capabilities = yield* readWorkspaceCapabilities(actor);
+  const granted = actor.agentGrantId
+    ? yield* readAgentGrantCapabilities(actor)
+    : capabilities.enabled;
   return {
     revision: capabilities.revision,
-    tools: tools.filter((tool) => capabilities.enabled.includes(tool.plugin)),
+    tools: tools.filter(
+      (tool) =>
+        capabilities.enabled.includes(tool.plugin) &&
+        granted.includes(tool.plugin) &&
+        (!(actor.agentGrantId ?? actor.groupBindingId) ||
+          tool.plugin !== "memory")
+    ),
   };
 });
 
 const invokeWorkspaceTool = Effect.fn("Executor.invokeWorkspaceTool")(
   function* (
     actor: typeof WorkspaceActorSchema.Type,
-    call: Parameters<SandboxToolInvoker["invoke"]>[0]
+    call: Parameters<SandboxToolInvoker["invoke"]>[0],
+    providers?: SandboxToolInvoker
   ) {
     // Admission uses the installed catalog, never verb/name heuristics. Recheck
     // current membership and settings even when an execution was already started.
@@ -115,21 +154,41 @@ const invokeWorkspaceTool = Effect.fn("Executor.invokeWorkspaceTool")(
         if (memory.needsAttention) return yield* new ExecutorAccessDenied();
         return { results: memory.results.slice(0, 8) };
       }
+      case "workspace.ontology.read": {
+        yield* Schema.decodeUnknownEffect(Schema.Struct({}))(call.args, {
+          onExcessProperty: "error",
+        });
+        const result = yield* readOntology(actor);
+        return { graph: result.graph, revision: result.revision };
+      }
       default:
+        if (
+          call.path.startsWith("workspace.google.") &&
+          providers &&
+          !actor.agentGrantId &&
+          !actor.groupBindingId
+        )
+          return yield* providers.invoke(call);
         return yield* new ExecutorAccessDenied();
     }
   }
 );
 
 export const executeWorkspace = Effect.fn("Executor.executeWorkspace")(
-  function* (actor: typeof WorkspaceActorSchema.Type, code: string) {
+  function* (
+    actor: typeof WorkspaceActorSchema.Type,
+    code: string,
+    providers?: SandboxToolInvoker
+  ) {
     yield* requireWorkspaceAccess(actor);
     const context = yield* Effect.context<
       WorkspaceRepository | LearnedMemory | PgClient.PgClient
     >();
     return yield* runWorkspaceCode(code, {
       invoke: (call) =>
-        invokeWorkspaceTool(actor, call).pipe(Effect.provide(context)),
+        invokeWorkspaceTool(actor, call, providers).pipe(
+          Effect.provide(context)
+        ),
     });
   }
 );

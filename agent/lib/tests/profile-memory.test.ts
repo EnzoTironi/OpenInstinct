@@ -15,6 +15,21 @@ import { accessScopeForUser } from "@shared/identity/access-scope";
 const derivedWorkspaceId = accessScopeForUser("better-auth:user").workspaceId;
 
 describe("profile memory", () => {
+  it.each(["a2a", "matrix"])(
+    "omits personal memory before resolving a %s shared principal",
+    async (authenticator) => {
+      const context = memoryContext(
+        userPrincipal(authenticator, derivedWorkspaceId)
+      );
+      expect(resolveProfileMemoryScope(context)).toBeNull();
+      expect(personalInfoMemory.scope(context)).toBeNull();
+      expect(
+        await personalInfoMemory.provider.tools(
+          memoryToolsContext(userPrincipal(authenticator, derivedWorkspaceId))
+        )
+      ).toBeNull();
+    }
+  );
   it("shares the canonical workspace across verified authenticators", () => {
     const workspaceId = derivedWorkspaceId;
     expect(
