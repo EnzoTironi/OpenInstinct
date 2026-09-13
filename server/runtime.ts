@@ -1,5 +1,8 @@
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { PgClient } from "@effect/sql-pg";
+import { WorkspaceRepository } from "./workspaces/repository";
+import { LearnedMemory } from "./memory/learned";
+import { Mem0 } from "./memory/mem0";
 import { Config, Layer, ManagedRuntime } from "effect";
 import { ChannelAccounts } from "./accounts";
 import { NativeDeviceAuth } from "./accounts/device";
@@ -23,6 +26,11 @@ const infrastructure = Layer.mergeAll(
   BrowserWorkerAccess.layer,
   Messaging.layer,
   MemoryDocuments.layer,
+  WorkspaceRepository.layer,
+  LearnedMemory.layer.pipe(
+    Layer.provide(Mem0.layer),
+    Layer.provide(WorkspaceRepository.layer)
+  ),
   PersonalMemory.layer,
   Telegram.layer,
   Kapso.layer,

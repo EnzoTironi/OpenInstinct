@@ -1,10 +1,15 @@
+import { browserWorkspaceHeaders } from "@web/workspaces/navigation";
 import { Client, type MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 
 const eventsPerRead = 128;
 const messagesPerPage = 4;
 const tailIndexHeader = "x-eve-stream-tail-index";
-const client = new Client({ host: "" });
+const client = new Client({
+  host: "",
+  headers: browserWorkspaceHeaders,
+  redirect: "error",
+});
 const messageStreamEventSchema = z.custom<MessageStreamEvent>(
   (value) =>
     z
@@ -32,7 +37,7 @@ export async function readLatestSessionHistory(
       includeTailIndex: true,
       startIndex: -eventsPerRead,
     }),
-    { cache: "no-store", signal }
+    { cache: "no-store", signal, headers: browserWorkspaceHeaders() }
   );
   if (!response.ok) throw await streamResponseError(response);
 

@@ -24,7 +24,7 @@ describe("root and worker capability boundaries", () => {
       "calendar.ts",
       "contacts.ts",
       "device-auth.ts",
-      "email-quarantine.ts",
+      "executor.ts",
       "gmail.ts",
       "messaging.ts",
       "personal-memory.ts",

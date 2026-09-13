@@ -23,6 +23,8 @@
     "perf": "error"
   },
   "ignorePatterns": [
+    // Pinned third-party kernel: retain upstream style; typecheck and run its tests.
+    "vendor/executor/**",
     "tools/oxlint/anti-slop/**",
     // Manual live TG Bot API probe; fixture harness is the CI proof.
     "scripts/groups-live-e2e.ts"

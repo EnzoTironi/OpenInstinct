@@ -40,6 +40,13 @@ After Eve 0.52 + Graphile fencing, the qualified SIGKILL path reclaims orphaned 
      (e.g. `ask_question`) mark `runtimeEntry` so resolve-tool can load authored
      schemas after SIGKILL/cold start. Upstream 0.52 only required runtimeEntry
      when `hasExecute`.
+  5. Zoen's virtual shell uses an empty network allowlist. The stock just-bash
+     binding enables unrestricted internet access; this patch disables that
+     implicit bridge. External services remain available through authenticated
+     application tools. `agent/sandbox.ts` pins this backend on every host.
+  6. Runtime error inspection records a bounded message/stack instead of inspecting
+     arbitrary provider error properties. Model request bodies and their private
+     context must not enter logs or traces through `requestBodyValues`.
 
 - `@workflow/world@5.0.0-beta.32` — workflow recovery / acceptance cohort.
 - `@workflow/world-postgres@5.0.0-beta.39` — PGWorld renewable worker leases,

@@ -9,13 +9,31 @@ import { serverRuntime } from "../../../server/runtime";
 import { readGoogleWorkspaceConnection } from "../../../server/google-workspace";
 import { PanelIntro } from "../_components/panel-intro";
 import styles from "../_components/panel.module.css";
+import { accessScopeForUser } from "@shared/identity/access-scope";
+import { PanelLink } from "../_components/panel-link";
 
 export default async function MailPage() {
   const { t } = await getI18n();
+  const scope = await requireRequestScope();
+  if (scope.workspaceId !== accessScopeForUser(scope.userId).workspaceId)
+    return (
+      <div className={styles.page}>
+        <PanelIntro
+          image="/marketing/panel/zoen-mail.jpg"
+          title={t("Cada coisa no seu espaço.")}
+          description={t(
+            "Seu Gmail pessoal continua no espaço pessoal. Você pode preparar textos com os arquivos da equipe."
+          )}
+        />
+        <div className={styles.actions}>
+          <Button nativeButton={false} render={<PanelLink href="/chat" />}>
+            {t("Abrir conversa")}
+          </Button>
+        </div>
+      </div>
+    );
   const connection = await serverRuntime.runPromise(
-    readGoogleWorkspaceConnection(await requireRequestScope()).pipe(
-      Effect.result
-    )
+    readGoogleWorkspaceConnection(scope).pipe(Effect.result)
   );
   const connected =
     Result.isSuccess(connection) && connection.success.state === "connected";

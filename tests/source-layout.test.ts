@@ -33,6 +33,7 @@ describe("source layout", () => {
       "hooks",
       "i18n",
       "trpc",
+      "workspaces",
     ]);
     expect(files("web")).toEqual([]);
     expect(directories("shared")).toEqual([
@@ -45,6 +46,7 @@ describe("source layout", () => {
       "schedules",
       "user-profile",
       "vault",
+      "workspaces",
       "workstreams",
     ]);
     expect(files("shared")).toEqual([]);

@@ -6,7 +6,7 @@ import {
   type ChatSummary,
   type SaveChat,
 } from "@shared/chat/schema";
-import { chats, db } from "@db";
+import { agentSessions, chats, db } from "@db";
 import { ensureScope } from "./scope";
 import { waitForSessionOwnership } from "./sessions";
 
@@ -33,15 +33,28 @@ function toChatSummary(row: z.infer<typeof chatRowSchema>): ChatSummary {
 }
 
 export async function listChats(scope: AccessScope) {
-  const rows = chatRowSchema
-    .array()
-    .parse(
-      await db
-        .select()
-        .from(chats)
-        .where(eq(chats.workspaceId, scope.workspaceId))
-        .orderBy(desc(chats.updatedAt))
-    );
+  const rows = chatRowSchema.array().parse(
+    await db
+      .select({
+        channel: chats.channel,
+        costUsd: chats.costUsd,
+        createdAt: chats.createdAt,
+        inputTokens: chats.inputTokens,
+        outputTokens: chats.outputTokens,
+        sessionId: chats.sessionId,
+        title: chats.title,
+        updatedAt: chats.updatedAt,
+      })
+      .from(chats)
+      .innerJoin(agentSessions, eq(agentSessions.sessionId, chats.sessionId))
+      .where(
+        and(
+          eq(chats.workspaceId, scope.workspaceId),
+          eq(agentSessions.createdByUserId, scope.userId)
+        )
+      )
+      .orderBy(desc(chats.updatedAt))
+  );
   return chatListSchema.parse(rows.map(toChatSummary));
 }
 

@@ -4,7 +4,7 @@ import {
   emailRegister,
   emailSearch,
   emailSync,
-} from "@agent/tools/email-quarantine";
+} from "../../../server/operon/legacy-tools";
 import { expect, it } from "vitest";
 
 it("does gate register on approval and leaves connect, sync, and search open", () => {

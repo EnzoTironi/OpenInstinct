@@ -4,9 +4,26 @@ import * as AuthSession from "@db/services/auth/session";
 import * as SessionService from "@db/services/sessions";
 import { authSessionFor } from "@tests/helpers/auth-session";
 import eveChannel, { sessionIdFromPath } from "@agent/channels/eve";
+import * as WorkspaceSession from "../../../server/workspaces/session";
+import { Effect } from "effect";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 
 const getAuthSessionMock = vi.spyOn(AuthSession, "getAuthSession");
 const isSessionOwnedMock = vi.spyOn(SessionService, "isSessionOwned");
+// These route guards exercise the pure mocked authority result. Database
+// authorization itself is covered by the real PostgreSQL workspace suite.
+vi.mock("../../../server/runtime", async () => {
+  const effectModule = await import("effect");
+  return { serverRuntime: { runPromise: effectModule.Effect.runPromise } };
+});
+vi.spyOn(WorkspaceSession, "resolveWorkspaceActor").mockImplementation(() =>
+  Effect.succeed({
+    ...accessScopeForUser("better-auth:user-1"),
+    authSessionId: "session-user-1",
+    role: "owner",
+    organizationId: null,
+  })
+);
 
 beforeEach(() => {
   vi.useFakeTimers();

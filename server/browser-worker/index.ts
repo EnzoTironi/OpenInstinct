@@ -4,6 +4,7 @@ import type { SessionAuthContext } from "eve/context";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { scopeFromPrincipal } from "../../shared/identity/principal-scope";
+import { workspaceActorFromPrincipal } from "../workspaces/access";
 import {
   BrowserWorkerAccessError,
   requireBrowserWorkerChannelIdentity,
@@ -26,10 +27,20 @@ const authorize = Effect.fn("BrowserWorkerAccess.authorize")(
       catch: () => new BrowserWorkerAccessError({ reason: "unauthenticated" }),
     });
     const canonical = accessScopeForUser(scope.userId);
-    if (canonical.workspaceId !== scope.workspaceId)
+    if (
+      canonical.workspaceId !== scope.workspaceId &&
+      principal.attributes.workspaceKind !== "company"
+    )
       return yield* new BrowserWorkerAccessError({
         reason: "unauthenticated",
       });
+    if (canonical.workspaceId !== scope.workspaceId) {
+      yield* workspaceActorFromPrincipal(principal).pipe(
+        Effect.mapError(
+          () => new BrowserWorkerAccessError({ reason: "unauthenticated" })
+        )
+      );
+    }
 
     if (principal.authenticator === "scheduled-worker") {
       const runId = yield* Schema.decodeUnknownEffect(identifier)(

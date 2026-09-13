@@ -31,7 +31,13 @@ export async function proxy(request: NextRequest) {
   }
 
   if (await getAuthSession(request.headers)) {
-    return NextResponse.next();
+    const headers = new Headers(request.headers);
+    if (!pathname.startsWith("/api/") && !pathname.startsWith("/eve/")) {
+      const workspace = request.nextUrl.searchParams.get("space");
+      if (workspace) headers.set("x-zoen-workspace", workspace);
+      else headers.delete("x-zoen-workspace");
+    }
+    return NextResponse.next({ request: { headers } });
   }
 
   // Unauthenticated visitors hitting home see the marketing landing.

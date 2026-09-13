@@ -28,6 +28,7 @@ function resolvePersonalInfoAccessScope(
     context.session.auth.initiator,
   ].find((principal) => {
     if (principal?.principalType !== "user") return false;
+    if (principal.attributes.workspaceKind === "company") return false;
     return z.string().safeParse(principal.attributes.workspaceId).success;
   });
 

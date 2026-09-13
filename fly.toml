@@ -33,7 +33,9 @@ cpus = 2
 
 [checks]
 [checks.alive]
-type = "tcp"
+type = "http"
+method = "get"
+path = "/eve/v1/health"
 port = 3000
 interval = "15s"
 timeout = "5s"

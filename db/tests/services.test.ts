@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Database from "@db";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import * as schema from "../schema";
 import {
   browserTraceDomains as browserTraceDomainsTable,
@@ -31,6 +32,7 @@ describe("database services", () => {
     await applyChatChannelMigration(client);
     await applyOrgWorkspaceRbacMigration(client);
     await applyOrgSsoAuditErasureMigration(client);
+    await client.exec("ALTER TABLE workspaces ADD COLUMN display_name text");
 
     const pgliteDatabase = drizzle(client, { schema });
     // SAFETY: PGlite implements the query-builder surface exercised by these services despite using a different Drizzle driver.
@@ -59,8 +61,8 @@ describe("database services", () => {
       import("@db/services/scope"),
       import("@db/services/vault"),
     ]);
-    const alice = { userId: "alice", workspaceId: "workspace:alice" };
-    const bob = { userId: "bob", workspaceId: "workspace:bob" };
+    const alice = accessScopeForUser("alice");
+    const bob = accessScopeForUser("bob");
 
     await scope.ensureScope(alice);
     await scope.ensureScope(bob);

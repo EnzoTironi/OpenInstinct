@@ -1,0 +1,257 @@
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  margin: 22px 0;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 20px;
+  background: rgb(255 255 255 / 3%);
+}
+.tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 4px;
+  border-radius: 15px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  cursor: pointer;
+}
+.tabs svg {
+  width: 17px;
+  height: 17px;
+}
+.tabs [aria-selected="true"] {
+  background: rgb(255 255 255 / 11%);
+  color: var(--foreground);
+}
+.list {
+  display: grid;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 24px;
+  overflow: hidden;
+}
+.list:empty {
+  display: none;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 80px;
+  padding: 18px;
+  width: 100%;
+  text-align: left;
+  background: rgb(255 255 255 / 3%);
+  cursor: pointer;
+}
+.row + .row {
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+.row:hover {
+  background: rgb(255 255 255 / 7%);
+}
+.row:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+.row > svg:first-child {
+  width: 24px;
+  height: 24px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+.row > svg:last-child {
+  width: 17px;
+  height: 17px;
+  margin-left: auto;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.row > .toggle {
+  margin-left: auto;
+  flex: 0 0 42px;
+  height: 26px;
+  border-radius: 20px;
+  padding: 3px;
+  background: rgb(255 255 255 / 12%);
+}
+.toggle > span {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--foreground);
+  transition: transform 180ms ease;
+}
+.toggle[data-active="true"] {
+  background: #658657;
+}
+.toggle[data-active="true"] > span {
+  transform: translateX(16px);
+}
+.row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.empty {
+  text-align: center;
+  color: var(--muted-foreground);
+  margin: 30px 0;
+}
+.actions,
+.bottomLinks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 26px 0 12px;
+  flex-wrap: wrap;
+}
+.bottomLinks {
+  justify-content: space-between;
+  margin-top: 32px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.bottomLinks a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 0;
+}
+.bottomLinks svg {
+  width: 16px;
+  height: 16px;
+}
+.create {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+.editor {
+  padding: 4px 20px 24px;
+}
+.editorBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.filename {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 16px;
+}
+.document {
+  min-height: 42dvh;
+  field-sizing: fixed;
+  resize: vertical;
+  padding: 20px;
+  background: rgb(255 255 255 / 3%);
+  border-radius: 20px;
+  font:
+    14px/1.8 ui-monospace,
+    monospace;
+}
+.saveBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 20px;
+}
+.caption {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  max-width: 210px;
+}
+.error {
+  color: var(--destructive);
+  margin-top: 16px;
+  font-size: 14px;
+}
+.history {
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 20px;
+  margin-bottom: 16px;
+  padding: 14px;
+  max-height: 35dvh;
+  overflow-y: auto;
+}
+.historyRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.historyRow svg {
+  width: 16px;
+  height: 16px;
+}
+.historyRow small {
+  margin-left: auto;
+  opacity: 0.6;
+}
+.version pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.upload {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 28px;
+  padding: 38px 20px;
+  border: 1px dashed rgb(255 255 255 / 25%);
+  border-radius: 28px;
+  text-align: center;
+  background: rgb(255 255 255 / 4%);
+  overflow-wrap: anywhere;
+}
+.upload > svg {
+  width: 36px;
+  height: 36px;
+  color: var(--muted-foreground);
+}
+.upload small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.upload input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.upload:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (min-width: 600px) {
+  .editor {
+    padding: 4px 32px 28px;
+  }
+}

@@ -1,6 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { Schema } from "effect";
-import type { AccessScope } from "@shared/identity/access-scope";
+import {
+  accessScopeForUser,
+  type AccessScope,
+} from "@shared/identity/access-scope";
 import { db, workspaceMemberships, workspaces } from "@db";
 
 class ScopeAccessDenied extends Schema.TaggedError<ScopeAccessDenied>()(
@@ -12,11 +15,14 @@ class ScopeAccessDenied extends Schema.TaggedError<ScopeAccessDenied>()(
 export async function ensureScope(scope: AccessScope) {
   const createdAt = new Date();
   await db.transaction(async (transaction) => {
-    const created = await transaction
-      .insert(workspaces)
-      .values({ createdAt, id: scope.workspaceId })
-      .onConflictDoNothing({ target: workspaces.id })
-      .returning({ id: workspaces.id });
+    const created =
+      scope.workspaceId === accessScopeForUser(scope.userId).workspaceId
+        ? await transaction
+            .insert(workspaces)
+            .values({ createdAt, id: scope.workspaceId })
+            .onConflictDoNothing({ target: workspaces.id })
+            .returning({ id: workspaces.id })
+        : [];
     if (created.length === 1) {
       await transaction.insert(workspaceMemberships).values({
         createdAt,

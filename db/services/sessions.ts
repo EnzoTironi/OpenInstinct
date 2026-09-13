@@ -36,6 +36,7 @@ export async function isSessionOwned(scope: AccessScope, sessionId: string) {
     .where(
       and(
         eq(agentSessions.workspaceId, scope.workspaceId),
+        eq(agentSessions.createdByUserId, scope.userId),
         eq(agentSessions.sessionId, sessionId)
       )
     )

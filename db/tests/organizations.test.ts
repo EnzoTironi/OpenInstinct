@@ -23,6 +23,7 @@ describe("C01 organizations service", () => {
     for (const migration of [
       "0000_fluffy_the_spike.sql",
       "0029_org-workspace-rbac.sql",
+      "0032_executor-workspaces.sql",
     ]) {
       await applyMigration(client, migration);
     }

@@ -6,7 +6,12 @@ import { accessScopeForUser } from "@shared/identity/access-scope";
 const identifier = Schema.NonEmptyString.check(Schema.isTrimmed());
 const decodePrincipal = Schema.decodeUnknownResult(
   Schema.Struct({
-    attributes: Schema.Struct({ workspaceId: identifier }),
+    attributes: Schema.Struct({
+      workspaceId: identifier,
+      workspaceKind: Schema.optionalKey(
+        Schema.Literals(["personal", "company"])
+      ),
+    }),
     id: Schema.optionalKey(identifier),
     principalId: Schema.optionalKey(identifier),
   })
@@ -39,6 +44,14 @@ export function scopeFromPrincipal(
     });
   }
   const scope = accessScopeForUser(userId);
+  // This marker is issued only by an authenticated route after live membership
+  // validation. Resource services still recheck membership at execution time.
+  if (
+    principal.attributes.workspaceKind === "company" &&
+    !principal.attributes.workspaceId.startsWith("personal:")
+  ) {
+    return { userId, workspaceId: principal.attributes.workspaceId };
+  }
   if (scope.workspaceId !== principal.attributes.workspaceId) {
     throw new PrincipalScopeError({
       message: "The workspace does not belong to the authenticated user.",

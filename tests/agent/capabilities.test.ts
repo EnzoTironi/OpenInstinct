@@ -7,21 +7,12 @@ import workstreamMemory from "@agent/memory/workstreams";
 import browserAgent from "@agent/subagents/browser-agent/agent";
 import calendar from "@agent/tools/calendar";
 import contacts from "@agent/tools/contacts";
-import emailQuarantine from "@agent/tools/email-quarantine";
 import gmail from "@agent/tools/gmail";
 import messaging from "@agent/tools/messaging";
 import schedules from "@agent/tools/schedules";
 import vault from "@agent/tools/vault";
 
-const groupedTools = [
-  calendar,
-  contacts,
-  emailQuarantine,
-  gmail,
-  messaging,
-  schedules,
-  vault,
-];
+const groupedTools = [calendar, contacts, gmail, messaging, schedules, vault];
 
 describe("authored mode capability matrix", () => {
   it("gives interactive turns the authored coordinator capabilities", async () => {
@@ -31,10 +22,6 @@ describe("authored mode capability matrix", () => {
       "calendar-create-event",
       "calendar-list-events",
       "contacts-search",
-      "email-connect",
-      "email-register",
-      "email-search",
-      "email-sync",
       "gmail-read-thread",
       "gmail-search",
       "gmail-send",

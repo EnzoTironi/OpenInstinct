@@ -5,10 +5,7 @@ import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const eveTool = readFileSync(
-  join(here, "../../agent/tools/email-quarantine.ts"),
-  "utf8"
-);
+const eveTool = readFileSync(join(here, "legacy-tools.ts"), "utf8");
 const operonDir = here;
 
 it("does keep Eve free of @operon/runtime and a second Better Auth", () => {

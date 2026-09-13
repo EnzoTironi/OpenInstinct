@@ -180,7 +180,7 @@ describe("chat conversation", () => {
     expect(markup).not.toContain("is cancelled");
   });
 
-  it("hides runtime errors from the iMessage transcript", () => {
+  it("shows a safe failure in the default conversation without runtime details", () => {
     const agent = {
       data: { messages: [message("turn-1:user", "Try this")] },
       error: new Error("Internal runtime failure"),
@@ -197,9 +197,47 @@ describe("chat conversation", () => {
     );
 
     expect(markup).toContain("Try this");
-    expect(markup).not.toContain("Request failed");
+    expect(markup).toContain("O pedido falhou");
+    expect(markup).toContain("Não foi possível concluir o pedido.");
     expect(markup).not.toContain("Internal runtime failure");
   });
+
+  it.each([
+    ["complete", "A finished answer", true],
+    ["streaming", "Still composing", false],
+    ["complete", "DELIVERY_COMPLETE", false],
+  ] as const)(
+    "handles an undelivered %s reply: %s",
+    (status, text, visible) => {
+      const agent = {
+        data: {
+          messages: [
+            {
+              id: "turn-1:assistant",
+              role: "assistant",
+              metadata: { status, turnId: "turn-1" },
+              parts: [
+                { type: "reasoning", text: "Private reasoning", state: "done" },
+                { type: "text", text, state: "done" },
+              ],
+            },
+          ],
+        },
+        error: undefined,
+        events: [],
+        respond: async () => undefined,
+        status: "ready",
+      } satisfies Pick<
+        ChatAgent,
+        "data" | "error" | "events" | "respond" | "status"
+      >;
+      const markup = renderToStaticMarkup(
+        <ChatConversation agent={agent} traceView="imessage" />
+      );
+      expect(markup.includes(text)).toBe(visible);
+      expect(markup).not.toContain("Private reasoning");
+    }
+  );
 });
 
 function message(id: string, text: string): EveMessage {

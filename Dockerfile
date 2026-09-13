@@ -2,15 +2,6 @@
 # Alchemy Docker Postgres stays outside this image (see docs/ops/hosted-fly.md).
 # syntax=docker/dockerfile:1
 
-FROM node:24-bookworm-slim AS operon
-WORKDIR /source
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates git \
-  && rm -rf /var/lib/apt/lists/*
-COPY operon.lock ./
-COPY scripts/prepare-operon.sh ./scripts/prepare-operon.sh
-RUN sh scripts/prepare-operon.sh /opt/operon
-
 FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.24.0 --activate
@@ -45,17 +36,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV EVE_NEXT_PRODUCTION_PORT=4274
-ENV OPERON_HOME=/opt/operon
-ENV OPERON_BUILDER_ENABLED=true
 RUN corepack enable && corepack prepare pnpm@11.24.0 --activate \
   && apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates git \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app /app
-COPY --from=operon /opt/operon /opt/operon
 RUN chmod +x /app/scripts/fly-entrypoint.sh \
-  && node -e "require.resolve('just-bash')" \
-  && test -f /opt/operon/packages/cli/dist/bin.js
+  && node -e "require.resolve('just-bash'); require.resolve('@firecrawl/anydoc/cli.js'); require.resolve('quickjs-emscripten')" \
+  && git --version
 # Eve optional peer: just-bash (bash tool / sandbox). Fail the image build if missing.
 # Next binds all families for Fly proxy/health (IPv6); Eve stays on loopback.
 # Entrypoint materializes CHATGPT_AUTH_JSON / CODEX_AUTH_JSON then pnpm start.

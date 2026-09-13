@@ -14,6 +14,8 @@ import {
   type AccessScope,
 } from "@shared/identity/access-scope";
 import { getAuthSession } from "@db/services/auth/session";
+import { serverRuntime } from "../../server/runtime";
+import { resolveWorkspaceActor } from "../../server/workspaces/session";
 import { sendMessageToolResultSchema } from "@shared/chat/message-delivery";
 import {
   finalizeScheduledReportDelivery,
@@ -36,6 +38,7 @@ const authenticate: Parameters<typeof routeAuth>[1] = [
         authSessionId: identity.sessionId,
         conversationChannel: "eve",
         workspaceId: scope.workspaceId,
+        workspaceKind: identity.workspaceKind,
       },
       authenticator: "authjs",
       principalId: scope.userId,
@@ -185,8 +188,13 @@ function decodePathSegment(segment: string) {
 async function requestIdentityFromRequest(request: Request) {
   const session = await getAuthSession(request.headers);
   if (!session) return undefined;
+  const actor = await serverRuntime.runPromise(
+    resolveWorkspaceActor(request.headers),
+    { signal: request.signal }
+  );
   return {
-    scope: accessScopeForUser(`better-auth:${session.user.id}`),
+    scope: { userId: actor.userId, workspaceId: actor.workspaceId },
+    workspaceKind: actor.organizationId === null ? "personal" : "company",
     sessionId: session.session.id,
   };
 }

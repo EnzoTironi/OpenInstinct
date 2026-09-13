@@ -19,8 +19,10 @@ import {
   vaultImportItemsSchema,
 } from "@shared/vault/schema";
 import { createTRPCRouter, protectedProcedure } from "./init";
+import { workspacesRouter } from "./workspaces";
 
 export const appRouter = createTRPCRouter({
+  workspaces: workspacesRouter,
   accountChannels: {
     revoke: protectedProcedure
       .input(

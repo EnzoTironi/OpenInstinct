@@ -1,7 +1,6 @@
 import { getI18n } from "@web/i18n/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import {
   BrainIcon,
   ChevronRightIcon,
@@ -28,6 +27,7 @@ import { ModelSelector } from "./_components/model-selector";
 import { PanelIntro } from "../_components/panel-intro";
 import { LanguagePicker } from "@web/i18n/language-picker";
 import styles from "../_components/panel.module.css";
+import { PanelLink } from "../_components/panel-link";
 
 const sections = [
   { id: "channels", label: "Seus mensageiros." },
@@ -44,7 +44,8 @@ const accountLinks = [
     label: "Dados pessoais",
     icon: UserRoundIcon,
   },
-  { href: "/account?section=memory", label: "Memória", icon: BrainIcon },
+  { href: "/space/memory", label: "Memória", icon: BrainIcon },
+  { href: "/space/profile", label: "Seu username", icon: UserRoundIcon },
   {
     href: "/account?section=preferences",
     label: "Preferências",
@@ -107,11 +108,11 @@ async function AccountLinks({
   return (
     <nav aria-label={t("Configurações da conta")} className={styles.actionList}>
       {links.map(({ href, label, icon: Icon }) => (
-        <Link href={href} key={href}>
+        <PanelLink href={href} key={href}>
           <Icon aria-hidden="true" />
           {t(label)}
           <ChevronRightIcon aria-hidden="true" />
-        </Link>
+        </PanelLink>
       ))}
     </nav>
   );
