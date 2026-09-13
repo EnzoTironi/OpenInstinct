@@ -12,13 +12,42 @@
   --border: #26343d18;
   --input: #26343d28;
   --ring: #788d74;
+  position: relative;
+  isolation: isolate;
   min-height: 100svh;
   padding: 40px 24px 22px;
   color: var(--foreground);
-  background:
-    linear-gradient(180deg, #07132120, #07132170),
-    url("/marketing/sky-midnight.webp") center / cover fixed;
+  background: #071321;
   font-family: var(--merit-family-text);
+}
+.skyBackdrop {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.skyLayer {
+  object-fit: cover;
+  object-position: center bottom;
+  opacity: 0;
+  transition: opacity 3s ease;
+}
+.skyVisible {
+  opacity: 1;
+}
+.skyBackdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #07132170, #071321ab);
+  opacity: 1;
+  transition: opacity 3s ease;
+}
+.skyBackdrop[data-sky="midnight"]::after,
+.skyBackdrop[data-sky="predawn"]::after {
+  opacity: 0.45;
 }
 .frame {
   width: min(100%, 960px);
@@ -38,7 +67,7 @@
   border: 1px solid #ffffff25;
   border-radius: 24px;
   color: #f8f8f3;
-  background: #ffffff0b;
+  background: #11213740;
   backdrop-filter: blur(24px);
 }
 .brand {
@@ -137,7 +166,7 @@
 }
 .signature {
   margin: 22px auto 0;
-  color: #e3eaf0a8;
+  color: #e3eaf0de;
   text-align: center;
   font-size: 11px;
   letter-spacing: 0.025em;
@@ -540,6 +569,8 @@
 
 .drawerPanel {
   --drawer-bleed-background: #102139;
+  isolation: isolate;
+  overflow: hidden;
   margin: 0 auto;
   width: min(100%, 680px);
   max-height: 80dvh;
@@ -555,20 +586,16 @@
   color: var(--foreground);
   font-family: var(--merit-family-text);
 }
-.drawerPanel::before {
-  content: "";
+.drawerPanel .skyBackdrop {
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: url("/marketing/sky-midnight.webp") center bottom / cover;
   opacity: 0.22;
 }
 .drawerPanel.wideFrame {
   width: min(100%, 960px);
 }
 .drawerPanel :global([data-slot="drawer-content"]) {
-  position: relative;
+  position: static;
+  border-radius: 0;
 }
 .drawerPanel :global([data-slot="drawer-swipe-handle"]) {
   height: 20px;

@@ -11,18 +11,21 @@ export function RefreshButton() {
 
   return (
     <Button
+      aria-label="Atualizar atividade"
       disabled={pending}
       onClick={() => {
         startTransition(() => {
           router.refresh();
         });
       }}
-      size="sm"
+      size="icon"
       type="button"
       variant="outline"
     >
-      <RefreshCwIcon className={pending ? "animate-spin" : undefined} />
-      Refresh
+      <RefreshCwIcon
+        aria-hidden="true"
+        className={pending ? "animate-spin" : undefined}
+      />
     </Button>
   );
 }

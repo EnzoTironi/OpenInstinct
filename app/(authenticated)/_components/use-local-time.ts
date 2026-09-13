@@ -3,8 +3,12 @@ import { useSyncExternalStore } from "react";
 
 function subscribe(onChange: () => void) {
   const timer = setInterval(onChange, 60_000);
+  window.addEventListener("focus", onChange);
+  document.addEventListener("visibilitychange", onChange);
   return () => {
     clearInterval(timer);
+    window.removeEventListener("focus", onChange);
+    document.removeEventListener("visibilitychange", onChange);
   };
 }
 function currentMinute() {

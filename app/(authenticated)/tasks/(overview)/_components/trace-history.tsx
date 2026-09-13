@@ -1,54 +1,20 @@
 "use client";
 
-import { RefreshCwIcon } from "lucide-react";
-import Link from "next/link";
+import { ArrowUpRightIcon, Clock3Icon, RefreshCwIcon } from "lucide-react";
+import Image from "next/image";
 import { useMemo } from "react";
-import { z } from "zod";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@web/components/ui/table";
 import type { BrowserTracePage } from "@db/services/browser-traces";
 import { api } from "@web/trpc/client";
-
-const statusLabels = {
-  cancelled: { label: "Cancelled", variant: "secondary" },
-  error: { label: "Error", variant: "destructive" },
-  failure: { label: "Failed", variant: "warning" },
-  running: { label: "Running", variant: "information" },
-  success: { label: "Succeeded", variant: "success" },
-} as const;
-const traceStatusSchema = z.enum([
-  "cancelled",
-  "error",
-  "failure",
-  "running",
-  "success",
-]);
-
-function statusLabel(status: string) {
-  const parsed = traceStatusSchema.safeParse(status);
-  return parsed.success
-    ? statusLabels[parsed.data]
-    : { label: status, variant: "secondary" as const };
-}
-
-function formatDuration(durationMs: number | null) {
-  if (durationMs === null) return "—";
-  if (durationMs < 1000) return "<1s";
-  const seconds = Math.round(durationMs / 1000);
-  if (seconds < 60) return `${String(seconds)}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${String(minutes)}m ${String(seconds % 60)}s`;
-  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60)}m`;
-}
+import { cn } from "@web/components/class-names";
+import { PanelLink } from "../../../_components/panel-link";
+import {
+  formatTraceDuration,
+  traceStatusLabel,
+} from "../../_lib/trace-presentation";
+import styles from "../../_components/activity.module.css";
 
 export function TraceHistory({
   initialError,
@@ -82,32 +48,30 @@ export function TraceHistory({
   const historyError = history.error
     ? history.error instanceof Error
       ? history.error.message
-      : "Unable to load browser traces"
+      : "Não foi possível carregar a atividade."
     : history.data
       ? undefined
       : initialError;
-  const succeeded = traces.filter((trace) => trace.status === "success").length;
-
   return (
-    <section aria-label="Browser trace history" className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 type-label">
+    <section aria-label="Atividade no navegador" className="grid min-w-0 gap-4">
+      <div className={styles.toolbar}>
         {traces.length > 0 ? (
-          <>
-            <span>{String(traces.length)} loaded</span>
-            <Badge variant="success">{String(succeeded)} succeeded</Badge>
-          </>
+          <span className="type-label">
+            {traces.length} {traces.length === 1 ? "atividade" : "atividades"}
+          </span>
         ) : null}
         <Button
+          aria-label="Atualizar atividade"
           disabled={history.isFetching}
           onClick={() => void history.refetch()}
-          size="sm"
+          size="icon"
           type="button"
           variant="outline"
         >
           <RefreshCwIcon
+            aria-hidden="true"
             className={history.isFetching ? "animate-spin" : undefined}
           />
-          Refresh
         </Button>
       </div>
 
@@ -117,75 +81,40 @@ export function TraceHistory({
         </Alert>
       ) : null}
 
-      <Table className="table-fixed">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[26%]">Task</TableHead>
-            <TableHead className="w-[9%]">Status</TableHead>
-            <TableHead className="w-[8%]">Duration</TableHead>
-            <TableHead className="w-[18%]">Domains</TableHead>
-            <TableHead className="w-[25%]">Result</TableHead>
-            <TableHead className="w-[14%]">Started</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {traces.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} variant="empty">
-                {history.isFetching
-                  ? "Loading browser traces…"
-                  : "No browser traces yet. Give the agent a browser task from the chat."}
-              </TableCell>
-            </TableRow>
-          ) : (
-            traces.map((trace) => {
-              const status = statusLabel(trace.status);
-              return (
-                <TableRow key={trace.sessionId}>
-                  <TableCell className="truncate" title={trace.task}>
-                    <Button
-                      nativeButton={false}
-                      render={<Link href={`/tasks/${trace.sessionId}`} />}
-                      size="none"
-                      variant="link"
-                    >
-                      {trace.task}
-                    </Button>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                  </TableCell>
-                  <TableCell className="truncate">
-                    {formatDuration(trace.durationMs)}
-                  </TableCell>
-                  <TableCell
-                    className="truncate"
-                    title={trace.domains.join(", ")}
-                  >
-                    {trace.domains.length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      trace.domains.join(", ")
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className="truncate text-muted-foreground"
-                    title={trace.resultMessage ?? undefined}
-                  >
-                    {trace.resultMessage ?? "—"}
-                  </TableCell>
-                  <TableCell
-                    className="truncate text-muted-foreground"
-                    suppressHydrationWarning
-                  >
-                    {new Date(trace.startedAt).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
+      {traces.length === 0 && !historyError ? (
+        history.isLoading ? (
+          <output className="type-supporting-body text-muted-foreground">
+            Carregando atividade…
+          </output>
+        ) : (
+          <div className={styles.empty}>
+            <Image
+              alt=""
+              height={200}
+              width={300}
+              sizes="300px"
+              src="/marketing/panel/zoen-meeting.png"
+            />
+            <h2 className="type-section-title">
+              Tudo começa com uma conversa.
+            </h2>
+            <p className="type-supporting-body">
+              Peça uma pesquisa ou uma tarefa. Os resultados aparecem aqui.
+            </p>
+            <Button nativeButton={false} render={<PanelLink href="/chat" />}>
+              Abrir conversa
+            </Button>
+          </div>
+        )
+      ) : null}
+
+      {traces.length > 0 && (
+        <ul className={styles.list}>
+          {traces.map((trace) => (
+            <TraceHistoryCard key={trace.sessionId} trace={trace} />
+          ))}
+        </ul>
+      )}
 
       {history.hasNextPage ? (
         <Button
@@ -195,9 +124,53 @@ export function TraceHistory({
           type="button"
           variant="outline"
         >
-          {history.isFetchingNextPage ? "Loading…" : "Load older traces"}
+          {history.isFetchingNextPage ? "Carregando…" : "Ver mais atividades"}
         </Button>
       ) : null}
     </section>
+  );
+}
+
+function TraceHistoryCard({
+  trace,
+}: {
+  readonly trace: BrowserTracePage["traces"][number];
+}) {
+  const status = traceStatusLabel(trace.status);
+  return (
+    <li>
+      <PanelLink
+        className={styles.card}
+        href={`/tasks/${encodeURIComponent(trace.sessionId)}`}
+      >
+        <div className={styles.cardTop}>
+          <Badge variant={status.variant}>{status.label}</Badge>
+          <ArrowUpRightIcon aria-hidden="true" />
+        </div>
+        <h2 className="type-card-title">{trace.task}</h2>
+        {trace.resultMessage && (
+          <p className="type-supporting-body">{trace.resultMessage}</p>
+        )}
+        <div className={cn(styles.metadata, "type-caption")}>
+          {trace.durationMs !== null && (
+            <span>
+              <Clock3Icon aria-hidden="true" />
+              {formatTraceDuration(trace.durationMs)}
+            </span>
+          )}
+          <time dateTime={trace.startedAt} suppressHydrationWarning>
+            {new Date(trace.startedAt).toLocaleString("pt-BR", {
+              dateStyle: "short",
+              timeStyle: "short",
+            })}
+          </time>
+        </div>
+        {trace.domains.length > 0 && (
+          <p className={cn(styles.domains, "type-caption")}>
+            {trace.domains.join(" · ")}
+          </p>
+        )}
+      </PanelLink>
+    </li>
   );
 }

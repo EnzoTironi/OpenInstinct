@@ -241,11 +241,11 @@ function serializeBrowserTrace<
     domains: { domain: string }[];
     startedAt: Date;
   },
->({ domains, ...trace }: T) {
+>({ domains, completedAt, startedAt, ...trace }: T) {
   return {
     ...trace,
-    completedAt: trace.completedAt?.toISOString() ?? null,
+    completedAt: completedAt?.toISOString() ?? null,
     domains: domains.map(({ domain }) => domain),
-    startedAt: trace.startedAt.toISOString(),
+    startedAt: startedAt.toISOString(),
   };
 }

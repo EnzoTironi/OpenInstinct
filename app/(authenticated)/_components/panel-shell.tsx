@@ -23,6 +23,8 @@ import {
   DrawerTitle,
 } from "@web/components/ui/drawer";
 import { useLocalTime } from "./use-local-time";
+import { getLocalDay } from "./local-day";
+import { PanelSky } from "./panel-sky";
 import styles from "./panel.module.css";
 
 export function PanelShell({
@@ -36,6 +38,7 @@ export function PanelShell({
   const router = useRouter();
   const section = useSearchParams().get("section");
   const home = pathname === "/";
+  const { sky } = getLocalDay(useLocalTime());
   const [dismissed, setDismissed] = useState(false);
   const open = !home && !dismissed;
   useEffect(() => {
@@ -57,6 +60,7 @@ export function PanelShell({
       }}
     >
       <div className={styles.shell} lang="pt-BR">
+        <PanelSky phase={sky} />
         <a className={styles.skipLink} href="#panel-content">
           Pular para o conteúdo
         </a>
@@ -116,6 +120,7 @@ export function PanelShell({
             )}
             lang="pt-BR"
           >
+            <PanelSky phase={sky} />
             <DrawerTitle className="sr-only">Seu espaço Zoen</DrawerTitle>
             <div className={styles.sheetChrome}>
               {accountDetail && (

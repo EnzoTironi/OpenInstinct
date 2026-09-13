@@ -1,9 +1,7 @@
-import { MessageSquareIcon } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@web/components/ui/button";
 import { listBrowserTraces } from "@db/services/browser-traces";
 import { requireRequestScope } from "@web/auth/request-scope";
 import { TraceHistory } from "./_components/trace-history";
+import styles from "../_components/activity.module.css";
 
 export default async function TasksPage() {
   const scope = await requireRequestScope();
@@ -13,26 +11,15 @@ export default async function TasksPage() {
     initialPage = await listBrowserTraces(scope);
   } catch (error) {
     console.error("Unable to read browser traces", error);
-    initialError = "Unable to read the browser trace history.";
+    initialError = "Não foi possível carregar a atividade. Tente atualizar.";
   }
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:p-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="max-w-2xl">
-          <h1 className="type-page-title">Atividade no navegador</h1>
-          <p className="type-supporting-body mt-2 text-muted-foreground">
-            Acompanhe o que o Zoen fez no navegador, os resultados e os sites
-            acessados.
-          </p>
-        </div>
-        <Button
-          nativeButton={false}
-          render={<Link href="/chat" />}
-          variant="outline"
-        >
-          Abrir conversa
-          <MessageSquareIcon data-icon="inline-end" />
-        </Button>
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <h1 className="type-page-title">Atividade</h1>
+        <p className="type-supporting-body">
+          O que o Zoen fez por você no navegador.
+        </p>
       </header>
 
       <TraceHistory initialError={initialError} initialPage={initialPage} />
