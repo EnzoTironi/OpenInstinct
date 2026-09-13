@@ -10,10 +10,7 @@ import { releaseImage } from "./images.ts";
 import { production } from "./production.ts";
 import { appSecrets, webSecretNames } from "./secrets.ts";
 import { backupSecrets } from "./backups.ts";
-import {
-  PrepareApplicationDatabase,
-  PrepareMemoryDatabase,
-} from "./database.ts";
+import { PrepareServiceDatabases } from "./database.ts";
 import { MigrateApplication } from "./migrations.ts";
 import { provisionMatrix, deployMatrix } from "./matrix.ts";
 
@@ -149,28 +146,25 @@ export const hosted = Effect.gen(function* () {
     },
   }).pipe(retain(true));
 
-  const applicationDatabase = yield* PrepareApplicationDatabase({
+  const databases = yield* PrepareServiceDatabases({
     app: pgName,
     machine: postgres.machineId,
     release: pgImage,
-    credentialVersion: applicationCredentialVersion,
+    credentialVersion: Output.all(
+      applicationCredentialVersion,
+      memoryBootstrapPassword.digest,
+      matrixSecrets.databaseVersion
+    ).pipe(Output.map((values) => JSON.stringify(values))),
   });
   const matrix = yield* deployMatrix({
     provision: matrixSecrets,
     postgresApp: pgName,
-    postgresMachine: postgres.machineId,
-    postgresImage: pgImage,
+    databaseRelease: databases.release,
     webApp: webName,
     serverName: matrixServerName,
     region,
   });
 
-  const memoryDatabase = yield* PrepareMemoryDatabase({
-    app: pgName,
-    machine: postgres.machineId,
-    release: pgImage,
-    credentialVersion: memoryBootstrapPassword.digest,
-  });
   const memoryDatabaseSecret = yield* Fly.Secret("MemoryDatabaseUrl", {
     app: memoryApp,
     name: "ZOEN_MEMORY_DATABASE_URL",
@@ -226,7 +220,7 @@ export const hosted = Effect.gen(function* () {
       "zoen.database": memoryDatabaseSecret.digest.pipe(
         Output.map((value) => value ?? "")
       ),
-      "zoen.database-ready": memoryDatabase.release,
+      "zoen.database-ready": databases.release,
     },
   }).pipe(retain(true));
 
@@ -253,7 +247,7 @@ export const hosted = Effect.gen(function* () {
     region,
     database: policy.database,
     image: webImage,
-    prepared: applicationDatabase,
+    prepared: databases,
   });
   const web = yield* Fly.Machine("Web", {
     app: webApp,
