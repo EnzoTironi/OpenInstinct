@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "@tests/helpers/i18n";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 interface Mocks {

@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { createContext, useContext, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { ArrowUpRightIcon, MessageCircleIcon, XIcon } from "lucide-react";
@@ -41,9 +43,10 @@ function ChannelIcon({
 }
 
 export function ConversationIcons() {
+  const { t } = useI18n();
   const destinations = useContext(OnboardingContext);
   return (
-    <nav aria-label="Escolha seu mensageiro" className={styles.icons}>
+    <nav aria-label={t("Escolha seu mensageiro")} className={styles.icons}>
       {channels.map((channel) => {
         const destination = destinations?.[channel.id];
         return destination ? (
@@ -89,6 +92,7 @@ export function OnboardingProvider({
   readonly children: ReactNode;
   readonly destinations: Effect.Success<typeof conversationDestinations>;
 }) {
+  const { t } = useI18n();
   const [unavailable, setUnavailable] = useState<
     (typeof channels)[number]["label"] | null
   >(null);
@@ -103,12 +107,14 @@ export function OnboardingProvider({
         {children}
         <DialogContent className={styles.sheet} showCloseButton={false}>
           <div aria-hidden="true" className={styles.handle} />
-          <DialogTitle className="sr-only">Começar uma conversa</DialogTitle>
+          <DialogTitle className="sr-only">
+            {t("Começar uma conversa")}
+          </DialogTitle>
           <DialogDescription className="sr-only">
-            Escolha seu mensageiro para conversar com o Zoen.
+            {t("Escolha seu mensageiro para conversar com o Zoen.")}
           </DialogDescription>
           <DialogClose
-            aria-label="Fechar"
+            aria-label={t("Fechar")}
             className={styles.close}
             render={<Button size="icon" variant="plain" />}
           >
@@ -141,7 +147,8 @@ export function OnboardingProvider({
           </div>
           {unavailable && (
             <output className={styles.status}>
-              {unavailable} ainda não está disponível por aqui. Volte em breve.
+              {unavailable}{" "}
+              {t("ainda não está disponível por aqui. Volte em breve.")}
             </output>
           )}
         </DialogContent>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import {
   Collapsible,
   CollapsibleContent,
@@ -87,6 +89,7 @@ function ToolHeader({
   title,
   ...props
 }: ToolHeaderProps) {
+  const { t } = useI18n();
   const presentation = status ? statusPresentation[status] : undefined;
 
   return (
@@ -117,7 +120,7 @@ function ToolHeader({
           data-status={status}
         >
           {statusIcon === undefined ? presentation.icon : statusIcon}
-          {statusLabel === undefined ? presentation.label : statusLabel}
+          {statusLabel === undefined ? t(presentation.label) : statusLabel}
         </span>
       ) : null}
       <ChevronRightIcon className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
@@ -145,9 +148,10 @@ interface ToolInputProps extends ComponentProps<"div"> {
 }
 
 function ToolInput({ className, input, ...props }: ToolInputProps) {
+  const { t } = useI18n();
   return (
     <div className={cn("space-y-2 overflow-hidden", className)} {...props}>
-      <p className="type-label text-muted-foreground">Parameters</p>
+      <p className="type-label text-muted-foreground">{t("Parameters")}</p>
       <pre className="type-code overflow-x-auto rounded-md bg-muted/50 p-3">
         <code>{JSON.stringify(input, null, 2)}</code>
       </pre>
@@ -166,6 +170,7 @@ function ToolOutput({
   output,
   ...props
 }: ToolOutputProps) {
+  const { t } = useI18n();
   if (output === undefined && !errorText) return null;
 
   const text = z.string().safeParse(output);
@@ -178,7 +183,7 @@ function ToolOutput({
   return (
     <div className={cn("space-y-2", className)} {...props}>
       <p className="type-label text-muted-foreground">
-        {errorText ? "Error" : "Result"}
+        {errorText ? t("Error") : t("Result")}
       </p>
       <div
         className={cn(

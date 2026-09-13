@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import {
   Command,
   CommandEmpty,
@@ -462,9 +464,12 @@ type DropdownMenuSelectEvent = SyntheticEvent<HTMLDivElement> & {
 };
 
 export const PromptInputActionAddAttachments = ({
-  label = "Add photos or files",
+  label,
   ...props
 }: PromptInputActionAddAttachmentsProps) => {
+  const { t } = useI18n();
+  const localizedLabel = label ?? t("Add photos or files");
+
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
@@ -477,7 +482,7 @@ export const PromptInputActionAddAttachments = ({
 
   return (
     <DropdownMenuItem {...props} onSelect={handleSelect}>
-      <ImageIcon className="mr-2 size-4" /> {label}
+      <ImageIcon className="mr-2 size-4" /> {localizedLabel}
     </DropdownMenuItem>
   );
 };
@@ -489,10 +494,13 @@ export type PromptInputActionAddScreenshotProps = ComponentProps<
 };
 
 export const PromptInputActionAddScreenshot = ({
-  label = "Take screenshot",
+  label,
   onSelect,
   ...props
 }: PromptInputActionAddScreenshotProps) => {
+  const { t } = useI18n();
+  const localizedLabel = label ?? t("Take screenshot");
+
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
@@ -525,7 +533,7 @@ export const PromptInputActionAddScreenshot = ({
   return (
     <DropdownMenuItem {...props} onSelect={handleSelect}>
       <Monitor className="mr-2 size-4" />
-      {label}
+      {localizedLabel}
     </DropdownMenuItem>
   );
 };
@@ -576,6 +584,7 @@ export const PromptInput = ({
   children,
   ...props
 }: PromptInputProps) => {
+  const { t } = useI18n();
   // Try to use a provider controller if present
   const controller = useOptionalPromptInputController();
   const usingProvider = !!controller;
@@ -644,7 +653,7 @@ export const PromptInput = ({
       if (incoming.length && accepted.length === 0) {
         onError?.({
           code: "accept",
-          message: "No files match the accepted types.",
+          message: t("No files match the accepted types."),
         });
         return;
       }
@@ -654,7 +663,7 @@ export const PromptInput = ({
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
           code: "max_file_size",
-          message: "All files exceed the maximum size.",
+          message: t("All files exceed the maximum size."),
         });
         return;
       }
@@ -669,7 +678,7 @@ export const PromptInput = ({
         if (capacity !== undefined && sized.length > capacity) {
           onError?.({
             code: "max_files",
-            message: "Too many files. Some were not added.",
+            message: t("Too many files. Some were not added."),
           });
         }
         const next: (FileUIPart & { id: string })[] = [];
@@ -685,7 +694,7 @@ export const PromptInput = ({
         return [...prev, ...next];
       });
     },
-    [matchesAccept, maxFiles, maxFileSize, onError]
+    [matchesAccept, maxFiles, maxFileSize, onError, t]
   );
 
   const removeLocal = useCallback((id: string) => {
@@ -706,7 +715,7 @@ export const PromptInput = ({
       if (incoming.length && accepted.length === 0) {
         onError?.({
           code: "accept",
-          message: "No files match the accepted types.",
+          message: t("No files match the accepted types."),
         });
         return;
       }
@@ -716,7 +725,7 @@ export const PromptInput = ({
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
           code: "max_file_size",
-          message: "All files exceed the maximum size.",
+          message: t("All files exceed the maximum size."),
         });
         return;
       }
@@ -730,7 +739,7 @@ export const PromptInput = ({
       if (capacity !== undefined && sized.length > capacity) {
         onError?.({
           code: "max_files",
-          message: "Too many files. Some were not added.",
+          message: t("Too many files. Some were not added."),
         });
       }
 
@@ -738,7 +747,7 @@ export const PromptInput = ({
         controller?.attachments.add(capped);
       }
     },
-    [matchesAccept, maxFileSize, maxFiles, onError, files.length, controller]
+    [matchesAccept, maxFileSize, maxFiles, onError, files.length, controller, t]
   );
 
   const clearAttachments = useCallback(() => {
@@ -975,12 +984,12 @@ export const PromptInput = ({
     <>
       <input
         accept={accept}
-        aria-label="Upload files"
+        aria-label={t("Upload files")}
         className="hidden"
         multiple={multiple}
         onChange={handleChange}
         ref={inputRef}
-        title="Upload files"
+        title={t("Upload files")}
         type="file"
       />
       <form
@@ -1044,12 +1053,15 @@ export const PromptInputTextarea = ({
   onChange,
   onKeyDown,
   className,
-  placeholder = "What would you like to know?",
+  placeholder,
   ref,
   value,
   defaultValue,
   ...props
 }: PromptInputTextareaProps) => {
+  const { t } = useI18n();
+  const localizedPlaceholder = placeholder ?? t("What would you like to know?");
+
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
   const layout = useContext(PromptInputLayoutContext);
@@ -1264,7 +1276,7 @@ export const PromptInputTextarea = ({
       onCompositionStart={handleCompositionStart}
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
-      placeholder={placeholder}
+      placeholder={localizedPlaceholder}
       ref={textareaRef}
       {...props}
       {...controlledProps}
@@ -1483,6 +1495,7 @@ export const PromptInputSubmit = ({
   children,
   ...props
 }: PromptInputSubmitProps) => {
+  const { t } = useI18n();
   const layout = useContext(PromptInputLayoutContext);
   const isGenerating = status === "submitted" || status === "streaming";
 
@@ -1512,7 +1525,7 @@ export const PromptInputSubmit = ({
 
   const button = (
     <InputGroupButton
-      aria-label={isGenerating ? "Stop" : "Submit"}
+      aria-label={isGenerating ? t("Stop") : t("Submit")}
       className={cn(className)}
       onClick={handleClick}
       size={size}

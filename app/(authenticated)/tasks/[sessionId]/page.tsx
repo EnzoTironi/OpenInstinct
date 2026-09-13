@@ -1,3 +1,4 @@
+import { getI18n } from "@web/i18n/server";
 import { ArrowLeftIcon } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Badge } from "@web/components/ui/badge";
@@ -21,6 +22,7 @@ import styles from "../_components/activity.module.css";
 export default async function TraceDetailPage({
   params,
 }: PageProps<"/tasks/[sessionId]">) {
+  const { t, locale } = await getI18n();
   const scope = await requireRequestScope();
   const { sessionId } = await params;
   const trace = await readBrowserTrace(scope, sessionId);
@@ -44,12 +46,12 @@ export default async function TraceDetailPage({
             variant="ghost"
           >
             <ArrowLeftIcon data-icon="inline-start" />
-            Atividade
+            {t("Atividade")}
           </Button>
         </div>
         <div className={styles.detailTitle}>
           <div className="grid min-w-0 justify-items-start gap-4">
-            <Badge variant={status.variant}>{status.label}</Badge>
+            <Badge variant={status.variant}>{t(status.label)}</Badge>
             <h1 className="type-page-title">{trace.task}</h1>
           </div>
           <div className={cn(styles.metadata, "mt-4 type-caption")}>
@@ -57,7 +59,7 @@ export default async function TraceDetailPage({
               <span>{formatTraceDuration(trace.durationMs)}</span>
             )}
             <time dateTime={trace.startedAt}>
-              {new Date(trace.startedAt).toLocaleString("pt-BR", {
+              {new Date(trace.startedAt).toLocaleString(locale, {
                 dateStyle: "short",
                 timeStyle: "short",
               })}
@@ -75,7 +77,10 @@ export default async function TraceDetailPage({
         </div>
       </header>
 
-      <section aria-label="Etapas da atividade" className="grid min-w-0 gap-4">
+      <section
+        aria-label={t("Etapas da atividade")}
+        className="grid min-w-0 gap-4"
+      >
         <div className={styles.toolbar}>
           {events.length > 0 ? (
             <span className="type-label">
@@ -87,7 +92,7 @@ export default async function TraceDetailPage({
 
         {events.length === 0 ? (
           <p className="type-supporting-body text-muted-foreground">
-            Nenhuma etapa registrada ainda.
+            {t("Nenhuma etapa registrada ainda.")}
           </p>
         ) : (
           <ol className={styles.list}>
@@ -97,7 +102,7 @@ export default async function TraceDetailPage({
                   className="type-caption text-muted-foreground"
                   dateTime={event.at}
                 >
-                  {new Date(event.at).toLocaleTimeString("pt-BR")}
+                  {new Date(event.at).toLocaleTimeString(locale)}
                 </time>
                 <h2 className="type-card-title">{event.label}</h2>
                 {event.detail && (

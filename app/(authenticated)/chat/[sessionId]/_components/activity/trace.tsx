@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import {
   defaultMessageReducer,
   type MessageStreamEvent,
@@ -42,6 +44,7 @@ export function SubagentTrace({
   readonly status: SubagentStatus;
   readonly target: SubagentCalledStreamEvent["data"];
 }) {
+  const { t } = useI18n();
   const data = useMemo(
     () =>
       events.reduce(
@@ -54,7 +57,11 @@ export function SubagentTrace({
   const isRunning = status === "starting" || status === "working";
   const turnFailure = useMemo(() => getLatestTurnFailure(events), [events]);
   const error = streamError ?? turnFailure;
-  const statusLabel = error ? "Failed" : isRunning ? "Running" : status;
+  const statusLabel = error
+    ? t("Failed")
+    : isRunning
+      ? t("Running")
+      : t(status);
   const badgeVariant = error
     ? "destructive"
     : isRunning
@@ -70,7 +77,9 @@ export function SubagentTrace({
     <section className="py-4">
       <Alert variant={alertVariant}>
         <BotIcon />
-        <AlertTitle>{target.name} trace</AlertTitle>
+        <AlertTitle>
+          {t("Atividade de {name}", { name: target.name })}
+        </AlertTitle>
         <AlertAction>
           <Badge variant={badgeVariant}>{statusLabel}</Badge>
         </AlertAction>
@@ -88,7 +97,7 @@ export function SubagentTrace({
             {isLoadingOlder ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : null}
-            {isLoadingOlder ? "Loading…" : "Load older messages"}
+            {isLoadingOlder ? t("Loading…") : t("Load older messages")}
           </Button>
         ) : null}
         {data.messages.map((message, index) => (
@@ -103,7 +112,7 @@ export function SubagentTrace({
         ))}
         {(isLoading || isRunning) && data.messages.length === 0 ? (
           <Shimmer className="type-supporting-body" duration={1}>
-            Loading task trace
+            {t("Loading task trace")}
           </Shimmer>
         ) : null}
         {error ? (

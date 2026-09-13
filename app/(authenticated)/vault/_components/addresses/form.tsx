@@ -1,5 +1,9 @@
 "use client";
 
+import { validationOptions } from "@web/i18n/validation";
+
+import { useI18n } from "@web/i18n/context";
+
 import { type SubmitEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
@@ -28,6 +32,7 @@ export function AddressForm({
   readonly initialLabel?: string;
   readonly onSaved: () => void;
 }) {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const create = api.vault.create.useMutation({
     onSuccess: () => {
@@ -46,7 +51,7 @@ export function AddressForm({
     recipientName: "",
     region: "",
   });
-  const result = addressFormSchema.safeParse(form);
+  const result = addressFormSchema.safeParse(form, validationOptions(locale));
   const errors =
     attempted && !result.success
       ? z.flattenError(result.error).fieldErrors
@@ -79,18 +84,18 @@ export function AddressForm({
           <FormField
             error={errors.nickname?.[0]}
             id="vault-address-label"
-            label="Name"
+            label={t("Name")}
             onChange={(value) => {
               update("nickname", value);
             }}
-            placeholder="Home"
+            placeholder={t("Home")}
             value={form.nickname}
           />
           <FormField
             autoComplete="name"
             error={errors.recipientName?.[0]}
             id="vault-address-recipient"
-            label="Recipient name"
+            label={t("Recipient name")}
             onChange={(value) => {
               update("recipientName", value);
             }}
@@ -101,7 +106,7 @@ export function AddressForm({
           autoComplete="address-line1"
           error={errors.line1?.[0]}
           id="vault-address-line1"
-          label="Address line 1"
+          label={t("Address line 1")}
           onChange={(value) => {
             update("line1", value);
           }}
@@ -111,7 +116,7 @@ export function AddressForm({
           autoComplete="address-line2"
           error={errors.line2?.[0]}
           id="vault-address-line2"
-          label="Address line 2 (optional)"
+          label={t("Address line 2 (optional)")}
           onChange={(value) => {
             update("line2", value);
           }}
@@ -122,7 +127,7 @@ export function AddressForm({
             autoComplete="address-level2"
             error={errors.city?.[0]}
             id="vault-address-city"
-            label="City"
+            label={t("City")}
             onChange={(value) => {
               update("city", value);
             }}
@@ -132,7 +137,7 @@ export function AddressForm({
             autoComplete="address-level1"
             error={errors.region?.[0]}
             id="vault-address-region"
-            label="State / province / region"
+            label={t("State / province / region")}
             onChange={(value) => {
               update("region", value);
             }}
@@ -144,7 +149,7 @@ export function AddressForm({
             autoComplete="postal-code"
             error={errors.postalCode?.[0]}
             id="vault-address-postal"
-            label="ZIP / postal code"
+            label={t("ZIP / postal code")}
             onChange={(value) => {
               update("postalCode", value);
             }}
@@ -154,7 +159,7 @@ export function AddressForm({
             autoComplete="country"
             error={errors.countryCode?.[0]}
             id="vault-address-country"
-            label="Country"
+            label={t("Country")}
             maxLength={2}
             onChange={(value) => {
               update("countryCode", value.toUpperCase());
@@ -165,7 +170,7 @@ export function AddressForm({
       </FieldGroup>
       <DialogFooter>
         <Button disabled={create.isPending} type="submit">
-          Save address
+          {t("Save address")}
         </Button>
       </DialogFooter>
     </form>

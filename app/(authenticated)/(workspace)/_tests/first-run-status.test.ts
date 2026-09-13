@@ -1,21 +1,28 @@
+import { createTranslator } from "@web/i18n/translate";
+import ptBR from "@web/i18n/messages/pt-br.json";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it } from "vitest";
 import {
   FirstRunStatus,
   describeLinkedChannels,
 } from "../_components/first-run-status";
 
+const t = createTranslator(ptBR);
+
 describe("first-run status", () => {
   it("describes linked messenger families", () => {
     expect(
-      describeLinkedChannels([{ channel: "telegram", senderId: "1" }])
+      describeLinkedChannels([{ channel: "telegram", senderId: "1" }], t)
     ).toContain("Telegram");
     expect(
-      describeLinkedChannels([
-        { channel: "telegram", senderId: "1" },
-        { channel: "kapso", senderId: "2" },
-      ])
+      describeLinkedChannels(
+        [
+          { channel: "telegram", senderId: "1" },
+          { channel: "kapso", senderId: "2" },
+        ],
+        t
+      )
     ).toContain("WhatsApp");
   });
 

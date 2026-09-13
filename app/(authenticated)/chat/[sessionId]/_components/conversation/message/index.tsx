@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import type { EveMessage } from "eve/react";
 import { useState } from "react";
 import { Message, MessageContent } from "@web/components/ai-elements/message";
@@ -24,6 +26,18 @@ export function AgentMessage({
   readonly timestamp?: string;
   readonly userVisibleOnly?: boolean;
 }) {
+  const { locale } = useI18n();
+
+  const timestampFormatter = new Intl.DateTimeFormat(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const fullTimestampFormatter = new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
   const [optimisticTimestamp] = useState(() => new Date().toISOString());
   const displayedTimestamp =
     timestamp ?? (message.role === "user" ? optimisticTimestamp : undefined);
@@ -102,13 +116,3 @@ function userVisibleParts(
   );
   return [...(sentMessageParts ?? []), ...controls];
 }
-
-const timestampFormatter = new Intl.DateTimeFormat(undefined, {
-  hour: "numeric",
-  minute: "2-digit",
-});
-
-const fullTimestampFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});

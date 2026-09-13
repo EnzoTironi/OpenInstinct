@@ -1,3 +1,4 @@
+import { getI18n } from "@web/i18n/server";
 import { Effect, Result } from "effect";
 import { CheckIcon } from "lucide-react";
 import Link from "next/link";
@@ -10,6 +11,7 @@ import { PanelIntro } from "../_components/panel-intro";
 import styles from "../_components/panel.module.css";
 
 export default async function MailPage() {
+  const { t } = await getI18n();
   const connection = await serverRuntime.runPromise(
     readGoogleWorkspaceConnection(await requireRequestScope()).pipe(
       Effect.result
@@ -21,16 +23,16 @@ export default async function MailPage() {
     <div className={styles.page}>
       <PanelIntro
         image="/marketing/panel/zoen-mail.jpg"
-        title="Menos e-mail. Mais vida."
-        description="Resumos e respostas, em uma conversa."
+        title={t("Menos e-mail. Mais vida.")}
+        description={t("Resumos e respostas, em uma conversa.")}
       />
       {Result.isFailure(connection) ? (
         <Alert variant="destructive">
-          <AlertTitle>Não foi possível verificar seu Gmail</AlertTitle>
+          <AlertTitle>{t("Não foi possível verificar seu Gmail")}</AlertTitle>
           <AlertDescription>
-            Tente novamente em{" "}
+            {t("Tente novamente em")}{" "}
             <Link href="/connections" className="underline">
-              Conexões
+              {t("Conexões")}
             </Link>
             .
           </AlertDescription>
@@ -43,7 +45,7 @@ export default async function MailPage() {
               <Link href={connected ? "/chat?starter=email" : "/connections"} />
             }
           >
-            {connected ? "Organizar meus e-mails" : "Conectar meu Gmail"}
+            {connected ? t("Organizar meus e-mails") : t("Conectar meu Gmail")}
           </Button>
           {connected && (
             <>
@@ -51,11 +53,11 @@ export default async function MailPage() {
                 href="/chat?starter=email-draft"
                 className={styles.subtleLink}
               >
-                Preparar uma resposta
+                {t("Preparar uma resposta")}
               </Link>
               <Link href="/connections" className={styles.statusLine}>
                 <CheckIcon aria-hidden="true" />
-                Gmail conectado
+                {t("Gmail conectado")}
               </Link>
             </>
           )}

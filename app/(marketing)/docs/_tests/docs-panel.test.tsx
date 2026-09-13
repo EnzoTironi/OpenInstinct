@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it } from "vitest";
 import { OnboardingProvider } from "../../_components/onboarding";
 import { DocsPanel } from "../_components/docs-panel";

@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeftIcon,
@@ -34,6 +36,7 @@ export function PanelShell({
   readonly children: ReactNode;
   readonly background: ReactNode;
 }) {
+  const { t, locale } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const section = useSearchParams().get("section");
@@ -59,10 +62,10 @@ export function PanelShell({
         setDismissed(false);
       }}
     >
-      <div className={styles.shell} lang="pt-BR">
+      <div className={styles.shell} lang={locale}>
         <PanelSky phase={sky} />
         <a className={styles.skipLink} href="#panel-content">
-          Pular para o conteúdo
+          {t("Pular para o conteúdo")}
         </a>
         <div
           className={cn(styles.frame, styles.homeFrame)}
@@ -70,13 +73,17 @@ export function PanelShell({
           aria-hidden={!home || undefined}
         >
           <header className={styles.header}>
-            <Link aria-label="Zoen · Início" className={styles.brand} href="/">
+            <Link
+              aria-label={t("Zoen · Início")}
+              className={styles.brand}
+              href="/"
+            >
               <Logo />
               <span>Zoen</span>
             </Link>
             <PanelDate />
             <Button
-              aria-label="Sua conta"
+              aria-label={t("Sua conta")}
               className={styles.accountButton}
               nativeButton={false}
               render={<PanelLink href="/account" />}
@@ -98,7 +105,7 @@ export function PanelShell({
           </div>
         </div>
         <p className={styles.signature} aria-hidden={!home || undefined}>
-          Menos na cabeça. Mais na vida.
+          {t("Menos na cabeça. Mais na vida.")}
         </p>
         <Drawer
           open={open}
@@ -118,14 +125,16 @@ export function PanelShell({
               (pathname === "/recipes" || conversation) && styles.wideFrame,
               conversation && styles.drawerConversation
             )}
-            lang="pt-BR"
+            lang={locale}
           >
             <PanelSky phase={sky} />
-            <DrawerTitle className="sr-only">Seu espaço Zoen</DrawerTitle>
+            <DrawerTitle className="sr-only">
+              {t("Seu espaço Zoen")}
+            </DrawerTitle>
             <div className={styles.sheetChrome}>
               {accountDetail && (
                 <Button
-                  aria-label="Voltar à conta"
+                  aria-label={t("Voltar à conta")}
                   className={styles.sheetBack}
                   nativeButton={false}
                   render={<PanelLink href="/account" />}
@@ -137,7 +146,7 @@ export function PanelShell({
               )}
               {conversation && (
                 <Button
-                  aria-label="Conectar ferramentas"
+                  aria-label={t("Conectar ferramentas")}
                   className={styles.sheetConnections}
                   nativeButton={false}
                   render={
@@ -153,7 +162,7 @@ export function PanelShell({
               )}
               {conversation && (
                 <Button
-                  aria-label="Histórico de conversas"
+                  aria-label={t("Histórico de conversas")}
                   className={styles.sheetBack}
                   nativeButton={false}
                   render={<Link href="/chat/history" />}
@@ -166,7 +175,7 @@ export function PanelShell({
               <DrawerClose
                 render={
                   <Button
-                    aria-label="Fechar painel"
+                    aria-label={t("Fechar painel")}
                     className={styles.sheetClose}
                     size="icon"
                     variant="ghost"
@@ -192,18 +201,19 @@ export function PanelShell({
 }
 
 function PanelDate() {
+  const { t, locale } = useI18n();
   const date = useLocalTime();
   return (
     <time className={styles.date} dateTime={date?.toISOString()}>
       {date
-        ? new Intl.DateTimeFormat("pt-BR", {
+        ? new Intl.DateTimeFormat(locale, {
             weekday: "short",
             day: "numeric",
             month: "short",
           })
             .format(date)
             .replaceAll(".", "")
-        : "Seu espaço pessoal"}
+        : t("Seu espaço pessoal")}
     </time>
   );
 }

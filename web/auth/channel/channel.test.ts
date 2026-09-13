@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToEnglishMarkup as renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it } from "vitest";
 import {
   channelHttpError,
@@ -63,7 +63,7 @@ describe("shared channel authorization", () => {
           onRestart: () => undefined,
         })
       );
-      expect(html).toContain("current Companion account");
+      expect(html).toContain("current Zoen account");
       expect(html).not.toContain("Enter this browser");
       expect(html).toContain(present);
       expect(html).not.toContain(absent);

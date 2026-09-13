@@ -1,0 +1,95 @@
+.heading {
+  margin-bottom: 1.8rem;
+}
+.group {
+  display: grid;
+  gap: 0.65rem;
+}
+.group + .group {
+  margin-top: 1.8rem;
+}
+.label {
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+.list {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.list > * + * {
+  border-top: 1px solid rgb(224 238 246 / 0.1);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  min-height: 78px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0.8rem 0.25rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  white-space: normal;
+}
+.row:enabled {
+  cursor: pointer;
+}
+.row:enabled:hover {
+  background: rgb(238 247 255 / 0.06);
+}
+.row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.row:disabled {
+  opacity: 0.6;
+}
+.icon {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: rgb(239 246 250 / 0.09);
+}
+.icon img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.icon svg {
+  width: 28px;
+  height: 28px;
+}
+.copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 0.2rem;
+}
+.copy small {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.trailing {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--muted-foreground);
+}
+.manage {
+  padding: 0.7rem 0.3rem 1.2rem;
+  display: grid;
+  gap: 0.85rem;
+}
+.empty {
+  color: var(--muted-foreground);
+  padding: 0.8rem 0;
+}

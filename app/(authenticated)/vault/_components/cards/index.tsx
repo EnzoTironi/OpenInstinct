@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { PlusIcon } from "lucide-react";
 import type { VaultItem } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
@@ -24,6 +26,7 @@ export function VaultCards({
 }: {
   readonly items: readonly VaultItem[];
 }) {
+  const { t, locale } = useI18n();
   const setup = useVaultSetup();
   const initialAdd = setup?.kind === "payment";
   const section = useVaultSection(initialAdd ? "add" : "list");
@@ -32,24 +35,26 @@ export function VaultCards({
     <VaultSection
       onOpenChange={section.onOpenChange}
       open={section.open}
-      title="Cards"
+      title={t("Cards")}
     >
-      <VaultSectionTrigger items={items} title="Cards" />
+      <VaultSectionTrigger items={items} title={t("Cards")} />
       <VaultSectionContent view={section.view}>
         {section.view === "list" ? (
           <>
             <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Cards</DialogTitle>
+              <DialogTitle>{t("Cards")}</DialogTitle>
               <DialogDescription>
                 {items.length > 0
-                  ? `Search and manage ${items.length.toLocaleString()} saved cards.`
-                  : "Add your first saved card."}
+                  ? t("Buscar e gerenciar itens salvos ({count}).", {
+                      count: items.length.toLocaleString(locale),
+                    })
+                  : t("Add your first saved card.")}
               </DialogDescription>
             </DialogHeader>
             <VaultItemBrowser
               items={items}
               searchId="vault-search-cards"
-              title="Cards"
+              title={t("Cards")}
             />
             <div className="flex justify-end gap-2">
               <Button
@@ -59,7 +64,7 @@ export function VaultCards({
                 type="button"
               >
                 <PlusIcon />
-                Add card
+                {t("Add card")}
               </Button>
             </div>
           </>
@@ -69,13 +74,14 @@ export function VaultCards({
               onClick={() => {
                 section.setView("list");
               }}
-              title="Cards"
+              title={t("Cards")}
             />
             <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Add card</DialogTitle>
+              <DialogTitle>{t("Add card")}</DialogTitle>
               <DialogDescription>
-                Sensitive values are encrypted before database storage and are
-                never returned after saving.
+                {t(
+                  "Sensitive values are encrypted before database storage and are never returned after saving."
+                )}
               </DialogDescription>
             </DialogHeader>
             <CardForm

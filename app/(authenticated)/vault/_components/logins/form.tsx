@@ -1,5 +1,9 @@
 "use client";
 
+import { validationOptions } from "@web/i18n/validation";
+
+import { useI18n } from "@web/i18n/context";
+
 import { type SubmitEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
@@ -68,6 +72,7 @@ export function LoginForm({
   readonly initialOrigin?: string;
   readonly onSaved: () => void;
 }) {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const create = api.vault.create.useMutation({
     onSuccess: () => {
@@ -83,7 +88,7 @@ export function LoginForm({
     origin: initialOrigin,
     password: "",
   });
-  const result = loginFormSchema.safeParse(form);
+  const result = loginFormSchema.safeParse(form, validationOptions(locale));
   const errors =
     attempted && !result.success
       ? z.flattenError(result.error).fieldErrors
@@ -121,7 +126,7 @@ export function LoginForm({
           <FormField
             error={errors.nickname?.[0]}
             id="vault-login-label"
-            label="Name"
+            label={t("Name")}
             onChange={(nickname) => {
               setForm((current) => ({ ...current, nickname }));
             }}
@@ -134,7 +139,7 @@ export function LoginForm({
           error={errors.origin?.[0]}
           id="vault-login-origin"
           inputMode="url"
-          label="Website"
+          label={t("Website")}
           onChange={(origin) => {
             setForm((current) => ({ ...current, origin }));
           }}
@@ -152,7 +157,7 @@ export function LoginForm({
           {initialIdentifierType ? null : (
             <Field>
               <FieldLabel htmlFor="vault-login-identifier-type">
-                Sign in with
+                {t("Sign in with")}
               </FieldLabel>
               <Select
                 onValueChange={(value) => {
@@ -171,9 +176,9 @@ export function LoginForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="username">Username</SelectItem>
+                  <SelectItem value="email">{t("Email")}</SelectItem>
+                  <SelectItem value="phone">{t("Phone")}</SelectItem>
+                  <SelectItem value="username">{t("Username")}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -182,7 +187,7 @@ export function LoginForm({
             autoComplete="username"
             error={errors.identifier?.[0]}
             id="vault-login-identifier"
-            label={identifierLabel(form.identifierType)}
+            label={t(identifierLabel(form.identifierType))}
             onChange={(identifier) => {
               setForm((current) => ({ ...current, identifier }));
             }}
@@ -194,12 +199,12 @@ export function LoginForm({
           autoComplete="new-password"
           description={
             passwordOptional
-              ? "Leave blank if you sign in with a one-time code."
+              ? t("Leave blank if you sign in with a one-time code.")
               : undefined
           }
           error={errors.password?.[0]}
           id="vault-login-password"
-          label={passwordOptional ? "Password (optional)" : "Password"}
+          label={passwordOptional ? t("Password (optional)") : t("Password")}
           onChange={(password) => {
             setForm((current) => ({ ...current, password }));
           }}
@@ -209,7 +214,7 @@ export function LoginForm({
       </FieldGroup>
       <DialogFooter>
         <Button disabled={create.isPending} type="submit">
-          Save login
+          {t("Save login")}
         </Button>
       </DialogFooter>
     </form>

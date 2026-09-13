@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import type { VaultItem } from "@shared/vault/schema";
 import { VaultItemList } from "./section";
 
@@ -8,12 +10,13 @@ export function VaultOtherItems({
 }: {
   readonly items: readonly VaultItem[];
 }) {
+  const { t } = useI18n();
   if (items.length === 0) return null;
 
   return (
     <section aria-labelledby="other-vault-heading" className="space-y-3">
       <h2 className="type-section-title" id="other-vault-heading">
-        Other
+        {t("Other")}
       </h2>
       <div className="border-y border-border/50">
         <VaultItemList items={items} />

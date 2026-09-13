@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useState } from "react";
 import { Option, Schema } from "effect";
 import {
@@ -18,6 +20,7 @@ const wipeResponseSchema = Schema.Struct({
 });
 
 export function AccountPrivacyWipeSection() {
+  const { t } = useI18n();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +39,8 @@ export function AccountPrivacyWipeSection() {
         setError(
           text.trim() ||
             (response.status === 401
-              ? "Sign in to wipe personal memory."
-              : "Online wipe is unavailable. Try again.")
+              ? t("Sign in to wipe personal memory.")
+              : t("Online wipe is unavailable. Try again."))
         );
         setBusy(false);
         setConfirming(false);
@@ -48,7 +51,9 @@ export function AccountPrivacyWipeSection() {
       const body = Option.isSome(decoded) ? decoded.value : {};
       if (body.status && body.status !== "partial_online_wipe") {
         setError(
-          "Unexpected wipe status. This is not full account deletion; reload Account."
+          t(
+            "Unexpected wipe status. This is not full account deletion; reload Account."
+          )
         );
         setBusy(false);
         setConfirming(false);
@@ -59,7 +64,7 @@ export function AccountPrivacyWipeSection() {
       // Sessions are invalidated; send the user to sign-in.
       window.location.assign("/sign-in?callbackUrl=%2Faccount");
     } catch {
-      setError("Unable to reach the wipe API. Check your connection.");
+      setError(t("Unable to reach the wipe API. Check your connection."));
       setBusy(false);
       setConfirming(false);
     }
@@ -73,37 +78,38 @@ export function AccountPrivacyWipeSection() {
     >
       <div className="space-y-2">
         <h2 id="privacy-wipe-heading" className="type-section-title">
-          Seus dados e sua privacidade
+          {t("Seus dados e sua privacidade")}
         </h2>
         <p className="type-supporting-body text-muted-foreground">
-          Exporte seus dados ou apague a memória pessoal salva. Essa ação também
-          encerra suas sessões no navegador.
+          {t(
+            "Exporte seus dados ou apague a memória pessoal salva. Essa ação também encerra suas sessões no navegador."
+          )}
         </p>
       </div>
 
       <Alert variant="warning">
-        <AlertTitle>O que esta ação remove</AlertTitle>
-        <AlertDescription>{accountOnlineWipeLimits}</AlertDescription>
+        <AlertTitle>{t("O que esta ação remove")}</AlertTitle>
+        <AlertDescription>{t(accountOnlineWipeLimits)}</AlertDescription>
       </Alert>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <h3 className="type-supporting-body font-medium">
-            O que será apagado
+            {t("O que será apagado")}
           </h3>
           <ul className="list-disc space-y-1 pl-5 type-caption text-muted-foreground">
             {accountOnlineWipeWipedHint.map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item}>{t(item)}</li>
             ))}
           </ul>
         </div>
         <div className="space-y-2">
           <h3 className="type-supporting-body font-medium">
-            O que será mantido
+            {t("O que será mantido")}
           </h3>
           <ul className="list-disc space-y-1 pl-5 type-caption text-muted-foreground">
             {accountOnlineWipeNotWiped.map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item}>{t(item)}</li>
             ))}
           </ul>
         </div>
@@ -111,18 +117,18 @@ export function AccountPrivacyWipeSection() {
 
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>Não foi possível apagar</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertTitle>{t("Não foi possível apagar")}</AlertTitle>
+          <AlertDescription>{t(error)}</AlertDescription>
         </Alert>
       ) : null}
 
       {resultLimits ? (
         <Alert variant="information">
-          <AlertTitle>Exclusão parcial concluída</AlertTitle>
+          <AlertTitle>{t("Exclusão parcial concluída")}</AlertTitle>
           <AlertDescription>
-            {resultLimits}
+            {t(resultLimits)}
             {resultNotWiped?.length
-              ? ` Still retained: ${resultNotWiped.join(", ")}.`
+              ? ` ${t("Ainda mantidos: {items}", { items: resultNotWiped.map((item) => t(item)).join(", ") })}`
               : ""}
           </AlertDescription>
         </Alert>
@@ -134,7 +140,7 @@ export function AccountPrivacyWipeSection() {
           download
           href="/api/account/export"
         >
-          Exportar meus dados (JSON)
+          {t("Exportar meus dados (JSON)")}
         </a>
         {!confirming ? (
           <Button
@@ -145,7 +151,7 @@ export function AccountPrivacyWipeSection() {
             }}
             variant="destructive"
           >
-            Apagar memória pessoal
+            {t("Apagar memória pessoal")}
           </Button>
         ) : (
           <>
@@ -156,7 +162,7 @@ export function AccountPrivacyWipeSection() {
               }}
               variant="destructive"
             >
-              {busy ? "Apagando…" : "Confirmar exclusão parcial"}
+              {busy ? t("Apagando…") : t("Confirmar exclusão parcial")}
             </Button>
             <Button
               disabled={busy}
@@ -165,7 +171,7 @@ export function AccountPrivacyWipeSection() {
               }}
               variant="ghost"
             >
-              Cancelar
+              {t("Cancelar")}
             </Button>
           </>
         )}

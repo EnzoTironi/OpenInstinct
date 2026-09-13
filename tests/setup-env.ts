@@ -1,5 +1,17 @@
 import { vi } from "vitest";
 
+vi.mock("@web/i18n/server", async () => {
+  const { createTranslator } = await import("@web/i18n/translate");
+  const { default: messages } = await import("@web/i18n/messages/pt-br.json");
+  return {
+    getI18n: async () => ({
+      locale: "pt-BR",
+      messages,
+      t: createTranslator(messages),
+    }),
+  };
+});
+
 const testEnvironment = {
   BETTER_AUTH_SECRET: "test-auth-secret-0123456789abcdefghijklmnop",
   BETTER_AUTH_URL: "https://example.com",

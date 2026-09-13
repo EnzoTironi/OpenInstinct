@@ -1,3 +1,4 @@
+import { getI18n } from "@web/i18n/server";
 import { Effect, Result } from "effect";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -7,18 +8,20 @@ import { serverRuntime } from "../../../server/runtime";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { buttonVariants } from "@web/components/ui/button";
 
-function MemoryUnavailable() {
+async function MemoryUnavailable() {
+  const { t } = await getI18n();
   return (
     <Alert variant="destructive">
-      <AlertTitle>Não foi possível carregar a memória</AlertTitle>
+      <AlertTitle>{t("Não foi possível carregar a memória")}</AlertTitle>
       <AlertDescription>
-        Atualize a página para tentar novamente.
+        {t("Atualize a página para tentar novamente.")}
       </AlertDescription>
     </Alert>
   );
 }
 
 export async function PersonalMemorySection() {
+  const { t } = await getI18n();
   let result;
   try {
     result = await serverRuntime.runPromise(
@@ -43,15 +46,17 @@ export async function PersonalMemorySection() {
     >
       <div className="space-y-2">
         <h2 id="personal-memory-heading" className="type-section-title">
-          O que o Zoen lembra
+          {t("O que o Zoen lembra")}
         </h2>
         <p className="type-supporting-body text-muted-foreground">
-          Seu perfil e as notas salvas pelo Zoen. A exportação desta memória
-          inclui esses registros. Conversas, arquivos, conexões e agendamentos
-          ficam fora deste arquivo.
+          {t(
+            "Seu perfil e as notas salvas pelo Zoen. A exportação desta memória inclui esses registros. Conversas, arquivos, conexões e agendamentos ficam fora deste arquivo."
+          )}
         </p>
       </div>
-      <h3 className="type-supporting-body font-medium">Seu perfil salvo</h3>
+      <h3 className="type-supporting-body font-medium">
+        {t("Seu perfil salvo")}
+      </h3>
       {profile.length ? (
         <dl className="type-supporting-body grid gap-2">
           {profile.map(([field, value]) => (
@@ -65,25 +70,26 @@ export async function PersonalMemorySection() {
         </dl>
       ) : (
         <p className="type-supporting-body text-muted-foreground">
-          Nenhum detalhe do perfil salvo ainda.
+          {t("Nenhum detalhe do perfil salvo ainda.")}
         </p>
       )}
       <Link
         href="/personal-info"
         className={buttonVariants({ variant: "outline" })}
       >
-        Editar meus dados
+        {t("Editar meus dados")}
       </Link>
-      <h3 className="type-supporting-body font-medium">Notas do Zoen</h3>
+      <h3 className="type-supporting-body font-medium">{t("Notas do Zoen")}</h3>
       <p className="type-supporting-body text-muted-foreground">
-        Peça ao Zoen para corrigir ou esquecer uma informação na sua conversa
-        privada. Ele pode atualizar seu perfil e suas notas. Conversas
-        anteriores e cópias já baixadas permanecem separadas.
+        {t(
+          "Peça ao Zoen para corrigir ou esquecer uma informação na sua conversa privada. Ele pode atualizar seu perfil e suas notas. Conversas anteriores e cópias já baixadas permanecem separadas."
+        )}
       </p>
       {snapshot.notes.status === "unresolved" ? (
         <p className="type-supporting-body text-muted-foreground">
-          Ainda não foi possível localizar as notas desta conta. Continue uma
-          conversa com o Zoen e atualize esta página.
+          {t(
+            "Ainda não foi possível localizar as notas desta conta. Continue uma conversa com o Zoen e atualize esta página."
+          )}
         </p>
       ) : snapshot.notes.documents.length ? (
         snapshot.notes.documents.map((document) => (
@@ -92,12 +98,12 @@ export async function PersonalMemorySection() {
             className="type-supporting-body rounded-lg bg-muted p-3 wrap-break-word whitespace-pre-wrap"
           >
             {document.content.replace(/^<!--[^\n]*-->\r?\n/u, "") ||
-              "Nenhuma nota salva neste documento."}
+              t("Nenhuma nota salva neste documento.")}
           </pre>
         ))
       ) : (
         <p className="type-supporting-body text-muted-foreground">
-          Nenhuma nota salva nesta memória.
+          {t("Nenhuma nota salva nesta memória.")}
         </p>
       )}
       <a
@@ -105,7 +111,7 @@ export async function PersonalMemorySection() {
         download
         className={buttonVariants({ variant: "outline" })}
       >
-        Exportar minha memória (JSON)
+        {t("Exportar minha memória (JSON)")}
       </a>
     </section>
   );

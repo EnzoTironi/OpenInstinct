@@ -1,5 +1,9 @@
 "use client";
 
+import { validationOptions } from "@web/i18n/validation";
+
+import { useI18n } from "@web/i18n/context";
+
 import { type SubmitEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
@@ -46,6 +50,7 @@ export function CardForm({
   readonly initialLabel?: string;
   readonly onSaved: () => void;
 }) {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const create = api.vault.create.useMutation({
     onSuccess: () => {
@@ -63,7 +68,10 @@ export function CardForm({
     nickname: initialLabel,
   });
   const cardType = paymentCardType(form.cardNumber);
-  const result = paymentCardFormSchema.safeParse(form);
+  const result = paymentCardFormSchema.safeParse(
+    form,
+    validationOptions(locale)
+  );
   const errors =
     attempted && !result.success
       ? z.flattenError(result.error).fieldErrors
@@ -104,7 +112,7 @@ export function CardForm({
             autoComplete="cc-name"
             error={errors.cardholderName?.[0]}
             id="vault-payment-cardholder"
-            label="Name on card"
+            label={t("Name on card")}
             name="cc-name"
             onChange={(cardholderName) => {
               setForm((current) => ({ ...current, cardholderName }));
@@ -115,12 +123,12 @@ export function CardForm({
             autoComplete="off"
             error={errors.nickname?.[0]}
             id="vault-payment-nickname"
-            label="Nickname (optional)"
+            label={t("Nickname (optional)")}
             name="card-nickname"
             onChange={(nickname) => {
               setForm((current) => ({ ...current, nickname }));
             }}
-            placeholder="Personal"
+            placeholder={t("Personal")}
             value={form.nickname}
           />
         </div>
@@ -130,7 +138,7 @@ export function CardForm({
           error={errors.cardNumber?.[0]}
           id="vault-payment-number"
           inputMode="numeric"
-          label="Card number"
+          label={t("Card number")}
           maxLength={23}
           name="cc-number"
           onChange={(value) => {
@@ -150,7 +158,7 @@ export function CardForm({
             error={errors.expiration?.[0]}
             id="vault-payment-expiration"
             inputMode="numeric"
-            label="Expiration"
+            label={t("Expiration")}
             maxLength={7}
             name="cc-exp"
             onChange={(value) => {
@@ -159,7 +167,7 @@ export function CardForm({
                 expiration: formatExpiration(value),
               }));
             }}
-            placeholder="MM / YY"
+            placeholder={t("MM / YY")}
             value={form.expiration}
           />
           <CardField
@@ -184,7 +192,7 @@ export function CardForm({
             className="col-span-2 sm:col-span-1"
             error={errors.billingPostalCode?.[0]}
             id="vault-payment-postal-code"
-            label="Billing ZIP / postal"
+            label={t("Billing ZIP / postal")}
             maxLength={20}
             name="postal-code"
             onChange={(billingPostalCode) => {
@@ -197,7 +205,7 @@ export function CardForm({
 
       <DialogFooter>
         <Button disabled={create.isPending} type="submit">
-          Save card
+          {t("Save card")}
         </Button>
       </DialogFooter>
     </form>

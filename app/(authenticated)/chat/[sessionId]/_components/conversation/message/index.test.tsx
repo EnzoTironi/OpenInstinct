@@ -1,5 +1,5 @@
 import type { EveMessage } from "eve/react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToEnglishMarkup as renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it } from "vitest";
 import { AgentMessage } from ".";
 

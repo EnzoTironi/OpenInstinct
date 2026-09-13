@@ -4,7 +4,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToEnglishMarkup as renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("motion/react", () => {

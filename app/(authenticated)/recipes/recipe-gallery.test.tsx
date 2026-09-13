@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it } from "vitest";
 import { chatStarters } from "../_lib/chat-starters";
 import { RecipeGallery } from "./recipe-gallery";

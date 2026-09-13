@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "motion/react";
 import styles from "./marketing-landing.module.css";
@@ -16,6 +18,7 @@ const phrases = [
 ] as const;
 
 export function RotatingHeadline() {
+  const { t } = useI18n();
   const [current, setCurrent] = useState(0);
   const reduceMotion = useReducedMotion();
   useEffect(() => {
@@ -30,7 +33,7 @@ export function RotatingHeadline() {
 
   return (
     <span className={styles.rotatingHeadline}>
-      <span className="sr-only">cuidar de tudo sozinho.</span>
+      <span className="sr-only">{t("cuidar de tudo sozinho.")}</span>
       {phrases.map(([firstLine, secondLine], index) => (
         <em
           aria-hidden="true"
@@ -38,9 +41,9 @@ export function RotatingHeadline() {
           data-active={index === current}
           key={firstLine + secondLine}
         >
-          {firstLine}
+          {t(firstLine)}
           <br />
-          {secondLine}
+          {t(secondLine)}
         </em>
       ))}
     </span>

@@ -1,3 +1,5 @@
+import { LanguagePicker } from "@web/i18n/language-picker";
+import { getI18n } from "@web/i18n/server";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -6,15 +8,20 @@ import { ChannelAuthForm } from "@web/auth/channel/form";
 import { safeCallbackUrl } from "@web/auth/channel/client";
 import { getAuthSession } from "@db/services/auth/session";
 
-export const metadata: Metadata = {
-  title: "Sign in | Companion",
-  description:
-    "Sign in to Companion through Telegram or WhatsApp. No phone number to type.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return {
+    title: t("Sign in | Companion"),
+    description: t(
+      "Sign in to Companion through Telegram or WhatsApp. No phone number to type."
+    ),
+  };
+}
 
 export default async function SignInPage({
   searchParams,
 }: PageProps<"/sign-in">) {
+  const { t } = await getI18n();
   const params = await searchParams;
   const callbackValue = params.callbackUrl;
   const callbackUrl = safeCallbackUrl(
@@ -26,35 +33,38 @@ export default async function SignInPage({
       <section className="w-full max-w-sm space-y-6">
         <div className="space-y-2">
           <p className="type-caption text-muted-foreground">
-            Your assistant, one conversation away
+            {t("Your assistant, one conversation away")}
           </p>
-          <h1 className="type-page-title">Pick up the conversation</h1>
+          <h1 className="type-page-title">{t("Pick up the conversation")}</h1>
           <p className="type-supporting-body text-muted-foreground">
-            Sign in through the messenger you use with your assistant. New here?
-            See the{" "}
+            {t(
+              "Sign in through the messenger you use with your assistant. New here? See the"
+            )}{" "}
             <Link
               className="text-foreground underline underline-offset-4"
               href="/welcome"
             >
-              product overview
+              {t("product overview")}
             </Link>{" "}
-            or start with{" "}
+            {t("or start with")}{" "}
             <Link
               className="text-foreground underline underline-offset-4"
               href="/get-started"
             >
-              Get started
+              {t("Get started")}
             </Link>{" "}
-            to create your account and bind a channel in one flow.
+            {t("to create your account and bind a channel in one flow.")}
           </p>
         </div>
         {params.reason === "channel-unlinked" ? (
           <output className="type-supporting-body block text-muted-foreground">
-            Channel disconnected. You were signed out of all browsers. Use a
-            remaining linked channel to sign in again.
+            {t(
+              "Channel disconnected. You were signed out of all browsers. Use a remaining linked channel to sign in again."
+            )}
           </output>
         ) : null}
         <ChannelAuthForm purpose="login" callbackUrl={callbackUrl} />
+        <LanguagePicker />
       </section>
     </main>
   );

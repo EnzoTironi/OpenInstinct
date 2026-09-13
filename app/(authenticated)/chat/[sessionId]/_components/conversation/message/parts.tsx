@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import type { EveMessagePart } from "eve/react";
 import { MessageResponse } from "@web/components/ai-elements/message";
 import {
@@ -30,6 +33,7 @@ export function AgentMessagePart({
   readonly showCaret: boolean;
   readonly userVisibleOnly: boolean;
 }) {
+  const { t } = useI18n();
   switch (part.type) {
     case "step-start":
       return null;
@@ -99,7 +103,7 @@ export function AgentMessagePart({
       );
     }
   }
-  throw new Error("Unsupported agent message part.");
+  throw new Error(t("Unsupported agent message part."));
 }
 
 export function partKey(part: EveMessagePart, index: number): string {

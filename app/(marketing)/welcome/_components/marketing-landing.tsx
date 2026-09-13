@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -93,6 +96,7 @@ const questions = [
 ] as const;
 
 export function MarketingLanding() {
+  const { t } = useI18n();
   return (
     <MarketingShell active="product">
       <main className={styles.landing} id="conteudo">
@@ -100,25 +104,25 @@ export function MarketingLanding() {
         <section className={styles.hero} data-sky="0">
           <MarketingFrame className={styles.heroContent}>
             <p className="type-supporting-body">
-              Seu dia, seu trabalho, suas pessoas. Um Zoen.
+              {t("Seu dia, seu trabalho, suas pessoas. Um Zoen.")}
             </p>
             <h1 className={cn("type-signal", styles.heroTitle)}>
-              Você não precisa
+              {t("Você não precisa")}
               <br />
               <RotatingHeadline />
             </h1>
             <div className={styles.integrations}>
-              <span>Converse no</span>
+              <span>{t("Converse no")}</span>
               <ConversationIcons />
             </div>
             <div className={styles.actions}>
               <OnboardingTrigger className={styles.primaryButton} size="lg">
-                Começar agora <ArrowUpRightIcon aria-hidden="true" />
+                {t("Começar agora")} <ArrowUpRightIcon aria-hidden="true" />
               </OnboardingTrigger>
             </div>
           </MarketingFrame>
           <a
-            aria-label="Ver como o Zoen ajuda no dia a dia"
+            aria-label={t("Ver como o Zoen ajuda no dia a dia")}
             className={styles.scrollHint}
             href="#dia-a-dia"
           >
@@ -129,16 +133,16 @@ export function MarketingLanding() {
         <section className={styles.story} data-sky="1" id="dia-a-dia">
           <MarketingFrame className={styles.storyRow}>
             <h2 className={cn("type-signal", styles.largeTitle)}>
-              Aquela ideia.
+              {t("Aquela ideia.")}
               <br />
-              Aquele prazo.
+              {t("Aquele prazo.")}
               <br />
-              Onde você
+              {t("Onde você")}
               <br />
-              <em>salvou mesmo?</em>
+              <em>{t("salvou mesmo?")}</em>
             </h2>
             <Image
-              alt="Lembretes espalhados entre mensagens, notas e abas"
+              alt={t("Lembretes espalhados entre mensagens, notas e abas")}
               className={styles.storyImage}
               height={2624}
               sizes="(max-width: 760px) 90vw, 48vw"
@@ -149,7 +153,7 @@ export function MarketingLanding() {
           </MarketingFrame>
           <MarketingFrame className={cn(styles.storyRow, styles.reverse)}>
             <Image
-              alt="Um calendário cheio de compromissos e lembretes"
+              alt={t("Um calendário cheio de compromissos e lembretes")}
               className={styles.storyImage}
               height={2628}
               sizes="(max-width: 760px) 90vw, 48vw"
@@ -158,34 +162,37 @@ export function MarketingLanding() {
               width={2528}
             />
             <h2 className={cn("type-signal", styles.largeTitle)}>
-              Você organiza
-              <br />o calendário.
+              {t("Você organiza")}
+              <br />
+              {t("o calendário.")}
               <br />
               <em>
-                A vida continua
+                {t("A vida continua")}
                 <br />
-                acontecendo.
+                {t("acontecendo.")}
               </em>
             </h2>
           </MarketingFrame>
           <MarketingFrame className={styles.statement}>
             <h2 className={cn("type-signal", styles.largeTitle)}>
-              O trabalho, a família,
+              {t("O trabalho, a família,")}
               <br />
-              as coisas só suas.
+              {t("as coisas só suas.")}
               <br />
-              <em>É muita coisa para uma cabeça.</em>
+              <em>{t("É muita coisa para uma cabeça.")}</em>
             </h2>
             <p className="type-body">
-              Você merece tempo para pensar no que vem depois.
+              {t("Você merece tempo para pensar no que vem depois.")}
             </p>
           </MarketingFrame>
         </section>
 
         <section className={styles.sky} data-sky="2">
           <MarketingFrame className={styles.skyContent}>
-            <p className={styles.eyebrow}>MAIS ESPAÇO PARA</p>
-            <h2 className={cn("type-signal", styles.lifeTitle)}>Sua vida.</h2>
+            <p className={styles.eyebrow}>{t("MAIS ESPAÇO PARA")}</p>
+            <h2 className={cn("type-signal", styles.lifeTitle)}>
+              {t("Sua vida.")}
+            </h2>
             <Image
               alt=""
               className={styles.face}
@@ -196,22 +203,22 @@ export function MarketingLanding() {
               width={88}
             />
             <h2 className={cn("type-signal", styles.largeTitle)}>
-              Deixe os detalhes com ele.
+              {t("Deixe os detalhes com ele.")}
               <br />
-              <em>Fique com os momentos.</em>
+              <em>{t("Fique com os momentos.")}</em>
             </h2>
             <div className={styles.benefits}>
               <p>
-                <strong>Capture a ideia.</strong>
-                <span>Seu Zoen lembra onde ela leva.</span>
+                <strong>{t("Capture a ideia.")}</strong>
+                <span>{t("Seu Zoen lembra onde ela leva.")}</span>
               </p>
               <p>
-                <strong>Encontre o próximo passo.</strong>
-                <span>Ele acompanha até estar resolvido.</span>
+                <strong>{t("Encontre o próximo passo.")}</strong>
+                <span>{t("Ele acompanha até estar resolvido.")}</span>
               </p>
               <p>
-                <strong>Esteja presente.</strong>
-                <span>As pequenas pendências ficam com ele.</span>
+                <strong>{t("Esteja presente.")}</strong>
+                <span>{t("As pequenas pendências ficam com ele.")}</span>
               </p>
             </div>
           </MarketingFrame>
@@ -220,28 +227,29 @@ export function MarketingLanding() {
         <section className={styles.how} data-sky="3" id="como-funciona">
           <MarketingFrame>
             <h2 className={cn("type-signal", styles.centeredTitle)}>
-              Começa com uma conversa.
+              {t("Começa com uma conversa.")}
               <br />
-              <em>Continua com algo resolvido.</em>
+              <em>{t("Continua com algo resolvido.")}</em>
             </h2>
             <div className={styles.messageExample}>
-              <span>Você</span>
-              <p>“Guarda esse contrato e me avisa antes de vencer.”</p>
+              <span>{t("Você")}</span>
+              <p>{t("“Guarda esse contrato e me avisa antes de vencer.”")}</p>
             </div>
             <div className={styles.steps}>
               {steps.map((step) => (
                 <div key={step.title}>
                   <step.icon aria-hidden="true" />
-                  <h3 className="type-section-title">{step.title}</h3>
-                  <p>{step.body}</p>
+                  <h3 className="type-section-title">{t(step.title)}</h3>
+                  <p>{t(step.body)}</p>
                 </div>
               ))}
             </div>
             <div className={styles.replyExample}>
               <span>Zoen</span>
               <p>
-                Guardei. O contrato vence em 30 de novembro. Vou te lembrar com
-                uma semana de antecedência.
+                {t(
+                  "Guardei. O contrato vence em 30 de novembro. Vou te lembrar com uma semana de antecedência."
+                )}
               </p>
             </div>
           </MarketingFrame>
@@ -250,17 +258,17 @@ export function MarketingLanding() {
         <section className={styles.conversation} data-sky="3" id="para-voce">
           <MarketingFrame>
             <h2 className={cn("type-signal", styles.centeredTitle)}>
-              Do jeito que você fala.
+              {t("Do jeito que você fala.")}
               <br />
-              <em>No lugar onde já conversa.</em>
+              <em>{t("No lugar onde já conversa.")}</em>
             </h2>
             <ChatPreview />
             <div className={styles.ease}>
               {[
-                "Escreva com suas palavras",
-                "Continue de onde parou",
-                "Peça para ajustar",
-                "Converse pelo seu canal",
+                t("Escreva com suas palavras"),
+                t("Continue de onde parou"),
+                t("Peça para ajustar"),
+                t("Converse pelo seu canal"),
               ].map((item) => (
                 <span key={item}>
                   <CheckIcon aria-hidden="true" />
@@ -274,14 +282,14 @@ export function MarketingLanding() {
         <section className={styles.landscapes} data-sky="4">
           <MarketingFrame>
             <h2 className={cn("type-signal", styles.centeredTitle)}>
-              Para o que você precisa fazer.
+              {t("Para o que você precisa fazer.")}
               <br />
-              <em>E para o que você quer viver.</em>
+              <em>{t("E para o que você quer viver.")}</em>
             </h2>
             <div className={styles.landscapeGrid}>
               <a className={styles.landscape} href="#para-voce">
                 <Image
-                  alt="Ilha flutuante com um escritório"
+                  alt={t("Ilha flutuante com um escritório")}
                   height={1708}
                   sizes="(max-width: 760px) 90vw, 44vw"
                   src="/marketing/office.webp"
@@ -289,12 +297,13 @@ export function MarketingLanding() {
                   width={3252}
                 />
                 <span>
-                  NO TRABALHO<strong>Resolva.</strong>
+                  {t("NO TRABALHO")}
+                  <strong>{t("Resolva.")}</strong>
                 </span>
               </a>
               <a className={styles.landscape} href="#pessoas-de-confianca">
                 <Image
-                  alt="Ilha flutuante com um parque"
+                  alt={t("Ilha flutuante com um parque")}
                   height={1708}
                   sizes="(max-width: 760px) 90vw, 44vw"
                   src="/marketing/park.webp"
@@ -302,7 +311,8 @@ export function MarketingLanding() {
                   width={3252}
                 />
                 <span>
-                  NA SUA VIDA<strong>Esteja presente.</strong>
+                  {t("NA SUA VIDA")}
+                  <strong>{t("Esteja presente.")}</strong>
                 </span>
               </a>
             </div>
@@ -316,21 +326,21 @@ export function MarketingLanding() {
         >
           <MarketingFrame className={styles.connectionContent}>
             <p className={styles.eyebrow}>
-              AS FERRAMENTAS SÃO SUAS. A CONEXÃO É COM ELE.
+              {t("AS FERRAMENTAS SÃO SUAS. A CONEXÃO É COM ELE.")}
             </p>
             <h2 className={cn("type-signal", styles.centeredTitle)}>
-              “Conecta isso para mim?”
+              {t("“Conecta isso para mim?”")}
               <br />
-              <em>Deixe com seu Zoen.</em>
+              <em>{t("Deixe com seu Zoen.")}</em>
             </h2>
             <p>
-              Sua agenda, seus arquivos, o sistema do seu negócio. Peça na
-              conversa. Ele encontra a conexão ou constrói o que falta em
-              segundo plano. Você continua o seu dia.
+              {t(
+                "Sua agenda, seus arquivos, o sistema do seu negócio. Peça na conversa. Ele encontra a conexão ou constrói o que falta em segundo plano. Você continua o seu dia."
+              )}
             </p>
             <ConnectionCarousel />
             <p className={styles.quiet}>
-              Você escolhe o acesso. Ele cuida dos detalhes.
+              {t("Você escolhe o acesso. Ele cuida dos detalhes.")}
             </p>
           </MarketingFrame>
         </section>
@@ -342,25 +352,30 @@ export function MarketingLanding() {
         >
           <MarketingFrame className={styles.trustedGrid}>
             <div>
-              <p className={styles.eyebrow}>SUA REDE DE CONFIANÇA</p>
+              <p className={styles.eyebrow}>{t("SUA REDE DE CONFIANÇA")}</p>
               <h2 className={cn("type-signal", styles.largeTitle)}>
-                Seu Zoen.
-                <br />O Zoen deles.
+                {t("Seu Zoen.")}
                 <br />
-                <em>Um plano juntos.</em>
+                {t("O Zoen deles.")}
+                <br />
+                <em>{t("Um plano juntos.")}</em>
               </h2>
               <p>
-                Um jantar com a família. A viagem dos amigos. A reunião que
-                nunca encontra horário. Seu Zoen conversa com o Zoen das pessoas
-                que você escolheu e cuida da combinação.
+                {t(
+                  "Um jantar com a família. A viagem dos amigos. A reunião que nunca encontra horário. Seu Zoen conversa com o Zoen das pessoas que você escolheu e cuida da combinação."
+                )}
               </p>
               <p className={styles.quiet}>
-                Vocês compartilham o plano. Cada pessoa mantém sua privacidade.
+                {t(
+                  "Vocês compartilham o plano. Cada pessoa mantém sua privacidade."
+                )}
               </p>
             </div>
             <figure className={styles.networkMockup}>
               <Image
-                alt="Mockup de iMessage: seu Zoen e o da Ana combinam um jantar para sexta às 20h, com sua confirmação."
+                alt={t(
+                  "Mockup de iMessage: seu Zoen e o da Ana combinam um jantar para sexta às 20h, com sua confirmação."
+                )}
                 height={1536}
                 sizes="(max-width: 760px) 115vw, 520px"
                 src="/marketing/zoen-imessage.webp"
@@ -368,7 +383,7 @@ export function MarketingLanding() {
                 width={1024}
               />
               <figcaption>
-                Só com quem você escolheu para a sua rede.
+                {t("Só com quem você escolheu para a sua rede.")}
               </figcaption>
             </figure>
           </MarketingFrame>
@@ -377,12 +392,12 @@ export function MarketingLanding() {
         <section className={styles.plans} data-sky="5">
           <MarketingFrame className={styles.planContent}>
             <h2 className={cn("type-signal", styles.centeredTitle)}>
-              Comece com um pedido.
+              {t("Comece com um pedido.")}
             </h2>
-            <p>Seu Zoen entra no ritmo com você.</p>
+            <p>{t("Seu Zoen entra no ritmo com você.")}</p>
             <div className={styles.actions}>
               <OnboardingTrigger className={styles.primaryButton} size="lg">
-                Começar agora <ArrowUpRightIcon aria-hidden="true" />
+                {t("Começar agora")} <ArrowUpRightIcon aria-hidden="true" />
               </OnboardingTrigger>
             </div>
           </MarketingFrame>
@@ -391,28 +406,28 @@ export function MarketingLanding() {
         <section className={styles.faq} data-sky="6" id="duvidas">
           <MarketingFrame className={styles.faqGrid}>
             <div className={styles.faqIntro}>
-              <p className={styles.eyebrow}>ANTES DO PRIMEIRO OI</p>
+              <p className={styles.eyebrow}>{t("ANTES DO PRIMEIRO OI")}</p>
               <h2 className={cn("type-signal", styles.largeTitle)}>
-                Pode perguntar.
+                {t("Pode perguntar.")}
               </h2>
-              <p>Veja como começar com seu Zoen.</p>
+              <p>{t("Veja como começar com seu Zoen.")}</p>
               <Button
                 className={styles.glassButton}
                 nativeButton={false}
                 render={<Link href="/docs" />}
                 variant="outline"
               >
-                Ler o guia <ArrowUpRightIcon aria-hidden="true" />
+                {t("Ler o guia")} <ArrowUpRightIcon aria-hidden="true" />
               </Button>
             </div>
             <div>
               {questions.map((item) => (
                 <details className={styles.question} key={item.question}>
                   <summary>
-                    {item.question}
+                    {t(item.question)}
                     <span aria-hidden="true">+</span>
                   </summary>
-                  <p>{item.answer}</p>
+                  <p>{t(item.answer)}</p>
                 </details>
               ))}
             </div>

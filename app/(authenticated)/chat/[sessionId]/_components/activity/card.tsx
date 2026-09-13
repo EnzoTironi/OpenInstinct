@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import type { MessageStreamEvent } from "eve/client";
 import { ChevronRightIcon } from "lucide-react";
 import {
@@ -35,17 +38,18 @@ export function ActivityCard({
   readonly usage: ChatUsage;
   readonly workingCount: number;
 }) {
+  const { t, locale } = useI18n();
   return (
     <Card className="max-h-full w-full gap-0 overflow-hidden" size="sm">
       <CardContent className="min-h-0 overflow-y-auto">
-        <p className="type-caption text-muted-foreground">Activity</p>
+        <p className="type-caption text-muted-foreground">{t("Activity")}</p>
         <div className="mt-3 space-y-2">
           <Field orientation="horizontal">
             <label
               className="type-supporting-body flex-1"
               htmlFor="show-full-trace"
             >
-              <span className="font-[300]">Show full trace</span>
+              <span className="font-[300]">{t("Show full trace")}</span>
             </label>
             <Switch
               checked={traceView === "trace"}
@@ -57,26 +61,28 @@ export function ActivityCard({
           </Field>
           <div className="flex items-center gap-4">
             <span className="type-supporting-body">
-              <span className="font-[300]">Usage</span>
+              <span className="font-[300]">{t("Usage")}</span>
             </span>
             <span className="ml-auto type-caption text-muted-foreground tabular-nums">
-              {formatChatUsage(usage)}
+              {formatChatUsage(usage, locale)}
             </span>
           </div>
         </div>
 
         <section className="mt-4 border-t pt-4">
-          <h2 className="type-caption text-muted-foreground">Tasks</h2>
+          <h2 className="type-caption text-muted-foreground">{t("Tasks")}</h2>
           {sessions.length === 0 ? (
             <p className="type-supporting-body mt-2 text-muted-foreground">
-              No tasks yet
+              {t("No tasks yet")}
             </p>
           ) : (
             <>
               <div className="type-supporting-body mt-2 flex items-center gap-3 pb-2 tabular-nums">
-                <span>{workingCount} working</span>
+                <span>
+                  {workingCount} {t("working")}
+                </span>
                 <span className="ml-auto text-muted-foreground">
-                  {doneCount} done
+                  {doneCount} {t("done")}
                 </span>
               </div>
               <div>
@@ -89,7 +95,10 @@ export function ActivityCard({
                     ) ?? session.task;
                   return (
                     <Button
-                      aria-label={`${agentLabel(session.name)} task, ${status}`}
+                      aria-label={t("{name}: {status}", {
+                        name: agentLabel(session.name),
+                        status: t(status),
+                      })}
                       className="rounded-lg p-3"
                       data-task-session={session.childSessionId}
                       key={session.childSessionId}
@@ -104,7 +113,7 @@ export function ActivityCard({
                           {agentLabel(session.name)}
                         </span>
                         <span className="block truncate type-caption text-muted-foreground">
-                          {task ?? "Open to load task details"}
+                          {task ?? t("Open to load task details")}
                         </span>
                       </span>
                       <StatusIndicator status={status} />

@@ -1,11 +1,13 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import type {
   ChannelAuthorizationError,
   ChannelAuthorizationStatus,
 } from "@web/auth/channel/client";
 import { Effect, Result } from "effect";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type {
   channelChallengeSchema,
@@ -32,10 +34,16 @@ import { authClient } from "@web/auth/client";
 export function ChannelAuthForm({
   callbackUrl,
   purpose,
+  children,
 }: {
   readonly callbackUrl: string;
   readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
+  readonly children?: (request: {
+    start: (channel: typeof channelProviderSchema.Type) => void;
+    busy: boolean;
+  }) => ReactNode;
 }) {
+  const { t } = useI18n();
   const [challenge, setChallenge] =
     useState<typeof channelChallengeSchema.Type>();
   const action = useAuthorizationRequest();
@@ -61,51 +69,76 @@ export function ChannelAuthForm({
     );
   return (
     <div className="space-y-3">
-      <Button
-        className="w-full"
-        size="lg"
-        disabled={action.busy}
-        onClick={() => {
-          start("telegram");
-        }}
-        type="button"
-      >
-        {action.busy
-          ? purpose === "login"
-            ? "Preparing sign-in…"
-            : "Preparing link…"
-          : purpose === "login"
-            ? "Continue with Telegram"
-            : "Link Telegram"}
-      </Button>
-      <Button
-        className="w-full"
-        size="lg"
-        disabled={action.busy}
-        onClick={() => {
-          start("kapso");
-        }}
-        type="button"
-        variant="outline"
-      >
-        {purpose === "login" ? "Continue with WhatsApp" : "Link WhatsApp"}
-      </Button>
+      {children ? (
+        children({ start, busy: action.busy })
+      ) : (
+        <ChannelChoices purpose={purpose} start={start} busy={action.busy} />
+      )}
       {action.error ? (
         <Alert variant="destructive">
           <AlertDescription>
-            {channelFailureMessage(action.error, purpose)}
+            {t(channelFailureMessage(action.error, purpose))}
           </AlertDescription>
         </Alert>
       ) : null}
       {purpose === "link" && action.error?.status === 401 ? (
         <SignInAgain callbackUrl={callbackUrl} />
       ) : null}
+    </div>
+  );
+}
+
+function ChannelChoices({
+  purpose,
+  start,
+  busy,
+}: {
+  readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
+  readonly start: (channel: typeof channelProviderSchema.Type) => void;
+  readonly busy: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <>
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={busy}
+        onClick={() => {
+          start("telegram");
+        }}
+        type="button"
+      >
+        {busy
+          ? purpose === "login"
+            ? t("Preparing sign-in…")
+            : t("Preparing link…")
+          : purpose === "login"
+            ? t("Continue with Telegram")
+            : t("Link Telegram")}
+      </Button>
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={busy}
+        onClick={() => {
+          start("kapso");
+        }}
+        type="button"
+        variant="outline"
+      >
+        {purpose === "login" ? t("Continue with WhatsApp") : t("Link WhatsApp")}
+      </Button>
       <p className="type-caption text-muted-foreground">
         {purpose === "login"
-          ? "Choose a messenger, confirm this browser’s sign-in in chat, then return here. No phone number or password to enter."
-          : "Choose the messenger account you want to link. Confirm the link in that chat, then return here to finish. A recent sign-in is required."}
+          ? t(
+              "Choose a messenger, confirm this browser’s sign-in in chat, then return here. No phone number or password to enter."
+            )
+          : t(
+              "Choose the messenger account you want to link. Confirm the link in that chat, then return here to finish. A recent sign-in is required."
+            )}
       </p>
-    </div>
+    </>
   );
 }
 
@@ -122,6 +155,7 @@ export function PendingAuthorization({
   readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
   readonly onRestart: () => void;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [status, setStatus] = useState<ChannelAuthorizationStatus>("pending");
   const [error, setError] = useState<string>();
@@ -162,8 +196,8 @@ export function PendingAuthorization({
             );
             setError(
               next.status === "invalid"
-                ? `${channelFailureMessage(result.failure, purpose)} Start a new request to continue.`
-                : channelFailureMessage(result.failure, purpose)
+                ? `${t(channelFailureMessage(result.failure, purpose))} ${t("Comece um novo pedido para continuar.")}`
+                : t(channelFailureMessage(result.failure, purpose))
             );
             if (next.status !== "pending") {
               setStatus(next.status);
@@ -177,14 +211,15 @@ export function PendingAuthorization({
         setStatus("expired");
       });
       void Effect.runPromise(poll, { signal: controller.signal }).catch(() => {
-        if (!controller.signal.aborted) setError(channelHttpError(0).message);
+        if (!controller.signal.aborted)
+          setError(t(channelHttpError(0).message));
       });
     }
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [challenge, status, purpose]);
+  }, [challenge, status, purpose, t]);
 
   function complete() {
     if (status !== "confirmed") return;
@@ -207,7 +242,7 @@ export function PendingAuthorization({
         status={status}
         busy={action.busy}
         error={
-          action.error ? channelFailureMessage(action.error, purpose) : error
+          action.error ? t(channelFailureMessage(action.error, purpose)) : error
         }
         onContinue={complete}
         onRestart={onRestart}
@@ -259,6 +294,7 @@ export function useAuthorizationRequest() {
 }
 
 export function SignInAgain({ callbackUrl }: { readonly callbackUrl: string }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   return (
@@ -285,12 +321,12 @@ export function SignInAgain({ callbackUrl }: { readonly callbackUrl: string }) {
           });
         }}
       >
-        {busy ? "Signing out…" : "Sign in again"}
+        {busy ? t("Signing out…") : t("Sign in again")}
       </Button>
       {failed ? (
         <Alert variant="destructive">
           <AlertDescription>
-            Unable to sign out. Check your connection and try again.
+            {t("Unable to sign out. Check your connection and try again.")}
           </AlertDescription>
         </Alert>
       ) : null}

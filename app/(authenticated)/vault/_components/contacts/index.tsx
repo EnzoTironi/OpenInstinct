@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { PlusIcon } from "lucide-react";
 import type { VaultItem } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
@@ -24,6 +26,7 @@ export function VaultContacts({
 }: {
   readonly items: readonly VaultItem[];
 }) {
+  const { t, locale } = useI18n();
   const setup = useVaultSetup();
   const initialAdd = setup?.kind === "contact";
   const section = useVaultSection(initialAdd ? "add" : "list");
@@ -32,24 +35,26 @@ export function VaultContacts({
     <VaultSection
       onOpenChange={section.onOpenChange}
       open={section.open}
-      title="Contact info"
+      title={t("Contact info")}
     >
-      <VaultSectionTrigger items={items} title="Contact info" />
+      <VaultSectionTrigger items={items} title={t("Contact info")} />
       <VaultSectionContent view={section.view}>
         {section.view === "list" ? (
           <>
             <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Contact info</DialogTitle>
+              <DialogTitle>{t("Contact info")}</DialogTitle>
               <DialogDescription>
                 {items.length > 0
-                  ? `Search and manage ${items.length.toLocaleString()} saved contact info.`
-                  : "Add your first saved contact."}
+                  ? t("Buscar e gerenciar itens salvos ({count}).", {
+                      count: items.length.toLocaleString(locale),
+                    })
+                  : t("Add your first saved contact.")}
               </DialogDescription>
             </DialogHeader>
             <VaultItemBrowser
               items={items}
               searchId="vault-search-contacts"
-              title="Contact info"
+              title={t("Contact info")}
             />
             <div className="flex justify-end gap-2">
               <Button
@@ -59,7 +64,7 @@ export function VaultContacts({
                 type="button"
               >
                 <PlusIcon />
-                Add contact
+                {t("Add contact")}
               </Button>
             </div>
           </>
@@ -69,13 +74,14 @@ export function VaultContacts({
               onClick={() => {
                 section.setView("list");
               }}
-              title="Contact info"
+              title={t("Contact info")}
             />
             <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Add contact</DialogTitle>
+              <DialogTitle>{t("Add contact")}</DialogTitle>
               <DialogDescription>
-                Sensitive values are encrypted before database storage and are
-                never returned after saving.
+                {t(
+                  "Sensitive values are encrypted before database storage and are never returned after saving."
+                )}
               </DialogDescription>
             </DialogHeader>
             <ContactForm

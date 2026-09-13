@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import {
   ArrowLeftIcon,
   ChevronRightIcon,
@@ -67,14 +69,17 @@ export function VaultSectionTrigger({
   readonly items: readonly VaultItem[];
   readonly title: string;
 }) {
+  const { t, locale } = useI18n();
   return (
     <DialogTrigger render={<Button type="button" variant="surface" />}>
       <span className="min-w-0 flex-1">
         <span className="block type-label">{title}</span>
         <span className="type-supporting-body block text-muted-foreground">
           {items.length > 0
-            ? `${items.length.toLocaleString()} saved`
-            : `No saved ${title.toLocaleLowerCase()}`}
+            ? t("{count} itens salvos", {
+                count: items.length.toLocaleString(locale),
+              })
+            : t("Nenhum item salvo ainda.")}
         </span>
       </span>
       <ChevronRightIcon />
@@ -128,13 +133,14 @@ export function VaultItemBrowser({
   readonly searchId: string;
   readonly title: string;
 }) {
+  const { t, locale } = useI18n();
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(VAULT_DIALOG_PAGE_SIZE);
-  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const normalizedQuery = query.trim().toLocaleLowerCase(locale);
   const filteredItems = normalizedQuery
     ? items.filter((item) =>
         `${item.label}\n${item.account}`
-          .toLocaleLowerCase()
+          .toLocaleLowerCase(locale)
           .includes(normalizedQuery)
       )
     : items;
@@ -145,7 +151,7 @@ export function VaultItemBrowser({
       {items.length > 0 ? (
         <div>
           <Label className="sr-only" htmlFor={searchId}>
-            Search {title.toLocaleLowerCase()}
+            {t("Buscar em {name}", { name: title })}
           </Label>
           <InputGroup>
             <InputGroupAddon>
@@ -157,7 +163,7 @@ export function VaultItemBrowser({
                 setQuery(event.target.value);
                 setVisibleCount(VAULT_DIALOG_PAGE_SIZE);
               }}
-              placeholder="Search by name or account"
+              placeholder={t("Search by name or account")}
               type="search"
               value={query}
             />
@@ -168,7 +174,7 @@ export function VaultItemBrowser({
       )}
 
       <section
-        aria-label={`${title} list`}
+        aria-label={t("Lista de {name}", { name: title })}
         className="-mx-4 no-scrollbar min-h-0 overflow-y-auto px-4"
         onScroll={(event) => {
           const list = event.currentTarget;
@@ -185,11 +191,12 @@ export function VaultItemBrowser({
           <VaultItemList items={visibleItems} />
         ) : query.trim() ? (
           <p className="type-supporting-body py-10 text-center text-muted-foreground">
-            No matches for “{query.trim()}”
+            {t("No matches for “")}
+            {query.trim()}”
           </p>
         ) : (
           <p className="type-supporting-body py-10 text-center text-muted-foreground">
-            No saved {title.toLocaleLowerCase()} yet.
+            {t("Nenhum item salvo ainda.")}
           </p>
         )}
       </section>
@@ -212,6 +219,7 @@ export function VaultItemList({
 }
 
 function VaultItemRow({ item }: { readonly item: VaultItem }) {
+  const { t } = useI18n();
   const router = useRouter();
   const remove = api.vault.remove.useMutation({
     onSuccess: () => {
@@ -231,7 +239,7 @@ function VaultItemRow({ item }: { readonly item: VaultItem }) {
         ) : null}
       </div>
       <Button
-        aria-label={`Remove ${item.label}`}
+        aria-label={t("Remover {name}", { name: item.label })}
         disabled={remove.isPending}
         onClick={() => {
           remove.mutate({ id: item.id });

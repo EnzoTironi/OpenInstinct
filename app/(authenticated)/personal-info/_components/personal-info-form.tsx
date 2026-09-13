@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { type SubmitEvent, useState } from "react";
 import { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
@@ -17,6 +19,7 @@ export function PersonalInfoForm({
 }: {
   readonly initialProfile: UserProfile;
 }) {
+  const { t } = useI18n();
   const updateProfile = api.userProfile.update.useMutation();
   const [status, setStatus] = useState<"error" | "saved">();
 
@@ -55,19 +58,21 @@ export function PersonalInfoForm({
   return (
     <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
       <div className="space-y-2">
-        <h1 className="type-page-title">Sobre você.</h1>
+        <h1 className="type-page-title">{t("Sobre você.")}</h1>
         <p className="type-body max-w-2xl text-muted-foreground">
-          Os detalhes que ajudam o Zoen a preencher formulários para você.
-          Guarde senhas e dados de pagamento no Cofre.
+          {t(
+            "Os detalhes que ajudam o Zoen a preencher formulários para você. Guarde senhas e dados de pagamento no Cofre."
+          )}
         </p>
       </div>
 
       {status === "error" ? (
         <Alert variant="destructive">
-          <AlertTitle>Couldn&apos;t save personal info</AlertTitle>
+          <AlertTitle>{t("Couldn't save personal info")}</AlertTitle>
           <AlertDescription>
-            Check the email, birth date, and two-letter country code, then try
-            again.
+            {t(
+              "Check the email, birth date, and two-letter country code, then try again."
+            )}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -75,39 +80,39 @@ export function PersonalInfoForm({
       <form className="space-y-10" onSubmit={submit}>
         <section aria-labelledby="identity-heading" className="space-y-4">
           <h2 className="type-label" id="identity-heading">
-            Identidade e contato
+            {t("Identidade e contato")}
           </h2>
           <div className="grid gap-5 sm:grid-cols-2">
             <ProfileField
               autoComplete="given-name"
               defaultValue={initialProfile.firstName}
-              label="Nome"
+              label={t("Nome")}
               name="firstName"
             />
             <ProfileField
               autoComplete="family-name"
               defaultValue={initialProfile.lastName}
-              label="Sobrenome"
+              label={t("Sobrenome")}
               name="lastName"
             />
             <ProfileField
               autoComplete="email"
               defaultValue={initialProfile.email}
-              label="Email"
+              label={t("Email")}
               name="email"
               type="email"
             />
             <ProfileField
               autoComplete="tel"
               defaultValue={initialProfile.phone}
-              label="Telefone"
+              label={t("Telefone")}
               name="phone"
               type="tel"
             />
             <ProfileField
               autoComplete="bday"
               defaultValue={initialProfile.dateOfBirth}
-              label="Data de nascimento"
+              label={t("Data de nascimento")}
               name="dateOfBirth"
               type="date"
             />
@@ -116,45 +121,45 @@ export function PersonalInfoForm({
 
         <section aria-labelledby="address-heading" className="space-y-4">
           <h2 className="type-label" id="address-heading">
-            Endereço
+            {t("Endereço")}
           </h2>
           <div className="grid gap-5 sm:grid-cols-2">
             <ProfileField
               autoComplete="address-line1"
               className="sm:col-span-2"
               defaultValue={initialProfile.addressLine1}
-              label="Endereço"
+              label={t("Endereço")}
               name="addressLine1"
             />
             <ProfileField
               autoComplete="address-line2"
               className="sm:col-span-2"
               defaultValue={initialProfile.addressLine2}
-              label="Complemento"
+              label={t("Complemento")}
               name="addressLine2"
             />
             <ProfileField
               autoComplete="address-level2"
               defaultValue={initialProfile.city}
-              label="Cidade"
+              label={t("Cidade")}
               name="city"
             />
             <ProfileField
               autoComplete="address-level1"
               defaultValue={initialProfile.region}
-              label="State / region"
+              label={t("State / region")}
               name="region"
             />
             <ProfileField
               autoComplete="postal-code"
               defaultValue={initialProfile.postalCode}
-              label="CEP"
+              label={t("CEP")}
               name="postalCode"
             />
             <ProfileField
               autoComplete="country"
               defaultValue={initialProfile.countryCode}
-              label="Código do país"
+              label={t("Código do país")}
               maxLength={2}
               name="countryCode"
               placeholder="US"
@@ -164,13 +169,13 @@ export function PersonalInfoForm({
 
         <div className="flex items-center gap-3 border-t border-border/50 pt-6">
           <Button disabled={updateProfile.isPending} type="submit">
-            {updateProfile.isPending ? "Salvando…" : "Salvar meus dados"}
+            {updateProfile.isPending ? t("Salvando…") : t("Salvar meus dados")}
           </Button>
           <p
             aria-live="polite"
             className="type-supporting-body text-muted-foreground"
           >
-            {status === "saved" ? "Saved." : null}
+            {status === "saved" ? t("Saved.") : null}
           </p>
         </div>
       </form>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useState } from "react";
 import { ArrowUpRightIcon, SearchIcon } from "lucide-react";
 import Image from "next/image";
@@ -29,6 +31,7 @@ const illustrations: Record<(typeof chatStarters)[number]["id"], string> = {
 };
 
 export function RecipeGallery() {
+  const { t, locale } = useI18n();
   const [category, setCategory] = useState<string>("Destaques");
   const [query, setQuery] = useState("");
   const matching = chatStarters.filter((recipe) => {
@@ -39,33 +42,35 @@ export function RecipeGallery() {
         : recipe.category === category);
     return (
       inCategory &&
-      `${recipe.label} ${recipe.description} ${recipe.category}`
-        .toLocaleLowerCase("pt-BR")
-        .includes(query.trim().toLocaleLowerCase("pt-BR"))
+      `${t(recipe.label)} ${t(recipe.description)} ${t(recipe.category)}`
+        .toLocaleLowerCase(locale)
+        .includes(query.trim().toLocaleLowerCase(locale))
     );
   });
   return (
     <>
       <div className={styles.filters}>
         <select
-          aria-label="Categoria de receitas"
+          aria-label={t("Categoria de receitas")}
           value={category}
           onChange={(event) => {
             setCategory(event.target.value);
           }}
         >
           {categories.map((label) => (
-            <option key={label}>{label}</option>
+            <option key={label} value={label}>
+              {t(label)}
+            </option>
           ))}
         </select>
         <div className={styles.search}>
           <SearchIcon aria-hidden="true" />
           <Input
-            aria-label="Buscar receitas"
+            aria-label={t("Buscar receitas")}
             onChange={(event) => {
               setQuery(event.target.value);
             }}
-            placeholder="Uma ideia…"
+            placeholder={t("Uma ideia…")}
             value={query}
           />
         </div>
@@ -86,8 +91,8 @@ export function RecipeGallery() {
               />
             </div>
             <div className={styles.recipeCopy}>
-              <span className={styles.category}>{recipe.category}</span>
-              <h2 className="type-section-title">{recipe.label}</h2>
+              <span className={styles.category}>{t(recipe.category)}</span>
+              <h2 className="type-section-title">{t(recipe.label)}</h2>
               <ArrowUpRightIcon aria-hidden="true" />
             </div>
           </Link>
@@ -95,11 +100,11 @@ export function RecipeGallery() {
       </div>
       {matching.length === 0 && (
         <output className={styles.noResults}>
-          Nenhuma ideia por aqui. Tente outra busca.
+          {t("Nenhuma ideia por aqui. Tente outra busca.")}
         </output>
       )}
       <p className={styles.footer}>
-        <Link href="/chat">Ou me conte a sua ideia.</Link>
+        <Link href="/chat">{t("Ou me conte a sua ideia.")}</Link>
       </p>
     </>
   );

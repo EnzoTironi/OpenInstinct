@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import type { ComponentProps, ReactNode } from "react";
 import {
   Command,
@@ -31,16 +33,19 @@ export function ModelSelectorTrigger(
 export function ModelSelectorContent({
   children,
   className,
-  title = "Choose a model",
+  title,
   ...props
 }: ComponentProps<typeof DialogContent> & { readonly title?: ReactNode }) {
+  const { t } = useI18n();
+  const localizedTitle = title ?? t("Choose a model");
+
   return (
     <DialogContent
       aria-describedby={undefined}
       className={cn("border-none p-0 outline outline-border", className)}
       {...props}
     >
-      <DialogTitle className="sr-only">{title}</DialogTitle>
+      <DialogTitle className="sr-only">{localizedTitle}</DialogTitle>
       <Command className="**:data-[slot=command-input-wrapper]:h-auto">
         {children}
       </Command>

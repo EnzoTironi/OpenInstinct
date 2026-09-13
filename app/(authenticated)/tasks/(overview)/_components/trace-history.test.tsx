@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "@tests/helpers/i18n";
 import { TRPCClientError } from "@trpc/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrowserTracePage } from "@db/services/browser-traces";

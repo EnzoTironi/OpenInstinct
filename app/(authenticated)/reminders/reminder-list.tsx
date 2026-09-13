@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import { cn } from "@web/components/class-names";
 import { PanelIntro } from "../_components/panel-intro";
 import { Button } from "@web/components/ui/button";
@@ -11,14 +14,14 @@ const jobLabels = {
   active: "Ativa",
   paused: "Pausada",
   completed: "Sem próximas ocorrências",
-};
+} as const;
 const runLabels = {
   queued: "Aguardando execução",
   running: "Em andamento",
   waiting_for_input: "Aguardando resposta",
   completed: "Concluída",
   dead_letter: "Falhou",
-};
+} as const;
 const reportLabels = {
   not_ready: "Relatório em preparação",
   not_needed: "Sem relatório",
@@ -29,40 +32,36 @@ const reportLabels = {
   failed: "Entrega falhou; partes podem ter sido enviadas",
   cancelled: "Entrega interrompida; partes podem ter sido enviadas",
   uncertain: "Entrega incerta; nova tentativa automática bloqueada",
-};
+} as const;
 const channelLabels = {
   eve: "Zoen",
   linq: "Linq",
   telegram: "Telegram",
   kapso: "WhatsApp",
-};
-const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "UTC",
-});
+} as const;
 
 type ReminderPage = Effect.Success<ReturnType<typeof listReminders>>;
 
 export function ReminderList({ reminders, hasMore }: ReminderPage) {
+  const { t } = useI18n();
   return (
     <>
       {reminders.length === 0 ? (
         <>
           <PanelIntro
             image="/marketing/panel/zoen-calm.jpg"
-            title="Cuide do agora."
-            description="Eu lembro do depois."
+            title={t("Cuide do agora.")}
+            description={t("Eu lembro do depois.")}
           />
           <div className={styles.actions}>
             <Button
               nativeButton={false}
               render={<Link href="/chat?starter=reminder" />}
             >
-              Criar minha primeira automação
+              {t("Criar minha primeira automação")}
             </Button>
             <Link className={styles.subtleLink} href="/recipes">
-              Explorar ideias
+              {t("Explorar ideias")}
             </Link>
           </div>
         </>
@@ -75,14 +74,16 @@ export function ReminderList({ reminders, hasMore }: ReminderPage) {
       )}
       {hasMore ? (
         <p className="type-caption text-muted-foreground">
-          Mostrando os primeiros 50 agendamentos, com os ativos primeiro. Os
-          demais estão disponíveis nas conversas originais.
+          {t(
+            "Mostrando os primeiros 50 agendamentos, com os ativos primeiro. Os demais estão disponíveis nas conversas originais."
+          )}
         </p>
       ) : null}
       {reminders.length > 0 && (
         <p className="type-caption text-muted-foreground">
-          Horários em UTC. Um agendamento sem próximas ocorrências ainda pode
-          ter uma execução ou entrega em andamento.
+          {t(
+            "Horários em UTC. Um agendamento sem próximas ocorrências ainda pode ter uma execução ou entrega em andamento."
+          )}
         </p>
       )}
     </>
@@ -94,10 +95,16 @@ function ReminderCard({
 }: {
   readonly reminder: ReminderPage["reminders"][number];
 }) {
+  const { t, locale } = useI18n();
+  const dateFormatter = new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  });
   return (
     <li className={cn("space-y-3", styles.sectionCard)}>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">{jobLabels[reminder.status]}</Badge>
+        <Badge variant="secondary">{t(jobLabels[reminder.status])}</Badge>
         <span className="type-caption text-muted-foreground">
           {channelLabels[reminder.conversationChannel]}
         </span>
@@ -109,8 +116,8 @@ function ReminderCard({
         <div>
           <dt className="inline">
             {reminder.status === "paused"
-              ? "Próxima ocorrência salva: "
-              : "Próxima ocorrência: "}
+              ? t("Próxima ocorrência salva: ")
+              : t("Próxima ocorrência: ")}
           </dt>
           <dd className="inline">
             {reminder.nextRunAt ? (
@@ -118,15 +125,15 @@ function ReminderCard({
                 {dateFormatter.format(reminder.nextRunAt)} UTC
               </time>
             ) : (
-              "Nenhuma agendada"
+              t("Nenhuma agendada")
             )}
           </dd>
         </div>
         {reminder.latestRunStatus ? (
           <div>
-            <dt className="inline">Última execução: </dt>
+            <dt className="inline">{t("Última execução:")} </dt>
             <dd className="inline">
-              {runLabels[reminder.latestRunStatus]}
+              {t(runLabels[reminder.latestRunStatus])}
               {reminder.latestScheduledFor
                 ? ` · ${dateFormatter.format(reminder.latestScheduledFor)} UTC`
                 : ""}
@@ -135,9 +142,9 @@ function ReminderCard({
         ) : null}
         {reminder.latestReportStatus ? (
           <div>
-            <dt className="inline">Entrega: </dt>
+            <dt className="inline">{t("Entrega:")} </dt>
             <dd className="inline">
-              {reportLabels[reminder.latestReportStatus]}
+              {t(reportLabels[reminder.latestReportStatus])}
             </dd>
           </div>
         ) : null}
@@ -147,13 +154,16 @@ function ReminderCard({
           className="type-label underline underline-offset-4"
           href={`/chat/${encodeURIComponent(reminder.originalSessionId)}`}
         >
-          Abrir conversa original
+          {t("Abrir conversa original")}
         </Link>
       ) : (
         <p className="type-caption text-muted-foreground">
           {reminder.conversationChannel !== "eve"
-            ? `Gerencie este agendamento na conversa original no ${channelLabels[reminder.conversationChannel]}.`
-            : "A conversa original não está disponível nesta conta."}
+            ? t(
+                "Gerencie este agendamento na conversa original no {channel}.",
+                { channel: channelLabels[reminder.conversationChannel] }
+              )
+            : t("A conversa original não está disponível nesta conta.")}
         </p>
       )}
     </li>
