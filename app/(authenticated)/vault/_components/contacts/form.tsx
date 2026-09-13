@@ -1,5 +1,9 @@
 "use client";
 
+import { validationOptions } from "@web/i18n/validation";
+
+import { useI18n } from "@web/i18n/context";
+
 import { type SubmitEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
@@ -42,6 +46,7 @@ export function ContactForm({
   readonly initialLabel?: string;
   readonly onSaved: () => void;
 }) {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const create = api.vault.create.useMutation({
     onSuccess: () => {
@@ -56,7 +61,7 @@ export function ContactForm({
     nickname: initialLabel,
     phone: "",
   });
-  const result = contactFormSchema.safeParse(form);
+  const result = contactFormSchema.safeParse(form, validationOptions(locale));
   const errors =
     attempted && !result.success
       ? z.flattenError(result.error).fieldErrors
@@ -92,18 +97,18 @@ export function ContactForm({
         <FormField
           error={errors.nickname?.[0]}
           id="vault-contact-label"
-          label="Name"
+          label={t("Name")}
           onChange={(value) => {
             update("nickname", value);
           }}
-          placeholder="Checkout"
+          placeholder={t("Checkout")}
           value={form.nickname}
         />
         <FormField
           autoComplete="name"
           error={errors.fullName?.[0]}
           id="vault-contact-name"
-          label="Full name (optional)"
+          label={t("Full name (optional)")}
           onChange={(value) => {
             update("fullName", value);
           }}
@@ -113,7 +118,7 @@ export function ContactForm({
           autoComplete="email"
           error={errors.email?.[0]}
           id="vault-contact-email"
-          label="Email (optional)"
+          label={t("Email (optional)")}
           onChange={(value) => {
             update("email", value);
           }}
@@ -124,7 +129,7 @@ export function ContactForm({
           autoComplete="tel"
           error={errors.phone?.[0]}
           id="vault-contact-phone"
-          label="Phone (optional)"
+          label={t("Phone (optional)")}
           onChange={(value) => {
             update("phone", value);
           }}
@@ -134,7 +139,7 @@ export function ContactForm({
       </FieldGroup>
       <DialogFooter>
         <Button disabled={create.isPending} type="submit">
-          Save contact
+          {t("Save contact")}
         </Button>
       </DialogFooter>
     </form>

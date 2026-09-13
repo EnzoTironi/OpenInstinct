@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import {
   LayoutGridIcon,
   MailIcon,
@@ -29,32 +32,35 @@ const destinations = [
 ] as const;
 
 export function HomeOverview() {
+  const { t } = useI18n();
   return (
     <>
       <div className={styles.scene}>
         <Image
-          alt="O mascote Zoen correndo para cuidar do seu dia"
+          alt={t("O mascote Zoen correndo para cuidar do seu dia")}
           fill
           loading="eager"
           sizes="(max-width: 540px) 95vw, 500px"
           src="/marketing/zoen-running.jpg"
           unoptimized
         />
-        <span className={styles.sceneLabel}>SEU DIA, COM MAIS LEVEZA</span>
+        <span className={styles.sceneLabel}>
+          {t("SEU DIA, COM MAIS LEVEZA")}
+        </span>
       </div>
       <div className={styles.homeContent}>
         <HomeGreeting />
         <p className={styles.subtitle}>
-          O que está na sua cabeça?
+          {t("O que está na sua cabeça?")}
           <br />
-          Pode deixar comigo.
+          {t("Pode deixar comigo.")}
         </p>
-        <nav aria-label="Seu Zoen" className={styles.tiles}>
+        <nav aria-label={t("Seu Zoen")} className={styles.tiles}>
           {destinations.map(({ href, label, icon: Icon, ...item }) => (
             <PanelLink className={styles.tile} href={href} key={href}>
               <Icon aria-hidden="true" />
-              <span>{label}</span>
-              {"caption" in item && <small>{item.caption}</small>}
+              <span>{t(label)}</span>
+              {"caption" in item && <small>{t(item.caption)}</small>}
             </PanelLink>
           ))}
         </nav>

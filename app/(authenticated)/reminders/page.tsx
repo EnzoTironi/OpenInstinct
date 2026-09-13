@@ -1,3 +1,4 @@
+import { getI18n } from "@web/i18n/server";
 import { PlusIcon } from "lucide-react";
 import styles from "../_components/panel.module.css";
 import { Effect, Result } from "effect";
@@ -10,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 
 export default async function RemindersPage() {
+  const { t } = await getI18n();
   const scope = await requireRequestScope();
   const result = await serverRuntime.runPromise(
     listReminders(scope).pipe(Effect.result)
@@ -19,9 +21,9 @@ export default async function RemindersPage() {
       {(Result.isFailure(result) || result.success.reminders.length > 0) && (
         <header className={styles.pageHeader}>
           <div>
-            <h1 className="type-page-title">Já está combinado.</h1>
+            <h1 className="type-page-title">{t("Já está combinado.")}</h1>
             <p className={styles.intro}>
-              Ajuste cada pedido na conversa em que ele começou.
+              {t("Ajuste cada pedido na conversa em que ele começou.")}
             </p>
           </div>
           <Button
@@ -29,16 +31,19 @@ export default async function RemindersPage() {
             render={<Link href="/chat?starter=reminder" />}
             variant="outline"
           >
-            <PlusIcon aria-hidden="true" /> Criar automação
+            <PlusIcon aria-hidden="true" /> {t("Criar automação")}
           </Button>
         </header>
       )}
       {Result.isFailure(result) ? (
         <Alert variant="destructive">
-          <AlertTitle>Não foi possível carregar as automações</AlertTitle>
+          <AlertTitle>
+            {t("Não foi possível carregar as automações")}
+          </AlertTitle>
           <AlertDescription>
-            Atualize a página para tentar novamente. Seus agendamentos foram
-            preservados.
+            {t(
+              "Atualize a página para tentar novamente. Seus agendamentos foram preservados."
+            )}
           </AlertDescription>
         </Alert>
       ) : (

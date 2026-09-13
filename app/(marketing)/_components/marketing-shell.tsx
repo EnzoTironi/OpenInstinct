@@ -1,3 +1,8 @@
+"use client";
+
+import { LanguagePicker } from "@web/i18n/language-picker";
+
+import { useI18n } from "@web/i18n/context";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@web/components/ui/logo";
@@ -36,13 +41,14 @@ export function MarketingShell({
   readonly children: ReactNode;
   readonly active?: "product" | "docs";
 }) {
+  const { t, locale } = useI18n();
   return (
     <div
       className={cn(
         "flex min-h-svh flex-col bg-background text-foreground",
         active === "product" && styles.landingShell
       )}
-      lang="pt-BR"
+      lang={locale}
     >
       <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-md">
         <MarketingFrame className="flex h-16 items-center justify-between gap-4">
@@ -51,7 +57,7 @@ export function MarketingShell({
             <span>Zoen</span>
           </Link>
           <nav
-            aria-label="Marketing"
+            aria-label={t("Marketing")}
             className="hidden items-center gap-1 md:flex"
           >
             {nav.map((item) => (
@@ -66,14 +72,14 @@ export function MarketingShell({
               size="sm"
               variant="quiet"
             >
-              Entrar
+              {t("Entrar")}
             </Button>
-            <OnboardingTrigger size="sm">Começar</OnboardingTrigger>
+            <OnboardingTrigger size="sm">{t("Começar")}</OnboardingTrigger>
           </div>
         </MarketingFrame>
         <MarketingFrame className="flex items-center gap-1 pb-3 md:hidden">
           <nav
-            aria-label="Marketing no celular"
+            aria-label={t("Marketing no celular")}
             className="flex flex-wrap items-center gap-1"
           >
             {nav.map((item) => (
@@ -85,7 +91,7 @@ export function MarketingShell({
               size="sm"
               variant="quiet"
             >
-              Entrar
+              {t("Entrar")}
             </Button>
           </nav>
         </MarketingFrame>
@@ -103,7 +109,7 @@ export function MarketingShell({
               <span>Zoen</span>
             </Link>
             <p className="type-caption text-muted-foreground">
-              Sua vida tem companhia. Conheça o{" "}
+              {t("Sua vida tem companhia. Conheça o")}{" "}
               <a
                 className="underline-offset-4 hover:text-foreground hover:underline"
                 href={companionPublicOrigin}
@@ -115,21 +121,24 @@ export function MarketingShell({
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2 type-caption text-muted-foreground">
             <Link className="hover:text-foreground" href="/welcome">
-              Produto
+              {t("Produto")}
             </Link>
             <Link className="hover:text-foreground" href="/docs">
-              Guia
+              {t("Guia")}
             </Link>
             <OnboardingTrigger
               className="font-normal hover:text-foreground"
               size="none"
               variant="quiet"
             >
-              Começar
+              {t("Começar")}
             </OnboardingTrigger>
             <Link className="hover:text-foreground" href="/sign-in">
-              Entrar
+              {t("Entrar")}
             </Link>
+          </div>
+          <div className="w-full max-w-xs sm:max-w-48">
+            <LanguagePicker />
           </div>
         </MarketingFrame>
       </footer>
@@ -144,6 +153,7 @@ function NavItem({
   readonly active?: "product" | "docs";
   readonly item: (typeof nav)[number];
 }) {
+  const { t } = useI18n();
   const isActive =
     (active === "product" && item.href === "/welcome") ||
     (active === "docs" && item.href === "/docs");
@@ -155,7 +165,7 @@ function NavItem({
       size="sm"
       variant={isActive ? "secondary" : "quiet"}
     >
-      {item.label}
+      {t(item.label)}
     </Button>
   );
 }

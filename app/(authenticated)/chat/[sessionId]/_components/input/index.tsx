@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import { useEffect, useMemo, useRef } from "react";
 import {
   PromptInput,
@@ -23,6 +26,7 @@ export function ChatInput({
   >;
   readonly sessionId?: string;
 }) {
+  const { t } = useI18n();
   const { mutate: saveChat } = api.chats.save.useMutation();
   const backgroundCatchUp = useRef<Promise<void> | undefined>(undefined);
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
@@ -84,7 +88,7 @@ export function ChatInput({
           <PromptInputTextarea
             className="min-h-0"
             disabled={agent.status === "submitted"}
-            placeholder="Send a message…"
+            placeholder={t("Send a message…")}
           />
         </PromptInputBody>
         <PromptInputFooter>

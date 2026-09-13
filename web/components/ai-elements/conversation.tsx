@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { Button } from "@web/components/ui/button";
 import { cn } from "@web/components/class-names";
 import type { UIMessage } from "ai";
@@ -166,32 +168,40 @@ export type ConversationEmptyStateProps = ComponentProps<"div"> & {
 
 export const ConversationEmptyState = ({
   className,
-  title = "No messages yet",
-  description = "Start a conversation to see messages here",
+  title,
+  description,
   icon,
   children,
   ...props
-}: ConversationEmptyStateProps) => (
-  <div
-    className={cn(
-      "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
-      className
-    )}
-    {...props}
-  >
-    {children ?? (
-      <>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
-        <div className="space-y-1">
-          <h3 className="text-sm font-medium">{title}</h3>
-          {description && (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          )}
-        </div>
-      </>
-    )}
-  </div>
-);
+}: ConversationEmptyStateProps) => {
+  const { t } = useI18n();
+  const localizedTitle = title ?? t("No messages yet");
+  const localizedDescription =
+    description ?? t("Start a conversation to see messages here");
+  return (
+    <div
+      className={cn(
+        "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
+        className
+      )}
+      {...props}
+    >
+      {children ?? (
+        <>
+          {icon && <div className="text-muted-foreground">{icon}</div>}
+          <div className="space-y-1">
+            <h3 className="text-sm font-medium">{localizedTitle}</h3>
+            {localizedDescription && (
+              <p className="text-sm text-muted-foreground">
+                {localizedDescription}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
 
@@ -202,6 +212,7 @@ export const ConversationScrollButton = ({
   className,
   ...props
 }: ConversationScrollButtonProps) => {
+  const { t } = useI18n();
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
   const isReady = useSyncExternalStore(
     subscribeToHydration,
@@ -217,7 +228,7 @@ export const ConversationScrollButton = ({
     isReady &&
     !isAtBottom && (
       <Button
-        aria-label="Scroll to bottom"
+        aria-label={t("Scroll to bottom")}
         className={cn(
           "absolute bottom-32 left-[50%] translate-x-[-50%] rounded-full dark:bg-background dark:hover:bg-muted",
           className

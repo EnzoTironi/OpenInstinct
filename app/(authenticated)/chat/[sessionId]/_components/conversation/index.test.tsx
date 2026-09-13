@@ -1,6 +1,6 @@
 import type { MessageStreamEvent } from "eve/client";
 import type { EveMessage } from "eve/react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it } from "vitest";
 import { ChatConversation } from ".";
 import type { ChatAgent } from "../chat-agent";

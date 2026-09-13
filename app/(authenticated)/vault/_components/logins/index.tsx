@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { PlusIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import type { VaultItem } from "@shared/vault/schema";
@@ -26,6 +28,7 @@ export function VaultLogins({
 }: {
   readonly items: readonly VaultItem[];
 }) {
+  const { t, locale } = useI18n();
   const searchParams = useSearchParams();
   const setup = useVaultSetup();
   const initialSetup = setup?.kind === "login" ? setup : undefined;
@@ -38,24 +41,26 @@ export function VaultLogins({
     <VaultSection
       onOpenChange={section.onOpenChange}
       open={section.open}
-      title="Logins"
+      title={t("Logins")}
     >
-      <VaultSectionTrigger items={items} title="Logins" />
+      <VaultSectionTrigger items={items} title={t("Logins")} />
       <VaultSectionContent view={section.view}>
         {section.view === "list" ? (
           <>
             <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Logins</DialogTitle>
+              <DialogTitle>{t("Logins")}</DialogTitle>
               <DialogDescription>
                 {items.length > 0
-                  ? `Search and manage ${items.length.toLocaleString()} saved logins.`
-                  : "Add your first saved login."}
+                  ? t("Buscar e gerenciar itens salvos ({count}).", {
+                      count: items.length.toLocaleString(locale),
+                    })
+                  : t("Add your first saved login.")}
               </DialogDescription>
             </DialogHeader>
             <VaultItemBrowser
               items={items}
               searchId="vault-search-logins"
-              title="Logins"
+              title={t("Logins")}
             />
             <div className="flex justify-end gap-2">
               <Button
@@ -65,7 +70,7 @@ export function VaultLogins({
                 type="button"
                 variant="outline"
               >
-                Bulk import
+                {t("Bulk import")}
               </Button>
               <Button
                 onClick={() => {
@@ -74,7 +79,7 @@ export function VaultLogins({
                 type="button"
               >
                 <PlusIcon />
-                Add login
+                {t("Add login")}
               </Button>
             </div>
           </>
@@ -84,7 +89,7 @@ export function VaultLogins({
               onClick={() => {
                 section.setView("list");
               }}
-              title="Logins"
+              title={t("Logins")}
             />
             {section.view === "import" ? (
               <ChromeImportPanel
@@ -96,10 +101,12 @@ export function VaultLogins({
               <>
                 <DialogHeader className="pr-10 sm:pr-6">
                   <DialogTitle>
-                    {initialSetup ? `Add ${initialSetup.label}` : "Add login"}
+                    {initialSetup
+                      ? t("Adicionar {name}", { name: initialSetup.label })
+                      : t("Add login")}
                   </DialogTitle>
                   <DialogDescription>
-                    Enter the credentials you use to sign in.
+                    {t("Enter the credentials you use to sign in.")}
                   </DialogDescription>
                 </DialogHeader>
                 <LoginForm

@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import {
   browserActivityKinds,
   type BrowserActivityDurations,
@@ -24,6 +27,7 @@ export function ActivityDurationBreakdown({
 }: {
   durations: BrowserActivityDurations;
 }) {
+  const { t } = useI18n();
   const segments = browserActivityKinds.flatMap((kind) => {
     const durationMs = durations[kind] ?? 0;
     return durationMs > 0 ? [{ durationMs, kind }] : [];
@@ -34,12 +38,12 @@ export function ActivityDurationBreakdown({
   return (
     <div className="grid gap-2">
       <div
-        aria-label="Time by activity type"
+        aria-label={t("Time by activity type")}
         className="flex h-1.5 overflow-hidden rounded-full bg-muted"
       >
         {segments.map(({ durationMs, kind }) => {
           const presentation = activityPresentation[kind];
-          const label = `${presentation.label}: ${formatDuration(durationMs)}`;
+          const label = `${t(presentation.label)}: ${formatDuration(durationMs)}`;
           return (
             <span
               aria-label={label}
@@ -60,7 +64,7 @@ export function ActivityDurationBreakdown({
                 aria-hidden="true"
                 className={`size-1.5 rounded-full ${presentation.className}`}
               />
-              {presentation.label} {formatDuration(durationMs)}
+              {t(presentation.label)} {formatDuration(durationMs)}
             </span>
           );
         })}

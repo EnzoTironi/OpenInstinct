@@ -1,9 +1,24 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it } from "vitest";
 import { HomeOverview } from "../../_components/home-overview";
 
 describe("Zoen home", () => {
+  it.each([
+    ["pt-BR", "Automações", "Conexões", "Receitas"],
+    ["en", "Automations", "Connections", "Recipes"],
+    ["es", "Automatizaciones", "Conexiones", "Recetas"],
+  ] as const)(
+    "renders the same home links in %s",
+    (locale, automations, connections, recipes) => {
+      const markup = renderToStaticMarkup(createElement(HomeOverview), locale);
+      for (const text of [automations, connections, recipes])
+        expect(markup).toContain(text);
+      expect(markup).toContain('href="/connections"');
+      expect(markup).toContain('href="/recipes"');
+    }
+  );
+
   it("links the five primary actions to real panel routes in the same tab", () => {
     const html = renderToStaticMarkup(createElement(HomeOverview));
     for (const href of [

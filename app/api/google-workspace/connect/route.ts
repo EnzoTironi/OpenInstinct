@@ -1,3 +1,4 @@
+import { getI18n } from "@web/i18n/server";
 import { Effect } from "effect";
 import { authentication } from "@db/services/auth";
 import { applicationOrigin } from "@shared/environment/origin";
@@ -10,18 +11,19 @@ import {
 import { readGoogleWorkspaceChallenge } from "../../../../server/google-workspace/challenge";
 
 export async function GET(request: Request) {
+  const i18n = await getI18n();
   return serverRuntime.runPromise(
     Effect.gen(function* () {
       const params = new URL(request.url).searchParams;
       const flow = params.get("flow");
       if (flow !== null && (!flow || flow.length > 8192))
-        return handoffFailure("invalid_callback");
+        return handoffFailure("invalid_callback", i18n);
       const auth = yield* authentication;
       const session = yield* Effect.tryPromise({
         try: () => auth.api.getSession({ headers: request.headers }),
         catch: () => new GoogleWorkspaceError({ reason: "unauthenticated" }),
       });
-      if (!session) return handoffFailure("unauthenticated");
+      if (!session) return handoffFailure("unauthenticated", i18n);
       const home = homeCallbacks(params.get("returnTo") ?? undefined);
       const callbackURL =
         flow === null
@@ -42,17 +44,20 @@ export async function GET(request: Request) {
       return new Response(null, { status: 302, headers });
     }).pipe(
       Effect.catchTag("GoogleWorkspaceError", (error) =>
-        Effect.succeed(handoffFailure(error.reason))
+        Effect.succeed(handoffFailure(error.reason, i18n))
       ),
       Effect.catchTag("AuthUnavailable", () =>
-        Effect.succeed(handoffFailure("unavailable"))
+        Effect.succeed(handoffFailure("unavailable", i18n))
       )
     ),
     { signal: request.signal }
   );
 }
 
-function handoffFailure(reason: GoogleWorkspaceError["reason"]) {
+function handoffFailure(
+  reason: GoogleWorkspaceError["reason"],
+  { t, locale }: Awaited<ReturnType<typeof getI18n>>
+) {
   const messages = {
     invalid_callback:
       "This connection link has expired or could not be verified. Return to your conversation and ask to connect Google Workspace again.",
@@ -66,7 +71,7 @@ function handoffFailure(reason: GoogleWorkspaceError["reason"]) {
       "Google Workspace needs your authorization. Return to your conversation and start the connection again.",
   };
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Connect Google Workspace</title></head><body><main><h1>Google Workspace could not be connected</h1><p>${messages[reason]}</p><p><a href="/chat/history">Return to your conversations</a></p><p><a href="/">Return home</a></p></main></body></html>`,
+    `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${t("Connect Google Workspace")}</title></head><body><main><h1>${t("Google Workspace could not be connected")}</h1><p>${t(messages[reason])}</p><p><a href="/chat/history">${t("Return to your conversations")}</a></p><p><a href="/">${t("Return home")}</a></p></main></body></html>`,
     {
       status:
         reason === "unauthenticated"

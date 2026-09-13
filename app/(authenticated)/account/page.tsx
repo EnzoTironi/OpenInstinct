@@ -1,3 +1,4 @@
+import { getI18n } from "@web/i18n/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -25,6 +26,7 @@ import { AccountPrivacyWipeSection } from "./_components/privacy-wipe-section";
 import { AuthenticatedAccountControl } from "./_components/account-control";
 import { ModelSelector } from "./_components/model-selector";
 import { PanelIntro } from "../_components/panel-intro";
+import { LanguagePicker } from "@web/i18n/language-picker";
 import styles from "../_components/panel.module.css";
 
 const sections = [
@@ -48,7 +50,7 @@ const accountLinks = [
     label: "Preferências",
     icon: SlidersHorizontalIcon,
   },
-];
+] as const;
 const preferenceLinks = [
   { href: "/personal-info", label: "Dados pessoais", icon: UserRoundIcon },
   { href: "/vault", label: "Cofre", icon: KeyRoundIcon },
@@ -60,11 +62,12 @@ const preferenceLinks = [
     icon: ShieldCheckIcon,
   },
   { href: "/tasks", label: "Atividade no navegador", icon: MonitorIcon },
-];
+] as const;
 
 export default async function AccountPage({
   searchParams,
 }: PageProps<"/account">) {
+  const { t } = await getI18n();
   const params = await searchParams;
   const section = sections.find(({ id }) => id === params.section);
   const session = await getAuthSession(await headers());
@@ -73,14 +76,14 @@ export default async function AccountPage({
     <div className={styles.page}>
       {section ? (
         <>
-          <h1 className="type-page-title">{section.label}</h1>
+          <h1 className="type-page-title">{t(section.label)}</h1>
           <AccountSection section={section.id} userId={session.user.id} />
         </>
       ) : (
         <>
           <PanelIntro
             image="/marketing/panel/zoen-friendly.jpg"
-            title="Seu Zoen. Seu espaço."
+            title={t("Seu Zoen. Seu espaço.")}
           />
           <AccountLinks links={accountLinks} />
           <div className={styles.actions}>
@@ -92,13 +95,21 @@ export default async function AccountPage({
   );
 }
 
-function AccountLinks({ links }: { readonly links: typeof accountLinks }) {
+async function AccountLinks({
+  links,
+}: {
+  readonly links: readonly (
+    | (typeof accountLinks)[number]
+    | (typeof preferenceLinks)[number]
+  )[];
+}) {
+  const { t } = await getI18n();
   return (
-    <nav aria-label="Configurações da conta" className={styles.actionList}>
+    <nav aria-label={t("Configurações da conta")} className={styles.actionList}>
       {links.map(({ href, label, icon: Icon }) => (
         <Link href={href} key={href}>
           <Icon aria-hidden="true" />
-          {label}
+          {t(label)}
           <ChevronRightIcon aria-hidden="true" />
         </Link>
       ))}
@@ -113,13 +124,19 @@ async function AccountSection({
   readonly section: (typeof sections)[number]["id"];
   readonly userId: string;
 }) {
+  const { t } = await getI18n();
   switch (section) {
     case "channels":
       return redirect("/connections?messengers=1");
     case "memory":
       return <PersonalMemorySection />;
     case "preferences":
-      return <AccountLinks links={preferenceLinks} />;
+      return (
+        <>
+          <LanguagePicker />
+          <AccountLinks links={preferenceLinks} />
+        </>
+      );
     case "plan":
       return <AccountPlan userId={userId} />;
     case "privacy":
@@ -127,7 +144,9 @@ async function AccountSection({
     case "advanced":
       return (
         <section className={styles.sectionCard}>
-          <h2 className="type-section-title mb-4">Modelo das conversas</h2>
+          <h2 className="type-section-title mb-4">
+            {t("Modelo das conversas")}
+          </h2>
           <ModelSelector
             modelId={await getGatewayModel(await requireRequestScope())}
           />

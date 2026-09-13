@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useEveAgent } from "eve/react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -21,6 +23,7 @@ export function NewChat({
 }: {
   readonly initialDraft?: string;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const { mutateAsync: saveChat } = api.chats.save.useMutation();
   const pendingTitle = useRef<string | undefined>(undefined);
@@ -71,7 +74,7 @@ export function NewChat({
       await agent.send(messageContent(message));
       // oxlint-disable-next-line typescript/no-unnecessary-condition -- Eve's onError callback updates this ref while send awaits.
       if (sendFailed.current) {
-        throw new Error("Unable to open the conversation");
+        throw new Error(t("Unable to open the conversation"));
       }
     } catch (error) {
       setSendError(true);
@@ -87,13 +90,13 @@ export function NewChat({
       <PromptInput compact onSubmit={handleSubmit}>
         <PromptInputBody>
           <PromptInputTextarea
-            aria-label="Mensagem para o Zoen"
+            aria-label={t("Mensagem para o Zoen")}
             className="min-h-0"
             disabled={sending}
             onChange={(event) => {
               setDraft(event.currentTarget.value);
             }}
-            placeholder="O que está na sua cabeça?"
+            placeholder={t("O que está na sua cabeça?")}
             ref={inputRef}
             value={draft}
           />
@@ -101,7 +104,7 @@ export function NewChat({
         <PromptInputFooter>
           <PromptInputTools />
           <PromptInputSubmit
-            aria-label={sending ? "Enviando mensagem" : "Enviar mensagem"}
+            aria-label={sending ? t("Enviando mensagem") : t("Enviar mensagem")}
             disabled={sending}
             status={sending ? "submitted" : undefined}
           />
@@ -109,15 +112,16 @@ export function NewChat({
       </PromptInput>
       {sendError ? (
         <p className="type-caption text-destructive" role="alert">
-          Não foi possível abrir sua conversa. Seu rascunho continua aqui.
-          Verifique a conexão e tente novamente.
+          {t(
+            "Não foi possível abrir sua conversa. Seu rascunho continua aqui. Verifique a conexão e tente novamente."
+          )}
         </p>
       ) : null}
       <p className="text-center type-caption text-muted-foreground">
         {initialDraft ? (
-          "Ajuste o pedido e envie quando quiser."
+          t("Ajuste o pedido e envie quando quiser.")
         ) : (
-          <Link href="/recipes">Precisa de uma ideia?</Link>
+          <Link href="/recipes">{t("Precisa de uma ideia?")}</Link>
         )}
       </p>
     </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { PlusIcon } from "lucide-react";
 import type { VaultItem } from "@shared/vault/schema";
 import { Button } from "@web/components/ui/button";
@@ -24,6 +26,7 @@ export function VaultAddresses({
 }: {
   readonly items: readonly VaultItem[];
 }) {
+  const { t, locale } = useI18n();
   const setup = useVaultSetup();
   const initialAdd = setup?.kind === "address";
   const section = useVaultSection(initialAdd ? "add" : "list");
@@ -32,24 +35,26 @@ export function VaultAddresses({
     <VaultSection
       onOpenChange={section.onOpenChange}
       open={section.open}
-      title="Addresses"
+      title={t("Addresses")}
     >
-      <VaultSectionTrigger items={items} title="Addresses" />
+      <VaultSectionTrigger items={items} title={t("Addresses")} />
       <VaultSectionContent view={section.view}>
         {section.view === "list" ? (
           <>
             <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Addresses</DialogTitle>
+              <DialogTitle>{t("Addresses")}</DialogTitle>
               <DialogDescription>
                 {items.length > 0
-                  ? `Search and manage ${items.length.toLocaleString()} saved addresses.`
-                  : "Add your first saved address."}
+                  ? t("Buscar e gerenciar itens salvos ({count}).", {
+                      count: items.length.toLocaleString(locale),
+                    })
+                  : t("Add your first saved address.")}
               </DialogDescription>
             </DialogHeader>
             <VaultItemBrowser
               items={items}
               searchId="vault-search-addresses"
-              title="Addresses"
+              title={t("Addresses")}
             />
             <div className="flex justify-end gap-2">
               <Button
@@ -59,7 +64,7 @@ export function VaultAddresses({
                 type="button"
               >
                 <PlusIcon />
-                Add address
+                {t("Add address")}
               </Button>
             </div>
           </>
@@ -69,13 +74,14 @@ export function VaultAddresses({
               onClick={() => {
                 section.setView("list");
               }}
-              title="Addresses"
+              title={t("Addresses")}
             />
             <DialogHeader className="pr-10 sm:pr-6">
-              <DialogTitle>Add address</DialogTitle>
+              <DialogTitle>{t("Add address")}</DialogTitle>
               <DialogDescription>
-                Sensitive values are encrypted before database storage and are
-                never returned after saving.
+                {t(
+                  "Sensitive values are encrypted before database storage and are never returned after saving."
+                )}
               </DialogDescription>
             </DialogHeader>
             <AddressForm

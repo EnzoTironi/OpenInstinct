@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import { AlertCircleIcon, BrainIcon, LoaderCircleIcon } from "lucide-react";
 import { Fragment, useMemo } from "react";
 import {
@@ -39,6 +42,7 @@ export function ChatConversation({
   readonly sessionId?: string;
   readonly traceView: TraceView;
 }) {
+  const { t } = useI18n();
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
   const isRestoring =
     agent.status === "resuming" && agent.data.messages.length === 0;
@@ -98,12 +102,12 @@ export function ChatConversation({
             {history.isLoadingOlder ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : null}
-            {history.isLoadingOlder ? "Loading…" : "Load older messages"}
+            {history.isLoadingOlder ? t("Loading…") : t("Load older messages")}
           </Button>
         ) : null}
         {isRestoring && messages.length === 0 ? (
           <Shimmer className="type-supporting-body self-center" duration={1}>
-            Loading recent messages
+            {t("Loading recent messages")}
           </Shimmer>
         ) : null}
         {messages.map((message, index) => {
@@ -174,12 +178,13 @@ function toErrorMessage(cause: unknown): string {
 }
 
 function ErrorMessage({ message }: { readonly message: string }) {
+  const { t } = useI18n();
   return (
     <Message className="max-w-full" from="assistant">
       <MessageContent>
         <Alert variant="destructive">
           <AlertCircleIcon />
-          <AlertTitle>Request failed</AlertTitle>
+          <AlertTitle>{t("Request failed")}</AlertTitle>
           <AlertDescription>{message}</AlertDescription>
         </Alert>
       </MessageContent>
@@ -188,12 +193,13 @@ function ErrorMessage({ message }: { readonly message: string }) {
 }
 
 function PendingThinking() {
+  const { t } = useI18n();
   return (
     <Message aria-live="polite" from="assistant">
       <MessageContent>
         <div className="type-supporting-body mb-4 flex w-full items-center gap-2 text-muted-foreground">
           <BrainIcon className="size-4" />
-          <Shimmer duration={1}>Thinking</Shimmer>
+          <Shimmer duration={1}>{t("Thinking")}</Shimmer>
         </div>
       </MessageContent>
     </Message>

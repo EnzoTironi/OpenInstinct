@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { ArrowUpRightIcon, Clock3Icon, RefreshCwIcon } from "lucide-react";
 import Image from "next/image";
 import { useMemo } from "react";
@@ -23,6 +25,7 @@ export function TraceHistory({
   readonly initialError?: string;
   readonly initialPage?: BrowserTracePage;
 }) {
+  const { t } = useI18n();
   const queryOptions = {
     getNextPageParam: (page: BrowserTracePage) => page.nextCursor ?? undefined,
     initialCursor: null,
@@ -48,12 +51,15 @@ export function TraceHistory({
   const historyError = history.error
     ? history.error instanceof Error
       ? history.error.message
-      : "Não foi possível carregar a atividade."
+      : t("Não foi possível carregar a atividade.")
     : history.data
       ? undefined
       : initialError;
   return (
-    <section aria-label="Atividade no navegador" className="grid min-w-0 gap-4">
+    <section
+      aria-label={t("Atividade no navegador")}
+      className="grid min-w-0 gap-4"
+    >
       <div className={styles.toolbar}>
         {traces.length > 0 ? (
           <span className="type-label">
@@ -61,7 +67,7 @@ export function TraceHistory({
           </span>
         ) : null}
         <Button
-          aria-label="Atualizar atividade"
+          aria-label={t("Atualizar atividade")}
           disabled={history.isFetching}
           onClick={() => void history.refetch()}
           size="icon"
@@ -84,7 +90,7 @@ export function TraceHistory({
       {traces.length === 0 && !historyError ? (
         history.isLoading ? (
           <output className="type-supporting-body text-muted-foreground">
-            Carregando atividade…
+            {t("Carregando atividade…")}
           </output>
         ) : (
           <div className={styles.empty}>
@@ -96,13 +102,15 @@ export function TraceHistory({
               src="/marketing/panel/zoen-meeting.png"
             />
             <h2 className="type-section-title">
-              Tudo começa com uma conversa.
+              {t("Tudo começa com uma conversa.")}
             </h2>
             <p className="type-supporting-body">
-              Peça uma pesquisa ou uma tarefa. Os resultados aparecem aqui.
+              {t(
+                "Peça uma pesquisa ou uma tarefa. Os resultados aparecem aqui."
+              )}
             </p>
             <Button nativeButton={false} render={<PanelLink href="/chat" />}>
-              Abrir conversa
+              {t("Abrir conversa")}
             </Button>
           </div>
         )
@@ -124,7 +132,9 @@ export function TraceHistory({
           type="button"
           variant="outline"
         >
-          {history.isFetchingNextPage ? "Carregando…" : "Ver mais atividades"}
+          {history.isFetchingNextPage
+            ? t("Carregando…")
+            : t("Ver mais atividades")}
         </Button>
       ) : null}
     </section>
@@ -136,6 +146,7 @@ function TraceHistoryCard({
 }: {
   readonly trace: BrowserTracePage["traces"][number];
 }) {
+  const { t, locale } = useI18n();
   const status = traceStatusLabel(trace.status);
   return (
     <li>
@@ -144,7 +155,7 @@ function TraceHistoryCard({
         href={`/tasks/${encodeURIComponent(trace.sessionId)}`}
       >
         <div className={styles.cardTop}>
-          <Badge variant={status.variant}>{status.label}</Badge>
+          <Badge variant={status.variant}>{t(status.label)}</Badge>
           <ArrowUpRightIcon aria-hidden="true" />
         </div>
         <h2 className="type-card-title">{trace.task}</h2>
@@ -159,7 +170,7 @@ function TraceHistoryCard({
             </span>
           )}
           <time dateTime={trace.startedAt} suppressHydrationWarning>
-            {new Date(trace.startedAt).toLocaleString("pt-BR", {
+            {new Date(trace.startedAt).toLocaleString(locale, {
               dateStyle: "short",
               timeStyle: "short",
             })}

@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import { SparklesIcon, XIcon } from "lucide-react";
 import type { RefObject } from "react";
 import {
@@ -18,6 +21,7 @@ export function TracePreview({
   readonly onClose: () => void;
   readonly session: SubagentSession;
 }) {
+  const { t } = useI18n();
   const history = useSessionHistory(session.childSessionId);
   const status = getSubagentStatus(history.events, session);
 
@@ -30,11 +34,11 @@ export function TracePreview({
             {agentLabel(session.name)}
           </h2>
           <p className="truncate type-caption text-muted-foreground">
-            Full task trace
+            {t("Full task trace")}
           </p>
         </div>
         <Button
-          aria-label="Close task trace"
+          aria-label={t("Close task trace")}
           onClick={onClose}
           ref={closeButtonRef}
           size="icon-sm"

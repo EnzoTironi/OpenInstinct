@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import Image from "next/image";
 import { useState } from "react";
 import { Button } from "@web/components/ui/button";
@@ -30,11 +32,12 @@ const mockups = [
 ] as const;
 
 export function ChatPreview() {
+  const { t } = useI18n();
   const [active, setActive] = useState<(typeof mockups)[number]>(mockups[0]);
   return (
     <div className={styles.chatDemo}>
       <fieldset
-        aria-label="Canal da demonstração"
+        aria-label={t("Canal da demonstração")}
         className={styles.channelChoices}
       >
         {mockups.map((mockup) => (
@@ -53,7 +56,7 @@ export function ChatPreview() {
       </fieldset>
       <figure className={styles.mockupStage}>
         <Image
-          alt={active.description}
+          alt={t(active.description)}
           height={1536}
           key={active.image}
           sizes="(max-width: 760px) 115vw, 560px"
@@ -61,7 +64,7 @@ export function ChatPreview() {
           unoptimized
           width={1024}
         />
-        <figcaption aria-live="polite">{active.caption}</figcaption>
+        <figcaption aria-live="polite">{t(active.caption)}</figcaption>
       </figure>
     </div>
   );

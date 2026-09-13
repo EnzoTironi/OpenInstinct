@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "motion/react";
 import {
@@ -74,6 +76,7 @@ const examples = [
 ] as const;
 
 export function ConnectionCarousel() {
+  const { t } = useI18n();
   const [current, setCurrent] = useState(0);
   const [playing, setPlaying] = useState(true);
   const reduceMotion = useReducedMotion();
@@ -91,8 +94,8 @@ export function ConnectionCarousel() {
 
   return (
     <section
-      aria-label="Exemplos de conexões"
-      aria-roledescription="carrossel"
+      aria-label={t("Exemplos de conexões")}
+      aria-roledescription={t("carrossel")}
       className={styles.connectionCarousel}
     >
       <div
@@ -100,8 +103,12 @@ export function ConnectionCarousel() {
         className={styles.carouselStage}
       >
         <article
-          aria-label={`${String(current + 1)} de ${String(examples.length)}: ${active.label}`}
-          aria-roledescription="slide"
+          aria-label={t("{current} de {total}: {label}", {
+            current: current + 1,
+            total: examples.length,
+            label: t(active.label),
+          })}
+          aria-roledescription={t("slide")}
           className={styles.connectionSlide}
           key={active.label}
         >
@@ -109,17 +116,17 @@ export function ConnectionCarousel() {
             <Icon aria-hidden="true" />
             <span>{active.service}</span>
           </div>
-          <h3>{active.title}</h3>
-          <blockquote>“{active.request}”</blockquote>
+          <h3>{t(active.title)}</h3>
+          <blockquote>“{t(active.request)}”</blockquote>
           <div className={styles.connectionAnswer}>
             <span>Zoen</span>
-            <p>{active.reply}</p>
+            <p>{t(active.reply)}</p>
           </div>
         </article>
       </div>
       <div className={styles.carouselControls}>
         <Button
-          aria-label="Exemplo anterior"
+          aria-label={t("Exemplo anterior")}
           className={styles.carouselArrow}
           onClick={() => {
             setPlaying(false);
@@ -132,10 +139,15 @@ export function ConnectionCarousel() {
         >
           <ArrowLeftIcon aria-hidden="true" />
         </Button>
-        <fieldset aria-label="Escolher exemplo" className={styles.carouselDots}>
+        <fieldset
+          aria-label={t("Escolher exemplo")}
+          className={styles.carouselDots}
+        >
           {examples.map((example, index) => (
             <Button
-              aria-label={`Mostrar exemplo: ${example.label}`}
+              aria-label={t("Mostrar exemplo: {name}", {
+                name: t(example.label),
+              })}
               aria-pressed={current === index}
               className={styles.carouselDot}
               key={example.label}
@@ -151,7 +163,7 @@ export function ConnectionCarousel() {
           ))}
         </fieldset>
         <Button
-          aria-label="Próximo exemplo"
+          aria-label={t("Próximo exemplo")}
           className={styles.carouselArrow}
           onClick={() => {
             setPlaying(false);
@@ -164,7 +176,9 @@ export function ConnectionCarousel() {
         </Button>
         {!reduceMotion && (
           <Button
-            aria-label={playing ? "Pausar carrossel" : "Reproduzir carrossel"}
+            aria-label={
+              playing ? t("Pausar carrossel") : t("Reproduzir carrossel")
+            }
             className={styles.carouselArrow}
             onClick={() => {
               setPlaying((value) => !value);

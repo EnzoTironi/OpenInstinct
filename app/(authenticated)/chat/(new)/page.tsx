@@ -1,3 +1,4 @@
+import { getI18n } from "@web/i18n/server";
 import { NewChat } from "./_components/new-chat";
 import { Logo } from "@web/components/ui/logo";
 import { chatStarters } from "../../_lib/chat-starters";
@@ -5,6 +6,7 @@ import { chatStarters } from "../../_lib/chat-starters";
 export default async function NewChatPage({
   searchParams,
 }: PageProps<"/chat">) {
+  const { t } = await getI18n();
   const params = await searchParams;
   const starter = chatStarters.find((item) => item.id === params.starter);
   return (
@@ -12,12 +14,15 @@ export default async function NewChatPage({
       <div className="flex w-full max-w-xl flex-col items-center gap-6">
         <Logo className="size-20 shadow-lg" />
         <div className="space-y-3 text-center">
-          <h1 className="type-page-title">Pode deixar comigo.</h1>
+          <h1 className="type-page-title">{t("Pode deixar comigo.")}</h1>
           <p className="type-supporting-body text-muted-foreground">
-            Uma coisa a menos para resolver.
+            {t("Uma coisa a menos para resolver.")}
           </p>
         </div>
-        <NewChat initialDraft={starter?.text} key={starter?.id ?? "new"} />
+        <NewChat
+          initialDraft={starter ? t(starter.text) : undefined}
+          key={starter?.id ?? "new"}
+        />
       </div>
     </div>
   );

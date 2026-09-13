@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type {
@@ -25,6 +27,7 @@ export function NativeDeviceForm({
   id,
   purpose,
 }: typeof deviceRequestSchema.Type) {
+  const { t } = useI18n();
   const [bound, setBound] = useState<typeof deviceBoundSchema.Type>();
   const action = useAuthorizationRequest();
   const [loading, setLoading] = useState(true);
@@ -52,7 +55,7 @@ export function NativeDeviceForm({
       controller.abort();
     };
   }, [id, purpose]);
-  if (loading) return <output>Checking this browser…</output>;
+  if (loading) return <output>{t("Checking this browser…")}</output>;
   if (resumeError)
     return (
       <DeviceChallengeRecovery
@@ -76,8 +79,12 @@ export function NativeDeviceForm({
     <div className="space-y-4">
       <p>
         {purpose === "link"
-          ? "Use the account recently signed in to this browser, then return to your messenger conversation to confirm the association. If your messenger belongs to another account, the request will be refused. Accounts and their data are not combined."
-          : "Bind this browser, then return to your messenger conversation and tell the assistant you are ready. You will be asked to approve this browser’s sign-in there."}
+          ? t(
+              "Use the account recently signed in to this browser, then return to your messenger conversation to confirm the association. If your messenger belongs to another account, the request will be refused. Accounts and their data are not combined."
+            )
+          : t(
+              "Bind this browser, then return to your messenger conversation and tell the assistant you are ready. You will be asked to approve this browser’s sign-in there."
+            )}
       </p>
       <Button
         type="button"
@@ -100,10 +107,10 @@ export function NativeDeviceForm({
           );
         }}
       >
-        {action.busy ? "Binding browser…" : "Use this browser"}
+        {action.busy ? t("Binding browser…") : t("Use this browser")}
       </Button>
       {action.error ? (
-        <p role="alert">{channelFailureMessage(action.error, purpose)}</p>
+        <p role="alert">{t(channelFailureMessage(action.error, purpose))}</p>
       ) : null}
       {purpose === "link" && action.error?.status === 401 ? (
         <SignInAgain callbackUrl="/account" />
@@ -114,7 +121,7 @@ export function NativeDeviceForm({
           render={<Link href={purpose === "link" ? "/account" : "/sign-in"} />}
           variant="outline"
         >
-          Start again
+          {t("Start again")}
         </Button>
       ) : null}
     </div>
@@ -130,6 +137,7 @@ export function DeviceChallengeRecovery({
   readonly purpose: typeof deviceRequestSchema.Type.purpose;
   readonly showSignInAgain: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-4">
       <p role="alert">{message}</p>
@@ -138,7 +146,7 @@ export function DeviceChallengeRecovery({
         render={<Link href={purpose === "link" ? "/account" : "/sign-in"} />}
         variant="outline"
       >
-        Start again
+        {t("Start again")}
       </Button>
       {showSignInAgain ? <SignInAgain callbackUrl="/account" /> : null}
     </div>

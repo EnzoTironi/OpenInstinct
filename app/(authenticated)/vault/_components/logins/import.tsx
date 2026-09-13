@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import {
   ExternalLinkIcon,
   FileKeyIcon,
@@ -29,6 +31,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const GOOGLE_PASSWORD_MANAGER_URL = "https://passwords.google.com/options";
 
 export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const importPasswords = api.vault.import.useMutation();
   const [selection, setSelection] =
@@ -46,7 +49,7 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
     setFileName(file?.name ?? "");
     if (!file) return;
     if (file.size > MAX_FILE_SIZE) {
-      setError("Choose a CSV smaller than 10 MB.");
+      setError(t("Choose a CSV smaller than 10 MB."));
       return;
     }
 
@@ -56,7 +59,7 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
       setError(
         parseError instanceof Error
           ? parseError.message
-          : "That CSV could not be read."
+          : t("That CSV could not be read.")
       );
     }
   };
@@ -87,32 +90,34 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
   const importError =
     error ??
     (importPasswords.error
-      ? "The import did not finish. Check the vault error and try again."
+      ? t("The import did not finish. Check the vault error and try again.")
       : undefined);
 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Import Chrome passwords</DialogTitle>
+        <DialogTitle>{t("Import Chrome passwords")}</DialogTitle>
         <DialogDescription>
-          Export a CSV from Google Password Manager, then choose it here. The
-          passwords go into this workspace&apos;s encrypted vault.
+          {t(
+            "Export a CSV from Google Password Manager, then choose it here. The passwords go into this workspace's encrypted vault."
+          )}
         </DialogDescription>
       </DialogHeader>
 
       {importedCount === undefined ? (
         <div className="grid gap-5">
           <div className="grid gap-2">
-            <p className="type-label">1. Export your passwords</p>
+            <p className="type-label">{t("1. Export your passwords")}</p>
             <p className="type-supporting-body text-muted-foreground">
-              Open Settings in Google Password Manager and choose Export
-              passwords.
+              {t(
+                "Open Settings in Google Password Manager and choose Export passwords."
+              )}
             </p>
             <Button
               nativeButton={false}
               render={
                 <a
-                  aria-label="Open Google Password Manager"
+                  aria-label={t("Open Google Password Manager")}
                   href={GOOGLE_PASSWORD_MANAGER_URL}
                   rel="noreferrer"
                   target="_blank"
@@ -120,14 +125,14 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
               }
               variant="outline"
             >
-              Open Google Password Manager
+              {t("Open Google Password Manager")}
               <ExternalLinkIcon />
             </Button>
           </div>
 
           <div className="grid gap-2">
             <Label htmlFor="chrome-passwords-csv">
-              2. Choose the exported CSV
+              {t("2. Choose the exported CSV")}
             </Label>
             <Input
               accept=".csv,text/csv"
@@ -141,10 +146,12 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
             />
             {selection ? (
               <p className="type-supporting-body text-muted-foreground">
-                {selection.items.length.toLocaleString()} login
-                {selection.items.length === 1 ? "" : "s"} ready from {fileName}
+                {t("Acessos prontos para importar: {count} · {file}", {
+                  count: selection.items.length.toLocaleString(locale),
+                  file: fileName,
+                })}
                 {selection.skipped > 0
-                  ? ` · ${selection.skipped.toLocaleString()} invalid ${selection.skipped === 1 ? "row" : "rows"} skipped`
+                  ? ` · ${t("Linhas inválidas ignoradas: {count}", { count: selection.skipped.toLocaleString(locale) })}`
                   : ""}
               </p>
             ) : null}
@@ -153,18 +160,18 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
           {importError ? (
             <Alert variant="destructive">
               <FileKeyIcon />
-              <AlertTitle>Couldn&apos;t import this file</AlertTitle>
+              <AlertTitle>{t("Couldn't import this file")}</AlertTitle>
               <AlertDescription>{importError}</AlertDescription>
             </Alert>
           ) : null}
 
           <Alert>
             <ShieldCheckIcon />
-            <AlertTitle>Your passwords stay in your vault</AlertTitle>
+            <AlertTitle>{t("Your passwords stay in your vault")}</AlertTitle>
             <AlertDescription>
-              The CSV is read in this browser and is not copied to Kernel.
-              Chrome exports passwords as plain text, so delete the file after
-              this import.
+              {t(
+                "The CSV is read in this browser and is not copied to Kernel. Chrome exports passwords as plain text, so delete the file after this import."
+              )}
             </AlertDescription>
           </Alert>
         </div>
@@ -172,12 +179,14 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
         <Alert>
           <ShieldCheckIcon />
           <AlertTitle>
-            {importedCount.toLocaleString()} login
-            {importedCount === 1 ? "" : "s"} imported
+            {t("Acessos importados: {count}", {
+              count: importedCount.toLocaleString(locale),
+            })}
           </AlertTitle>
           <AlertDescription>
-            They are now available to the agent through the encrypted vault.
-            Delete the exported CSV from your device.
+            {t(
+              "They are now available to the agent through the encrypted vault. Delete the exported CSV from your device."
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -191,10 +200,12 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
           >
             <UploadIcon />
             {importPasswords.isPending
-              ? "Importing…"
+              ? t("Importing…")
               : selection
-                ? `Import ${selection.items.length.toLocaleString()} ${selection.items.length === 1 ? "login" : "logins"}`
-                : "Choose a CSV"}
+                ? t("Importar acessos ({count})", {
+                    count: selection.items.length.toLocaleString(locale),
+                  })
+                : t("Choose a CSV")}
           </Button>
         ) : (
           <Button
@@ -204,7 +215,7 @@ export function ChromeImportPanel({ onDone }: { readonly onDone: () => void }) {
             }}
             type="button"
           >
-            Done
+            {t("Done")}
           </Button>
         )}
       </DialogFooter>
@@ -286,9 +297,7 @@ function parseChromePasswordsCsv(csv: string) {
     throw new Error("No valid saved passwords were found in this CSV.");
   }
   if (items.length > 3_000) {
-    throw new Error(
-      `This file contains ${items.length.toLocaleString()} passwords. Import up to 3,000 at a time.`
-    );
+    throw new Error("Importe até 3.000 senhas por vez.");
   }
 
   return { items, skipped };

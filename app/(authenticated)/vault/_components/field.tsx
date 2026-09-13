@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import {
   Field,
   FieldDescription,
@@ -21,6 +23,7 @@ export function FormField({
   readonly label: string;
   readonly onChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <Field data-invalid={error ? true : undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
@@ -33,7 +36,7 @@ export function FormField({
         }}
       />
       {description ? <FieldDescription>{description}</FieldDescription> : null}
-      <FieldError errors={error ? [{ message: error }] : undefined} />
+      <FieldError errors={error ? [{ message: t(error) }] : undefined} />
     </Field>
   );
 }

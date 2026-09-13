@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import type {
   ChangeEvent,
   ComponentProps,
@@ -309,10 +311,13 @@ export type QuestionSubmitProps = ComponentProps<typeof Button> & {
 };
 
 export const QuestionSubmit = ({
-  children = "Submit",
+  children,
   disabled,
   ...props
 }: QuestionSubmitProps) => {
+  const { t } = useI18n();
+  const localizedChildren = children ?? t("Submit");
+
   const question = useQuestion();
   const hasResponse =
     question.selectedValues.length > 0 || question.text.trim().length > 0;
@@ -323,7 +328,7 @@ export const QuestionSubmit = ({
       type="submit"
       {...props}
     >
-      {children}
+      {localizedChildren}
     </Button>
   );
 };

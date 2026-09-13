@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import type { EveAuthorizationPart } from "eve/react";
 import {
   CheckCircleIcon,
@@ -14,6 +17,7 @@ export function AuthorizationPrompt({
 }: {
   readonly part: EveAuthorizationPart;
 }) {
+  const { t } = useI18n();
   const isAuthorized =
     part.state === "completed" && part.outcome === "authorized";
   const isCompleted = part.state === "completed";
@@ -34,13 +38,13 @@ export function AuthorizationPrompt({
   return (
     <Alert variant={alertVariant}>
       <Icon />
-      <AlertTitle>{authorizationTitle(part)}</AlertTitle>
+      <AlertTitle>{authorizationTitle(part, t)}</AlertTitle>
       <AlertDescription>
-        <p>{authorizationDescription(part)}</p>
+        <p>{authorizationDescription(part, t)}</p>
         {shouldShowInstructions ? <p>{instructions}</p> : null}
         {part.state === "required" && part.authorization?.userCode ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span>Code</span>
+            <span>{t("Code")}</span>
             <Badge variant="outline">
               <code className="type-compact-code">
                 {part.authorization.userCode}
@@ -52,7 +56,7 @@ export function AuthorizationPrompt({
           <Button
             render={
               <a
-                aria-label={`Sign in with ${part.displayName}`}
+                aria-label={t("Entrar com {name}", { name: part.displayName })}
                 href={part.authorization.url}
                 rel="noreferrer"
                 target="_blank"
@@ -61,7 +65,7 @@ export function AuthorizationPrompt({
             size="sm"
           >
             <ExternalLinkIcon />
-            Sign in with {part.displayName}
+            {t("Sign in with")} {part.displayName}
           </Button>
         ) : null}
       </AlertDescription>
@@ -69,17 +73,29 @@ export function AuthorizationPrompt({
   );
 }
 
-function authorizationTitle(part: EveAuthorizationPart): string {
-  if (part.state === "required") return `Connect ${part.displayName}`;
-  if (part.outcome === "authorized") return `${part.displayName} connected`;
-  return `${part.displayName} authorization ${formatAuthorizationOutcome(part.outcome)}`;
+function authorizationTitle(
+  part: EveAuthorizationPart,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
+  if (part.state === "required")
+    return t("Conectar {name}", { name: part.displayName });
+  if (part.outcome === "authorized")
+    return t("{name} conectado.", { name: part.displayName });
+  return t("Autorização de {name}: {status}.", {
+    name: part.displayName,
+    status: t(formatAuthorizationOutcome(part.outcome)),
+  });
 }
 
-function authorizationDescription(part: EveAuthorizationPart): string {
+function authorizationDescription(
+  part: EveAuthorizationPart,
+  t: ReturnType<typeof useI18n>["t"]
+): string {
   if (part.state === "required") return part.description;
-  if (part.outcome === "authorized") return `${part.displayName} connected.`;
+  if (part.outcome === "authorized")
+    return t("{name} conectado.", { name: part.displayName });
   const tail = part.reason !== undefined ? ` (${part.reason})` : "";
-  return `${part.displayName} authorization ${formatAuthorizationOutcome(part.outcome)}${tail}.`;
+  return `${authorizationTitle(part, t)}${tail}`;
 }
 
 function formatAuthorizationOutcome(

@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import type { EveDynamicToolPart, EveMessageInputRequest } from "eve/react";
 import {
   Question,
@@ -26,6 +29,7 @@ export function QuestionRequest({
   readonly inputResponse?: InputResponse;
   readonly onInputResponses: RespondToAgentInput;
 }) {
+  const { t } = useI18n();
   const selectedOption = inputRequest.options?.find(
     (option) => option.id === inputResponse?.optionId
   );
@@ -75,18 +79,21 @@ export function QuestionRequest({
         </QuestionOptions>
       ) : null}
       {acceptsFreeform ? (
-        <QuestionInput aria-label="Answer" placeholder="Type your answer…" />
+        <QuestionInput
+          aria-label={t("Answer")}
+          placeholder={t("Type your answer…")}
+        />
       ) : null}
       {inputResponse ? (
         <QuestionDescription>
-          Responded:{" "}
+          {t("Responded:")}{" "}
           {selectedOption?.label ??
             inputResponse.text ??
             inputResponse.optionId}
         </QuestionDescription>
       ) : (
         <QuestionActions>
-          <QuestionSubmit>Answer</QuestionSubmit>
+          <QuestionSubmit>{t("Answer")}</QuestionSubmit>
         </QuestionActions>
       )}
     </Question>
@@ -102,6 +109,7 @@ export function InputRequestActions({
   readonly onInputResponses: RespondToAgentInput;
   readonly part: EveDynamicToolPart;
 }) {
+  const { t } = useI18n();
   const inputRequest = part.toolMetadata?.eve?.inputRequest;
   if (!inputRequest) return null;
 
@@ -116,7 +124,7 @@ export function InputRequestActions({
       <AlertDescription>
         {inputResponse ? (
           <p>
-            Responded:{" "}
+            {t("Responded:")}{" "}
             {selectedOption?.label ??
               inputResponse.text ??
               inputResponse.optionId}

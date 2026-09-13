@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { ChevronsUpDownIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -21,14 +23,8 @@ import type { RouterOutputs } from "@web/trpc/types";
 
 type ModelCatalogItem = RouterOutputs["models"]["list"][number];
 
-const priceFormatter = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 0,
-  style: "currency",
-  currency: "USD",
-});
-
 export function ModelSelector({ modelId }: { readonly modelId: string }) {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const catalog = api.models.list.useQuery(undefined, {
@@ -61,7 +57,7 @@ export function ModelSelector({ modelId }: { readonly modelId: string }) {
     catalog.error instanceof Error
       ? catalog.error.message
       : selectModel.error
-        ? "Unable to update the workspace. Try again."
+        ? t("Unable to update the workspace. Try again.")
         : undefined;
 
   return (
@@ -79,20 +75,20 @@ export function ModelSelector({ modelId }: { readonly modelId: string }) {
         <ModelSelectorLogo
           provider={providerLogo(modelId.split("/", 1)[0] ?? modelId)}
         />
-        Choose
+        {t("Choose")}
         <ChevronsUpDownIcon />
       </ModelSelectorTrigger>
       <ModelSelectorContent
         className="sm:max-w-xl"
         showCloseButton={false}
-        title="Choose a model"
+        title={t("Choose a model")}
       >
-        <ModelSelectorInput placeholder="Search models…" />
+        <ModelSelectorInput placeholder={t("Search models…")} />
         <ModelSelectorList className="max-h-[min(32rem,70vh)]">
           <ModelSelectorEmpty className="px-3 text-left text-muted-foreground">
             {catalog.isFetching
-              ? "Loading models…"
-              : (catalogError ?? "No matching models.")}
+              ? t("Loading models…")
+              : (catalogError ?? t("No matching models."))}
           </ModelSelectorEmpty>
           {groupedModels.map(([provider, providerModels]) => (
             <ModelSelectorGroup heading={provider} key={provider}>
@@ -112,9 +108,9 @@ export function ModelSelector({ modelId }: { readonly modelId: string }) {
                       {model.id}
                     </span>
                   </span>
-                  {formatPricing(model) ? (
+                  {formatPricing(model, locale, t("por milhão")) ? (
                     <ModelSelectorShortcut>
-                      {formatPricing(model)}
+                      {formatPricing(model, locale, t("por milhão"))}
                     </ModelSelectorShortcut>
                   ) : null}
                 </ModelSelectorItem>
@@ -134,8 +130,14 @@ function providerLogo(provider: string) {
   return provider;
 }
 
-function formatPricing(model: ModelCatalogItem) {
+function formatPricing(model: ModelCatalogItem, locale: string, unit: string) {
+  const priceFormatter = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    style: "currency",
+    currency: "USD",
+  });
   if (model.pricing?.input === undefined || model.pricing.output === undefined)
     return undefined;
-  return `${priceFormatter.format(model.pricing.input)} / ${priceFormatter.format(model.pricing.output)} per M`;
+  return `${priceFormatter.format(model.pricing.input)} / ${priceFormatter.format(model.pricing.output)} ${unit}`;
 }

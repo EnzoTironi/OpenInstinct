@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import type { EveMessagePart } from "eve/react";
 import { ExternalLinkIcon, FileIcon, ImageIcon } from "lucide-react";
 import { Button } from "@web/components/ui/button";
@@ -6,7 +9,8 @@ import { Card, CardContent } from "@web/components/ui/card";
 type EveFilePart = Extract<EveMessagePart, { type: "file" }>;
 
 export function AttachmentPart({ part }: { readonly part: EveFilePart }) {
-  const label = part.filename ?? "Attachment";
+  const { t } = useI18n();
+  const label = part.filename ?? t("Attachment");
   const detail = [part.mediaType, formatBytes(part.size)]
     .filter(Boolean)
     .join(" · ");
@@ -45,7 +49,7 @@ export function AttachmentPart({ part }: { readonly part: EveFilePart }) {
       nativeButton={false}
       render={
         <a
-          aria-label={`Open ${label}`}
+          aria-label={t("Abrir {name}", { name: label })}
           href={part.url}
           rel="noreferrer"
           target="_blank"

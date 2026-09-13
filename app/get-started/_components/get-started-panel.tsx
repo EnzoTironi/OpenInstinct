@@ -1,3 +1,8 @@
+"use client";
+
+import { LanguagePicker } from "@web/i18n/language-picker";
+
+import { useI18n } from "@web/i18n/context";
 import Link from "next/link";
 import { MessageCircleIcon } from "lucide-react";
 import { Button } from "@web/components/ui/button";
@@ -12,6 +17,7 @@ export function GetStartedPanel({
   readonly telegramUrl: string | null;
   readonly imessageUrl: string | null;
 }) {
+  const { t } = useI18n();
   const available = Boolean(whatsappUrl ?? telegramUrl ?? imessageUrl);
   return (
     <section className="w-full max-w-md space-y-8 text-center">
@@ -22,11 +28,15 @@ export function GetStartedPanel({
         <Logo /> Zoen
       </Link>
       <header className="space-y-3">
-        <h1 className="type-page-title">Tudo começa com um oi.</h1>
+        <h1 className="type-page-title">{t("Tudo começa com um oi.")}</h1>
         <p className="type-supporting-body text-muted-foreground">
           {available
-            ? "Abra a conversa e faça seu primeiro pedido. Seu Zoen começa com você."
-            : "A conversa ainda não está disponível por aqui. Volte em breve para conhecer seu Zoen."}
+            ? t(
+                "Abra a conversa e faça seu primeiro pedido. Seu Zoen começa com você."
+              )
+            : t(
+                "A conversa ainda não está disponível por aqui. Volte em breve para conhecer seu Zoen."
+              )}
         </p>
       </header>
       {available ? (
@@ -41,10 +51,15 @@ export function GetStartedPanel({
                 <Button
                   key={label}
                   nativeButton={false}
-                  render={<a aria-label={`Abrir ${label}`} href={url} />}
+                  render={
+                    <a
+                      aria-label={t("Abrir {name}", { name: label })}
+                      href={url}
+                    />
+                  }
                   size="lg"
                 >
-                  <MessageCircleIcon aria-hidden="true" /> Abrir {label}
+                  <MessageCircleIcon aria-hidden="true" /> {t("Abrir")} {label}
                 </Button>
               )
           )}
@@ -55,15 +70,16 @@ export function GetStartedPanel({
           render={<Link href="/welcome" />}
           size="lg"
         >
-          Conhecer o Zoen
+          {t("Conhecer o Zoen")}
         </Button>
       )}
       <p className="type-caption text-muted-foreground">
-        Já usa o Zoen?{" "}
+        {t("Já usa o Zoen?")}{" "}
         <Link className="underline underline-offset-4" href="/sign-in">
-          Acessar minha conta
+          {t("Acessar minha conta")}
         </Link>
       </p>
+      <LanguagePicker />
     </section>
   );
 }

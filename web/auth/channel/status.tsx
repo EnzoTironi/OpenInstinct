@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import type { ChannelAuthorizationStatus } from "@web/auth/channel/client";
 import type {
   channelChallengeSchema,
@@ -26,25 +29,35 @@ export function ChannelStatus({
   readonly onContinue: () => void;
   readonly onRestart: () => void;
 }) {
+  const { t, locale } = useI18n();
   const messenger = challenge.channel === "telegram" ? "Telegram" : "WhatsApp";
   return (
     <div className="space-y-4">
       {purpose === "link" && "purpose" in challenge ? (
         <p className="type-supporting-body text-muted-foreground">
-          This confirms the messenger’s existing association with the account
-          signed in to this browser. Accounts and their data are not combined.
+          {t(
+            "This confirms the messenger’s existing association with the account signed in to this browser. Accounts and their data are not combined."
+          )}
         </p>
       ) : null}
       <div aria-live="polite">
         {status === "pending" ? (
           <>
-            <h2 className="type-section-title">Confirm in {messenger}</h2>
+            <h2 className="type-section-title">
+              {t("Confirm in")} {messenger}
+            </h2>
             <p className="type-supporting-body mt-2 text-muted-foreground">
               {purpose === "login"
-                ? "Open the chat and confirm the request to sign in to this browser. Only approve a browser sign-in you requested. Then return to this tab."
+                ? t(
+                    "Open the chat and confirm the request to sign in to this browser. Only approve a browser sign-in you requested. Then return to this tab."
+                  )
                 : "purpose" in challenge
-                  ? "Return to the messenger conversation where you requested this association. Confirm the request for the account already signed in to this browser, then return to this tab."
-                  : "Open the messenger account you want to link and confirm the request to link it to your current Companion account. Only approve it if you started it here. Then return to this tab."}
+                  ? t(
+                      "Return to the messenger conversation where you requested this association. Confirm the request for the account already signed in to this browser, then return to this tab."
+                    )
+                  : t(
+                      "Open the messenger account you want to link and confirm the request to link it to your current Companion account. Only approve it if you started it here. Then return to this tab."
+                    )}
             </p>
             {"deepLink" in challenge ? (
               <Button
@@ -52,7 +65,9 @@ export function ChannelStatus({
                 nativeButton={false}
                 render={
                   <a
-                    aria-label={`Open ${messenger} to confirm ${purpose === "login" ? "sign-in" : "account linking"}`}
+                    aria-label={t("Abrir {messenger} para confirmar", {
+                      messenger,
+                    })}
                     href={challenge.deepLink}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -60,12 +75,12 @@ export function ChannelStatus({
                   />
                 }
               >
-                Open {messenger}
+                {t("Open")} {messenger}
               </Button>
             ) : null}
             <p className="mt-3 type-caption text-muted-foreground">
-              Waiting for your confirmation. This request expires at{" "}
-              {new Date(challenge.expiresAt).toLocaleTimeString([], {
+              {t("Waiting for your confirmation. This request expires at")}{" "}
+              {new Date(challenge.expiresAt).toLocaleTimeString(locale, {
                 hour: "2-digit",
                 minute: "2-digit",
               })}
@@ -74,11 +89,15 @@ export function ChannelStatus({
           </>
         ) : status === "confirmed" ? (
           <>
-            <h2 className="type-section-title">Confirmed in {messenger}</h2>
+            <h2 className="type-section-title">
+              {t("Confirmed in")} {messenger}
+            </h2>
             <p className="type-supporting-body mt-2 text-muted-foreground">
               {purpose === "login"
-                ? "Continue to sign in to this browser."
-                : "Finish linking this messenger account to your current Companion account."}
+                ? t("Continue to sign in to this browser.")
+                : t(
+                    "Finish linking this messenger account to your current Companion account."
+                  )}
             </p>
             <Button
               className="mt-4 w-full"
@@ -88,25 +107,26 @@ export function ChannelStatus({
             >
               {busy
                 ? purpose === "login"
-                  ? "Signing in…"
-                  : "Linking…"
+                  ? t("Signing in…")
+                  : t("Linking…")
                 : purpose === "login"
-                  ? "Enter this browser"
-                  : "Finish linking account"}
+                  ? t("Enter this browser")
+                  : t("Finish linking account")}
             </Button>
           </>
         ) : (
           <>
             <h2 className="type-section-title">
               {status === "expired"
-                ? "This request has expired"
+                ? t("This request has expired")
                 : status === "consumed"
-                  ? "This request was already used"
-                  : "This request could not be verified"}
+                  ? t("This request was already used")
+                  : t("This request could not be verified")}
             </h2>
             <p className="type-supporting-body mt-2 text-muted-foreground">
-              Start again to get a new request. Confirm only the new request in
-              your chat.
+              {t(
+                "Start again to get a new request. Confirm only the new request in your chat."
+              )}
             </p>
           </>
         )}
@@ -115,10 +135,10 @@ export function ChannelStatus({
         <Alert variant="destructive">
           <AlertTitle>
             {purpose === "login"
-              ? "Sign-in needs attention"
-              : "Account linking needs attention"}
+              ? t("Sign-in needs attention")
+              : t("Account linking needs attention")}
           </AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{t(error)}</AlertDescription>
         </Alert>
       ) : null}
       <Button
@@ -128,10 +148,10 @@ export function ChannelStatus({
         type="button"
         variant="outline"
       >
-        Start again or choose another messenger
+        {t("Start again or choose another messenger")}
       </Button>
       <p className="type-caption text-muted-foreground">
-        Keep this tab open until the request is complete.
+        {t("Keep this tab open until the request is complete.")}
       </p>
     </div>
   );

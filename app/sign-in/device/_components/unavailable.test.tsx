@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToEnglishMarkup as renderToStaticMarkup } from "@tests/helpers/i18n";
 import { describe, expect, it } from "vitest";
 import { DeviceChallengeRecovery } from "@web/auth/channel/device";
 import { DeviceSignInUnavailable } from "./unavailable";

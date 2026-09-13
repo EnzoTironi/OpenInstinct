@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useState } from "react";
 import { Option, Schema } from "effect";
 import { billingPlanCatalog, type BillingPlanId } from "@shared/billing/plans";
@@ -58,10 +60,11 @@ export function AccountBillingSection({
   readonly stripeCheckoutConfigured: boolean;
   readonly stripePortalConfigured: boolean;
 }) {
+  const { t, locale } = useI18n();
   const [busy, setBusy] = useState<"pro" | "portal" | "org" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const catalog = billingPlanCatalog[plan];
-  const seatLabel = String(seatCount);
+  const seatLabel = seatCount.toLocaleString(locale);
 
   return (
     <section
@@ -71,29 +74,31 @@ export function AccountBillingSection({
     >
       <div className="space-y-2">
         <h2 id="billing-heading" className="type-section-title">
-          <span id="plan">Seu plano</span>
+          <span id="plan">{t("Seu plano")}</span>
         </h2>
         <p className="type-supporting-body text-muted-foreground">
-          Plano atual: <span className="text-foreground">{catalog.name}</span>
+          {t("Plano atual:")}{" "}
+          <span className="text-foreground">{t(catalog.name)}</span>
           {plan === "org"
-            ? ` · ${seatLabel} seat${seatCount === 1 ? "" : "s"}`
+            ? ` · ${t("Assentos: {count}", { count: seatLabel })}`
             : ""}
-          {status !== "active" ? ` · status ${status}` : ""}. O plano gratuito
-          não precisa de cartão.
+          {status !== "active" ? ` · ${t(status)}` : ""}
+          {t(". O plano gratuito não precisa de cartão.")}
         </p>
       </div>
 
       {!stripeCheckoutConfigured && !stripePortalConfigured ? (
         <p className="type-supporting-body rounded-2xl bg-muted p-5 text-muted-foreground">
-          As alterações de plano ainda não estão disponíveis. Você pode
-          continuar usando seu plano atual.
+          {t(
+            "As alterações de plano ainda não estão disponíveis. Você pode continuar usando seu plano atual."
+          )}
         </p>
       ) : null}
 
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>Assinatura</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertTitle>{t("Assinatura")}</AlertTitle>
+          <AlertDescription>{t(error)}</AlertDescription>
         </Alert>
       ) : null}
 
@@ -114,7 +119,7 @@ export function AccountBillingSection({
                   setError(
                     cause instanceof Error
                       ? cause.message
-                      : "Unable to start Checkout."
+                      : t("Unable to start Checkout.")
                   );
                   setBusy(null);
                   return undefined;
@@ -122,10 +127,10 @@ export function AccountBillingSection({
             }}
           >
             {!stripeCheckoutConfigured
-              ? "Alteração indisponível"
+              ? t("Alteração indisponível")
               : busy === "pro"
-                ? "Abrindo…"
-                : "Mudar para Pro"}
+                ? t("Abrindo…")
+                : t("Mudar para Pro")}
           </Button>
         ) : null}
         {organizationId ? (
@@ -148,7 +153,7 @@ export function AccountBillingSection({
                   setError(
                     cause instanceof Error
                       ? cause.message
-                      : "Unable to start Org Checkout."
+                      : t("Unable to start Org Checkout.")
                   );
                   setBusy(null);
                   return undefined;
@@ -157,10 +162,10 @@ export function AccountBillingSection({
             variant="outline"
           >
             {!stripeCheckoutConfigured
-              ? "Assentos indisponíveis"
+              ? t("Assentos indisponíveis")
               : busy === "org"
-                ? "Abrindo…"
-                : "Adicionar pessoas"}
+                ? t("Abrindo…")
+                : t("Adicionar pessoas")}
           </Button>
         ) : null}
         <Button
@@ -180,7 +185,7 @@ export function AccountBillingSection({
                 setError(
                   cause instanceof Error
                     ? cause.message
-                    : "Unable to open Customer Portal."
+                    : t("Unable to open Customer Portal.")
                 );
                 setBusy(null);
                 return undefined;
@@ -189,10 +194,10 @@ export function AccountBillingSection({
           variant="outline"
         >
           {!stripePortalConfigured
-            ? "Gestão indisponível"
+            ? t("Gestão indisponível")
             : busy === "portal"
-              ? "Abrindo…"
-              : "Gerenciar assinatura"}
+              ? t("Abrindo…")
+              : t("Gerenciar assinatura")}
         </Button>
       </div>
     </section>

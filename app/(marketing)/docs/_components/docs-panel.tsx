@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@web/i18n/context";
 import Link from "next/link";
 import { Button } from "@web/components/ui/button";
 import { OnboardingTrigger } from "../../_components/onboarding";
@@ -37,33 +40,34 @@ const links = [
 ] as const;
 
 export function DocsPanel() {
+  const { t } = useI18n();
   return (
     <MarketingShell active="docs">
       <main>
         <MarketingFrame className="flex max-w-3xl flex-col gap-16 py-16 sm:py-24">
           <header className="flex flex-col gap-5">
-            <p className="type-caption text-muted-foreground">Guia</p>
+            <p className="type-caption text-muted-foreground">{t("Guia")}</p>
             <h1 className="type-signal text-4xl tracking-tight sm:text-5xl lg:leading-[1.05]">
-              Primeiros passos
+              {t("Primeiros passos")}
             </h1>
             <p className="type-body text-lg text-muted-foreground">
-              Seu primeiro pedido ao{" "}
+              {t("Seu primeiro pedido ao")}{" "}
               <a
                 className="underline-offset-4 hover:text-foreground hover:underline"
                 href={companionPublicOrigin}
               >
                 Zoen
               </a>{" "}
-              começa no seu mensageiro.
+              {t("começa no seu mensageiro.")}
             </p>
             <div className="flex flex-wrap gap-3">
-              <OnboardingTrigger>Começar agora</OnboardingTrigger>
+              <OnboardingTrigger>{t("Começar agora")}</OnboardingTrigger>
               <Button
                 nativeButton={false}
                 render={<Link href="/welcome" />}
                 variant="outline"
               >
-                Voltar ao produto
+                {t("Voltar ao produto")}
               </Button>
             </div>
           </header>
@@ -76,7 +80,7 @@ export function DocsPanel() {
               className="type-signal text-3xl tracking-tight"
               id="flow-heading"
             >
-              Fluxo
+              {t("Fluxo")}
             </h2>
             <ol className="flex flex-col gap-4">
               {steps.map((step, index) => (
@@ -90,8 +94,8 @@ export function DocsPanel() {
                         {index + 1}
                       </span>
                       <div className="flex min-w-0 flex-col gap-1">
-                        <CardTitle>{step.title}</CardTitle>
-                        <CardDescription>{step.body}</CardDescription>
+                        <CardTitle>{t(step.title)}</CardTitle>
+                        <CardDescription>{t(step.body)}</CardDescription>
                       </div>
                     </CardHeader>
                   </Card>
@@ -108,19 +112,23 @@ export function DocsPanel() {
               className="type-signal text-3xl tracking-tight"
               id="trust-docs-heading"
             >
-              Notas de confiança
+              {t("Notas de confiança")}
             </h2>
             <ul className="type-supporting-body flex flex-col gap-3 text-muted-foreground">
               <li>
-                Uma assinatura só começa depois da sua confirmação no Stripe.
+                {t(
+                  "Uma assinatura só começa depois da sua confirmação no Stripe."
+                )}
               </li>
               <li>
-                Sua conta permite consultar e apagar a memória pessoal salva.
-                Esse controle cobre a memória pessoal, sem apagar toda a conta.
+                {t(
+                  "Sua conta permite consultar e apagar a memória pessoal salva. Esse controle cobre a memória pessoal, sem apagar toda a conta."
+                )}
               </li>
               <li>
-                Você pode gerenciar ou cancelar sua assinatura pelo portal do
-                Stripe, acessível na sua conta.
+                {t(
+                  "Você pode gerenciar ou cancelar sua assinatura pelo portal do Stripe, acessível na sua conta."
+                )}
               </li>
             </ul>
           </section>
@@ -133,7 +141,7 @@ export function DocsPanel() {
               className="type-signal text-3xl tracking-tight"
               id="related-heading"
             >
-              Relacionados
+              {t("Relacionados")}
             </h2>
             <ul className="grid gap-3">
               {links.map((item) => (
@@ -141,8 +149,8 @@ export function DocsPanel() {
                   <Link className="block" href={item.href} prefetch={false}>
                     <Card className="transition-colors hover:bg-muted/40">
                       <CardHeader>
-                        <CardTitle>{item.title}</CardTitle>
-                        <CardDescription>{item.body}</CardDescription>
+                        <CardTitle>{t(item.title)}</CardTitle>
+                        <CardDescription>{t(item.body)}</CardDescription>
                       </CardHeader>
                     </Card>
                   </Link>

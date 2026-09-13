@@ -1,10 +1,15 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { useState } from "react";
 import { authClient } from "@web/auth/client";
 import { api } from "@web/trpc/client";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
+import { CheckIcon, ChevronRightIcon } from "lucide-react";
+import { ConnectionIcon } from "./connection-icon";
+import styles from "../connections.module.css";
 
 interface LinkedChannelIdentity {
   readonly id: string;
@@ -17,6 +22,7 @@ export function LinkedChannels({
 }: {
   readonly identities: readonly LinkedChannelIdentity[];
 }) {
+  const { t } = useI18n();
   const [selected, setSelected] = useState<string>();
   const [lastAccess, setLastAccess] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -40,66 +46,55 @@ export function LinkedChannels({
       {signingOut ? (
         <Alert>
           <AlertDescription>
-            Mensageiro desconectado. Saindo da conta…
+            {t("Mensageiro desconectado. Saindo da conta…")}
           </AlertDescription>
         </Alert>
       ) : null}
-      {identities.length === 0 ? (
-        <p className="type-supporting-body text-muted-foreground">
-          Nenhum mensageiro conectado. Escolha Telegram ou WhatsApp abaixo para
-          começar.
-        </p>
-      ) : (
-        <ul className="divide-y rounded-xl border">
+      {identities.length > 0 && (
+        <ul className={styles.list}>
           {identities.map((identity) => (
-            <li
-              key={identity.id}
-              className="flex flex-wrap items-center justify-between gap-3 p-4"
-            >
-              <div className="min-w-0">
-                <p className="type-supporting-body font-medium">
-                  {identity.channel === "telegram" ? "Telegram" : "WhatsApp"}
-                </p>
-                <p className="type-caption break-all text-muted-foreground">
-                  {identity.senderId}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
-                  revoke.isPending || signingOut || identities.length < 2
-                }
+            <li key={identity.id}>
+              <LinkedChannelRow
+                identity={identity}
+                expanded={selected === identity.id}
+                busy={revoke.isPending || signingOut}
                 onClick={() => {
                   revoke.reset();
                   setLastAccess(false);
-                  setSelected(identity.id);
+                  setSelected(
+                    selected === identity.id ? undefined : identity.id
+                  );
                 }}
-              >
-                Desconectar
-              </Button>
+              />
             </li>
           ))}
         </ul>
       )}
-      {identities.length === 1 || lastAccess ? (
+      {(selectedIdentity && identities.length === 1) || lastAccess ? (
         <Alert>
           <AlertDescription>
-            Este é seu único mensageiro para entrar na conta. Conecte outro
-            antes de desconectá-lo.
+            {t(
+              "Este é seu único mensageiro para entrar na conta. Conecte outro antes de desconectá-lo."
+            )}
           </AlertDescription>
         </Alert>
       ) : null}
-      {selectedIdentity ? (
+      {selectedIdentity && identities.length > 1 ? (
         <section
           className="space-y-3 rounded-xl border p-4"
-          aria-label="Confirmar desconexão do mensageiro"
+          aria-label={t("Confirmar desconexão do mensageiro")}
         >
           <p className="type-supporting-body">
-            Desconectar{" "}
-            {selectedIdentity.channel === "telegram" ? "Telegram" : "WhatsApp"}{" "}
-            ({selectedIdentity.senderId})? Você sairá da conta em todos os
-            navegadores. Use outro mensageiro conectado para entrar novamente.
+            {t(
+              "Desconectar {channel} ({account})? Você sairá da conta em todos os navegadores. Use outro mensageiro conectado para entrar novamente.",
+              {
+                channel:
+                  selectedIdentity.channel === "telegram"
+                    ? "Telegram"
+                    : "WhatsApp",
+                account: selectedIdentity.senderId,
+              }
+            )}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -110,7 +105,7 @@ export function LinkedChannels({
                 revoke.mutate({ identityId: selectedIdentity.id });
               }}
             >
-              {revoke.isPending ? "Desconectando…" : "Desconectar e sair"}
+              {revoke.isPending ? t("Desconectando…") : t("Desconectar e sair")}
             </Button>
             <Button
               type="button"
@@ -122,16 +117,49 @@ export function LinkedChannels({
                 revoke.reset();
               }}
             >
-              Cancelar
+              {t("Cancelar")}
             </Button>
           </div>
         </section>
       ) : null}
       {revoke.error ? (
         <Alert variant="destructive">
-          <AlertDescription>{revoke.error.message}</AlertDescription>
+          <AlertDescription>{t(revoke.error.message)}</AlertDescription>
         </Alert>
       ) : null}
     </div>
+  );
+}
+
+function LinkedChannelRow({
+  identity,
+  expanded,
+  busy,
+  onClick,
+}: {
+  readonly identity: LinkedChannelIdentity;
+  readonly expanded: boolean;
+  readonly busy: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      className={styles.row}
+      type="button"
+      disabled={busy}
+      aria-expanded={expanded}
+      onClick={onClick}
+    >
+      <ConnectionIcon provider={identity.channel} />
+      <span className={styles.copy}>
+        <span>{identity.channel === "telegram" ? "Telegram" : "WhatsApp"}</span>
+        <small>{identity.senderId}</small>
+      </span>
+      {expanded ? (
+        <ChevronRightIcon className={styles.trailing} aria-hidden="true" />
+      ) : (
+        <CheckIcon className={styles.trailing} aria-hidden="true" />
+      )}
+    </button>
   );
 }

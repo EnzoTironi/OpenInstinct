@@ -1,3 +1,7 @@
+"use client";
+
+import type { createTranslator } from "@web/i18n/translate";
+import { useI18n } from "@web/i18n/context";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
@@ -12,9 +16,10 @@ function channelLabel(channel: LinkedChannelSummary["channel"]) {
 }
 
 export function describeLinkedChannels(
-  identities: readonly LinkedChannelSummary[]
+  identities: readonly LinkedChannelSummary[],
+  t: ReturnType<typeof createTranslator>
 ) {
-  if (identities.length === 0) return "Nenhum mensageiro conectado ainda.";
+  if (identities.length === 0) return t("Nenhum mensageiro conectado ainda.");
   const labels: string[] = [];
   for (const identity of identities) {
     const label = channelLabel(identity.channel);
@@ -22,9 +27,11 @@ export function describeLinkedChannels(
   }
   const first = labels.at(0);
   if (first !== undefined && labels.length === 1) {
-    return first + " está conectado à sua conta.";
+    return t("{channel} conectado à sua conta.", { channel: first });
   }
-  return labels.join(" e ") + " estão conectados à sua conta.";
+  return t("{channels} conectados à sua conta.", {
+    channels: labels.join(t(" e ")),
+  });
 }
 
 export function FirstRunStatus({
@@ -34,16 +41,17 @@ export function FirstRunStatus({
   readonly identities: readonly LinkedChannelSummary[];
   readonly welcome: boolean;
 }) {
+  const { t } = useI18n();
   const linked = identities.length > 0;
   if (!welcome && linked) return null;
   if (linked) {
     return (
       <Alert>
-        <AlertTitle>Tudo pronto.</AlertTitle>
+        <AlertTitle>{t("Tudo pronto.")}</AlertTitle>
         <AlertDescription className="space-y-3">
           <p>
-            {describeLinkedChannels(identities)} Fale com o Zoen por lá ou
-            comece por aqui.
+            {describeLinkedChannels(identities, t)}{" "}
+            {t("Fale com o Zoen por lá ou comece por aqui.")}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -51,7 +59,7 @@ export function FirstRunStatus({
               render={<Link href="/chat" />}
               size="sm"
             >
-              Começar uma conversa
+              {t("Começar uma conversa")}
             </Button>
             <Button
               nativeButton={false}
@@ -59,7 +67,7 @@ export function FirstRunStatus({
               size="sm"
               variant="outline"
             >
-              Conexões
+              {t("Conexões")}
             </Button>
           </div>
         </AlertDescription>
@@ -68,15 +76,17 @@ export function FirstRunStatus({
   }
   return (
     <Alert>
-      <AlertTitle>Leve o Zoen com você.</AlertTitle>
+      <AlertTitle>{t("Leve o Zoen com você.")}</AlertTitle>
       <AlertDescription className="space-y-3">
-        <p>Conecte o Telegram ou o WhatsApp para conversar onde preferir.</p>
+        <p>
+          {t("Conecte o Telegram ou o WhatsApp para conversar onde preferir.")}
+        </p>
         <Button
           nativeButton={false}
           render={<Link href="/connections?messengers=1" />}
           size="sm"
         >
-          Conectar um mensageiro
+          {t("Conectar um mensageiro")}
         </Button>
       </AlertDescription>
     </Alert>

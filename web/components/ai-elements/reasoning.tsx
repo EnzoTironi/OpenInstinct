@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import {
   Collapsible,
   CollapsibleContent,
@@ -178,21 +180,34 @@ export type ReasoningTriggerProps = ComponentProps<
   getThinkingMessage?: (isStreaming: boolean, duration?: number) => ReactNode;
 };
 
-const defaultGetThinkingMessage = (isStreaming: boolean, duration?: number) => {
+function ThinkingMessage({
+  isStreaming,
+  duration,
+}: {
+  readonly isStreaming: boolean;
+  readonly duration?: number;
+}) {
+  const { t, locale } = useI18n();
   if (isStreaming || duration === 0) {
-    return <Shimmer duration={1}>Thinking...</Shimmer>;
+    return <Shimmer duration={1}>{t("Thinking...")}</Shimmer>;
   }
   if (duration === undefined) {
-    return <p>Thought for a few seconds</p>;
+    return <p>{t("Thought for a few seconds")}</p>;
   }
-  return <p>Thought for {duration} seconds</p>;
-};
+  return (
+    <p>
+      {t("Pensou por {seconds} segundos", {
+        seconds: duration.toLocaleString(locale),
+      })}
+    </p>
+  );
+}
 
 export const ReasoningTrigger = memo(
   ({
     className,
     children,
-    getThinkingMessage = defaultGetThinkingMessage,
+    getThinkingMessage,
     ...props
   }: ReasoningTriggerProps) => {
     const { isStreaming, isOpen, duration } = useReasoning();
@@ -209,7 +224,14 @@ export const ReasoningTrigger = memo(
           {children ?? (
             <>
               <BrainIcon className="size-4" />
-              {getThinkingMessage(isStreaming, duration)}
+              {getThinkingMessage ? (
+                getThinkingMessage(isStreaming, duration)
+              ) : (
+                <ThinkingMessage
+                  isStreaming={isStreaming}
+                  duration={duration}
+                />
+              )}
               <ChevronDownIcon
                 className={cn(
                   "size-4 transition-transform",

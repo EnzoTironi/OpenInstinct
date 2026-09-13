@@ -1,17 +1,22 @@
+import { getI18n } from "@web/i18n/server";
 import type { Metadata } from "next";
 import { Schema } from "effect";
 import { deviceRequestSchema } from "@shared/identity/channel-auth";
 import { NativeDeviceForm } from "@web/auth/channel/device";
 import { DeviceSignInUnavailable } from "./_components/unavailable";
 
-export const metadata: Metadata = {
-  title: "Sign in | Companion",
-  description: "Finish Companion sign-in on this browser.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return {
+    title: t("Sign in | Companion"),
+    description: t("Finish Companion sign-in on this browser."),
+  };
+}
 
 export default async function DeviceSignInPage({
   searchParams,
 }: PageProps<"/sign-in/device">) {
+  const { t } = await getI18n();
   const params = await searchParams;
   if (
     !Schema.is(deviceRequestSchema)({ id: params.id, purpose: params.purpose })
@@ -26,8 +31,8 @@ export default async function DeviceSignInPage({
       <section className="w-full max-w-sm space-y-6">
         <h1 className="type-page-title">
           {purpose === "link"
-            ? "Confirm your account association"
-            : "Sign in to this browser"}
+            ? t("Confirm your account association")
+            : t("Sign in to this browser")}
         </h1>
         <NativeDeviceForm id={id} purpose={purpose} />
       </section>

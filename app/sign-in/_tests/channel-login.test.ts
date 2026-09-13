@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToEnglishMarkup as renderToStaticMarkup } from "@tests/helpers/i18n";
 import { Effect, Schema } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { ChannelStatus } from "@web/auth/channel/status";

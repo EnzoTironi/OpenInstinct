@@ -31,6 +31,7 @@ describe("source layout", () => {
       "browser",
       "components",
       "hooks",
+      "i18n",
       "trpc",
     ]);
     expect(files("web")).toEqual([]);

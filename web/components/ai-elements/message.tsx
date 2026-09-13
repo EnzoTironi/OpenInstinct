@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import { Button } from "@web/components/ui/button";
 import { ButtonGroup, ButtonGroupText } from "@web/components/ui/button-group";
 import {
@@ -258,11 +260,12 @@ export const MessageBranchPrevious = ({
   children,
   ...props
 }: MessageBranchPreviousProps) => {
+  const { t } = useI18n();
   const { goToPrevious, totalBranches } = useMessageBranch();
 
   return (
     <Button
-      aria-label="Previous branch"
+      aria-label={t("Previous branch")}
       disabled={totalBranches <= 1}
       onClick={goToPrevious}
       size="icon-sm"
@@ -281,11 +284,12 @@ export const MessageBranchNext = ({
   children,
   ...props
 }: MessageBranchNextProps) => {
+  const { t } = useI18n();
   const { goToNext, totalBranches } = useMessageBranch();
 
   return (
     <Button
-      aria-label="Next branch"
+      aria-label={t("Next branch")}
       disabled={totalBranches <= 1}
       onClick={goToNext}
       size="icon-sm"
@@ -304,6 +308,7 @@ export const MessageBranchPage = ({
   className,
   ...props
 }: MessageBranchPageProps) => {
+  const { t } = useI18n();
   const { currentBranch, totalBranches } = useMessageBranch();
 
   return (
@@ -314,7 +319,7 @@ export const MessageBranchPage = ({
       )}
       {...props}
     >
-      {currentBranch + 1} of {totalBranches}
+      {currentBranch + 1} {t("of")} {totalBranches}
     </ButtonGroupText>
   );
 };
@@ -331,12 +336,13 @@ export function ArtifactMessageImage({
   src,
   ...props
 }: ComponentProps<"img"> & { readonly node?: unknown }) {
+  const { t } = useI18n();
   void _node;
   const parsedSource = z.string().safeParse(src);
   if (!parsedSource.success || !isBrowserImageArtifactUrl(parsedSource.data)) {
     return (
       <span className="text-muted-foreground">
-        Image not displayed: {alt ?? "external image"}
+        {t("Image not displayed:")} {alt ?? t("external image")}
       </span>
     );
   }
@@ -346,7 +352,7 @@ export function ArtifactMessageImage({
       {/* oxlint-disable-next-line nextjs/no-img-element -- validated runtime browser image URL */}
       <img
         {...props}
-        alt={alt ?? "Browser image"}
+        alt={alt ?? t("Browser image")}
         className={cn(
           "my-3 max-h-[32rem] w-auto max-w-full rounded-lg border bg-muted object-contain",
           className

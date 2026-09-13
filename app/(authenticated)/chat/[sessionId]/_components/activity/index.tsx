@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@web/i18n/context";
+
 import type { MessageStreamEvent } from "eve/client";
 import { ListTreeIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -39,6 +41,7 @@ export function SubagentPanel({
   readonly sessionId?: string;
   readonly traceView: TraceView;
 }) {
+  const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string>();
   const [mobileOpen, setMobileOpen] = useState(false);
   const traceCloseButton = useRef<HTMLButtonElement>(null);
@@ -96,7 +99,7 @@ export function SubagentPanel({
     [sessions]
   );
   const workingCount = [...statuses.values()].filter((status) =>
-    ["starting", "working"].includes(status)
+    ["starting", t("working")].includes(status)
   ).length;
   const doneCount = sessions.length - workingCount;
   const openTask = (childSessionId: string) => {
@@ -142,7 +145,7 @@ export function SubagentPanel({
       </aside>
 
       <Button
-        aria-label="Open activity panel"
+        aria-label={t("Open activity panel")}
         className="absolute top-2 right-3 z-30 md:hidden"
         onClick={() => {
           setMobileOpen(true);
@@ -193,12 +196,17 @@ export function SubagentPanel({
         >
           <SheetHeader className="sr-only">
             <SheetTitle>
-              {selected ? `${selected.name} trace` : "Agent activity"}
+              {selected
+                ? t("{name}: {status}", {
+                    name: selected.name,
+                    status: t("Atividade"),
+                  })
+                : t("Agent activity")}
             </SheetTitle>
             <SheetDescription>
               {selected
-                ? "Full trace for the selected subagent"
-                : "Conversation views, sources, and live task statuses"}
+                ? t("Full trace for the selected subagent")
+                : t("Conversation views, sources, and live task statuses")}
             </SheetDescription>
           </SheetHeader>
           {selected ? (

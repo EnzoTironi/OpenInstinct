@@ -56,16 +56,16 @@ export function combineChatUsage(usages: readonly ChatUsage[]): ChatUsage {
   };
 }
 
-export function formatChatUsage(usage: ChatUsage) {
+export function formatChatUsage(usage: ChatUsage, locale = "en") {
   const tokens = usage.inputTokens + usage.outputTokens;
-  const tokenLabel = `${new Intl.NumberFormat("en", {
+  const tokenLabel = `${new Intl.NumberFormat(locale, {
     notation: tokens >= 10_000 ? "compact" : "standard",
     maximumFractionDigits: 1,
   }).format(tokens)} tokens`;
 
   if (usage.costUsd === null) return tokenLabel;
 
-  const costLabel = new Intl.NumberFormat("en-US", {
+  const costLabel = new Intl.NumberFormat(locale, {
     currency: "USD",
     maximumFractionDigits: usage.costUsd < 0.01 ? 4 : 2,
     minimumFractionDigits: 2,
