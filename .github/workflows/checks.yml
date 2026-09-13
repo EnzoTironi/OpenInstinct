@@ -139,7 +139,10 @@ jobs:
           bash infrastructure/postgres/test-recovery.sh
       - name: Start pgvector for memory integration tests
         run: |
+          mkdir -p "${RUNNER_TEMP}/memory-postgres-data"
+          chmod 777 "${RUNNER_TEMP}/memory-postgres-data"
           docker run -d --name memory-postgres -p 127.0.0.1:5432:5432 \
+            -v "${RUNNER_TEMP}/memory-postgres-data:/data" \
             -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
             -e ZOEN_MEMORY_DATABASE_PASSWORD=ci-memory-password \
             -e POSTGRES_DB=companion_runtime_test zoen-postgres-proof:pg17-backup
