@@ -40,14 +40,14 @@ export function LinkedChannels({
       {signingOut ? (
         <Alert>
           <AlertDescription>
-            Channel disconnected. Signing you out…
+            Mensageiro desconectado. Saindo da conta…
           </AlertDescription>
         </Alert>
       ) : null}
       {identities.length === 0 ? (
         <p className="type-supporting-body text-muted-foreground">
-          No messengers linked yet. Use “Link another channel” below to connect
-          Telegram or WhatsApp.
+          Nenhum mensageiro conectado. Escolha Telegram ou WhatsApp abaixo para
+          começar.
         </p>
       ) : (
         <ul className="divide-y rounded-xl border">
@@ -76,7 +76,7 @@ export function LinkedChannels({
                   setSelected(identity.id);
                 }}
               >
-                Disconnect
+                Desconectar
               </Button>
             </li>
           ))}
@@ -85,21 +85,21 @@ export function LinkedChannels({
       {identities.length === 1 || lastAccess ? (
         <Alert>
           <AlertDescription>
-            This is your last sign-in channel. Link another channel before
-            disconnecting it.
+            Este é seu único mensageiro para entrar na conta. Conecte outro
+            antes de desconectá-lo.
           </AlertDescription>
         </Alert>
       ) : null}
       {selectedIdentity ? (
         <section
           className="space-y-3 rounded-xl border p-4"
-          aria-label="Confirm channel disconnection"
+          aria-label="Confirmar desconexão do mensageiro"
         >
           <p className="type-supporting-body">
-            Disconnect{" "}
+            Desconectar{" "}
             {selectedIdentity.channel === "telegram" ? "Telegram" : "WhatsApp"}{" "}
-            ({selectedIdentity.senderId})? You will be signed out on all
-            browsers. Use a remaining linked channel to sign in again.
+            ({selectedIdentity.senderId})? Você sairá da conta em todos os
+            navegadores. Use outro mensageiro conectado para entrar novamente.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -110,7 +110,7 @@ export function LinkedChannels({
                 revoke.mutate({ identityId: selectedIdentity.id });
               }}
             >
-              {revoke.isPending ? "Disconnecting…" : "Disconnect and sign out"}
+              {revoke.isPending ? "Desconectando…" : "Desconectar e sair"}
             </Button>
             <Button
               type="button"
@@ -122,7 +122,7 @@ export function LinkedChannels({
                 revoke.reset();
               }}
             >
-              Cancel
+              Cancelar
             </Button>
           </div>
         </section>

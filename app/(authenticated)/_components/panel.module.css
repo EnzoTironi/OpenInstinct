@@ -1,0 +1,634 @@
+.shell {
+  --primary: #24394a;
+  --primary-foreground: #fff;
+  --background: #faf9f6;
+  --foreground: #26343d;
+  --card: #fff;
+  --card-foreground: #26343d;
+  --muted: #efefeb;
+  --muted-foreground: #67737b;
+  --secondary: #e9ece8;
+  --secondary-foreground: #26343d;
+  --border: #26343d18;
+  --input: #26343d28;
+  --ring: #788d74;
+  min-height: 100svh;
+  padding: 40px 24px 22px;
+  color: var(--foreground);
+  background:
+    linear-gradient(180deg, #07132120, #07132170),
+    url("/marketing/sky-midnight.webp") center / cover fixed;
+  font-family: var(--merit-family-text);
+}
+.frame {
+  width: min(100%, 960px);
+  margin: auto;
+}
+.homeFrame {
+  width: min(100%, 500px);
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 68px;
+  margin-bottom: 14px;
+  padding: 12px 20px;
+  border: 1px solid #ffffff25;
+  border-radius: 24px;
+  color: #f8f8f3;
+  background: #ffffff0b;
+  backdrop-filter: blur(24px);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 25px;
+  letter-spacing: -0.055em;
+}
+.brand img {
+  width: 34px;
+  height: 34px;
+  box-shadow: 0 0 0 1px #ffffff35;
+}
+.date {
+  font-size: 12px;
+  color: #e4e9ee;
+}
+.accountButton {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #f3f3ef;
+  color: #253947;
+}
+.accountButton:hover {
+  background: #fff;
+  color: #253947;
+}
+.surface {
+  display: flex;
+  flex-direction: column;
+  height: calc(100svh - 166px);
+  overflow: hidden;
+  min-height: 460px;
+  border: 1px solid #ffffff70;
+  border-radius: 28px;
+  background: var(--background);
+  box-shadow:
+    0 30px 100px #0003,
+    inset 0 1px #fff;
+}
+.content {
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #84958a50 transparent;
+}
+.content :global(.type-page-title) {
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+}
+.content :global(.type-section-title) {
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.content :global([data-slot="button"][data-size="default"]),
+.content :global([data-slot="button"][data-size="lg"]) {
+  min-height: 40px;
+  padding-inline: 16px;
+  border-radius: 14px;
+}
+.content :global([data-slot="button"][data-size="sm"]) {
+  min-height: 32px;
+  padding-inline: 12px;
+  border-radius: 10px;
+}
+.content :global([data-slot="button"][data-variant="surface"]) {
+  border-radius: 18px;
+  box-shadow: none;
+}
+.content :global([data-slot="input"]) {
+  min-height: 42px;
+  border-radius: 12px;
+  background: var(--card);
+}
+.content :global([data-slot="alert"]) {
+  border-radius: 16px;
+}
+.conversationSurface .content {
+  overflow: hidden;
+}
+.homeSurface .content {
+  overflow: visible;
+}
+.homeSurface {
+  height: auto;
+  min-height: 0;
+  color: #fff;
+  background: linear-gradient(150deg, #18344b30, #0e203606);
+  border-color: #ffffff12;
+  box-shadow: none;
+}
+.signature {
+  margin: 22px auto 0;
+  color: #e3eaf0a8;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.025em;
+}
+.skipLink {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 12px;
+  background: #fff;
+  transform: translateY(-150%);
+}
+.skipLink:focus {
+  transform: translateY(0);
+}
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 32px;
+}
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+.eyebrow {
+  margin-bottom: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.intro {
+  margin-top: 12px;
+  max-width: 500px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.sectionCard {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card);
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+}
+.row + .row {
+  border-top: 1px solid var(--border);
+}
+.rowCopy {
+  flex: 1;
+  min-width: 0;
+}
+.rowCopy p + p {
+  margin-top: 5px;
+}
+.iconBox {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #ffffff0a;
+  color: #dce8cb;
+}
+.iconBox svg {
+  width: 21px;
+  height: 21px;
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 370px;
+  padding: 36px 20px;
+  text-align: center;
+}
+.empty .iconBox {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 24px;
+  border-radius: 24px;
+}
+.empty .iconBox svg {
+  width: 30px;
+  height: 30px;
+}
+.empty p {
+  max-width: 340px;
+  margin: 12px 0 24px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.settingsContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.quietLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.quietLinks a:hover {
+  color: var(--foreground);
+}
+@media (max-width: 760px) {
+  .shell {
+    padding: 16px 14px 22px;
+  }
+  .header {
+    gap: 12px;
+    padding: 10px 15px;
+    min-height: 62px;
+    border-radius: 20px;
+  }
+  .surface {
+    border-radius: 23px;
+    height: calc(100svh - 188px);
+    min-height: 400px;
+  }
+  .homeSurface {
+    height: auto;
+    min-height: 0;
+  }
+  .page {
+    padding: 24px 20px;
+    gap: 24px;
+  }
+  .pageHeader {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .signature {
+    font-size: 10px;
+  }
+  .sectionCard {
+    padding: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell *,
+  .shell *::before,
+  .shell *::after {
+    scroll-behavior: auto;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (min-width: 761px) and (max-height: 800px) {
+  .shell {
+    padding-top: 22px;
+  }
+}
+
+.innerFrame {
+  --primary: #f3f2e9;
+  --primary-foreground: #203447;
+  --background: #122a40;
+  --foreground: #f2f5f5;
+  --card: #ffffff08;
+  --card-foreground: #f2f5f5;
+  --muted: #ffffff0a;
+  --muted-foreground: #b3c5d3;
+  --secondary: #ffffff0e;
+  --secondary-foreground: #f2f5f5;
+  --accent: #ffffff18;
+  --accent-foreground: #fff;
+  --border: #ffffff1c;
+  --input: #ffffff30;
+  --ring: #cfdec0;
+  width: min(100%, 680px);
+  color: var(--foreground);
+}
+.innerFrame .surface {
+  height: auto;
+  min-height: calc(100svh - 166px);
+  background: linear-gradient(150deg, #18344bf0, #0e2036ee);
+  border-color: #ffffff25;
+  box-shadow: 0 30px 100px #0003;
+}
+.innerFrame .content {
+  overflow: visible;
+}
+.innerFrame .conversationSurface {
+  height: calc(100svh - 166px);
+  min-height: 460px;
+}
+.innerFrame .conversationSurface .content {
+  overflow: hidden;
+}
+.innerFrame .content :global([data-slot="button"][data-size="default"]),
+.innerFrame .content :global([data-slot="button"][data-size="lg"]) {
+  min-height: 46px;
+  border-radius: 28px;
+  padding-inline: 22px;
+}
+.innerFrame .content :global([data-slot="button"][data-size="sm"]) {
+  border-radius: 20px;
+}
+.innerFrame .content :global([data-slot="input"]),
+.innerFrame .content :global([data-slot="textarea"]) {
+  background: #ffffff08;
+}
+.visualIntro {
+  text-align: center;
+}
+.illustration {
+  position: relative;
+  height: 260px;
+  margin: -32px -32px 0;
+  overflow: hidden;
+  mask-image: linear-gradient(#000 55%, transparent 100%);
+}
+.illustration img {
+  object-fit: cover;
+  object-position: 50% 45%;
+}
+.visualIntro h1 {
+  position: relative;
+  margin-top: -16px;
+}
+.visualIntro .intro {
+  max-width: 340px;
+  margin: 12px auto 0;
+}
+.innerFrame .visualIntro :global(.type-page-title) {
+  font-size: clamp(34px, 5vw, 44px);
+  line-height: 1.15;
+}
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+.actionList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: #ffffff06;
+  overflow: hidden;
+}
+.actionList a {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 21px 22px;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+.actionList a + a {
+  border-top: 1px solid var(--border);
+}
+.actionList a:hover {
+  background: #ffffff0b;
+}
+.actionList a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -3px;
+}
+.actionList svg {
+  width: 21px;
+  height: 21px;
+  color: #dce8cb;
+  stroke-width: 1.5;
+}
+.actionList svg:last-child {
+  margin-left: auto;
+  width: 15px;
+  height: 15px;
+  color: var(--muted-foreground);
+}
+.subtleLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.subtleLink:hover {
+  color: #fff;
+}
+.statusLine {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.statusLine svg {
+  width: 14px;
+  height: 14px;
+}
+.disclosure {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0 20px;
+  background: var(--card);
+}
+.disclosure summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 20px 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 14px;
+}
+.disclosure summary::-webkit-details-marker {
+  display: none;
+}
+.disclosure summary svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s;
+}
+.disclosure[open] > summary svg {
+  transform: rotate(180deg);
+}
+.disclosure > div {
+  padding-bottom: 20px;
+}
+.disclosure summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.serviceIcons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.serviceIcons span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 72px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.serviceIcons svg {
+  box-sizing: content-box;
+  width: 23px;
+  height: 23px;
+  padding: 17px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: #e3eddb;
+  background: #ffffff08;
+  stroke-width: 1.5;
+}
+@media (max-width: 760px) {
+  .illustration {
+    height: 210px;
+    margin: -24px -20px 0;
+  }
+  .innerFrame .surface {
+    min-height: calc(100svh - 160px);
+  }
+  .innerFrame .conversationSurface {
+    height: calc(100svh - 134px);
+    min-height: 430px;
+  }
+  .actionList a {
+    padding: 19px 18px;
+  }
+}
+
+.wideFrame {
+  width: min(100%, 960px);
+}
+
+.drawerPanel {
+  --drawer-bleed-background: #102139;
+  margin: 0 auto;
+  width: min(100%, 680px);
+  max-height: 80dvh;
+  height: 80dvh;
+  border: 1px solid #ffffff28;
+  border-bottom: 0;
+  border-radius: 32px 32px 0 0;
+  background: linear-gradient(160deg, #153951bd, #07182dbc);
+  backdrop-filter: blur(28px) saturate(1.15);
+  box-shadow:
+    0 -20px 90px #0003,
+    inset 0 1px #ffffff12;
+  color: var(--foreground);
+  font-family: var(--merit-family-text);
+}
+.drawerPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: url("/marketing/sky-midnight.webp") center bottom / cover;
+  opacity: 0.22;
+}
+.drawerPanel.wideFrame {
+  width: min(100%, 960px);
+}
+.drawerPanel :global([data-slot="drawer-content"]) {
+  position: relative;
+}
+.drawerPanel :global([data-slot="drawer-swipe-handle"]) {
+  height: 20px;
+}
+.drawerPanel :global([data-slot="drawer-swipe-handle"])::after {
+  width: 36px;
+  height: 4px;
+  background: #ffffff50;
+}
+.drawerPanel .content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.drawerPanel .page {
+  padding-bottom: max(36px, env(safe-area-inset-bottom));
+}
+.sheetChrome {
+  position: relative;
+  flex-shrink: 0;
+  height: 42px;
+}
+.sheetClose,
+.sheetBack,
+.sheetConnections {
+  position: absolute;
+  top: 0;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #d8e5f215;
+  color: #e4edf2;
+}
+.sheetClose:hover,
+.sheetBack:hover,
+.sheetConnections:hover {
+  background: #ffffff25;
+  color: #fff;
+}
+.sheetBack {
+  right: auto;
+  left: 18px;
+}
+.drawerConversation .content {
+  overflow: hidden;
+}
+@media (max-width: 760px) {
+  .drawerPanel {
+    border-radius: 30px 30px 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawerPanel,
+  .drawerPanel * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.sheetConnections {
+  left: 60px;
+  right: auto;
+}

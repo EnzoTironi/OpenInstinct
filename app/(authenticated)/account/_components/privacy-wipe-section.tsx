@@ -73,23 +73,24 @@ export function AccountPrivacyWipeSection() {
     >
       <div className="space-y-2">
         <h2 id="privacy-wipe-heading" className="type-section-title">
-          Privacy export and online wipe
+          Seus dados e sua privacidade
         </h2>
         <p className="type-supporting-body text-muted-foreground">
-          Same honesty as the API: this is a{" "}
-          <span className="text-foreground">partial online wipe</span> of
-          personal memory plus browser sessions — not full account erasure.
+          Exporte seus dados ou apague a memória pessoal salva. Essa ação também
+          encerra suas sessões no navegador.
         </p>
       </div>
 
       <Alert variant="warning">
-        <AlertTitle>Not full account deletion</AlertTitle>
+        <AlertTitle>O que esta ação remove</AlertTitle>
         <AlertDescription>{accountOnlineWipeLimits}</AlertDescription>
       </Alert>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <h3 className="type-supporting-body font-medium">Wiped online</h3>
+          <h3 className="type-supporting-body font-medium">
+            O que será apagado
+          </h3>
           <ul className="list-disc space-y-1 pl-5 type-caption text-muted-foreground">
             {accountOnlineWipeWipedHint.map((item) => (
               <li key={item}>{item}</li>
@@ -97,7 +98,9 @@ export function AccountPrivacyWipeSection() {
           </ul>
         </div>
         <div className="space-y-2">
-          <h3 className="type-supporting-body font-medium">Not wiped</h3>
+          <h3 className="type-supporting-body font-medium">
+            O que será mantido
+          </h3>
           <ul className="list-disc space-y-1 pl-5 type-caption text-muted-foreground">
             {accountOnlineWipeNotWiped.map((item) => (
               <li key={item}>{item}</li>
@@ -108,14 +111,14 @@ export function AccountPrivacyWipeSection() {
 
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>Wipe failed</AlertTitle>
+          <AlertTitle>Não foi possível apagar</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
 
       {resultLimits ? (
         <Alert variant="information">
-          <AlertTitle>partial_online_wipe</AlertTitle>
+          <AlertTitle>Exclusão parcial concluída</AlertTitle>
           <AlertDescription>
             {resultLimits}
             {resultNotWiped?.length
@@ -131,7 +134,7 @@ export function AccountPrivacyWipeSection() {
           download
           href="/api/account/export"
         >
-          Download privacy export (JSON)
+          Exportar meus dados (JSON)
         </a>
         {!confirming ? (
           <Button
@@ -142,7 +145,7 @@ export function AccountPrivacyWipeSection() {
             }}
             variant="destructive"
           >
-            Wipe personal memory online
+            Apagar memória pessoal
           </Button>
         ) : (
           <>
@@ -153,7 +156,7 @@ export function AccountPrivacyWipeSection() {
               }}
               variant="destructive"
             >
-              {busy ? "Wiping…" : "Confirm partial online wipe"}
+              {busy ? "Apagando…" : "Confirmar exclusão parcial"}
             </Button>
             <Button
               disabled={busy}
@@ -162,7 +165,7 @@ export function AccountPrivacyWipeSection() {
               }}
               variant="ghost"
             >
-              Cancel
+              Cancelar
             </Button>
           </>
         )}

@@ -66,7 +66,9 @@ vi.mock("@web/components/ai-elements/prompt-input", () => ({
   PromptInputBody: ({ children }: { children: ReactNode }) => children,
   PromptInputFooter: ({ children }: { children: ReactNode }) => children,
   PromptInputSubmit: () => <button type="submit">Send</button>,
-  PromptInputTextarea: () => <textarea />,
+  PromptInputTextarea: ({ value }: { value: string }) => (
+    <textarea defaultValue={value} />
+  ),
   PromptInputTools: () => null,
 }));
 
@@ -79,6 +81,14 @@ describe("new chat", () => {
     mocks.promptSubmit = undefined;
     mocks.saveChat.mockReset().mockResolvedValue(undefined);
     mocks.routerReplace.mockReset();
+  });
+
+  it("opens a recipe as an editable draft without sending or creating a chat", () => {
+    const draft = "Prepare meu dia e aguarde minha revisão.";
+    const html = renderToStaticMarkup(<NewChat initialDraft={draft} />);
+    expect(html).toContain(draft);
+    expect(mocks.agent.send).not.toHaveBeenCalled();
+    expect(mocks.saveChat).not.toHaveBeenCalled();
   });
 
   it("navigates the first prompt into its session route once", async () => {

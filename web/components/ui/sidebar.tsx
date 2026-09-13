@@ -7,7 +7,6 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
 
-import { useIsMobile } from "@web/hooks/use-mobile";
 import { cn } from "@web/components/class-names";
 import { Button } from "@web/components/ui/button";
 import { Input } from "@web/components/ui/input";
@@ -27,6 +26,28 @@ import {
 } from "@web/components/ui/tooltip";
 import { PanelLeftIcon } from "lucide-react";
 import { z } from "zod";
+
+const MOBILE_BREAKPOINT = 768;
+
+function useIsMobile() {
+  return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+function subscribe(onStoreChange: () => void) {
+  const mediaQuery = window.matchMedia("(max-width: 767px)");
+  mediaQuery.addEventListener("change", onStoreChange);
+  return () => {
+    mediaQuery.removeEventListener("change", onStoreChange);
+  };
+}
+
+function getSnapshot() {
+  return window.innerWidth < MOBILE_BREAKPOINT;
+}
+
+function getServerSnapshot() {
+  return false;
+}
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;

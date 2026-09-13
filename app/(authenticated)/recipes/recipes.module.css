@@ -1,0 +1,146 @@
+.filters {
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  align-items: center;
+}
+.filters select {
+  min-width: 135px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff08;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.filters select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.filters option {
+  background: #183247;
+  color: #fff;
+}
+.search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-width: 260px;
+}
+.search svg {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  width: 15px;
+  height: 15px;
+  color: var(--muted-foreground);
+}
+.search input {
+  padding-left: 35px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.recipe {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: #ffffff08;
+  transition:
+    transform 0.2s,
+    background 0.2s;
+}
+.recipe:hover {
+  transform: translateY(-4px);
+  background: #ffffff12;
+}
+.recipe:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.art {
+  position: relative;
+  height: 220px;
+}
+.art img {
+  object-fit: contain;
+  padding: 12px 8px;
+  object-position: center;
+  transition: transform 0.35s;
+}
+.recipe:hover img {
+  transform: scale(1.04);
+}
+.recipeCopy {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 22px 26px;
+  margin-top: -8px;
+}
+.category {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.recipeCopy h2 {
+  padding-right: 18px;
+  font-size: 20px;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  font-weight: 400;
+}
+.recipeCopy svg {
+  position: absolute;
+  bottom: 30px;
+  right: 18px;
+  width: 16px;
+  height: 16px;
+  color: #cfdec0;
+}
+.footer,
+.noResults {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  padding-top: 8px;
+}
+.footer a:hover {
+  color: #fff;
+}
+@media (max-width: 850px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .art {
+    height: 220px;
+  }
+  .recipeCopy h2 {
+    font-size: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recipe,
+  .art img {
+    transition: none;
+  }
+  .recipe:hover,
+  .recipe:hover img {
+    transform: none;
+  }
+}

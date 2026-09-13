@@ -1,38 +1,42 @@
+import { cn } from "@web/components/class-names";
+import { PanelIntro } from "../_components/panel-intro";
+import { Button } from "@web/components/ui/button";
+import styles from "../_components/panel.module.css";
 import type { Effect } from "effect";
 import Link from "next/link";
 import type { listReminders } from "../../../server/schedules/queries";
 import { Badge } from "@web/components/ui/badge";
 
 const jobLabels = {
-  active: "Active",
-  paused: "Paused",
-  completed: "No future occurrences",
+  active: "Ativa",
+  paused: "Pausada",
+  completed: "Sem próximas ocorrências",
 };
 const runLabels = {
-  queued: "Waiting to run",
-  running: "In progress",
-  waiting_for_input: "Waiting for a response",
-  completed: "Run finished",
-  dead_letter: "Run failed",
+  queued: "Aguardando execução",
+  running: "Em andamento",
+  waiting_for_input: "Aguardando resposta",
+  completed: "Concluída",
+  dead_letter: "Falhou",
 };
 const reportLabels = {
-  not_ready: "Report not ready",
-  not_needed: "No report needed",
-  pending: "Report pending",
-  queued: "Report queued",
-  delivered: "Report delivered",
-  suppressed: "Report suppressed",
-  failed: "Delivery failed; some parts may have been sent",
-  cancelled: "Delivery stopped; some parts may have been sent",
-  uncertain: "Delivery uncertain; automatic retry blocked",
+  not_ready: "Relatório em preparação",
+  not_needed: "Sem relatório",
+  pending: "Relatório pendente",
+  queued: "Relatório na fila",
+  delivered: "Relatório entregue",
+  suppressed: "Relatório suprimido",
+  failed: "Entrega falhou; partes podem ter sido enviadas",
+  cancelled: "Entrega interrompida; partes podem ter sido enviadas",
+  uncertain: "Entrega incerta; nova tentativa automática bloqueada",
 };
 const channelLabels = {
-  eve: "Companion",
+  eve: "Zoen",
   linq: "Linq",
   telegram: "Telegram",
   kapso: "WhatsApp",
 };
-const dateFormatter = new Intl.DateTimeFormat("en", {
+const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "medium",
   timeStyle: "short",
   timeZone: "UTC",
@@ -44,16 +48,24 @@ export function ReminderList({ reminders, hasMore }: ReminderPage) {
   return (
     <>
       {reminders.length === 0 ? (
-        <p className="type-supporting-body rounded-lg border border-border/50 p-6 text-muted-foreground">
-          No reminders to show yet.{" "}
-          <Link
-            className="text-foreground underline underline-offset-4"
-            href="/chat?starter=reminder"
-          >
-            Create your first reminder
-          </Link>{" "}
-          with an editable request in chat.
-        </p>
+        <>
+          <PanelIntro
+            image="/marketing/panel/zoen-calm.jpg"
+            title="Cuide do agora."
+            description="Eu lembro do depois."
+          />
+          <div className={styles.actions}>
+            <Button
+              nativeButton={false}
+              render={<Link href="/chat?starter=reminder" />}
+            >
+              Criar minha primeira automação
+            </Button>
+            <Link className={styles.subtleLink} href="/recipes">
+              Explorar ideias
+            </Link>
+          </div>
+        </>
       ) : (
         <ul className="space-y-4">
           {reminders.map((reminder) => (
@@ -63,14 +75,16 @@ export function ReminderList({ reminders, hasMore }: ReminderPage) {
       )}
       {hasMore ? (
         <p className="type-caption text-muted-foreground">
-          Showing the first 50 reminders, with active schedules first. More
-          schedules are available in their original conversations.
+          Mostrando os primeiros 50 agendamentos, com os ativos primeiro. Os
+          demais estão disponíveis nas conversas originais.
         </p>
       ) : null}
-      <p className="type-caption text-muted-foreground">
-        Times are shown in UTC. A schedule with no future occurrences may still
-        have a run or report in progress.
-      </p>
+      {reminders.length > 0 && (
+        <p className="type-caption text-muted-foreground">
+          Horários em UTC. Um agendamento sem próximas ocorrências ainda pode
+          ter uma execução ou entrega em andamento.
+        </p>
+      )}
     </>
   );
 }
@@ -81,11 +95,11 @@ function ReminderCard({
   readonly reminder: ReminderPage["reminders"][number];
 }) {
   return (
-    <li className="space-y-3 rounded-lg border border-border/50 p-4">
+    <li className={cn("space-y-3", styles.sectionCard)}>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{jobLabels[reminder.status]}</Badge>
         <span className="type-caption text-muted-foreground">
-          {channelLabels[reminder.conversationChannel]} conversation
+          {channelLabels[reminder.conversationChannel]}
         </span>
       </div>
       <p className="type-supporting-body wrap-break-word whitespace-pre-wrap">
@@ -95,8 +109,8 @@ function ReminderCard({
         <div>
           <dt className="inline">
             {reminder.status === "paused"
-              ? "Saved next occurrence: "
-              : "Next occurrence: "}
+              ? "Próxima ocorrência salva: "
+              : "Próxima ocorrência: "}
           </dt>
           <dd className="inline">
             {reminder.nextRunAt ? (
@@ -104,13 +118,13 @@ function ReminderCard({
                 {dateFormatter.format(reminder.nextRunAt)} UTC
               </time>
             ) : (
-              "None scheduled"
+              "Nenhuma agendada"
             )}
           </dd>
         </div>
         {reminder.latestRunStatus ? (
           <div>
-            <dt className="inline">Latest run: </dt>
+            <dt className="inline">Última execução: </dt>
             <dd className="inline">
               {runLabels[reminder.latestRunStatus]}
               {reminder.latestScheduledFor
@@ -121,7 +135,7 @@ function ReminderCard({
         ) : null}
         {reminder.latestReportStatus ? (
           <div>
-            <dt className="inline">Delivery: </dt>
+            <dt className="inline">Entrega: </dt>
             <dd className="inline">
               {reportLabels[reminder.latestReportStatus]}
             </dd>
@@ -133,13 +147,13 @@ function ReminderCard({
           className="type-label underline underline-offset-4"
           href={`/chat/${encodeURIComponent(reminder.originalSessionId)}`}
         >
-          Return to original conversation
+          Abrir conversa original
         </Link>
       ) : (
         <p className="type-caption text-muted-foreground">
           {reminder.conversationChannel !== "eve"
-            ? `Return to the original conversation in ${channelLabels[reminder.conversationChannel]} to manage this schedule.`
-            : "The original conversation is not available to this account."}
+            ? `Gerencie este agendamento na conversa original no ${channelLabels[reminder.conversationChannel]}.`
+            : "A conversa original não está disponível nesta conta."}
         </p>
       )}
     </li>

@@ -27,10 +27,10 @@ export function GoogleWorkspaceAction({
   });
 
   if (!state) {
-    return <Badge variant="secondary">Loading…</Badge>;
+    return <Badge variant="secondary">Carregando…</Badge>;
   }
   if (state === "unavailable") {
-    return <Badge variant="secondary">Setup required</Badge>;
+    return <Badge variant="secondary">Em preparação</Badge>;
   }
 
   const action = state === "connected" ? "disconnect" : "connect";
@@ -40,11 +40,11 @@ export function GoogleWorkspaceAction({
       onClick={() => {
         update.mutate({ action, returnTo: returnPath });
       }}
-      size="sm"
+      size="default"
       type="button"
-      variant="outline"
+      variant={state === "connected" ? "outline" : "default"}
     >
-      {state === "connected" ? "Disconnect" : "Connect"}
+      {state === "connected" ? "Desconectar Google" : "Conectar Google"}
     </Button>
   );
 }

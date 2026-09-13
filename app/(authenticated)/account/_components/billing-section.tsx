@@ -32,9 +32,7 @@ async function postBilling(
       Option.isSome(decoded) &&
       decoded.value.reason === "stripe_not_configured"
     ) {
-      throw new Error(
-        "Paid billing is disabled on this deployment (Stripe not configured)."
-      );
+      throw new Error("Planos pagos não estão disponíveis no momento.");
     }
     const message =
       Option.isSome(decoded) && decoded.value.error
@@ -73,43 +71,28 @@ export function AccountBillingSection({
     >
       <div className="space-y-2">
         <h2 id="billing-heading" className="type-section-title">
-          <span id="plan">Plan and billing</span>
+          <span id="plan">Seu plano</span>
         </h2>
         <p className="type-supporting-body text-muted-foreground">
-          Current plan: <span className="text-foreground">{catalog.name}</span>
+          Plano atual: <span className="text-foreground">{catalog.name}</span>
           {plan === "org"
             ? ` · ${seatLabel} seat${seatCount === 1 ? "" : "s"}`
             : ""}
-          {status !== "active" ? ` · status ${status}` : ""}. Free never
-          requires a card.
-          {stripeCheckoutConfigured
-            ? " Paid upgrades use Stripe Checkout; manage renewals in the Customer Portal."
-            : stripePortalConfigured
-              ? " Paid Checkout stays disabled until Stripe Prices are configured; Customer Portal may still open for an existing customer."
-              : " Paid Checkout and Customer Portal stay disabled until Stripe is configured."}
+          {status !== "active" ? ` · status ${status}` : ""}. O plano gratuito
+          não precisa de cartão.
         </p>
       </div>
 
-      {!stripeCheckoutConfigured || !stripePortalConfigured ? (
-        <Alert variant="information">
-          <AlertTitle>Stripe not fully configured</AlertTitle>
-          <AlertDescription>
-            {!stripeCheckoutConfigured
-              ? "Upgrade / Checkout CTAs are off on this deployment. "
-              : ""}
-            {!stripePortalConfigured
-              ? "Customer Portal CTA is off until STRIPE_SECRET_KEY is set. "
-              : ""}
-            Free continues without a card. Operators set{" "}
-            <code className="type-caption">STRIPE_*</code> names only — never
-            paste secret values into chat or git.
-          </AlertDescription>
-        </Alert>
+      {!stripeCheckoutConfigured && !stripePortalConfigured ? (
+        <p className="type-supporting-body rounded-2xl bg-muted p-5 text-muted-foreground">
+          As alterações de plano ainda não estão disponíveis. Você pode
+          continuar usando seu plano atual.
+        </p>
       ) : null}
 
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>Billing</AlertTitle>
+          <AlertTitle>Assinatura</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
@@ -139,10 +122,10 @@ export function AccountBillingSection({
             }}
           >
             {!stripeCheckoutConfigured
-              ? "Upgrade unavailable"
+              ? "Alteração indisponível"
               : busy === "pro"
-                ? "Redirecting…"
-                : "Upgrade to Pro"}
+                ? "Abrindo…"
+                : "Mudar para Pro"}
           </Button>
         ) : null}
         {organizationId ? (
@@ -174,10 +157,10 @@ export function AccountBillingSection({
             variant="outline"
           >
             {!stripeCheckoutConfigured
-              ? "Org seats unavailable"
+              ? "Assentos indisponíveis"
               : busy === "org"
-                ? "Redirecting…"
-                : "Buy Org seats"}
+                ? "Abrindo…"
+                : "Adicionar pessoas"}
           </Button>
         ) : null}
         <Button
@@ -206,10 +189,10 @@ export function AccountBillingSection({
           variant="outline"
         >
           {!stripePortalConfigured
-            ? "Manage billing unavailable"
+            ? "Gestão indisponível"
             : busy === "portal"
-              ? "Redirecting…"
-              : "Manage billing"}
+              ? "Abrindo…"
+              : "Gerenciar assinatura"}
         </Button>
       </div>
     </section>

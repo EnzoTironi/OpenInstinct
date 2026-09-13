@@ -1,3 +1,4 @@
+import styles from "../../_components/panel.module.css";
 import { MessageSquareIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import {
@@ -21,26 +22,28 @@ export default async function AllChatsPage() {
   )?.sessionId;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 px-4 py-6 sm:px-6 sm:py-8">
-      <header className="flex items-start justify-between gap-6">
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
         <div>
-          <h1 className="type-page-title">All chats</h1>
+          <p className={styles.eyebrow}>De onde a gente parou</p>
+          <h1 className="type-page-title">Suas conversas.</h1>
           <p className="type-supporting-body mt-1 text-muted-foreground">
-            Every conversation in this workspace · Usage{" "}
-            {formatChatUsage(totalUsage)}
+            Todas as conversas deste espaço · Uso {formatChatUsage(totalUsage)}
           </p>
         </div>
         <Button nativeButton={false} render={<Link href="/chat" />} size="sm">
           <PlusIcon />
-          New chat
+          Nova conversa
         </Button>
       </header>
 
-      <section aria-label="Chat history" className="grid gap-2">
+      <section aria-label="Histórico de conversas" className="grid gap-2">
         {chats.length === 0 ? (
           <Alert>
             <MessageSquareIcon />
-            <AlertDescription>No chats yet.</AlertDescription>
+            <AlertDescription>
+              Ainda não há conversas. Seu primeiro pedido começa aqui.
+            </AlertDescription>
           </Alert>
         ) : (
           chats.map((chat) => (
@@ -63,13 +66,13 @@ export default async function AllChatsPage() {
                 {chat.sessionId === imessageSessionId ? "iMessage" : chat.title}
               </span>
               {chat.sessionId === imessageSessionId ? (
-                <Badge variant="information">Main thread</Badge>
+                <Badge variant="information">Conversa principal</Badge>
               ) : null}
-              <span className="shrink-0 type-label text-muted-foreground">
+              <span className="hidden shrink-0 type-caption text-muted-foreground sm:block">
                 {formatChatUsage(chat.usage)}
               </span>
               <time
-                className="shrink-0 type-label text-muted-foreground"
+                className="hidden shrink-0 type-caption text-muted-foreground sm:block"
                 dateTime={chat.updatedAt}
               >
                 {formatChatDate(chat.updatedAt)}
@@ -83,7 +86,7 @@ export default async function AllChatsPage() {
 }
 
 function formatChatDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("pt-BR", {
     day: "numeric",
     month: "short",
     year: "numeric",
