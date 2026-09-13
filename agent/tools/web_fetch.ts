@@ -1,12 +1,20 @@
 import { webFetch } from "eve/tools/web_fetch";
-import { defineDynamic } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { resolveModeValue } from "../lib/mode";
+
+const fetchPage = defineTool({
+  ...webFetch,
+  execute(input, context) {
+    return webFetch.execute(input, context);
+  },
+});
+
 export default defineDynamic({
   events: {
     "turn.started": (_event, context) =>
       resolveModeValue(context, {
-        interactive: webFetch,
-        "scheduled-worker": webFetch,
+        interactive: fetchPage,
+        "scheduled-worker": fetchPage,
       }),
   },
 });

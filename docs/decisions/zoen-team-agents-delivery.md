@@ -47,7 +47,7 @@ the database. Protocol context identifiers confer no authority.
 
 ## Acceptance evidence — 2026-09-13
 
-- `pnpm check --concurrency=1`: 163 test files, 1,328 passed and 3 intentionally
+- `pnpm check --concurrency=1`: 163 test files, 1,343 passed and 3 intentionally
   skipped tests; TypeScript, lint, formatting and dependency checks pass. The
   production Next/Eve build passes with the restricted application login.
 - Real PostgreSQL runtime suite: 35 files, 132 tests. This includes database role
@@ -84,6 +84,17 @@ the database. Protocol context identifiers confer no authority.
   review flagged UI size/churn and generated migration/CI growth. Those findings
   are recorded rather than silenced. Ripwire could not resolve the dynamic
   Effect/Eve/test registrations for test selection; real suites supply the evidence.
+- A production session called the native Gmail search and Calendar free/busy tools
+  using the existing linked Google account. Both returned successful read-only
+  results; no message or calendar event was created.
+- The built application created a real temporary Kernel browser, navigated to
+  `https://example.com/`, extracted its heading and URL, and deleted that browser.
+  The browser uses an explicit OpenRouter model with a 4,096-token output cap;
+  the root retains its configured Codex model. Shared sessions fail before provider
+  resolution. Provider request-shape and live Eve model normalization are tested.
+- A native question paused the built application, accepted the selected answer,
+  resumed in the same session, fetched the public example page through `web_fetch`
+  and delivered the selected answer together with the verified page heading.
 
 ## Protocol and product boundaries
 

@@ -268,6 +268,8 @@ export const hosted = Effect.gen(function* () {
       EVE_NEXT_PRODUCTION_PORT: "4274",
       PRIMARY_REGION: region,
       COMPANION_MODEL_PROVIDER: "codex-local",
+      COMPANION_BROWSER_MODEL_PROVIDER: "openrouter",
+      COMPANION_BROWSER_MODEL: "openai/gpt-5-mini",
       BETTER_AUTH_URL: `https://${hostname}`,
       COMPANION_PUBLIC_BASE_URL: `https://${hostname}`,
       WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3000",

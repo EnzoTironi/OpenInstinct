@@ -44,6 +44,8 @@
       "cache": false,
       "passThroughEnv": [
         "AI_GATEWAY_API_KEY",
+        "COMPANION_*",
+        "OPENROUTER_API_KEY",
         "BETTER_AUTH_*",
         "BLOB_*",
         "DATABASE_URL",
@@ -75,6 +77,8 @@
       "cache": false,
       "passThroughEnv": [
         "AI_GATEWAY_API_KEY",
+        "COMPANION_*",
+        "OPENROUTER_API_KEY",
         "BETTER_AUTH_*",
         "BLOB_*",
         "DATABASE_URL",

@@ -146,6 +146,62 @@ describe("getSubagentSubscriptionKey", () => {
 });
 
 describe("getSubagentStatus", () => {
+  it.each([
+    ["is completed", "complete"],
+    ["failed", "failed"],
+    ["is cancelled", "cancelled"],
+  ] as const)(
+    "uses a native task delivery for %s without loading a child trace",
+    (state, expected) => {
+      const receipt = {
+        type: "subagent.completed",
+        data: {
+          backgroundTask: { status: "working", taskId: "task_1" },
+          callId: "call_1",
+          output: "Continuing in the background",
+          subagentName: "researcher",
+        },
+        meta,
+      } satisfies MessageStreamEvent;
+      const delivery = {
+        type: "message.received",
+        data: {
+          source: "task",
+          message: `Background task task_1 (researcher) ${state}.\n\nResult: synthetic`,
+          sequence: 1,
+          turnId: "turn_2",
+        },
+        meta,
+      } satisfies MessageStreamEvent;
+      const [session] = collectSubagentSessions([called, receipt, delivery]);
+      if (!session) throw new Error("Expected a collected subagent session");
+      expect(getSubagentStatus([], session)).toBe(expected);
+
+      const { source: _source, ...untrusted } = delivery.data;
+      const [spoofed] = collectSubagentSessions([
+        called,
+        receipt,
+        { ...delivery, data: untrusted },
+      ]);
+      if (!spoofed) throw new Error("Expected a collected subagent session");
+      expect(getSubagentStatus([], spoofed)).toBe("starting");
+
+      const [unrelated] = collectSubagentSessions([
+        called,
+        {
+          ...receipt,
+          data: {
+            ...receipt.data,
+            backgroundTask: { status: "working", taskId: "task_2" },
+          },
+        },
+        delivery,
+      ]);
+      if (!unrelated) throw new Error("Expected a collected subagent session");
+      expect(getSubagentStatus([], unrelated)).toBe("starting");
+    }
+  );
+
   it("uses the child stream instead of a background receipt", () => {
     const [session] = collectSubagentSessions([
       called,

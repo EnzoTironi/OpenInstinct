@@ -22,6 +22,18 @@ Fly private networking carries their traffic. The memory and Matrix database
 logins cannot connect to the application database. Application credentials are
 Fly vault secrets; they do not enter Git, image layers or public CI artifacts.
 
+The root agent keeps the `codex-local` profile. Browser execution has its own
+explicit provider and vision model: production uses OpenRouter with
+`openai/gpt-5-mini`, through the existing OpenRouter vault secret. Other
+installations default to Gateway with `meta/muse-spark-1.3`; set
+`COMPANION_BROWSER_MODEL_PROVIDER` and `COMPANION_BROWSER_MODEL` to change that
+selection. There is no automatic provider or model fallback. The browser resolves
+the live provider at each model step, as required by Eve's serialization contract,
+and rejects anonymous, shared and scheduled-report sessions before resolution.
+OpenRouter browser calls cap output at 4,096 tokens, including reasoning, rather
+than reserving the framework's 65,536-token default. Public web search belongs to
+that gated worker; the root retains scoped, read-only URL fetching.
+
 This is one database machine, not automatic high availability. A host outage
 requires recovery, and an image update can cause a brief restart. Production
 operation here means measured recovery, monitored backups and controlled changes;

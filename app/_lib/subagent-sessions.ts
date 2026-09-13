@@ -7,6 +7,7 @@ import type {
 export type SubagentSession = SubagentCalledStreamEvent["data"] & {
   readonly completion?: SubagentCompletedStreamEvent["data"];
   readonly task?: string;
+  readonly terminalStatus?: "complete" | "failed" | "cancelled";
 };
 
 export type SubagentStatus =
@@ -22,6 +23,7 @@ export function collectSubagentSessions(
 ): readonly SubagentSession[] {
   const completions = new Map<string, SubagentCompletedStreamEvent["data"]>();
   const tasks = new Map<string, string>();
+  const terminalStatuses = terminalTaskStatuses(events);
   const sessions = new Map<string, SubagentSession>();
 
   for (const event of events) {
@@ -44,16 +46,42 @@ export function collectSubagentSessions(
   for (const event of events) {
     if (event.type !== "subagent.called") continue;
 
+    const completion = completions.get(event.data.callId);
+    const taskId = completion?.backgroundTask?.taskId;
     const session = {
       ...event.data,
-      completion: completions.get(event.data.callId),
+      completion,
       task: tasks.get(event.data.callId),
+      terminalStatus: taskId ? terminalStatuses.get(taskId) : undefined,
     };
     sessions.delete(session.childSessionId);
     sessions.set(session.childSessionId, session);
   }
 
   return [...sessions.values()].toReversed();
+}
+
+function terminalTaskStatuses(events: readonly MessageStreamEvent[]) {
+  const statuses = new Map<string, SubagentSession["terminalStatus"]>();
+  for (const event of events) {
+    if (event.type !== "message.received" || event.data.source !== "task")
+      continue;
+    const notification =
+      /^Background task (\S+) \([^\r\n]+\) (is completed|failed|is cancelled)\./u.exec(
+        event.data.message
+      );
+    if (!notification?.[1]) continue;
+    const state = notification[2];
+    statuses.set(
+      notification[1],
+      state === "is completed"
+        ? "complete"
+        : state === "failed"
+          ? "failed"
+          : "cancelled"
+    );
+  }
+  return statuses;
 }
 
 export function getSubagentSubscriptionKey(
@@ -71,6 +99,7 @@ export function getSubagentStatus(
   events: readonly MessageStreamEvent[],
   session: SubagentSession
 ): SubagentStatus {
+  if (session.terminalStatus) return session.terminalStatus;
   const terminalSession = events
     .toReversed()
     .find((event) =>
