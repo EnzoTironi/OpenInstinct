@@ -80,7 +80,7 @@ the database. Protocol context identifiers confer no authority.
   DDL denial and `pg_amcheck --all`. The isolated restore refuses to publish backups.
   Local data mounts used disposable 1 GiB tmpfs because the host Docker filesystem
   exceeded the real 85% disk alarm; the alarm was not disabled. CI uses disk volumes.
-- Infrastructure TypeScript and all 14 Alchemy provider tests pass. Structural
+- Infrastructure TypeScript and all 18 Alchemy provider tests pass. Structural
   review flagged UI size/churn and generated migration/CI growth. Those findings
   are recorded rather than silenced. Ripwire could not resolve the dynamic
   Effect/Eve/test registrations for test selection; real suites supply the evidence.
@@ -95,6 +95,10 @@ the database. Protocol context identifiers confer no authority.
 - A native question paused the built application, accepted the selected answer,
   resumed in the same session, fetched the public example page through `web_fetch`
   and delivered the selected answer together with the verified page heading.
+- Database preparation is one ordered Alchemy action. The application, memory and
+  Matrix scripts must finish before migrations or service updates can start. A
+  provider test holds the first operation open to prove the next cannot race it,
+  and verifies that failure stops the sequence without exposing command output.
 
 ## Protocol and product boundaries
 

@@ -4,7 +4,6 @@ import { Random } from "alchemy/Random";
 import { retain } from "alchemy/RemovalPolicy";
 import { Effect } from "effect";
 import { releaseImage } from "./images.ts";
-import { PrepareMatrixDatabase } from "./database.ts";
 import { production } from "./production.ts";
 
 export const provisionMatrix = Effect.fn("provisionMatrix")(function* (input: {
@@ -75,18 +74,11 @@ export const provisionMatrix = Effect.fn("provisionMatrix")(function* (input: {
 export const deployMatrix = Effect.fn("deployMatrix")(function* (input: {
   provision: Effect.Success<ReturnType<typeof provisionMatrix>>;
   postgresApp: string;
-  postgresMachine: Output.Output<string>;
-  postgresImage: Output.Output<string>;
+  databaseRelease: Output.Output<string>;
   webApp: string;
   serverName: string;
   region: string;
 }) {
-  const database = yield* PrepareMatrixDatabase({
-    app: input.postgresApp,
-    machine: input.postgresMachine,
-    release: input.postgresImage,
-    credentialVersion: input.provision.databaseVersion,
-  });
   const image = yield* releaseImage("Matrix", input.provision.name, "./matrix");
   return yield* Fly.Machine("Matrix", {
     app: input.provision.app,
@@ -115,7 +107,7 @@ export const deployMatrix = Effect.fn("deployMatrix")(function* (input: {
     },
     metadata: {
       "zoen.secrets": input.provision.version,
-      "zoen.database-ready": database.release,
+      "zoen.database-ready": input.databaseRelease,
     },
   }).pipe(retain(true));
 });

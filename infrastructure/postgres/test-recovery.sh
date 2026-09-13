@@ -31,6 +31,7 @@ for _ in {1..120}; do
   sleep 1
 done
 if [[ $ready != true ]]; then docker logs "$source_name"; exit 1; fi
+docker exec "$source_name" /usr/local/bin/bootstrap-application.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-memory.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-memory.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-matrix.sh

@@ -68,6 +68,11 @@ superuser, role creation, database creation, replication or RLS bypass. It canno
 assume the migrator role. Graphile's private queue tables have an explicit runtime
 policy; the application does not become their owner to bypass RLS.
 
+One Alchemy action prepares the application, memory and Matrix databases in
+sequence. Their scripts update shared PostgreSQL catalogs and database permissions,
+so independent parallel actions can conflict. Migrations and service updates depend
+on the completed preparation, including all three credential versions.
+
 Before switching the web image, the stack takes an incremental backup and runs
 `scripts/migrate-hosted.ts` in a temporary machine with no public services, DNS
 registration or persistent volume. It checks the ordered migration hashes and
