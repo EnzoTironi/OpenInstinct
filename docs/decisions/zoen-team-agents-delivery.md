@@ -1,8 +1,9 @@
 # Team agents release
 
-Status: implementation and local acceptance complete; release gates and production
-deployment are recorded separately in GitHub Actions. This ledger distinguishes
-tested behavior from deployed infrastructure.
+Status: released and verified in production on 2026-09-13. Application and
+infrastructure release `9069f8a4ceed4da06927a52765be531ffa3a589f` is live at
+[zoen.tironi.xyz](https://zoen.tironi.xyz/). [Hosted CI passed](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34775895170);
+[Alchemy deployment, isolated restoration and service verification passed](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34776106181).
 
 ## Scope
 
@@ -100,6 +101,32 @@ the database. Protocol context identifiers confer no authority.
   provider test holds the first operation open to prove the next cannot race it,
   and verifies that failure stops the sequence without exposing command output.
 
+## Production acceptance — 2026-09-13
+
+- The final Alchemy workflow built and deployed immutable images, migrated the
+  existing database and passed the backup, role-isolation and public-health checks.
+  The original PostgreSQL machine and data volume were retained. Mem0 and the
+  private Matrix service use separate databases and roles on that PostgreSQL instance.
+- A temporary isolated machine restored the real production backup using the
+  deployed PostgreSQL 17.11 image. `pg_amcheck --all` passed. The recovery machine
+  was deleted and its volume detached with deletion accepted by the provider;
+  the provider may retain volume records while destruction completes.
+- Production contains all 40 application and 23 workflow migrations. The web
+  runtime connects as `zoen_app`, without superuser or public-schema CREATE access.
+- The authenticated production conversation paused for a native question, accepted
+  the selected answer and resumed in the same session. Gmail search and Calendar
+  free/busy both returned successful read-only results without sending email or
+  changing an event.
+- The production browser agent created a temporary Kernel browser, navigated to
+  `https://example.com/`, read its actual page title and URL, then deleted the
+  browser. The task displayed its completed status. The root retained its Codex
+  model; browser execution used the explicitly configured OpenRouter model.
+- The personal/work switch showed the existing Google and Telegram connections
+  only in the personal space. The team required explicit connection sharing.
+- In a test room in the owner's single-member team, a mention received the native
+  Zoen reply through Matrix. The room was subsequently closed and the empty room
+  list verified. No other person was invited or messaged.
+
 ## Protocol and product boundaries
 
 Matrix runs a pinned private Synapse, with virtual users controlled by authenticated
@@ -127,7 +154,7 @@ authored source; database credentials and live permissions remain outside Git.
 ## Acceptance checklist
 
 - [x] Self-hosted PostgreSQL, pgvector, encrypted object backups and real recovery.
-- [x] Production migration journal matches the 37 released migrations exactly.
+- [x] Production journals contain all 40 application and 23 workflow migrations.
 - [x] Separate application and migration roles; runtime has no DDL or cluster privileges.
 - [x] Alchemy migration action before web switching, with ordered journal verification.
 - [x] Team Google connections and schedules with live membership/role checks.
@@ -136,4 +163,4 @@ authored source; database credentials and live permissions remain outside Git.
 - [x] Self-hosted Matrix transport and explicitly authorized room bindings.
 - [x] Versioned ontology, entities, links, actions and provenance in the existing panel.
 - [x] Cross-user browser proof, application checks, runtime tests and image recovery.
-- [ ] Release commit: hosted CI, merge, Alchemy production deploy and isolated recovery.
+- [x] Release commit: hosted CI, merge, Alchemy production deploy and isolated recovery.
