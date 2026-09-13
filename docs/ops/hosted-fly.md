@@ -1,5 +1,11 @@
 # Hosted Fly cutover (H01) — Mac → always-on off-Mac
 
+**Historical cutover record.** Production now uses the unified
+[Zoen Alchemy stack](../../infrastructure/README.md): web, PostgreSQL, Mem0,
+encrypted backups, Cloudflare DNS and TLS. Use that runbook for current
+deployment and recovery. The topology, secrets file and commands below describe
+the earlier cutover and must not be used to reconfigure the current installation.
+
 Operator recipe so Companion can leave **Mac-only** hosting for consumer /
 prosumer installs, while keeping the **Mac LaunchAgent** path as an optional
 local / prosumer mode.

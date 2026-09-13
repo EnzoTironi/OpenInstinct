@@ -35,7 +35,7 @@ jobs:
         run: bash scripts/companion-uptime-probe.sh --quiet
 
   postgres:
-    name: Verify PostgreSQL backup and WAL archive
+    name: Verify PostgreSQL backup, disk and private memory
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

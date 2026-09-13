@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 if [ "$(id -u)" = 0 ]; then exec gosu postgres "$0" "$@"; fi
+# WAL and data share this volume. Alert before storage exhaustion stops writes.
+df -Pk "$PGDATA" | awk 'NR == 2 {
+  used = $5 + 0;
+  printf "{\"disk_used_percent\":%d,\"disk_available_kib\":%d}\n", used, $4;
+  if (used >= 85) { print "PostgreSQL volume is at least 85% full" > "/dev/stderr"; exit 1 }
+}'
 # Inspect the repository itself rather than trusting a local success marker.
 pgbackrest --stanza=zoen --output=json info | jq -e '
   .[0] as $stanza |

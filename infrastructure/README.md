@@ -79,7 +79,8 @@ recovery path.
 The database image supervises PostgreSQL and the cron scheduler. Failed initial
 backups do not take the database offline. The external CI probe checks the
 repository itself, fails if the newest backup is older than 150 minutes, and
-checks WAL archive failures. GitHub workflow failure notifications provide the
+checks WAL archive failures, alerts at 85% disk usage, and probes the private
+Mem0 endpoint through the Fly network. GitHub workflow failure notifications provide the
 alert path. Cron execution on GitHub can be delayed; it is an operational probe,
 not a real-time availability SLA.
 
@@ -105,13 +106,15 @@ recoverable independently of the failed PostgreSQL machine.
 
 ## CI
 
-`Checks` builds this exact PostgreSQL image, tests encrypted backup + WAL replay
-
-- pgvector recovery + role isolation, runs the real Mem0 adapter against pgvector,
-  and runs application checks, database integration tests and the production build.
+`Checks` builds this exact PostgreSQL image, tests encrypted backup, WAL replay,
+pgvector recovery and role isolation, runs the real Mem0 adapter against pgvector,
+and runs application checks, database integration tests and the production build.
 
 `Zoen infrastructure` runs only on main, serializes deployments and requires a
 successful complete Checks run on the exact commit before a production deploy.
+It also runs a production recovery drill every Sunday at 04:47 UTC, after the
+scheduled full backup. The temporary recovery resources are removed even if
+verification fails.
 Its protected configuration is supplied by `ZOEN_PRODUCTION_ENV` and
 `ZOEN_ALCHEMY_STATE`. The uptime workflow uses an app-scoped
 `ZOEN_FLY_OPERATIONS_TOKEN`; no application secrets are required by its probe.

@@ -1,6 +1,8 @@
 name: Zoen infrastructure
 
 on:
+  schedule:
+    - cron: "47 4 * * 0"
   workflow_dispatch:
     inputs:
       operation:
@@ -24,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: production
+    env:
+      OPERATION: ${{ github.event_name == 'schedule' && 'recovery' || inputs.operation }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -34,7 +38,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir infrastructure install --frozen-lockfile
       - name: Require all CI checks on this exact commit
-        if: inputs.operation == 'deploy'
+        if: env.OPERATION == 'deploy'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -56,26 +60,26 @@ jobs:
           writeFileSync('infrastructure/.env.prod', process.env.ZOEN_PRODUCTION_ENV + '\nZOEN_RELEASE=' + process.env.GITHUB_SHA + '\nZOEN_RECOVERY_RUN=ci-' + process.env.GITHUB_RUN_ID + '-' + process.env.GITHUB_RUN_ATTEMPT + '\n', {mode: 0o600});
           JS
       - name: Check the exact source before deployment
-        if: inputs.operation == 'deploy'
+        if: env.OPERATION == 'deploy'
         run: |
           pnpm check --concurrency=1
           pnpm --dir infrastructure types:check
           docker build -t zoen-postgres-proof:pg17-backup infrastructure/postgres
           bash infrastructure/postgres/test-recovery.sh
       - name: Plan infrastructure
-        if: inputs.operation != 'recovery'
+        if: env.OPERATION != 'recovery'
         working-directory: infrastructure
         run: pnpm exec alchemy plan --stage prod --env-file "$PWD/.env.prod"
       - name: Deploy the tested release
-        if: inputs.operation == 'deploy'
+        if: env.OPERATION == 'deploy'
         working-directory: infrastructure
         run: pnpm exec alchemy deploy --stage prod --env-file "$PWD/.env.prod" --yes
       - name: Prove recovery on an isolated temporary machine
-        if: inputs.operation == 'recovery'
+        if: env.OPERATION == 'recovery'
         working-directory: infrastructure
         run: pnpm exec alchemy deploy recovery.run.ts --stage prod --env-file "$PWD/.env.prod" --yes
       - name: Verify database backup and public service
-        if: inputs.operation != 'plan'
+        if: env.OPERATION != 'plan'
         run: |
           pnpm --dir infrastructure check:production
           curl --fail --show-error --max-time 30 https://zoen.tironi.xyz/eve/v1/health

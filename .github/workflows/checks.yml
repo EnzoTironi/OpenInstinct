@@ -144,9 +144,14 @@ jobs:
             -e ZOEN_MEMORY_DATABASE_PASSWORD=ci-memory-password \
             -e POSTGRES_DB=companion_runtime_test zoen-postgres-proof:pg17-backup
           for attempt in {1..60}; do
-            docker exec memory-postgres pg_isready -U postgres && break
+            if [ "$(docker inspect --format '{{.State.Running}}' memory-postgres)" != true ]; then
+              docker logs memory-postgres
+              exit 1
+            fi
+            docker exec memory-postgres pg_isready -h 127.0.0.1 -U postgres && break
             sleep 1
           done
+          docker exec memory-postgres pg_isready -h 127.0.0.1 -U postgres
           docker exec memory-postgres /usr/local/bin/bootstrap-memory.sh
       - name: Verify the real memory adapter with isolated model fixtures
         working-directory: infrastructure/memory

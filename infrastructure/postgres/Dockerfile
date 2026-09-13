@@ -21,6 +21,9 @@ COPY entrypoint.sh verify-restore.sh backup.sh backup-health.sh bootstrap-memory
 COPY crontab /etc/crontabs/root
 RUN chmod 755 /usr/local/bin/*.sh \
     && chmod 600 /etc/crontabs/root \
+    && mkdir -p /data \
+    && chown postgres:postgres /data \
+    && chmod 700 /data \
     && pgbackrest version \
     && postgres --version | grep 'PostgreSQL) 17\.'
 ENV PGDATA=/data/pgdata

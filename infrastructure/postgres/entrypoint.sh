@@ -18,12 +18,20 @@ if [[ ${ZOEN_RESTORE_PROOF:-0} == 1 ]]; then
   /usr/local/bin/docker-entrypoint.sh postgres -c archive_mode=off &
   database_pid=$!
   trap 'kill -TERM "$database_pid" 2>/dev/null || true; wait "$database_pid" || true' EXIT INT TERM
-  for (( attempt=0; attempt<120; attempt++ )); do
-    if pg_isready -U postgres >/dev/null 2>&1; then break; fi
+  recovery_complete=false
+  for (( attempt=0; attempt<360; attempt++ )); do
+    # pg_isready also accepts a read-only hot-standby during WAL replay. The
+    # integrity proof installs amcheck, so wait until replay has finished.
+    if [[ $(psql -X -U postgres -d postgres -Atc 'SELECT NOT pg_is_in_recovery()' 2>/dev/null) == t ]]; then
+      recovery_complete=true
+      break
+    fi
     kill -0 "$database_pid" || exit 1
     sleep 1
   done
-  /usr/local/bin/verify-restore.sh > /tmp/zoen-restore-proof.json
+  [[ $recovery_complete == true ]] || { echo 'WAL recovery did not complete in time.' >&2; exit 1; }
+  /usr/local/bin/verify-restore.sh > /tmp/zoen-restore-proof.json.new
+  mv /tmp/zoen-restore-proof.json.new /tmp/zoen-restore-proof.json
   cat /tmp/zoen-restore-proof.json
   if [[ ${ZOEN_RECOVERY_HOLD:-0} == 1 ]]; then wait "$database_pid"; fi
   exit
