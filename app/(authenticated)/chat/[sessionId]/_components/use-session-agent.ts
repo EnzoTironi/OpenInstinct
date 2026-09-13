@@ -1,5 +1,7 @@
 "use client";
 
+import { browserWorkspaceHeaders } from "@web/workspaces/navigation";
+
 import {
   Client,
   defaultMessageReducer,
@@ -28,7 +30,11 @@ import {
 } from "../_lib/session-history";
 import type { ChatAgent } from "./chat-agent";
 
-const client = new Client({ host: "" });
+const client = new Client({
+  host: "",
+  headers: browserWorkspaceHeaders,
+  redirect: "error",
+});
 const messageReducer = defaultMessageReducer();
 
 export function useSessionAgent(sessionId: string): ChatAgent {

@@ -6,6 +6,7 @@ import { getGatewayModel } from "@db/services/settings";
 import { scopeFromPrincipal } from "../shared/identity/principal-scope";
 import { requireChannelPrincipal } from "../server/channels/principal";
 import { serverRuntime } from "../server/runtime";
+import { workspaceActorFromPrincipal } from "../server/workspaces/access";
 import { installationModel } from "./lib/installation-model";
 
 export default defineAgent({
@@ -32,6 +33,12 @@ export default defineAgent({
         }
         const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
         if (!caller) throw new Error("An authenticated user is required.");
+        if (
+          caller.authenticator === "authjs" ||
+          caller.authenticator === "verified-channel"
+        ) {
+          await serverRuntime.runPromise(workspaceActorFromPrincipal(caller));
+        }
         const channel = caller.attributes.conversationChannel;
         if (channel === "telegram" || channel === "kapso") {
           await serverRuntime.runPromise(

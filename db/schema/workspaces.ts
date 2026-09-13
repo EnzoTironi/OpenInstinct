@@ -23,6 +23,7 @@ export const workspaces = pgTable(
       .notNull(),
     /** NULL = personal workspace; set for company-linked workspaces. */
     organizationId: text("organization_id"),
+    displayName: text("display_name"),
   },
   (table) => [
     foreignKey({

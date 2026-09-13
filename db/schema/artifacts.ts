@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   check,
-  customType,
   index,
   integer,
   pgTable,
@@ -13,10 +12,7 @@ import {
 import { channelIdentities } from "./channels";
 import { channelInbox } from "./messaging";
 import { workspaces } from "./workspaces";
-
-const bytea = customType<{ data: Buffer }>({
-  dataType: () => "bytea",
-});
+import { bytea } from "./binary";
 
 export const privateArtifacts = pgTable(
   "private_artifact",

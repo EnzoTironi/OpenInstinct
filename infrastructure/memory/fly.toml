@@ -1,0 +1,29 @@
+app = "zoen-memory-tironi"
+primary_region = "gru"
+
+[build]
+dockerfile = "Dockerfile"
+
+[env]
+MEM0_TELEMETRY = "false"
+ZOEN_MEMORY_DATA = "/data"
+
+[[mounts]]
+source = "zoen_memory_data"
+destination = "/data"
+snapshot_retention = 14
+
+[[vm]]
+memory = "1gb"
+cpu_kind = "shared"
+cpus = 1
+
+# Private Fly network only; no public HTTP service or public IP is allocated.
+[checks.health]
+type = "http"
+port = 8000
+method = "get"
+path = "/health"
+interval = "30s"
+timeout = "5s"
+grace_period = "90s"

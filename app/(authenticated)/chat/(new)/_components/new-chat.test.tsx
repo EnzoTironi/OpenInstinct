@@ -37,6 +37,7 @@ const mocks = vi.hoisted<Mocks>(() => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.routerReplace }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("eve/react", () => ({

@@ -1,0 +1,43 @@
+.switcher {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 180px;
+  padding: 12px 10px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 4%);
+  font-size: 13px;
+}
+.switcher svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.switcher select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.switcher:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (max-width: 400px) {
+  .switcher {
+    max-width: 125px;
+    padding: 10px 8px;
+    gap: 5px;
+  }
+}

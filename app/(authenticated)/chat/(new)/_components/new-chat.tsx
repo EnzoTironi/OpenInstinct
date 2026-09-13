@@ -3,7 +3,8 @@
 import { useI18n } from "@web/i18n/context";
 
 import { useEveAgent } from "eve/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { workspaceHref } from "@web/workspaces/navigation";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -25,6 +26,7 @@ export function NewChat({
 }) {
   const { t } = useI18n();
   const router = useRouter();
+  const workspaceId = useSearchParams().get("space");
   const { mutateAsync: saveChat } = api.chats.save.useMutation();
   const pendingTitle = useRef<string | undefined>(undefined);
   const isSubmitting = useRef(false);
@@ -35,6 +37,7 @@ export function NewChat({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(false);
   const agent = useEveAgent({
+    headers: workspaceId ? { "x-zoen-workspace": workspaceId } : {},
     onError() {
       sendFailed.current = true;
       setSendError(true);
@@ -42,7 +45,10 @@ export function NewChat({
     onSessionChange(session) {
       if (session === undefined || navigationStarted.current) return;
       navigationStarted.current = true;
-      const path = `/chat/${encodeURIComponent(session.sessionId)}`;
+      const path = workspaceHref(
+        `/chat/${encodeURIComponent(session.sessionId)}`,
+        workspaceId
+      );
       void saveChat({
         sessionId: session.sessionId,
         title: pendingTitle.current,
@@ -121,7 +127,9 @@ export function NewChat({
         {initialDraft ? (
           t("Ajuste o pedido e envie quando quiser.")
         ) : (
-          <Link href="/recipes">{t("Precisa de uma ideia?")}</Link>
+          <Link href={workspaceHref("/recipes", workspaceId)}>
+            {t("Precisa de uma ideia?")}
+          </Link>
         )}
       </p>
     </div>

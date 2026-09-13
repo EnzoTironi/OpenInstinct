@@ -3,6 +3,7 @@
 import { useI18n } from "@web/i18n/context";
 import { AlertCircleIcon, BrainIcon, LoaderCircleIcon } from "lucide-react";
 import { Fragment, useMemo } from "react";
+import type { EveMessage } from "eve/react";
 import {
   imessageTimestamps,
   messageTimestamps,
@@ -154,19 +155,42 @@ export function ChatConversation({
               key={message.id}
               message={message}
               onInputResponses={(responses) => agent.respond(responses)}
+              sentMessageParts={
+                traceView === "imessage" ? completedReply(message) : undefined
+              }
               timestamp={timestamps.get(message.id)}
               userVisibleOnly={traceView === "imessage"}
             />
           );
         })}
         {showPendingThinking ? <PendingThinking /> : null}
-        {traceView === "trace" && errorMessage ? (
-          <ErrorMessage message={errorMessage} />
+        {errorMessage ? (
+          <ErrorMessage
+            message={
+              traceView === "trace"
+                ? errorMessage
+                : t("Unable to complete the request.")
+            }
+          />
         ) : null}
       </ConversationContent>
       <ConversationScrollButton />
     </Conversation>
   );
+}
+
+/** A completed reply remains visible when the model omits send_message. */
+function completedReply(message: EveMessage): EveMessage["parts"] {
+  if (message.role !== "assistant" || message.metadata?.status !== "complete")
+    return [];
+  const lastPart = message.parts.findLast(
+    (part) => part.type !== "step-start" && part.type !== "reasoning"
+  );
+  return lastPart?.type === "text" &&
+    lastPart.state === "done" &&
+    !/^DELIVERY_COMPLETE[.!]?$/i.test(lastPart.text.trim())
+    ? [lastPart]
+    : [];
 }
 
 function toErrorMessage(cause: unknown): string {

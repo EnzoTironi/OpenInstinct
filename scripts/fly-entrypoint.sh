@@ -5,8 +5,8 @@
 # Never logs or echoes secret values.
 set -eu
 
-# Operon snapshots use the same durable Postgres unless a separate DB is set.
-export OPERON_DATABASE_URL="${OPERON_DATABASE_URL:-${DATABASE_URL:?DATABASE_URL is required}}"
+# Workspace Git bundles and authority use the application's durable Postgres.
+: "${DATABASE_URL:?DATABASE_URL is required}"
 
 if [ -n "${CHATGPT_AUTH_JSON:-}" ]; then
   mkdir -p /root/.eve/auth

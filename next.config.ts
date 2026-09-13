@@ -36,6 +36,11 @@ export default function companionConfig(
       const frameworkRewrites = resolved.rewrites;
       return {
         ...resolved,
+        serverExternalPackages: [
+          ...(resolved.serverExternalPackages ?? []),
+          "@firecrawl/anydoc",
+          "quickjs-emscripten",
+        ],
         rewrites: () =>
           Effect.runPromise(
             Effect.gen(function* () {

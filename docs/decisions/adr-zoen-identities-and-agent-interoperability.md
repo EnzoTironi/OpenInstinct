@@ -97,5 +97,9 @@ memberships, handle collisions, hidden-bot enumeration, cross-workspace task IDs
 OAuth disconnect, and a work bot trying to read the owner's personal mailbox.
 Denied access remains denied even if the bot or handle is publicly discoverable.
 
+The [shared workspace proposal](adr-zoen-shared-workspaces.md) extends this model
+with Git-backed documents, group audiences, history access and a concrete
+concurrency/revocation experiment.
+
 This document specifies the implementation sequence. It does not enable company
 switching, public username search, Matrix federation or an A2A endpoint by itself.

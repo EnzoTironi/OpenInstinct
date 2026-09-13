@@ -2,6 +2,10 @@ import type { KnipConfig } from "knip";
 
 export default {
   ignoreIssues: {
+    // Preserve the pinned upstream kernel's public contracts and companion tests.
+    "vendor/executor/**/*.ts": ["exports", "types", "files"],
+    // Retain the former Operon adapter and tests for reference; it is no longer discovered by Eve.
+    "server/operon/legacy-tools.ts": ["exports"],
     // Eve AI Elements and shadcn registry primitives intentionally expose
     // a reusable component surface wider than this minimal chat consumes.
     "web/components/ai-elements/**/*.tsx": ["exports", "files", "types"],
@@ -10,13 +14,18 @@ export default {
   workspaces: {
     ".": {
       vitest: {
-        config: ["vitest.config.ts", "vitest.runtime.config.ts"],
+        config: [
+          "vitest.config.ts",
+          "vitest.runtime.config.ts",
+          "vitest.operon.config.ts",
+        ],
       },
       entry: [
         "agent/channels/**/*.ts",
         "agent/hooks/**/*.ts",
         "agent/instructions/**/*.ts",
         "agent/memory/**/*.ts",
+        "agent/skills/**/*.ts",
         "agent/subagents/**/*.ts",
         "agent/schedules/**/*.ts",
         "agent/tools/**/*.ts",
@@ -35,6 +44,8 @@ export default {
         // In-memory Operon MCP used by email-flow tests.
       ],
       ignoreDependencies: [
+        // The import worker invokes the native CLI in an isolated Node process.
+        "@firecrawl/anydoc",
         // Type owners referenced by the Eve declaration patch, which Knip does not parse.
         "@linqapp/chat-sdk-adapter",
         "chat",

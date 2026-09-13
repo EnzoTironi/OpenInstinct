@@ -1,5 +1,7 @@
 "use client";
 
+import { browserWorkspaceHeaders } from "@web/workspaces/navigation";
+
 import {
   Client,
   isCurrentTurnBoundaryEvent,
@@ -12,7 +14,11 @@ import {
   type SessionHistoryPage,
 } from "../../_lib/session-history";
 
-const client = new Client({ host: "" });
+const client = new Client({
+  host: "",
+  headers: browserWorkspaceHeaders,
+  redirect: "error",
+});
 
 export function useSessionHistory(sessionId: string) {
   const [history, setHistory] = useState<SessionHistoryPage>();

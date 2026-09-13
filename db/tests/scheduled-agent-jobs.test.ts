@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Database from "@db";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 import * as schema from "../schema";
 
 const databases: PGlite[] = [];
@@ -34,6 +35,7 @@ describe("scheduled agent jobs", () => {
       "0012_harsh_domino.sql",
       "0029_org-workspace-rbac.sql",
       "0030_org-sso-audit-erasure.sql",
+      "0032_executor-workspaces.sql",
     ]) {
       await applyMigration(client, migration);
     }
@@ -45,8 +47,8 @@ describe("scheduled agent jobs", () => {
     const scope = await import("@db/services/scope");
     const jobs = await import("@db/services/scheduled-agent-jobs");
     const leases = await import("@db/services/scheduled-agent-run-leases");
-    const alice = { userId: "alice", workspaceId: "workspace:alice" };
-    const bob = { userId: "bob", workspaceId: "workspace:bob" };
+    const alice = accessScopeForUser("alice");
+    const bob = accessScopeForUser("bob");
     const aliceConversation = {
       conversationChannel: "linq" as const,
       conversationId: "linq:chat-alice",

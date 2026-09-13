@@ -28,6 +28,8 @@ import { useLocalTime } from "./use-local-time";
 import { getLocalDay } from "./local-day";
 import { PanelSky } from "./panel-sky";
 import styles from "./panel.module.css";
+import { WorkspaceSwitcher } from "./workspace-switcher";
+import { workspaceHref } from "@web/workspaces/navigation";
 
 export function PanelShell({
   children,
@@ -40,6 +42,7 @@ export function PanelShell({
   const pathname = usePathname();
   const router = useRouter();
   const section = useSearchParams().get("section");
+  const workspaceId = useSearchParams().get("space");
   const home = pathname === "/";
   const { sky } = getLocalDay(useLocalTime());
   const [dismissed, setDismissed] = useState(false);
@@ -76,12 +79,12 @@ export function PanelShell({
             <Link
               aria-label={t("Zoen · Início")}
               className={styles.brand}
-              href="/"
+              href={workspaceHref("/", workspaceId)}
             >
               <Logo />
               <span>Zoen</span>
             </Link>
-            <PanelDate />
+            <WorkspaceSwitcher />
             <Button
               aria-label={t("Sua conta")}
               className={styles.accountButton}
@@ -111,7 +114,7 @@ export function PanelShell({
           open={open}
           onOpenChangeComplete={(isOpen) => {
             if (!isOpen && dismissed && !home)
-              router.push("/", { scroll: false });
+              router.push(workspaceHref("/", workspaceId), { scroll: false });
           }}
           showSwipeHandle
           onOpenChange={(isOpen) => {
@@ -151,7 +154,10 @@ export function PanelShell({
                   nativeButton={false}
                   render={
                     <Link
-                      href={`/connections?returnTo=${encodeURIComponent(googleWorkspaceReturnTo(pathname))}`}
+                      href={workspaceHref(
+                        `/connections?returnTo=${encodeURIComponent(googleWorkspaceReturnTo(pathname))}`,
+                        workspaceId
+                      )}
                     />
                   }
                   size="icon"
@@ -165,7 +171,9 @@ export function PanelShell({
                   aria-label={t("Histórico de conversas")}
                   className={styles.sheetBack}
                   nativeButton={false}
-                  render={<Link href="/chat/history" />}
+                  render={
+                    <Link href={workspaceHref("/chat/history", workspaceId)} />
+                  }
                   size="icon"
                   variant="ghost"
                 >
@@ -188,7 +196,7 @@ export function PanelShell({
             <div
               className={styles.content}
               id={!home ? "panel-content" : undefined}
-              key={`${pathname}:${section ?? ""}`}
+              key={`${workspaceId ?? "personal"}:${pathname}:${section ?? ""}`}
               tabIndex={-1}
             >
               {!home && children}
@@ -197,23 +205,5 @@ export function PanelShell({
         </Drawer>
       </div>
     </PanelNavigationContext>
-  );
-}
-
-function PanelDate() {
-  const { t, locale } = useI18n();
-  const date = useLocalTime();
-  return (
-    <time className={styles.date} dateTime={date?.toISOString()}>
-      {date
-        ? new Intl.DateTimeFormat(locale, {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-          })
-            .format(date)
-            .replaceAll(".", "")
-        : t("Seu espaço pessoal")}
-    </time>
   );
 }
