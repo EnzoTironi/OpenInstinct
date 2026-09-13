@@ -30,7 +30,6 @@ describe("source layout", () => {
       "auth",
       "browser",
       "components",
-      "hooks",
       "i18n",
       "trpc",
       "workspaces",
