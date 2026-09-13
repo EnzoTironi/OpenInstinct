@@ -1,6 +1,5 @@
 import hashlib
 import os
-import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
@@ -81,8 +80,8 @@ def test_replays_and_concurrent_requests_write_once(client):
     # A replay returns its receipt; it must never resurrect cleared content.
     assert remember(client, namespace, "Synthetic shared retry.", operation).status_code == 200
     assert call(client, namespace, "list").json()["results"] == []
-    with sqlite3.connect(service.app.state.ledger) as db:
-        assert "Synthetic" not in str(db.execute("SELECT * FROM operations").fetchall())
+    with service.app.state.ledger.pool.connection() as db:
+        assert "Synthetic" not in str(db.execute("SELECT * FROM memory_operations").fetchall())
 
 
 def test_provider_errors_are_redacted_and_ambiguous_writes_not_retried(client, monkeypatch):

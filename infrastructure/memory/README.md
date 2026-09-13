@@ -1,63 +1,40 @@
 # Private Zoen memory service
 
-This is the self-hosted Mem0 adapter consumed by Zoen. The SDK is pinned to
-`c7ee362aff94a369af70f13f2b4f853f6793ff4c` in `uv.lock`; its Apache 2.0 license is
-included. The service has no public Fly service or public IP.
+A small FastAPI adapter around the pinned Mem0 OSS revision in `app.py`.
+PostgreSQL with pgvector stores vectors and content-free idempotency receipts.
+The service runs privately on Fly; Alchemy manages its machine, secrets and
+persistent volume through `../alchemy.run.ts`.
 
-## Runtime
+Required variables: `ZOEN_MEM0_API_KEY` (at least 32 characters),
+`OPENROUTER_API_KEY`, `ZOEN_MEMORY_DATABASE_URL`. Models stay pinned by default to
+openai/gpt-5-mini and openai/text-embedding-3-small (1536 dimensions).
+`MEM0_TELEMETRY=false`. `/health` checks database readiness. Operations require a
+constant-time bearer-token comparison and an authenticated workspace namespace.
+Zoen checks current membership before calling this private API.
 
-- One worker, one embedded Qdrant writer, an encrypted `/data` volume.
-- SQLite stores idempotency receipts containing namespace, operation hash and
-  result IDs. Extraction history is in memory and cleared after operations.
-- Bearer authentication is required for operations. `/health` reports readiness
-  and the SDK revision without exposing configuration.
-- `ZOEN_MEM0_API_KEY` authenticates Zoen. `OPENROUTER_API_KEY` authenticates model
-  calls. Neither belongs in Git, user documents, logs or a browser response.
-- Zoen sets `ZOEN_MEM0_URL=http://zoen-memory-tironi.internal:8000` and the same
-  service key. LLM extraction uses `openai/gpt-5-mini`; embeddings use
-  `openai/text-embedding-3-small` with 1536 dimensions. Self-hosting storage does
-  not make those model requests local: submitted memory text goes to the model
-  provider.
+Each namespace has a PostgreSQL advisory lock shared across API processes.
+A durable pending receipt is committed before a provider write. Completed retries
+return the original receipt; an ambiguous write fails closed with 409 instead of
+possibly duplicating a mutation. Clearing memory preserves receipts so a replay
+cannot resurrect erased facts. Provider errors do not expose prompts or keys.
 
-The adapter limits requests to 32 KiB and 200 memories per namespace. Model
-clients have explicit timeouts and no automatic retries. One native lock protects
-embedded Qdrant. Scaling this deployment to several writers requires an external
-Qdrant service and a shared idempotency store first.
+On first start, `migrate_legacy.py` atomically imports vectors from `/data/vectors`
+and receipts from `/data/operations.db`. It validates embedding dimensions,
+refuses to merge independent stores, commits a migration marker, and retains the
+source volume. A restart never imports cleared memory again. Mem0 extraction
+history remains ephemeral; deleted facts are not retained in another durable
+history store.
 
-## Validation and deployment
+PostgreSQL backups cover both vectors and receipts. The original 3 GB volume and
+14-day snapshots remain available during migration. The same private API contract
+continues to serve the web app; the storage backend does not change user-facing
+memory operations.
 
 ```sh
-uv sync --frozen
-uv run pytest
-fly deploy --config fly.toml --remote-only
-fly checks list --app zoen-memory-tironi
+ZOEN_MEMORY_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/companion_runtime_test uv run pytest -q
 ```
 
-Tests use the real pinned Mem0/Qdrant implementation with a deterministic local
-embedding fixture. The delivery record separately records live-provider tests.
-Never run the test suite against a production data directory.
-
-## Failure and recovery
-
-Zoen authorizes the live user and workspace in PostgreSQL before every access.
-Each person's memory has a different opaque namespace, including inside a team.
-Shared team knowledge lives in the Git workspace instead.
-
-Before a mutation crosses the network, Zoen commits a pending-operation fence.
-If the result is uncertain, recalled memory remains unavailable. The app offers
-review of the service's current records followed by an explicit recovery action;
-that action never repeats an old write. Clearing all memory is a separate action.
-Cached recall receipts are tombstoned so an old replay cannot reintroduce forgotten
-facts. Deleting an account or removing a workspace member queues durable erasure;
-Eve drains the outbox every five minutes and retains failed receipts for retry.
-
-Fly takes encrypted volume snapshots with 14-day retention. A deleted memory may
-remain in a retained backup until that backup expires. Before restoring a snapshot,
-stop the writer, restore to a replacement volume, and verify health and an isolated
-namespace before attaching Zoen. Reconcile restored namespaces with current
-PostgreSQL memberships and erasure receipts before enabling recall; a historical
-snapshot must never restore access that has since been revoked.
-
-This deployment is a single instance. It has restart persistence and snapshots,
-not high availability. The volume and its SQLite/Qdrant contents form one recovery
-unit; copying only vectors loses the idempotency record.
+Tests replace only model calls with deterministic fixtures. Real Mem0, pgvector,
+PostgreSQL locks, receipt durability, tenant isolation, deletion and atomic legacy
+migration are exercised. A PostgreSQL server with the vector extension is
+required; the CI job builds the production database image for this purpose.

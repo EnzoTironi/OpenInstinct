@@ -122,6 +122,8 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    env:
+      ZOEN_MEMORY_DATABASE_URL: postgresql://zoen_memory:ci-memory-password@127.0.0.1:5432/zoen_memory
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -131,6 +133,26 @@ jobs:
           python-version: "3.12"
       - name: Install pinned package manager
         run: python -m pip install uv==0.12.13
+      - name: Build the production PostgreSQL image and prove recovery
+        run: |
+          docker build -t zoen-postgres-proof:pg17-backup infrastructure/postgres
+          bash infrastructure/postgres/test-recovery.sh
+      - name: Start pgvector for memory integration tests
+        run: |
+          docker run -d --name memory-postgres -p 127.0.0.1:5432:5432 \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            -e ZOEN_MEMORY_DATABASE_PASSWORD=ci-memory-password \
+            -e POSTGRES_DB=companion_runtime_test zoen-postgres-proof:pg17-backup
+          for attempt in {1..60}; do
+            if [ "$(docker inspect --format '{{.State.Running}}' memory-postgres)" != true ]; then
+              docker logs memory-postgres
+              exit 1
+            fi
+            docker exec memory-postgres pg_isready -h 127.0.0.1 -U postgres && break
+            sleep 1
+          done
+          docker exec memory-postgres pg_isready -h 127.0.0.1 -U postgres
+          docker exec memory-postgres /usr/local/bin/bootstrap-memory.sh
       - name: Verify the real memory adapter with isolated model fixtures
         working-directory: infrastructure/memory
         run: |

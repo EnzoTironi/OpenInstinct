@@ -16,7 +16,11 @@ next-env.d.ts
 # Secrets and local state — never bake into the image
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
+**/.alchemy
 infrastructure/.env
 infrastructure/.alchemy
 infrastructure/ingress/.env

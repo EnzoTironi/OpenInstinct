@@ -6,6 +6,7 @@ dependencies = [
   "mem0ai @ https://github.com/mem0ai/mem0/archive/c7ee362aff94a369af70f13f2b4f853f6793ff4c.tar.gz",
   "fastapi==0.141.1",
   "uvicorn==0.52.4",
+  "psycopg[binary,pool]==3.3.3",
 ]
 
 [dependency-groups]

@@ -1,0 +1,317 @@
+diff --git a/lib/Fly/Machine.d.ts b/lib/Fly/Machine.d.ts
+index ffdcb982af368e93be45f521f496085abd375ba7..b576f1a9af7ee31c25977033e654240af7ae7f79 100644
+--- a/lib/Fly/Machine.d.ts
++++ b/lib/Fly/Machine.d.ts
+@@ -1,3 +1,4 @@
++import type { FlyMachineConfig } from "@distilled.cloud/fly-io/machines";
+ import * as Effect from "effect/Effect";
+ import * as Provider from "../Provider.ts";
+ import { Resource } from "../Resource.ts";
+@@ -127,6 +128,12 @@ export interface MachineProps {
+      * Fly proxy services (HTTP/TCP ports).
+      */
+     services?: MachineService[];
++    /** Existing physical IDs to adopt; a missing or different machine fails closed. */
++    existingMachineIds?: string[];
++  /** Exact path-to-volume mapping to preserve when adopting production disks. */
++  existingVolumeIds?: Record<string, string>;
++    checks?: FlyMachineConfig["checks"];
++    skipDnsRegistration?: boolean;
+     /**
+      * Disks to attach. Each entry is a Fly volume group: `count`
+      * independent Volumes, one mounted on each replica. Also collected
+diff --git a/lib/Fly/Machine.js b/lib/Fly/Machine.js
+index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a6c8ead1dd6b71307d1aabf4223d87c253d52d13 100644
+--- a/lib/Fly/Machine.js
++++ b/lib/Fly/Machine.js
+@@ -461,6 +461,8 @@ const buildConfig = (input) => ({
+     restart: input.restart,
+     auto_destroy: input.autoDestroy,
+     init: input.init,
++    checks: input.checks,
++    dns: input.dns,
+ });
+ const sameImage = (machine, image) => {
+     const configImage = machine.config?.image;
+@@ -483,7 +485,11 @@ const sameGuest = (observed, desired) => (observed?.cpu_kind ?? DEFAULT_CPU_KIND
+     observed?.gpu_kind === desired.gpu_kind &&
+     observed?.gpus === desired.gpus;
+ const sameEnv = (observed, desired) => deepEqual(compactRecord(observed), desired);
+-const sameServices = (observed, desired) => deepEqual(observed ?? [], desired ?? [], { stripNullish: true });
++const comparableServices = (services) => (services ?? []).map((service) => ({
++    ...service,
++    autostop: typeof service.autostop === "boolean" ? service.autostop ? "stop" : "off" : service.autostop,
++}));
++const sameServices = (observed, desired) => deepEqual(comparableServices(observed), comparableServices(desired), { stripNullish: true });
+ const sameMounts = (observed, desired) => {
+     const key = (mount) => `${mount.volume ?? ""}:${mount.path ?? ""}`;
+     const left = [...(observed ?? [])].map(key).sort();
+@@ -506,7 +512,9 @@ const metadataChanged = (observed, desired) => {
+ };
+ const configDrifted = (machine, desired) => {
+     const config = machine.config;
+-    return (!sameImage(machine, desired.image) ||
++    return (!deepEqual(config?.checks ?? {}, desired.checks ?? {}, { stripNullish: true }) ||
++    !deepEqual(config?.dns ?? {}, desired.dns ?? {}, { stripNullish: true }) ||
++    !sameImage(machine, desired.image) ||
+         !sameGuest(config?.guest, desired.guest) ||
+         !sameEnv(config?.env, desired.env) ||
+         !sameServices(config?.services, desired.services) ||
+@@ -566,11 +574,19 @@ export const MachineProvider = () => Provider.succeed(Machine, {
+             appName,
+             id,
+             type: "Fly.Machine",
+-            machineIds: machineIdsOf(output),
++            machineIds: machineIdsOf(output).length ? machineIdsOf(output) : olds?.existingMachineIds,
+             baseName: name,
+         });
+-        if (found === undefined)
+-            return undefined;
++        const expected = olds?.existingMachineIds;
++      if (expected?.length && (!found || found.machineIds.length !== expected.length || expected.some((machineId) => !found.machineIds.includes(machineId)))) {
++        return yield* new MachineNotCreated({ appName: appName ?? "", name });
++      }
++      if (found === undefined) return undefined;
++      for (const [path, volumeId] of Object.entries(olds?.existingVolumeIds ?? {})) {
++        if (!found.replicas.every((replica) => replica.mounts.some((mount) => mount.path === path && mount.volumeId === volumeId && mount.sizeGb > 0))) {
++          return yield* new MachineNotCreated({ appName: appName ?? "", name });
++        }
++      }
+         return toAttrs(found);
+     }),
+     list: Effect.fn(function* () {
+@@ -579,6 +595,19 @@ export const MachineProvider = () => Provider.succeed(Machine, {
+     }),
+     reconcile: Effect.fn(function* ({ id, news, output, bindings }) {
+         const props = news;
++      if (props.existingMachineIds?.length) {
++        const existing = yield* observeReplicaSet({ appName: appNameOf(props.app), id, type: "Fly.Machine", machineIds: props.existingMachineIds, baseName: props.name });
++        if (!existing || props.existingMachineIds.length !== (props.count ?? 1) || existing.machineIds.length !== props.existingMachineIds.length || props.existingMachineIds.some((machineId) => !existing.machineIds.includes(machineId)) || (props.name && existing.name !== props.name) || (props.region && existing.region !== props.region)) {
++          return yield* new MachineNotCreated({ appName: appNameOf(props.app) ?? "", name: props.name ?? id });
++        }
++        for (const [path, volumeId] of Object.entries(props.existingVolumeIds ?? {})) {
++          const disk = props.mounts?.find((mount) => mount.path === path);
++          if (!disk || !existing.replicas.every((replica) => replica.mounts.some((mount) => mount.path === path && mount.volumeId === volumeId && mount.sizeGb > 0 && (!disk.name || disk.name === mount.name)))) {
++            return yield* new MachineNotCreated({ appName: appNameOf(props.app) ?? "", name: props.name ?? id });
++          }
++        }
++        output = toAttrs(existing);
++      }
+         const appName = appNameOf(props.app) ?? output?.appName;
+         if (appName === undefined) {
+             return yield* new MachineAppNotResolved({
+@@ -617,6 +646,8 @@ export const MachineProvider = () => Provider.succeed(Machine, {
+                 metadata: desiredMetadata(props, desired.metadata),
+                 restart,
+                 autoDestroy: props.autoDestroy,
++            checks: props.checks,
++            dns: props.skipDnsRegistration ? { skip_registration: true } : undefined,
+                 init,
+             }),
+             buildConfig: ({ mounts, metadata }) => buildConfig({
+@@ -628,6 +659,8 @@ export const MachineProvider = () => Provider.succeed(Machine, {
+                 metadata: desiredMetadata(props, metadata),
+                 restart,
+                 autoDestroy: props.autoDestroy,
++            checks: props.checks,
++            dns: props.skipDnsRegistration ? { skip_registration: true } : undefined,
+                 init,
+             }),
+         }).pipe(Effect.catchTag("Fly.ReplicaNotCreated", (error) => Effect.fail(new MachineNotCreated({
+diff --git a/lib/Fly/replicas.js b/lib/Fly/replicas.js
+index f0a10b019dd41b77007e0df661e8874bd6ce1218..9a3765b8fa7dea0640b9cf2ad32a34ec736eed67 100644
+--- a/lib/Fly/replicas.js
++++ b/lib/Fly/replicas.js
+@@ -206,7 +206,9 @@ export const reconcileReplicas = Effect.fn(function* (input) {
+     const alchemy = yield* createMachineMetadata(input.id, input.type);
+     const desiredNames = new Set(Array.from({ length: input.count }, (_, index) => replicaMachineName(input.baseName, index, input.count)));
+     const listed = yield* listMachinesByApp(input.appName);
+-    const owned = listed.filter((machine) => isOwnedType(machine, input.type));
++    const owned = listed.filter((machine) =>
++    isOwnedType(machine, input.type) || (input.outputMachineIds ?? []).includes(machine.id ?? ""),
++  );
+     const byIndex = new Map();
+     const preferIds = new Set((input.outputMachineIds ?? []).filter((id) => id.length > 0));
+     for (const machine of owned) {
+@@ -381,6 +383,15 @@ export const observeReplicaSet = Effect.fn(function* (input) {
+     const machines = found.filter((machine) => machine !== undefined);
+     if (machines.length === 0)
+         return undefined;
+-    return toReplicaSet(machines.map((machine) => toReplica(machine, new Map())), input.appName, machines[0]?.name ?? "", machines[0]?.config?.services);
++  const volumesById = new Map();
++  for (const machine of machines) {
++    for (const mount of machine.config?.mounts ?? []) {
++      if (!mount.volume || volumesById.has(mount.volume)) continue;
++      const volume = yield* getVolumeById(input.appName, mount.volume);
++      if (volume) volumesById.set(mount.volume, volume);
++    }
++  }
++  return toReplicaSet(
++    machines.map((machine) => toReplica(machine, volumesById)), input.appName, machines[0]?.name ?? "", machines[0]?.config?.services);
+ });
+ //# sourceMappingURL=replicas.js.map
+\ No newline at end of file
+diff --git a/src/Fly/Machine.ts b/src/Fly/Machine.ts
+index 089e5ddf069ab5225b5b75d508b44e8a77768c01..0917b7d5be577fe55fd65a29afa4b1ebe7b7e697 100644
+--- a/src/Fly/Machine.ts
++++ b/src/Fly/Machine.ts
+@@ -167,6 +167,14 @@ export interface MachineProps {
+    * Fly proxy services (HTTP/TCP ports).
+    */
+   services?: MachineService[];
++  /** Existing physical IDs to adopt; a missing or different machine fails closed. */
++  existingMachineIds?: string[];
++  /** Exact path-to-volume mapping to preserve when adopting production disks. */
++  existingVolumeIds?: Record<string, string>;
++  /** Native Fly health probes, reconciled with the machine configuration. */
++  checks?: FlyMachineConfig["checks"];
++  /** Isolate recovery machines from production private DNS. */
++  skipDnsRegistration?: boolean;
+   /**
+    * Disks to attach. Each entry is a Fly volume group: `count`
+    * independent Volumes, one mounted on each replica. Also collected
+@@ -742,6 +750,8 @@ const buildConfig = (input: {
+   restart: FlyMachineRestart | undefined;
+   autoDestroy: boolean | undefined;
+   init: FlyMachineInit | undefined;
++  checks: FlyMachineConfig["checks"];
++  dns: FlyMachineConfig["dns"];
+ }): FlyMachineConfig => ({
+   image: input.image,
+   guest: input.guest,
+@@ -755,6 +765,8 @@ const buildConfig = (input: {
+   restart: input.restart,
+   auto_destroy: input.autoDestroy,
+   init: input.init,
++  checks: input.checks,
++  dns: input.dns,
+ });
+ 
+ const sameImage = (machine: FlyMachine, image: string) => {
+@@ -786,10 +798,18 @@ const sameEnv = (
+   desired: Record<string, string>,
+ ) => deepEqual(compactRecord(observed), desired);
+ 
++// Fly returns booleans for autostop even when the API accepted "off"/"stop".
++const comparableServices = (services: FlyMachineService[] | undefined) =>
++  (services ?? []).map((service) => ({
++    ...service,
++    autostop: typeof service.autostop === "boolean"
++      ? service.autostop ? "stop" : "off"
++      : service.autostop,
++  }));
+ const sameServices = (
+   observed: FlyMachineService[] | undefined,
+   desired: FlyMachineService[] | undefined,
+-) => deepEqual(observed ?? [], desired ?? [], { stripNullish: true });
++) => deepEqual(comparableServices(observed), comparableServices(desired), { stripNullish: true });
+ 
+ const sameMounts = (
+   observed: FlyMachineMount[] | undefined,
+@@ -850,10 +870,14 @@ const configDrifted = (
+     restart: FlyMachineRestart | undefined;
+     autoDestroy: boolean | undefined;
+     init: FlyMachineInit | undefined;
++  checks: FlyMachineConfig["checks"];
++  dns: FlyMachineConfig["dns"];
+   },
+ ) => {
+   const config = machine.config;
+   return (
++    !deepEqual(config?.checks ?? {}, desired.checks ?? {}, { stripNullish: true }) ||
++    !deepEqual(config?.dns ?? {}, desired.dns ?? {}, { stripNullish: true }) ||
+     !sameImage(machine, desired.image) ||
+     !sameGuest(config?.guest, desired.guest) ||
+     !sameEnv(config?.env, desired.env) ||
+@@ -922,10 +946,19 @@ export const MachineProvider = () =>
+         appName,
+         id,
+         type: "Fly.Machine",
+-        machineIds: machineIdsOf(output),
++        machineIds: machineIdsOf(output).length ? machineIdsOf(output) : olds?.existingMachineIds,
+         baseName: name,
+       });
++      const expected = olds?.existingMachineIds;
++      if (expected?.length && (!found || found.machineIds.length !== expected.length || expected.some((machineId) => !found.machineIds.includes(machineId)))) {
++        return yield* new MachineNotCreated({ appName: appName ?? "", name });
++      }
+       if (found === undefined) return undefined;
++      for (const [path, volumeId] of Object.entries(olds?.existingVolumeIds ?? {})) {
++        if (!found.replicas.every((replica) => replica.mounts.some((mount) => mount.path === path && mount.volumeId === volumeId && mount.sizeGb > 0))) {
++          return yield* new MachineNotCreated({ appName: appName ?? "", name });
++        }
++      }
+       return toAttrs(found);
+     }),
+ 
+@@ -936,6 +969,19 @@ export const MachineProvider = () =>
+ 
+     reconcile: Effect.fn(function* ({ id, news, output, bindings }) {
+       const props = news;
++      if (props.existingMachineIds?.length) {
++        const existing = yield* observeReplicaSet({ appName: appNameOf(props.app), id, type: "Fly.Machine", machineIds: props.existingMachineIds, baseName: props.name });
++        if (!existing || props.existingMachineIds.length !== (props.count ?? 1) || existing.machineIds.length !== props.existingMachineIds.length || props.existingMachineIds.some((machineId) => !existing.machineIds.includes(machineId)) || (props.name && existing.name !== props.name) || (props.region && existing.region !== props.region)) {
++          return yield* new MachineNotCreated({ appName: appNameOf(props.app) ?? "", name: props.name ?? id });
++        }
++        for (const [path, volumeId] of Object.entries(props.existingVolumeIds ?? {})) {
++          const disk = props.mounts?.find((mount) => mount.path === path);
++          if (!disk || !existing.replicas.every((replica) => replica.mounts.some((mount) => mount.path === path && mount.volumeId === volumeId && mount.sizeGb > 0 && (!disk.name || disk.name === mount.name)))) {
++            return yield* new MachineNotCreated({ appName: appNameOf(props.app) ?? "", name: props.name ?? id });
++          }
++        }
++        output = toAttrs(existing);
++      }
+       const appName = appNameOf(props.app) ?? output?.appName;
+       if (appName === undefined) {
+         return yield* new MachineAppNotResolved({
+@@ -978,6 +1024,8 @@ export const MachineProvider = () =>
+             metadata: desiredMetadata(props, desired.metadata),
+             restart,
+             autoDestroy: props.autoDestroy,
++            checks: props.checks,
++            dns: props.skipDnsRegistration ? { skip_registration: true } : undefined,
+             init,
+           }),
+         buildConfig: ({ mounts, metadata }) =>
+@@ -990,6 +1038,8 @@ export const MachineProvider = () =>
+             metadata: desiredMetadata(props, metadata),
+             restart,
+             autoDestroy: props.autoDestroy,
++            checks: props.checks,
++            dns: props.skipDnsRegistration ? { skip_registration: true } : undefined,
+             init,
+           }),
+       }).pipe(
+diff --git a/src/Fly/replicas.ts b/src/Fly/replicas.ts
+index cdafb606e9258dba16f8cca97cc454a22b8c311a..01c2cfe7f31b56c861cb471a74aff27c667e98f5 100644
+--- a/src/Fly/replicas.ts
++++ b/src/Fly/replicas.ts
+@@ -411,7 +411,9 @@ export const reconcileReplicas = Effect.fn(function* (input: {
+     ),
+   );
+   const listed = yield* listMachinesByApp(input.appName);
+-  const owned = listed.filter((machine) => isOwnedType(machine, input.type));
++  const owned = listed.filter((machine) =>
++    isOwnedType(machine, input.type) || (input.outputMachineIds ?? []).includes(machine.id ?? ""),
++  );
+   const byIndex = new Map<number, FlyMachine>();
+   const preferIds = new Set(
+     (input.outputMachineIds ?? []).filter((id) => id.length > 0),
+@@ -645,8 +647,16 @@ export const observeReplicaSet = Effect.fn(function* (input: {
+     (machine): machine is FlyMachine => machine !== undefined,
+   );
+   if (machines.length === 0) return undefined;
++  const volumesById = new Map<string, FlyVolume>();
++  for (const machine of machines) {
++    for (const mount of machine.config?.mounts ?? []) {
++      if (!mount.volume || volumesById.has(mount.volume)) continue;
++      const volume = yield* getVolumeById(input.appName, mount.volume);
++      if (volume) volumesById.set(mount.volume, volume);
++    }
++  }
+   return toReplicaSet(
+-    machines.map((machine) => toReplica(machine, new Map())),
++    machines.map((machine) => toReplica(machine, volumesById)),
+     input.appName,
+     machines[0]?.name ?? "",
+     machines[0]?.config?.services,

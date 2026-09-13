@@ -1,268 +1,135 @@
-# Companion PostgreSQL with Alchemy and Effect
+# Zoen infrastructure
 
-This stack provisions PostgreSQL 17 for documented application stages
-(`local`, `dev`, `staging`, and `prod`). It uses `alchemy@2.0.0-beta.76`, Effect
-`4.0.0-rc.112`, and the active Docker CLI context. Select a local Docker
-context before deploying. It creates three Alchemy resources: a cached image
-reference, a named volume, and a running container with a healthcheck. The
-published port is chosen by Docker and binds to `127.0.0.1`.
+`alchemy.run.ts` is the entry point for local development and hosted production.
+The hosted stack uses Alchemy 2.0.0-beta.76 native Fly, Docker and Cloudflare
+providers. PostgreSQL is self-hosted; no managed Postgres product is provisioned.
 
-Stage policy lives in an Effect layer (`companion-stage.ts` →
-`CompanionStagePolicy`): database name, env-file hint, tier
-(`ephemeral` / `shared-preprod` / `production`), and whether destroy retains the
-Postgres data volume (`prod` only). Staging and prod share the same resource
-graph; they differ by that policy layer, not by a second stack program.
+## Production layout
 
-## Stage isolation
+| Resource                 | Configuration                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Web + Eve                | companion-tironi, gru, 2 shared CPUs / 2 GB                                                                         |
+| PostgreSQL 17 + pgvector | companion-pg-prod, gru, 1 shared CPU / 1 GB, encrypted 10 GB volume                                                 |
+| Private Mem0 API         | zoen-memory-tironi, gru, 1 shared CPU / 1 GB                                                                        |
+| Memory persistence       | PostgreSQL database zoen_memory, separate login; original encrypted 3 GB volume retained for legacy import/recovery |
+| Backups                  | Private Tigris bucket, pgBackRest client-side AES-256 encryption, continuous WAL archive                            |
+| Domain                   | Cloudflare A + AAAA records and Fly TLS certificate for zoen.tironi.xyz                                             |
+| Infrastructure state     | Alchemy Cloudflare remote state, encrypted with a separate key in Cloudflare Secrets Store                          |
 
-Alchemy stages are isolated instances of the same stack program:
+All machines remain running. PostgreSQL and memory have no public service or IP.
+Fly private networking carries database and memory traffic. The memory database
+login cannot connect to the application database. Application credentials are
+Fly vault secrets; they do not enter Git, image layers or public CI artifacts.
 
-| Stage     | Database name           | Tier           | Destroy retains volume |
-| --------- | ----------------------- | -------------- | ---------------------- |
-| `local`   | `open_instinct_local`   | ephemeral      | no                     |
-| `dev`     | `open_instinct_dev`     | ephemeral      | no                     |
-| `staging` | `open_instinct_staging` | shared-preprod | no                     |
-| `prod`    | `open_instinct_prod`    | production     | **yes**                |
+This is one database machine, not automatic high availability. A host outage
+requires recovery, and an image update can cause a brief restart. Production
+operation here means measured recovery, monitored backups and controlled changes;
+it does not imply zero downtime or guaranteed zero data loss.
 
-- Each `--stage` gets its own state under `infrastructure/.alchemy`.
-- Docker **physical names** for the container and volume include the stage, so
-  stages never share Docker resources.
-- Destroying one stage does not touch another stage's container or volume.
-- `POSTGRES_DB` is `open_instinct_<stage>` (hyphens become underscores).
+## Deployment
 
-Always pass an explicit `--stage`. Do not run two deploys of the same stage
-concurrently. Do not adopt unrelated containers or volumes.
-
-## Deploy
-
-From the repository root, with Node 24 and Docker running:
+Use Node 24 and the pinned pnpm version, then install both packages:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm --dir infrastructure install --frozen-lockfile
-cp infrastructure/.env.example infrastructure/.env
-chmod 600 infrastructure/.env
+pnpm --dir infrastructure types:check
 ```
 
-Set `COMPANION_POSTGRES_PASSWORD` in `infrastructure/.env` before deployment
-(name only in docs — never commit or print real values). The example password is
-only for a disposable local database. The deployment prints stage metadata,
-database, container, volume, and selected port **without** printing the password.
+Production configuration lives in an ignored, mode-0600
+`infrastructure/.env.prod`. It contains the current application secret values,
+`COMPANION_POSTGRES_PASSWORD`, `FLY_API_TOKEN`, `ZOEN_DNS_API_TOKEN`, and
+`ZOEN_CLOUDFLARE_ZONE_ID`. The DNS token is restricted to tironi.xyz. Cloudflare
+OAuth is used locally for state bootstrap; CI uses the already-provisioned state
+service token and does not need an interactive login.
 
-Plan / deploy / destroy per stage:
+`ZOEN_RELEASE` must be the full tested Git commit SHA. Alchemy builds and pushes
+Linux amd64 images and deploys their immutable digests. Optional
+`ZOEN_POSTGRES_IMAGE`, `ZOEN_MEMORY_IMAGE`, and `ZOEN_WEB_IMAGE` digest references
+support adoption or a deliberate rollback. Keep the database on PostgreSQL major
+17; a major upgrade requires a separate migration and recovery plan.
 
 ```sh
-# local
-pnpm --dir infrastructure plan --stage local
-pnpm --dir infrastructure run deploy --stage local --yes
-# or from root: pnpm infra:deploy:local
-
-# dev
-pnpm --dir infrastructure plan --stage dev
-pnpm --dir infrastructure run deploy --stage dev --yes
-# or from root: pnpm infra:deploy:dev
-
-# staging
-pnpm --dir infrastructure plan --stage staging
-pnpm --dir infrastructure run deploy --stage staging --yes
-# or from root: pnpm infra:deploy:staging
-
-# prod (same Docker program; retain-on-destroy for the data volume)
-pnpm --dir infrastructure plan --stage prod
-pnpm --dir infrastructure run deploy --stage prod --yes
-# or from root: pnpm infra:deploy:prod
+cd infrastructure
+pnpm exec alchemy plan --stage prod --env-file "$PWD/.env.prod"
+pnpm exec alchemy deploy --stage prod --env-file "$PWD/.env.prod" --yes
+pnpm check:production
 ```
 
-Confirm readiness with
-`docker inspect <container> --format '{{.State.Health.Status}}'`; wait for
-`healthy` before migrating. Deployment completion alone does not wait for the
-healthcheck.
+Inspect the plan: existing production machines and volumes must never be
+replaced. Their exact IDs are pinned in `production.ts`. Changes to those IDs are
+recovery operations, not routine deployment. Apps, machines, volumes, backup
+storage and encryption keys are retained on stack removal. Do not use `--force`
+or `destroy` as a way to clear an adoption error.
 
-## Promote local → dev → staging → prod
+Local/dev stages use Docker through `local.ts`, preserving the existing
+CompanionLocal stack and volumes. They do not use the hosted production database.
+`alchemy.fly-postgres.run.ts` remains a compatibility alias for the unified stack.
 
-Stages are **isolated**. Promoting does **not** copy Docker volumes or row data
-between stages. Promotion means: deploy the target stage, point an env file at
-its `DATABASE_URL`, run migrations, build+start paired Next+Eve, then (for
-public channels) durable ingress + the D01 webhook script.
+## Backups and recovery
 
-Recommended forward path:
+pgBackRest archives WAL continuously (`archive_timeout=60s`). The target recovery
+point is about one minute plus upload delay while the archive is healthy; this
+is a target, not a guarantee during a storage/network outage. Backups run in UTC:
+full Sunday at 02:17, differential other days at 02:17, incremental other hours
+at :17. Three full backups retain at least two weekly intervals and the WAL
+needed to restore them. Fly volume snapshots are retained for 14 days as a second
+recovery path.
 
-1. **`local`** — day-to-day operator loop. Env file hint: `.env.local`.
-2. **`dev`** — separate disposable stack when you need isolation from local.
-   Env file hint: `.env.dev`.
-3. **`staging`** — shared pre-prod on the same host/Docker. Env file hint:
-   `.env.staging`. Validate migrations, `pnpm start` pairing, and
-   `pnpm ingress:set-webhooks -- --dry-run` here before touching prod webhooks.
-4. **`prod`** — production tier. Env file hint: `.env.prod`. Destroy retains the
-   Postgres volume so a mistaken `destroy --stage prod` does not wipe data
-   (Alchemy forgets tracking; the volume remains — re-adopt carefully).
+The database image supervises PostgreSQL and the cron scheduler. Failed initial
+backups do not take the database offline. The external CI probe checks the
+repository itself, fails if the newest backup is older than 150 minutes, and
+checks WAL archive failures, alerts at 85% disk usage, and probes the private
+Mem0 endpoint through the Fly network. GitHub workflow failure notifications provide the
+alert path. Cron execution on GitHub can be delayed; it is an operational probe,
+not a real-time availability SLA.
 
-Per-stage cutover checklist (env **names** only; no secret values):
+Run a real production recovery drill through Alchemy:
 
 ```sh
-# 1) Deploy Alchemy Postgres for the target stage (example: staging)
-pnpm infra:deploy:staging
-
-# 2) Wire DATABASE_URL / DATABASE_URL_UNPOOLED in the stage env file
-#    (.env.staging / .env.prod / …) using the returned loopback port + database.
-
-# 3) Migrate app + workflow against that database
-pnpm db:migrate
-pnpm workflow:migrate
-
-# 4) Pair Next + Eve on matching ports (rewrite port baked at build)
-EVE_NEXT_PRODUCTION_PORT=4274 pnpm build
-pnpm start --port 3000 --eve-port 4274
-
-# 5) For standing Telegram/Kapso: named tunnel (D01) then webhook script
-pnpm ingress:set-webhooks -- --dry-run
-# apply only after durable HTTPS is stable for COMPANION_PUBLIC_BASE_URL
-# pnpm ingress:set-webhooks
+cd infrastructure
+ZOEN_RECOVERY_RUN=manual-20260913 pnpm recover:production
 ```
 
-Do **not** redirect production Telegram/Kapso webhooks from staging validation
-until prod ingress and ownership binding for _this_ install are understood.
-See [`ingress/README.md`](ingress/README.md) (D01 durable ingress +
-`scripts/set-channel-webhooks.sh`).
+`recovery.run.ts` creates an encrypted temporary volume and an isolated machine,
+restores from the encrypted object repository, runs pg_amcheck, reports only
+structural results, and deletes both temporary resources. The machine has no
+public services and is excluded from application DNS. It cannot archive WAL or
+write backups. An optional `ZOEN_RESTORE_TARGET` timestamp selects point-in-time
+recovery. No step changes the live volume or promotes the test machine.
 
-## Wire DATABASE_URL
+For a real incident: restore to an isolated replacement first; verify integrity,
+application schema and memory; stop writes to the old instance; update the pinned
+machine/volume identities only after validation. Preserve the old volume until
+rollback is no longer required. Encryption keys and state-service access must be
+recoverable independently of the failed PostgreSQL machine.
 
-Use the returned `5432/tcp` port and the stage database name. Examples only —
-replace `<url-encoded-password>` and `<port>` with your values; do not commit
-real secrets.
+## CI
 
-`.env.local` (stage `local`, database `open_instinct_local`):
+`Checks` builds this exact PostgreSQL image, tests encrypted backup, WAL replay,
+pgvector recovery and role isolation, runs the real Mem0 adapter against pgvector,
+and runs application checks, database integration tests and the production build.
 
-```dotenv
-DATABASE_URL=postgresql://postgres:<url-encoded-password>@127.0.0.1:<port>/open_instinct_local
-DATABASE_URL_UNPOOLED=postgresql://postgres:<url-encoded-password>@127.0.0.1:<port>/open_instinct_local
-```
+`Zoen infrastructure` runs only on main, serializes deployments and requires a
+successful complete Checks run on the exact commit before a production deploy.
+Every deployment ends with an isolated production recovery drill. The same drill
+runs every Sunday at 04:47 UTC, after the scheduled full backup. Temporary recovery
+resources are removed even if verification fails.
+Its protected configuration is supplied by `ZOEN_PRODUCTION_ENV` and
+`ZOEN_ALCHEMY_STATE`. The uptime workflow uses an app-scoped
+`ZOEN_FLY_OPERATIONS_TOKEN`; no application secrets are required by its probe.
+Rotate Fly deploy/probe tokens before their 90-day expiry. State and backup
+credentials are never included in uploaded artifacts.
 
-`.env.dev` (stage `dev`, database `open_instinct_dev`):
+## Alchemy compatibility patch
 
-```dotenv
-DATABASE_URL=postgresql://postgres:<url-encoded-password>@127.0.0.1:<port>/open_instinct_dev
-DATABASE_URL_UNPOOLED=postgresql://postgres:<url-encoded-password>@127.0.0.1:<port>/open_instinct_dev
-```
-
-`.env.staging` (stage `staging`, database `open_instinct_staging`):
-
-```dotenv
-DATABASE_URL=postgresql://postgres:<url-encoded-password>@127.0.0.1:<port>/open_instinct_staging
-DATABASE_URL_UNPOOLED=postgresql://postgres:<url-encoded-password>@127.0.0.1:<port>/open_instinct_staging
-```
-
-`.env.prod` (stage `prod`, database `open_instinct_prod`):
-
-```dotenv
-DATABASE_URL=postgresql://postgres:<url-encoded-password>@127.0.0.1:<port>/open_instinct_prod
-DATABASE_URL_UNPOOLED=postgresql://postgres:<url-encoded-password>@127.0.0.1:<port>/open_instinct_prod
-```
-
-Continue with `pnpm db:migrate`, `pnpm workflow:migrate`, `pnpm build`, and
-`pnpm start` from the root [runtime setup](../docs/local-runtime-setup.md)
-(pointing the launcher at the matching env file). The separate
-benchmark/development supervisors still own their existing Compose databases.
-
-## Always-on Next + Eve ports
-
-Channel routes rewrite Next → Eve at **build** time. Keep ports paired:
-
-| Process | Default loopback | How to change                                                   |
-| ------- | ---------------- | --------------------------------------------------------------- |
-| Eve     | `4274`           | `EVE_NEXT_PRODUCTION_PORT` at **build** + `--eve-port` at start |
-| Next    | `3000`           | `pnpm start --port <n>`                                         |
-
-```sh
-EVE_NEXT_PRODUCTION_PORT=4274 pnpm build
-pnpm start --port 3000 --eve-port 4274
-```
-
-`scripts/start.ts` rejects Eve port mismatches against
-`.next/routes-manifest.json`. For Mac reboot survival, install the LaunchAgent
-examples under [`ingress/`](ingress/README.md) (`companion-runtime` +
-`companion-cloudflared`). Full pairing notes and the D01 webhook setter:
-[`ingress/README.md`](ingress/README.md).
-
-## State and destroy
-
-Alchemy stores ownership and resource state in the ignored
-`infrastructure/.alchemy` directory, including the serialized database password.
-The package commands set a restrictive umask and create/protect this directory
-with mode `0700` before invoking Alchemy. Use these package commands for local
-state operations. Keep the directory while the resources exist, and use the
-same stage for later commands. A container replacement retains the unchanged
-volume but can change the published port; update the application URLs when that
-happens.
-
-To remove a non-prod stage, including its database contents:
-
-```sh
-pnpm --dir infrastructure destroy --stage local --yes
-pnpm --dir infrastructure destroy --stage dev --yes
-pnpm --dir infrastructure destroy --stage staging --yes
-```
-
-For `prod`, destroy drops Alchemy tracking but **retains** the Docker data
-volume (`RemovalPolicy.retain`). Do not treat that as a wipe. Re-adopting or
-manually removing a retained volume is an operator action outside the default
-destroy path.
-
-The image cache is retained by Alchemy's Docker provider. Destroy removes the
-owned container (and, except for prod, the data volume) for that stage only. It
-does not reverse application migrations in another database or another stage.
-
-## Compatibility and evidence
-
-The infrastructure package has its own lockfile and workspace boundary. Alchemy's
-optional Drizzle peers differ from the application's versions. Its optional
-Cap'n Proto compiler also declares an older TypeScript peer. Neither integration
-is installed here. `types:check` uses the root's sole TS7 compiler; this package
-does not install another compiler or override peer ranges.
-
-The installed Docker API requires `{}` for the volume properties in this stack.
-Its healthcheck command is a shell string; copying `CMD-SHELL` from a Compose
-array into that string causes an unhealthy container. The initial failing plan
-and healthcheck were retained during validation and corrected using the published
-API, without patching Alchemy.
-
-Local validation exercised a healthy loopback-only container, an actual PostgreSQL
-write, container replacement preserving the row and volume, an unchanged redeploy,
-and removal of the owned container and volume. A fresh final stack accepted both
-application and Workflow migrations. These are local infrastructure checks, not
-cloud deployment, backup, concurrent-deployment, or production qualification.
-
-Sources: [Docker provider](https://alchemy.run/docker/),
-[stages](https://alchemy.run/environments/stages),
-[published package manifest](https://github.com/alchemy-run/alchemy/blob/v2.0.0-beta.76/packages/alchemy/package.json).
-
-## Hosted Fly compute (H01)
-
-Two Alchemy Postgres providers share `CompanionStagePolicy` database names
-(`open_instinct_<stage>`). **Neither** is Fly Managed Postgres / Alchemy
-`Fly.Postgres` MPG:
-
-| Path                     | Entry                                                        | When                                                |
-| ------------------------ | ------------------------------------------------------------ | --------------------------------------------------- |
-| Docker (A/B)             | [`alchemy.run.ts`](alchemy.run.ts)                           | Mac / prosumer / WireGuard host                     |
-| Fly.Machine + volume (C) | [`alchemy.fly-postgres.run.ts`](alchemy.fly-postgres.run.ts) | Off-Mac; private `.internal` for `companion-tironi` |
-
-Option C operator script: [`../scripts/fly-alchemy-pg.sh`](../scripts/fly-alchemy-pg.sh)
-(`plan` / `deploy` / `status` / `url-shape` / `verify`). Root shortcuts:
-`pnpm infra:fly-pg:plan:prod`, `pnpm infra:fly-pg:deploy:prod`.
-
-For always-on **Next+Eve on Fly**, follow
-[`docs/ops/hosted-fly.md`](../docs/ops/hosted-fly.md) (`fly.toml`, root
-`Dockerfile`, `scripts/fly-companion.sh`). Mac LaunchAgent + Docker Alchemy
-remain valid for optional local/prosumer mode.
-
-## Durable public HTTPS (Telegram / Kapso)
-
-Alchemy here provisions Postgres only. For always-on public HTTPS to
-`/api/channels/telegram` and `/api/channels/kapso`, use the named Cloudflare
-Tunnel + LaunchAgent recipe under [`ingress/`](ingress/README.md) (D01). Prefer
-that path over ephemeral `trycloudflare` tunnels. Interim Enzo live public base
-(2026-09-10): `https://companion.tironi.xyz` (zoen.space Companion cutover
-deferred; Fly `app.zoen.space` product DNS stays). Webhook URL updates:
-`pnpm ingress:set-webhooks` → `scripts/set-channel-webhooks.sh` (env names only;
-never prints secrets).
+`patches/alchemy@2.0.0-beta.76.patch` extends the native Fly.Machine provider with
+explicit existing-machine/volume adoption and machine checks. It verifies the
+physical identities before mutation, reads actual volume metadata, and refuses
+an empty replacement if an expected machine or volume is missing. This addresses
+adoption of pre-existing machines without Alchemy labels. It also compares
+normalized autostop values: the API returns `false` for `"off"`, and comparing
+them literally causes unnecessary restarts. Remove the patch only when an
+upstream version supports these behaviors and the adoption/recovery
+proofs still pass. The provider remains native; provisioning is not a shell
+wrapper around flyctl.

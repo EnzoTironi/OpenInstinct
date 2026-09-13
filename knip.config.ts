@@ -62,7 +62,12 @@ export default {
       project: ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "!infrastructure/**"],
     },
     infrastructure: {
-      entry: ["alchemy.run.ts", "alchemy.fly-postgres.run.ts"],
+      entry: [
+        "alchemy.run.ts",
+        "alchemy.fly-postgres.run.ts",
+        "recovery.run.ts",
+        "operations.ts",
+      ],
       // POSIX shell builtin used to protect local Alchemy state.
       ignoreBinaries: ["umask"],
     },

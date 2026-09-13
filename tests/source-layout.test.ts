@@ -4,7 +4,11 @@ import { describe, expect, it } from "vitest";
 
 function directories(directory: string) {
   return readdirSync(directory)
-    .filter((entry) => statSync(join(directory, entry)).isDirectory())
+    .filter(
+      (entry) =>
+        statSync(join(directory, entry)).isDirectory() &&
+        readdirSync(join(directory, entry)).length > 0
+    )
     .toSorted();
 }
 
@@ -30,7 +34,6 @@ describe("source layout", () => {
       "auth",
       "browser",
       "components",
-      "hooks",
       "i18n",
       "trpc",
       "workspaces",

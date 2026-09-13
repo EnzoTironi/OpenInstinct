@@ -6,7 +6,6 @@ name: Companion uptime
 
 on:
   schedule:
-    # GitHub may delay cron under load; Mac LaunchAgent is the local backup.
     - cron: "*/10 * * * *"
   workflow_dispatch:
 
@@ -19,7 +18,7 @@ permissions:
 
 jobs:
   probe:
-    name: Probe companion.tironi.xyz
+    name: Probe zoen.tironi.xyz
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -32,5 +31,22 @@ jobs:
           # GitHub workflow-failure notifications for the workflow author.
           COMPANION_UPTIME_ALERT_URL: ${{ secrets.COMPANION_UPTIME_ALERT_URL }}
           COMPANION_UPTIME_NTFY_TOPIC: ${{ secrets.COMPANION_UPTIME_NTFY_TOPIC }}
-          COMPANION_UPTIME_BASE_URL: https://companion.tironi.xyz
+          COMPANION_UPTIME_BASE_URL: https://zoen.tironi.xyz
         run: bash scripts/companion-uptime-probe.sh --quiet
+
+  postgres:
+    name: Verify PostgreSQL backup, disk and private memory
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - run: pnpm --dir infrastructure install --frozen-lockfile
+      - name: Verify actual backup repository
+        working-directory: infrastructure
+        env:
+          FLY_API_TOKEN: ${{ secrets.ZOEN_FLY_OPERATIONS_TOKEN }}
+        run: node operations.ts check
