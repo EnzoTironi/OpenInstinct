@@ -119,10 +119,43 @@ index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a6c8ead1dd6b71307d1aabf4223d87c2
              }),
          }).pipe(Effect.catchTag("Fly.ReplicaNotCreated", (error) => Effect.fail(new MachineNotCreated({
 diff --git a/lib/Fly/replicas.js b/lib/Fly/replicas.js
-index f0a10b019dd41b77007e0df661e8874bd6ce1218..9a3765b8fa7dea0640b9cf2ad32a34ec736eed67 100644
+index f0a10b019dd41b77007e0df661e8874bd6ce1218..9b08e7c48e9e2d9765cbe5da01b63e5186cf0dd4 100644
 --- a/lib/Fly/replicas.js
 +++ b/lib/Fly/replicas.js
-@@ -206,7 +206,9 @@ export const reconcileReplicas = Effect.fn(function* (input) {
+@@ -72,10 +72,10 @@ export const waitStarted = (appName, machineId) => machines
+     timeout: WAIT_TIMEOUT_SECONDS,
+ })
+     .pipe(Effect.retry({
+-    times: 6,
+-    schedule: waitBackoff,
++    times: 30,
++    schedule: Schedule.spaced("2 seconds"),
+     while: (e) => e._tag === "GatewayTimeout",
+-}), Effect.timeout("50 seconds"));
++}), Effect.timeout("3 minutes"));
+ export const waitDestroyed = (appName, machineId) => machines
+     .waitMachine({
+     app_name: appName,
+@@ -93,13 +93,16 @@ export const ensureStarted = Effect.fn(function* (appName, machine, skipLaunch)
+     if (machineId === undefined || skipLaunch)
+         return machine;
+     const state = machine.state;
+-    if (state !== "started" && state !== "starting") {
++    // Create/update auto-launch; transient states must finish before another start.
++    if (state === "created" || state === "stopped" || state === "suspended" || state === "failed") {
+         yield* machines
+             .startMachine({
+             app_name: appName,
+             machine_id: machineId,
+         })
+-            .pipe(Effect.catchTag(["NotFound", "Conflict"], () => Effect.void));
++            .pipe(Effect.catchTag(["NotFound", "Conflict"], () => Effect.void), Effect.catchTag("UnknownFlyIoError", (error) => error.message?.includes("machine getting replaced, refusing to start")
++            ? Effect.void
++            : Effect.fail(error)));
+     }
+     yield* waitStarted(appName, machineId);
+     return (yield* getMachineById(appName, machineId)) ?? machine;
+@@ -206,7 +209,9 @@ export const reconcileReplicas = Effect.fn(function* (input) {
      const alchemy = yield* createMachineMetadata(input.id, input.type);
      const desiredNames = new Set(Array.from({ length: input.count }, (_, index) => replicaMachineName(input.baseName, index, input.count)));
      const listed = yield* listMachinesByApp(input.appName);
@@ -133,7 +166,7 @@ index f0a10b019dd41b77007e0df661e8874bd6ce1218..9a3765b8fa7dea0640b9cf2ad32a34ec
      const byIndex = new Map();
      const preferIds = new Set((input.outputMachineIds ?? []).filter((id) => id.length > 0));
      for (const machine of owned) {
-@@ -381,6 +383,15 @@ export const observeReplicaSet = Effect.fn(function* (input) {
+@@ -381,6 +386,15 @@ export const observeReplicaSet = Effect.fn(function* (input) {
      const machines = found.filter((machine) => machine !== undefined);
      if (machines.length === 0)
          return undefined;
@@ -150,7 +183,6 @@ index f0a10b019dd41b77007e0df661e8874bd6ce1218..9a3765b8fa7dea0640b9cf2ad32a34ec
 +    machines.map((machine) => toReplica(machine, volumesById)), input.appName, machines[0]?.name ?? "", machines[0]?.config?.services);
  });
  //# sourceMappingURL=replicas.js.map
-\ No newline at end of file
 diff --git a/src/Fly/Machine.ts b/src/Fly/Machine.ts
 index 089e5ddf069ab5225b5b75d508b44e8a77768c01..0917b7d5be577fe55fd65a29afa4b1ebe7b7e697 100644
 --- a/src/Fly/Machine.ts
@@ -283,10 +315,49 @@ index 089e5ddf069ab5225b5b75d508b44e8a77768c01..0917b7d5be577fe55fd65a29afa4b1eb
            }),
        }).pipe(
 diff --git a/src/Fly/replicas.ts b/src/Fly/replicas.ts
-index cdafb606e9258dba16f8cca97cc454a22b8c311a..01c2cfe7f31b56c861cb471a74aff27c667e98f5 100644
+index cdafb606e9258dba16f8cca97cc454a22b8c311a..770404be1d4d884c7398cd56b64603c68dde9e0a 100644
 --- a/src/Fly/replicas.ts
 +++ b/src/Fly/replicas.ts
-@@ -411,7 +411,9 @@ export const reconcileReplicas = Effect.fn(function* (input: {
+@@ -184,11 +184,11 @@ export const waitStarted = (appName: string, machineId: string) =>
+     })
+     .pipe(
+       Effect.retry({
+-        times: 6,
+-        schedule: waitBackoff,
++        times: 30,
++        schedule: Schedule.spaced("2 seconds"),
+         while: (e) => e._tag === "GatewayTimeout",
+       }),
+-      Effect.timeout("50 seconds"),
++      Effect.timeout("3 minutes"),
+     );
+ 
+ export const waitDestroyed = (appName: string, machineId: string) =>
+@@ -217,13 +217,21 @@ export const ensureStarted = Effect.fn(function* (
+   const machineId = machine.id;
+   if (machineId === undefined || skipLaunch) return machine;
+   const state = machine.state;
+-  if (state !== "started" && state !== "starting") {
++  // Create/update auto-launch; transient states must finish before another start.
++  if (state === "created" || state === "stopped" || state === "suspended" || state === "failed") {
+     yield* machines
+       .startMachine({
+         app_name: appName,
+         machine_id: machineId,
+       })
+-      .pipe(Effect.catchTag(["NotFound", "Conflict"], () => Effect.void));
++      .pipe(
++        Effect.catchTag(["NotFound", "Conflict"], () => Effect.void),
++        Effect.catchTag("UnknownFlyIoError", (error) =>
++          error.message?.includes("machine getting replaced, refusing to start")
++            ? Effect.void
++            : Effect.fail(error),
++        ),
++      );
+   }
+   yield* waitStarted(appName, machineId);
+   return (yield* getMachineById(appName, machineId)) ?? machine;
+@@ -411,7 +419,9 @@ export const reconcileReplicas = Effect.fn(function* (input: {
      ),
    );
    const listed = yield* listMachinesByApp(input.appName);
@@ -297,7 +368,7 @@ index cdafb606e9258dba16f8cca97cc454a22b8c311a..01c2cfe7f31b56c861cb471a74aff27c
    const byIndex = new Map<number, FlyMachine>();
    const preferIds = new Set(
      (input.outputMachineIds ?? []).filter((id) => id.length > 0),
-@@ -645,8 +647,16 @@ export const observeReplicaSet = Effect.fn(function* (input: {
+@@ -645,8 +655,16 @@ export const observeReplicaSet = Effect.fn(function* (input: {
      (machine): machine is FlyMachine => machine !== undefined,
    );
    if (machines.length === 0) return undefined;

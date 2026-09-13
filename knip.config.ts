@@ -67,6 +67,7 @@ export default {
         "alchemy.fly-postgres.run.ts",
         "recovery.run.ts",
         "operations.ts",
+        "tests/*.test.ts",
       ],
       // POSIX shell builtin used to protect local Alchemy state.
       ignoreBinaries: ["umask"],
