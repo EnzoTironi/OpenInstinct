@@ -92,7 +92,7 @@ export const hosted = Effect.gen(function* () {
         port: 5432,
         interval: "15s",
         timeout: "5s",
-        grace_period: "60s",
+        grace_period: "1m0s",
       },
     },
     restart: { policy: "always" },

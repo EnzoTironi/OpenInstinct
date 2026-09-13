@@ -127,7 +127,9 @@ credentials are never included in uploaded artifacts.
 explicit existing-machine/volume adoption and machine checks. It verifies the
 physical identities before mutation, reads actual volume metadata, and refuses
 an empty replacement if an expected machine or volume is missing. This addresses
-adoption of pre-existing machines without Alchemy labels. Remove the patch only
-when an upstream version supports these behaviors and the adoption/recovery
+adoption of pre-existing machines without Alchemy labels. It also compares
+normalized autostop values: the API returns `false` for `"off"`, and comparing
+them literally causes unnecessary restarts. Remove the patch only when an
+upstream version supports these behaviors and the adoption/recovery
 proofs still pass. The provider remains native; provisioning is not a shell
 wrapper around flyctl.

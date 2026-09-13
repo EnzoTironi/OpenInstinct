@@ -21,7 +21,7 @@ index ffdcb982af368e93be45f521f496085abd375ba7..b576f1a9af7ee31c25977033e654240a
       * Disks to attach. Each entry is a Fly volume group: `count`
       * independent Volumes, one mounted on each replica. Also collected
 diff --git a/lib/Fly/Machine.js b/lib/Fly/Machine.js
-index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a89701459cbc7c2e57013abd1ad0fa8b4c4a84e4 100644
+index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a6c8ead1dd6b71307d1aabf4223d87c253d52d13 100644
 --- a/lib/Fly/Machine.js
 +++ b/lib/Fly/Machine.js
 @@ -461,6 +461,8 @@ const buildConfig = (input) => ({
@@ -33,7 +33,20 @@ index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a89701459cbc7c2e57013abd1ad0fa8b
  });
  const sameImage = (machine, image) => {
      const configImage = machine.config?.image;
-@@ -506,7 +508,9 @@ const metadataChanged = (observed, desired) => {
+@@ -483,7 +485,11 @@ const sameGuest = (observed, desired) => (observed?.cpu_kind ?? DEFAULT_CPU_KIND
+     observed?.gpu_kind === desired.gpu_kind &&
+     observed?.gpus === desired.gpus;
+ const sameEnv = (observed, desired) => deepEqual(compactRecord(observed), desired);
+-const sameServices = (observed, desired) => deepEqual(observed ?? [], desired ?? [], { stripNullish: true });
++const comparableServices = (services) => (services ?? []).map((service) => ({
++    ...service,
++    autostop: typeof service.autostop === "boolean" ? service.autostop ? "stop" : "off" : service.autostop,
++}));
++const sameServices = (observed, desired) => deepEqual(comparableServices(observed), comparableServices(desired), { stripNullish: true });
+ const sameMounts = (observed, desired) => {
+     const key = (mount) => `${mount.volume ?? ""}:${mount.path ?? ""}`;
+     const left = [...(observed ?? [])].map(key).sort();
+@@ -506,7 +512,9 @@ const metadataChanged = (observed, desired) => {
  };
  const configDrifted = (machine, desired) => {
      const config = machine.config;
@@ -44,7 +57,7 @@ index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a89701459cbc7c2e57013abd1ad0fa8b
          !sameGuest(config?.guest, desired.guest) ||
          !sameEnv(config?.env, desired.env) ||
          !sameServices(config?.services, desired.services) ||
-@@ -566,11 +570,19 @@ export const MachineProvider = () => Provider.succeed(Machine, {
+@@ -566,11 +574,19 @@ export const MachineProvider = () => Provider.succeed(Machine, {
              appName,
              id,
              type: "Fly.Machine",
@@ -67,7 +80,7 @@ index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a89701459cbc7c2e57013abd1ad0fa8b
          return toAttrs(found);
      }),
      list: Effect.fn(function* () {
-@@ -579,6 +591,19 @@ export const MachineProvider = () => Provider.succeed(Machine, {
+@@ -579,6 +595,19 @@ export const MachineProvider = () => Provider.succeed(Machine, {
      }),
      reconcile: Effect.fn(function* ({ id, news, output, bindings }) {
          const props = news;
@@ -87,7 +100,7 @@ index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a89701459cbc7c2e57013abd1ad0fa8b
          const appName = appNameOf(props.app) ?? output?.appName;
          if (appName === undefined) {
              return yield* new MachineAppNotResolved({
-@@ -617,6 +642,8 @@ export const MachineProvider = () => Provider.succeed(Machine, {
+@@ -617,6 +646,8 @@ export const MachineProvider = () => Provider.succeed(Machine, {
                  metadata: desiredMetadata(props, desired.metadata),
                  restart,
                  autoDestroy: props.autoDestroy,
@@ -96,7 +109,7 @@ index b1d6401805b2a2422465ea76f20f311cdbdcc2d1..a89701459cbc7c2e57013abd1ad0fa8b
                  init,
              }),
              buildConfig: ({ mounts, metadata }) => buildConfig({
-@@ -628,6 +655,8 @@ export const MachineProvider = () => Provider.succeed(Machine, {
+@@ -628,6 +659,8 @@ export const MachineProvider = () => Provider.succeed(Machine, {
                  metadata: desiredMetadata(props, metadata),
                  restart,
                  autoDestroy: props.autoDestroy,
@@ -139,7 +152,7 @@ index f0a10b019dd41b77007e0df661e8874bd6ce1218..9a3765b8fa7dea0640b9cf2ad32a34ec
  //# sourceMappingURL=replicas.js.map
 \ No newline at end of file
 diff --git a/src/Fly/Machine.ts b/src/Fly/Machine.ts
-index 089e5ddf069ab5225b5b75d508b44e8a77768c01..8e6c755ee1fd9852f9b1080a18f85348cd1b872f 100644
+index 089e5ddf069ab5225b5b75d508b44e8a77768c01..0917b7d5be577fe55fd65a29afa4b1ebe7b7e697 100644
 --- a/src/Fly/Machine.ts
 +++ b/src/Fly/Machine.ts
 @@ -167,6 +167,14 @@ export interface MachineProps {
@@ -175,7 +188,27 @@ index 089e5ddf069ab5225b5b75d508b44e8a77768c01..8e6c755ee1fd9852f9b1080a18f85348
  });
  
  const sameImage = (machine: FlyMachine, image: string) => {
-@@ -850,10 +862,14 @@ const configDrifted = (
+@@ -786,10 +798,18 @@ const sameEnv = (
+   desired: Record<string, string>,
+ ) => deepEqual(compactRecord(observed), desired);
+ 
++// Fly returns booleans for autostop even when the API accepted "off"/"stop".
++const comparableServices = (services: FlyMachineService[] | undefined) =>
++  (services ?? []).map((service) => ({
++    ...service,
++    autostop: typeof service.autostop === "boolean"
++      ? service.autostop ? "stop" : "off"
++      : service.autostop,
++  }));
+ const sameServices = (
+   observed: FlyMachineService[] | undefined,
+   desired: FlyMachineService[] | undefined,
+-) => deepEqual(observed ?? [], desired ?? [], { stripNullish: true });
++) => deepEqual(comparableServices(observed), comparableServices(desired), { stripNullish: true });
+ 
+ const sameMounts = (
+   observed: FlyMachineMount[] | undefined,
+@@ -850,10 +870,14 @@ const configDrifted = (
      restart: FlyMachineRestart | undefined;
      autoDestroy: boolean | undefined;
      init: FlyMachineInit | undefined;
@@ -190,7 +223,7 @@ index 089e5ddf069ab5225b5b75d508b44e8a77768c01..8e6c755ee1fd9852f9b1080a18f85348
      !sameImage(machine, desired.image) ||
      !sameGuest(config?.guest, desired.guest) ||
      !sameEnv(config?.env, desired.env) ||
-@@ -922,10 +938,19 @@ export const MachineProvider = () =>
+@@ -922,10 +946,19 @@ export const MachineProvider = () =>
          appName,
          id,
          type: "Fly.Machine",
@@ -211,7 +244,7 @@ index 089e5ddf069ab5225b5b75d508b44e8a77768c01..8e6c755ee1fd9852f9b1080a18f85348
        return toAttrs(found);
      }),
  
-@@ -936,6 +961,19 @@ export const MachineProvider = () =>
+@@ -936,6 +969,19 @@ export const MachineProvider = () =>
  
      reconcile: Effect.fn(function* ({ id, news, output, bindings }) {
        const props = news;
@@ -231,7 +264,7 @@ index 089e5ddf069ab5225b5b75d508b44e8a77768c01..8e6c755ee1fd9852f9b1080a18f85348
        const appName = appNameOf(props.app) ?? output?.appName;
        if (appName === undefined) {
          return yield* new MachineAppNotResolved({
-@@ -978,6 +1016,8 @@ export const MachineProvider = () =>
+@@ -978,6 +1024,8 @@ export const MachineProvider = () =>
              metadata: desiredMetadata(props, desired.metadata),
              restart,
              autoDestroy: props.autoDestroy,
@@ -240,7 +273,7 @@ index 089e5ddf069ab5225b5b75d508b44e8a77768c01..8e6c755ee1fd9852f9b1080a18f85348
              init,
            }),
          buildConfig: ({ mounts, metadata }) =>
-@@ -990,6 +1030,8 @@ export const MachineProvider = () =>
+@@ -990,6 +1038,8 @@ export const MachineProvider = () =>
              metadata: desiredMetadata(props, metadata),
              restart,
              autoDestroy: props.autoDestroy,

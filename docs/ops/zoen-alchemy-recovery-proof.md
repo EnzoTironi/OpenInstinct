@@ -26,5 +26,10 @@ The live Mem0 service reports the PostgreSQL backend, completed its atomic legac
 import and uses a login without superuser privileges or access to the application
 database. The original memory volume remains available for recovery.
 
+Live inference, semantic search, receipt replay and deletion passed using a
+synthetic preference and the actual model providers; the test memory was removed.
+Reapplying the Alchemy stack preserved all three machine instance IDs, verifying
+that an unchanged deployment does not restart the running services.
+
 See the [infrastructure runbook](../../infrastructure/README.md) for deployment,
 the weekly and post-deployment recovery jobs, backup retention and incident steps.
