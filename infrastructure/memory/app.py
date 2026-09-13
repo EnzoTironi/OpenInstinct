@@ -1,10 +1,8 @@
 """Private Mem0 adapter. Zoen resolves membership; this service never accepts users directly."""
 
 import hashlib
-import json
 import os
 import secrets
-import sqlite3
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -16,6 +14,9 @@ from fastapi.responses import JSONResponse
 from mem0 import Memory
 from mem0.memory.storage import SQLiteManager
 from pydantic import BaseModel, ConfigDict, Field
+from psycopg.types.json import Jsonb
+from ledger import MemoryLedger
+from migrate_legacy import migrate_legacy
 
 REVISION = "c7ee362aff94a369af70f13f2b4f853f6793ff4c"
 lock = threading.RLock()
@@ -30,9 +31,10 @@ async def lifespan(app: FastAPI):
     data.mkdir(parents=True, exist_ok=True, mode=0o700)
     config = {
         "version": "v1.1",
-        "vector_store": {"provider": "qdrant", "config": {
-            "path": str(data / "vectors"), "collection_name": "zoen_memories",
-            "embedding_model_dims": 1536, "on_disk": True,
+        "vector_store": {"provider": "pgvector", "config": {
+            "connection_string": os.environ["ZOEN_MEMORY_DATABASE_URL"],
+            "collection_name": "zoen_memories", "embedding_model_dims": 1536,
+            "minconn": 1, "maxconn": 4, "hnsw": True,
         }},
         "llm": {"provider": "openai", "config": {
             "api_key": os.environ["OPENROUTER_API_KEY"],
@@ -50,18 +52,17 @@ async def lifespan(app: FastAPI):
         "history_db_path": ":memory:",
     }
     app.state.memory = Memory.from_config(config)
+    app.state.memory.vector_store.create_col()
     app.state.memory.llm.client = app.state.memory.llm.client.with_options(timeout=20.0, max_retries=0)
     app.state.memory.embedding_model.client = app.state.memory.embedding_model.client.with_options(timeout=10.0, max_retries=0)
     app.state.key = key
-    app.state.ledger = data / "operations.db"
-    with sqlite3.connect(app.state.ledger) as db:
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("""CREATE TABLE IF NOT EXISTS operations (
-            namespace TEXT NOT NULL, operation_id TEXT NOT NULL,
-            request_hash TEXT NOT NULL, result TEXT,
-            PRIMARY KEY(namespace, operation_id))""")
-    yield
-    app.state.memory.close()
+    app.state.ledger = MemoryLedger(os.environ["ZOEN_MEMORY_DATABASE_URL"])
+    try:
+        migrate_legacy(data, app.state.ledger)
+        yield
+    finally:
+        app.state.memory.close()
+        app.state.ledger.close()
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -128,27 +129,33 @@ def apply_operation(memory, request, namespace):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "backend": "mem0", "revision": REVISION}
+    try:
+        if not app.state.ledger.healthy():
+            raise RuntimeError("Memory collection unavailable")
+        return {"ok": True, "backend": "mem0-pgvector", "revision": REVISION}
+    except Exception:
+        raise HTTPException(503, "memory_unavailable") from None
 
 
 @app.post("/v1/memory")
 def memory_operation(request: MemoryRequest):
     namespace = str(request.namespace)
     memory = app.state.memory
-    # The embedded store has a single writer. Run exactly one Uvicorn worker.
+    # The local lock protects Mem0's auxiliary in-memory history. PostgreSQL
+    # serializes a namespace across replicas and survives process restarts.
     with lock:
         try:
-            if request.action == "list":
-                return {"results": [serialize(item) for item in rows(memory.get_all(filters={"user_id": namespace}, top_k=200))]}
-            if request.action == "search":
-                if not request.text:
-                    raise HTTPException(422, "text_required")
-                return {"results": [serialize(item) for item in rows(memory.search(request.text, filters={"user_id": namespace}, top_k=8))]}
-            if not request.operation_id:
-                raise HTTPException(422, "operation_id_required")
-            digest = hashlib.sha256(request.model_dump_json().encode()).hexdigest()
-            with sqlite3.connect(app.state.ledger) as db:
-                row = db.execute("SELECT request_hash, result FROM operations WHERE namespace=? AND operation_id=?",
+            with app.state.ledger.namespace(namespace) as db:
+                if request.action == "list":
+                    return {"results": [serialize(item) for item in rows(memory.get_all(filters={"user_id": namespace}, top_k=200))]}
+                if request.action == "search":
+                    if not request.text:
+                        raise HTTPException(422, "text_required")
+                    return {"results": [serialize(item) for item in rows(memory.search(request.text, filters={"user_id": namespace}, top_k=8))]}
+                if not request.operation_id:
+                    raise HTTPException(422, "operation_id_required")
+                digest = hashlib.sha256(request.model_dump_json().encode()).hexdigest()
+                row = db.execute("SELECT request_hash, result FROM memory_operations WHERE namespace=%s AND operation_id=%s",
                                  (namespace, request.operation_id)).fetchone()
                 if row:
                     if row[0] != digest:
@@ -156,14 +163,13 @@ def memory_operation(request: MemoryRequest):
                     if row[1] is None:
                         # A crash may have happened after a write. Never blindly ingest twice.
                         raise HTTPException(409, "operation_needs_reconciliation")
-                    return json.loads(row[1])
+                    return row[1]
                 if request.action == "remember" and len(rows(memory.get_all(filters={"user_id": namespace}, top_k=200))) >= 200:
                     raise HTTPException(409, "memory_limit")
-                db.execute("INSERT INTO operations VALUES (?, ?, ?, NULL)", (namespace, request.operation_id, digest))
-                db.commit()
+                db.execute("INSERT INTO memory_operations VALUES (%s, %s, %s, NULL)", (namespace, request.operation_id, digest))
                 result = apply_operation(memory, request, namespace)
-                db.execute("UPDATE operations SET result=? WHERE namespace=? AND operation_id=?",
-                           (json.dumps(result), namespace, request.operation_id))
+                db.execute("UPDATE memory_operations SET result=%s WHERE namespace=%s AND operation_id=%s",
+                           (Jsonb(result), namespace, request.operation_id))
                 return result
         except HTTPException:
             raise

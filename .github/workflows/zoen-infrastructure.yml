@@ -1,0 +1,84 @@
+name: Zoen infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Infrastructure operation
+        required: true
+        type: choice
+        options: [plan, deploy, recovery]
+        default: plan
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: zoen-production-infrastructure
+  cancel-in-progress: false
+
+jobs:
+  infrastructure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir infrastructure install --frozen-lockfile
+      - name: Require all CI checks on this exact commit
+        if: inputs.operation == 'deploy'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh run list --workflow checks.yml --commit "$GITHUB_SHA" --status success --json databaseId --jq 'length')
+          test "$count" -gt 0 || { echo 'The complete Checks workflow must pass on this commit before deployment.'; exit 1; }
+      - name: Install protected deployment configuration
+        env:
+          ZOEN_PRODUCTION_ENV: ${{ secrets.ZOEN_PRODUCTION_ENV }}
+          ZOEN_ALCHEMY_STATE: ${{ secrets.ZOEN_ALCHEMY_STATE }}
+        run: |
+          node --input-type=module <<'JS'
+          import { mkdirSync, writeFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          if (!process.env.ZOEN_PRODUCTION_ENV || !process.env.ZOEN_ALCHEMY_STATE) throw new Error('Production configuration is missing');
+          const directory = join(process.env.HOME, '.alchemy');
+          mkdirSync(join(directory, 'credentials', 'ci'), { recursive: true, mode: 0o700 });
+          writeFileSync(join(directory, 'profiles.json'), JSON.stringify({version: 1, profiles: {ci: {Fly: {method: 'env'}, Cloudflare: {method: 'env'}}}}), {mode: 0o600});
+          writeFileSync(join(directory, 'credentials', 'ci', 'cloudflare-state-store.json'), process.env.ZOEN_ALCHEMY_STATE, {mode: 0o600});
+          writeFileSync('infrastructure/.env.prod', process.env.ZOEN_PRODUCTION_ENV + '\nZOEN_RELEASE=' + process.env.GITHUB_SHA + '\nZOEN_RECOVERY_RUN=ci-' + process.env.GITHUB_RUN_ID + '-' + process.env.GITHUB_RUN_ATTEMPT + '\n', {mode: 0o600});
+          JS
+      - name: Check the exact source before deployment
+        if: inputs.operation == 'deploy'
+        run: |
+          pnpm check --concurrency=1
+          pnpm --dir infrastructure types:check
+          docker build -t zoen-postgres-proof:pg17-backup infrastructure/postgres
+          bash infrastructure/postgres/test-recovery.sh
+      - name: Plan infrastructure
+        if: inputs.operation != 'recovery'
+        working-directory: infrastructure
+        run: pnpm exec alchemy plan --stage prod --env-file "$PWD/.env.prod"
+      - name: Deploy the tested release
+        if: inputs.operation == 'deploy'
+        working-directory: infrastructure
+        run: pnpm exec alchemy deploy --stage prod --env-file "$PWD/.env.prod" --yes
+      - name: Prove recovery on an isolated temporary machine
+        if: inputs.operation == 'recovery'
+        working-directory: infrastructure
+        run: pnpm exec alchemy deploy recovery.run.ts --stage prod --env-file "$PWD/.env.prod" --yes
+      - name: Verify database backup and public service
+        if: inputs.operation != 'plan'
+        run: |
+          pnpm --dir infrastructure check:production
+          curl --fail --show-error --max-time 30 https://zoen.tironi.xyz/eve/v1/health
+      - name: Remove runner credentials
+        if: always()
+        run: rm -f infrastructure/.env.prod "$HOME/.alchemy/credentials/ci/cloudflare-state-store.json"
