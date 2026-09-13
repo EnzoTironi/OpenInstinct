@@ -30,7 +30,13 @@ export const releaseImage = Effect.fn(function* (
     name: `registry.fly.io/${appName}`,
     tag: release,
     registry: { server: "registry.fly.io", username: "x", password: token },
-    build: { context, platform: "linux/amd64" },
+    build: {
+      context,
+      platform: "linux/amd64",
+      // Attestation timestamps otherwise change the OCI index on a cached
+      // build, making an unchanged plan restart the database and memory.
+      options: ["--provenance=false"],
+    },
   });
   return image.repoDigest.pipe(
     Output.map((digest) => {
