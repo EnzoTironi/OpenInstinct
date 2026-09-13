@@ -28,6 +28,8 @@ jobs:
     environment: production
     env:
       OPERATION: ${{ github.event_name == 'schedule' && 'recovery' || inputs.operation }}
+      # The CLI resolves its profile before loading --env-file.
+      ALCHEMY_PROFILE: ci
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -55,7 +57,7 @@ jobs:
           if (!process.env.ZOEN_PRODUCTION_ENV || !process.env.ZOEN_ALCHEMY_STATE) throw new Error('Production configuration is missing');
           const directory = join(process.env.HOME, '.alchemy');
           mkdirSync(join(directory, 'credentials', 'ci'), { recursive: true, mode: 0o700 });
-          writeFileSync(join(directory, 'profiles.json'), JSON.stringify({version: 1, profiles: {ci: {Fly: {method: 'env'}, Cloudflare: {method: 'env'}}}}), {mode: 0o600});
+          writeFileSync(join(directory, 'profiles.json'), JSON.stringify({version: 0, profiles: {ci: {Fly: {method: 'env'}, Cloudflare: {method: 'env'}}}}), {mode: 0o600});
           writeFileSync(join(directory, 'credentials', 'ci', 'cloudflare-state-store.json'), process.env.ZOEN_ALCHEMY_STATE, {mode: 0o600});
           writeFileSync('infrastructure/.env.prod', process.env.ZOEN_PRODUCTION_ENV + '\nZOEN_RELEASE=' + process.env.GITHUB_SHA + '\nZOEN_RECOVERY_RUN=ci-' + process.env.GITHUB_RUN_ID + '-' + process.env.GITHUB_RUN_ATTEMPT + '\n', {mode: 0o600});
           JS
