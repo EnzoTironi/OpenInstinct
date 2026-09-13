@@ -112,9 +112,9 @@ and runs application checks, database integration tests and the production build
 
 `Zoen infrastructure` runs only on main, serializes deployments and requires a
 successful complete Checks run on the exact commit before a production deploy.
-It also runs a production recovery drill every Sunday at 04:47 UTC, after the
-scheduled full backup. The temporary recovery resources are removed even if
-verification fails.
+Every deployment ends with an isolated production recovery drill. The same drill
+runs every Sunday at 04:47 UTC, after the scheduled full backup. Temporary recovery
+resources are removed even if verification fails.
 Its protected configuration is supplied by `ZOEN_PRODUCTION_ENV` and
 `ZOEN_ALCHEMY_STATE`. The uptime workflow uses an app-scoped
 `ZOEN_FLY_OPERATIONS_TOKEN`; no application secrets are required by its probe.

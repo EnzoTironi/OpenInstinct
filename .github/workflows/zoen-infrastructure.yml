@@ -75,7 +75,7 @@ jobs:
         working-directory: infrastructure
         run: pnpm exec alchemy deploy --stage prod --env-file "$PWD/.env.prod" --yes
       - name: Prove recovery on an isolated temporary machine
-        if: env.OPERATION == 'recovery'
+        if: env.OPERATION != 'plan'
         working-directory: infrastructure
         run: pnpm exec alchemy deploy recovery.run.ts --stage prod --env-file "$PWD/.env.prod" --yes
       - name: Verify database backup and public service
