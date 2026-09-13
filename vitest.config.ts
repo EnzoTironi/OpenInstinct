@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
@@ -29,6 +29,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // Infrastructure exercises its isolated provider packages with node:test.
+    exclude: [...configDefaults.exclude, "infrastructure/**"],
     // Keep simultaneous PGlite initialization bounded while CI runs TS7 and lint.
     maxWorkers: 2,
     setupFiles: ["./tests/setup-env.ts"],

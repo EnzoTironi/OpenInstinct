@@ -66,6 +66,7 @@ jobs:
         run: |
           pnpm check --concurrency=1
           pnpm --dir infrastructure types:check
+          pnpm --dir infrastructure test:providers
           docker build -t zoen-postgres-proof:pg17-backup infrastructure/postgres
           bash infrastructure/postgres/test-recovery.sh
       - name: Plan infrastructure

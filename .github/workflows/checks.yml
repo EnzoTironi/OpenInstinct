@@ -44,6 +44,7 @@ jobs:
         run: |
           pnpm --dir infrastructure peers check
           pnpm --dir infrastructure types:check
+          pnpm --dir infrastructure test:providers
 
   runtime-storage:
     name: Runtime storage and build
