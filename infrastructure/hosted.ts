@@ -215,7 +215,7 @@ export const hosted = Effect.gen(function* () {
         path: "/eve/v1/health",
         interval: "15s",
         timeout: "5s",
-        grace_period: "1m",
+        grace_period: "1m0s",
       },
     },
     restart: { policy: "always" },
