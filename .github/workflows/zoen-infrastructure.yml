@@ -39,13 +39,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir infrastructure install --frozen-lockfile
-      - name: Require all CI checks on this exact commit
+      - name: Require checks and native evaluations on this exact commit
         if: env.OPERATION == 'deploy'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          count=$(gh run list --workflow checks.yml --commit "$GITHUB_SHA" --status success --json databaseId --jq 'length')
-          test "$count" -gt 0 || { echo 'The complete Checks workflow must pass on this commit before deployment.'; exit 1; }
+          for workflow in checks.yml zoen-agent-evals.yml; do
+            conclusion=$(gh run list --workflow "$workflow" --commit "$GITHUB_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // ""')
+            test "$conclusion" = success || { echo "The latest $workflow run must pass on this exact commit before deployment."; exit 1; }
+          done
       - name: Install protected deployment configuration
         env:
           ZOEN_PRODUCTION_ENV: ${{ secrets.ZOEN_PRODUCTION_ENV }}

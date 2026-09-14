@@ -1,65 +1,76 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EveEvalResult } from "eve/evals";
 import { launchReporter } from "../evals/launch/reporter";
 
-afterEach(() => vi.unstubAllEnvs());
+let directory: string;
+beforeAll(async () => {
+  directory = await mkdtemp(join(tmpdir(), "zoen-eval-receipt-"));
+  vi.stubEnv("ZOEN_EVAL_REPORT", join(directory, "receipt.json"));
+});
+afterAll(async () => {
+  vi.unstubAllEnvs();
+  await rm(directory, { recursive: true, force: true });
+});
 
-test("retains failure and approval evidence without provider messages or payloads", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "zoen-eval-receipt-"));
-  const destination = join(directory, "receipt.json");
-  vi.stubEnv("ZOEN_EVAL_REPORT", destination);
-  const timestamp = "2026-09-14T00:00:00.000Z";
-  const entry: EveEvalResult = {
-    id: "launch/browser",
-    verdict: "failed",
-    startedAt: timestamp,
-    completedAt: timestamp,
-    assertions: [
-      {
-        name: "succeeded",
-        severity: "gate",
-        passed: false,
-        score: 0,
-        message: "private-assertion-payload",
-      },
-      { name: "completed call", severity: "gate", passed: true, score: 1 },
-      { name: "no failures", severity: "soft", passed: true, score: 1 },
-    ],
-    result: {
-      output: "private-model-output",
-      finalMessage: "private-message",
-      status: "failed",
-      traceContexts: [],
-      derived: {
-        toolCalls: [],
-        toolCallCount: 0,
-        subagentCalls: [],
-        subagentCallCount: 0,
-        inputRequests: [],
-        parked: false,
-        messageCount: 0,
-        reasoningBlockCount: 0,
-      },
-      events: [
+test.each([
+  ["429 rate limit", "rate-limit"],
+  ["The usage limit has been reached", "provider-quota"],
+])(
+  "retains %s evidence without provider messages or payloads",
+  async (message, category) => {
+    const destination = join(directory, "receipt.json");
+    const timestamp = "2026-09-14T00:00:00.000Z";
+    const entry: EveEvalResult = {
+      id: "launch/browser",
+      verdict: "failed",
+      error: "Timeout while reading private-provider-payload",
+      startedAt: timestamp,
+      completedAt: timestamp,
+      assertions: [
         {
-          type: "step.failed",
-          meta: { at: timestamp, id: "synthetic-event" },
-          data: {
-            code: "MODEL_CALL_FAILED",
-            message: "429 rate limit; Authorization: private-provider-key",
-            details: { token: "private-diagnostic-token" },
-            sequence: 0,
-            stepIndex: 0,
-            turnId: "synthetic-turn",
-          },
+          name: "succeeded",
+          severity: "gate",
+          passed: false,
+          score: 0,
+          message: "private-assertion-payload",
         },
+        { name: "completed call", severity: "gate", passed: true, score: 1 },
+        { name: "no failures", severity: "soft", passed: true, score: 1 },
       ],
-    },
-  };
-  try {
+      result: {
+        output: "private-model-output",
+        finalMessage: "private-message",
+        status: "failed",
+        traceContexts: [],
+        derived: {
+          toolCalls: [],
+          toolCallCount: 0,
+          subagentCalls: [],
+          subagentCallCount: 0,
+          inputRequests: [],
+          parked: false,
+          messageCount: 0,
+          reasoningBlockCount: 0,
+        },
+        events: [
+          {
+            type: "step.failed",
+            meta: { at: timestamp, id: "synthetic-event" },
+            data: {
+              code: "MODEL_CALL_FAILED",
+              message: `${message}; Authorization: private-provider-key`,
+              details: { token: "private-diagnostic-token" },
+              sequence: 0,
+              stepIndex: 0,
+              turnId: "synthetic-turn",
+            },
+          },
+        ],
+      },
+    };
     await launchReporter.onRunComplete({
       target: {
         kind: "remote",
@@ -81,6 +92,7 @@ test("retains failure and approval evidence without provider messages or payload
     expect(report).toMatchObject({
       cases: [
         {
+          executionError: "timeout",
           outcome: {
             status: "failed",
             parked: false,
@@ -90,7 +102,7 @@ test("retains failure and approval evidence without provider messages or payload
               {
                 event: "step.failed",
                 code: "MODEL_CALL_FAILED",
-                category: "rate-limit",
+                category,
               },
             ],
           },
@@ -99,7 +111,5 @@ test("retains failure and approval evidence without provider messages or payload
         },
       ],
     });
-  } finally {
-    await rm(directory, { recursive: true, force: true });
   }
-});
+);

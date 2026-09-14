@@ -1,7 +1,8 @@
 # Zoen launch validation
 
-Status: Executor ownership is merged and deployed; final native CI and channel
-journey verification remain in progress. This is not a blanket launch approval.
+Status: Executor ownership is merged and deployed. Final native validation is
+blocked by the configured model's usage quota; cross-account messenger linking
+and the other unchecked journeys remain incomplete. This is not launch approval.
 Baseline: `601014ec894fb7ae482373495400cfe796c860af`.
 This ledger tracks the launch work after the verified team-agents release.
 A passing component test is not a completed user journey or a live-provider proof.
@@ -103,6 +104,14 @@ Production rollout on 2026-09-13:
   incorrectly delegated to WhatsApp Web. The coordinator instructions now route
   Zoen account authentication through Executor's native device-auth tools. The
   complete account-link journey is still a separate, unpassed gate.
+- A read-only production inspection confirmed that the current Telegram and
+  WhatsApp pilot identities belong to different accounts. A prompt or webhook
+  correction cannot safely unify them. Explicit account consolidation is still
+  required; the conflict check has not been bypassed and no identities were moved.
+- The deployed web chat completed a real Code Mode query with two successful
+  Executor searches, one for tools and one for skills, then replied normally.
+  That workspace has no published skills; the synthetic benchmark provisions
+  its own Git procedures. The query performed no file or external mutations.
 - CI now starts the built application and native Eve server in addition to
   compiling them. Early hosted eval attempts failed before scoring: the runner
   needed its build port aligned, Eve's own credential file prepared, and runtime
@@ -117,10 +126,29 @@ Production rollout on 2026-09-13:
   inclusion is limited to the receipt/JUnit paths; subsequent summaries also
   retain event types, failure categories and mandatory assertion counts without
   exporting provider messages or model payloads.
+- The next hosted run, [34798930394](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34798930394),
+  retained its reports correctly. It passed 7/15 scenarios, then the remaining
+  eight were blocked before tool execution by `The usage limit has been reached`.
+  It is a failed release gate, not a product pass. The selected models were not
+  changed and no reset credit was consumed.
+- A separate local approval reproduction passed twice (30 mandatory assertions)
+  and then timed out in a provider call after schema discovery, before any
+  approval or mutation. The failed run is retained under
+  `.eve/launch-0bc3253b-bd18-4307-a100-0f7f2a1fec64/run-3.json`.
+  Configured model requests now carry a 90-second abort deadline, including the
+  response stream, combined with Eve's existing cancellation signal. Native Eve
+  retains retry and action execution ownership. Tests cover a stalled stream,
+  user cancellation and model identity/request-option preservation; the new
+  deadline still needs a fresh live run after provider quota is available.
+- Production deployment now requires both the latest Checks and native eval
+  workflows to pass on the exact source commit. A previous successful run cannot
+  hide a newer failed run. Plan, backup and recovery operations remain available.
+  The deadline and release-gate hardening await the next validated deployment;
+  production still runs the `5c18eaaa` release identified above.
 
 Local validation on 2026-09-13:
 
-- `pnpm check`: 1,355 tests passed, 3 skipped; type, lint, formatting and unused-code
+- `pnpm check`: 1,360 tests passed, 3 skipped; type, lint, formatting and unused-code
   checks passed. The skips remain visible and are not counted as passes.
 - Full PostgreSQL/Matrix runtime suite: 137 tests passed in 37 files.
 - Isolated infrastructure type check and provider suite: 22 tests passed.

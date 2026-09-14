@@ -12,6 +12,10 @@ const receipts = Schema.Struct({ calls: Schema.Array(ExecutorReceiptSchema) });
 
 // Classify provider diagnostics without exporting their messages, URLs or payloads.
 function failureCategory(message: string) {
+  if (
+    /usage limit|quota|insufficient.*(?:credit|balance)|\b402\b/iu.test(message)
+  )
+    return "provider-quota";
   if (/rate.?limit|too many requests|\b429\b/iu.test(message))
     return "rate-limit";
   if (
@@ -59,6 +63,7 @@ function caseMetrics(entry: EveEvalResult) {
   return {
     id: entry.id,
     verdict: entry.verdict,
+    executionError: entry.error ? failureCategory(entry.error) : null,
     outcome: caseOutcome(entry.result),
     gates: {
       passed: entry.assertions.filter(
