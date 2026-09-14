@@ -12,7 +12,7 @@ import { channelChallengeSchema } from "../../shared/identity/channel-auth";
 import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
 import { channelPrincipal } from "../../server/channels/principal";
-import { personalMemoryProvider } from "../../agent/lib/personal-memory-provider";
+import { personalMemoryProvider } from "../../server/executor/memory/personal-memory-provider";
 
 const cookieHeader = (response: Response) =>
   response.headers

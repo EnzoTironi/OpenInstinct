@@ -4,12 +4,12 @@ import type { DynamicResolveContext } from "eve/tools";
 import { describe, expect, it } from "vitest";
 import personalInfoMemory from "@agent/memory/personal_info";
 import workstreamMemory from "@agent/memory/workstreams";
-import calendar from "@agent/tools/calendar";
-import contacts from "@agent/tools/contacts";
-import gmail from "@agent/tools/gmail";
+import calendar from "../../server/executor/tools/calendar";
+import contacts from "../../server/executor/tools/contacts";
+import gmail from "../../server/executor/tools/gmail";
 import messaging from "@agent/tools/messaging";
-import schedules from "@agent/tools/schedules";
-import vault from "@agent/tools/vault";
+import schedules from "../../server/executor/tools/schedules";
+import vault from "../../server/executor/tools/vault";
 
 const groupedTools = [calendar, contacts, gmail, messaging, schedules, vault];
 

@@ -13,7 +13,7 @@ export async function requireDeliveredText(
     status: "completed",
   });
   const parsed = Schema.decodeUnknownResult(sendMessageOutputSchema)(
-    delivery.input
+    delivery.output
   );
   const text =
     Result.isSuccess(parsed) && parsed.success.kind === "message"

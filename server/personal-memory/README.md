@@ -42,7 +42,7 @@ The installed public `eve/memory` contract supplies
 Eve documents the key as an opaque digest; this implementation never reproduces
 its hashing algorithm or accepts it from a client.
 
-`agent/lib/personal-memory-provider.ts` keeps the existing `fileMemory` provider,
+`server/executor/memory/personal-memory-provider.ts` keeps the existing `fileMemory` provider,
 PostgreSQL backend, native save/remove tools and cancellation wrapper. Before
 recall/tool resolution it derives the canonical owner from `session.auth.current`,
 requires current authority, and checks the resolved value equals that workspace
@@ -163,7 +163,7 @@ mutating memory tool result is present without a pending refresh. A later
 ### Code
 
 - `agent/lib/personal-memory-recall-refresh.ts` — Effect-native order helpers.
-- `agent/lib/personal-memory-provider.ts` — wraps mutating tools with refresh.
+- `server/executor/memory/personal-memory-provider.ts` — wraps mutating tools with refresh.
 - Companion Eve `0.52` patch — enqueues/applies mid-turn recall refresh in the
   memory tool callbacks and tool loop (`PendingMemoryToolRefresh`).
 

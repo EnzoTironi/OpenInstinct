@@ -5,6 +5,7 @@ const rootTools = "agent/tools";
 const rootMemory = "agent/memory/profile.ts";
 const workerRoot = "agent/subagents/browser-agent";
 const workerTools = `${workerRoot}/tools`;
+const executorBrowser = "server/executor/browser";
 
 function toolFiles(directory: string, root = directory): string[] {
   return readdirSync(directory, { withFileTypes: true })
@@ -19,22 +20,24 @@ function toolFiles(directory: string, root = directory): string[] {
 describe("root and worker capability boundaries", () => {
   it("keeps root coordination separate from browser execution", () => {
     expect(toolFiles(rootTools)).toEqual([
-      "artifacts.ts",
       "ask_question.ts",
-      "calendar.ts",
-      "contacts.ts",
-      "device-auth.ts",
-      "executor.ts",
-      "gmail.ts",
+      "bash.ts",
+      "execute.ts",
+      "load_skill.ts",
       "messaging.ts",
-      "ontology.ts",
-      "personal-memory.ts",
+      "read_file.ts",
       "respond-to-approval.ts",
-      "schedules.ts",
-      "vault.ts",
-      "web_fetch.ts",
       "web_search.ts",
+      "write_file.ts",
     ]);
+    expect(readFileSync(`${rootTools}/execute.ts`, "utf8")).toContain(
+      'executorTool("coordinator")'
+    );
+    for (const tool of ["bash", "load_skill", "read_file", "write_file"]) {
+      expect(readFileSync(`${rootTools}/${tool}.ts`, "utf8")).toContain(
+        "disableTool()"
+      );
+    }
     expect(existsSync(`${rootTools}/sendMessage.ts`)).toBe(false);
     expect(existsSync("agent/extensions/kernel/extension.ts")).toBe(false);
     expect(existsSync("agent/extensions/kernel/connections/browser.ts")).toBe(
@@ -47,7 +50,7 @@ describe("root and worker capability boundaries", () => {
       "utf8"
     );
     expect(rootInstructions).toContain(
-      "Perform public research, source discovery, comparisons, and current-information lookups directly with `web_search`"
+      "If search is unavailable, delegate a bounded public-research task to `browser-agent`"
     );
     expect(rootInstructions).toContain(
       "try `web_fetch` before browser automation"
@@ -55,7 +58,10 @@ describe("root and worker capability boundaries", () => {
   });
 
   it("keeps durable memory scoped to the authenticated root user", () => {
-    const memory = readFileSync(rootMemory, "utf8");
+    expect(readFileSync(rootMemory, "utf8")).toContain(
+      'export { default } from "../../server/executor/memory/profile"'
+    );
+    const memory = readFileSync("server/executor/memory/profile.ts", "utf8");
 
     expect(memory).toContain("defineMemory(");
     expect(memory).toContain("scope: resolveProfileMemoryScope");
@@ -65,20 +71,18 @@ describe("root and worker capability boundaries", () => {
     expect(toolFiles(workerTools)).toEqual([
       "ask_question.ts",
       "bash.ts",
-      "capture_browser_image.ts",
-      "computer_action.ts",
-      "fill_from_vault.ts",
-      "list_vault.ts",
+      "execute.ts",
       "load_skill.ts",
-      "manage_browsers.ts",
       "personal_info.ts",
       "read_file.ts",
-      "semantic_browser.ts",
       "todo.ts",
       "web_fetch.ts",
       "web_search.ts",
       "write_file.ts",
     ]);
+    expect(readFileSync(`${workerTools}/execute.ts`, "utf8")).toContain(
+      'executorTool("browser")'
+    );
     expect(existsSync(`${workerRoot}/tools/sendMessage.ts`)).toBe(false);
     expect(existsSync(`${workerRoot}/tools/request_vault_setup.ts`)).toBe(
       false
@@ -113,7 +117,7 @@ describe("root and worker capability boundaries", () => {
       "computer_action",
       "manage_browsers",
     ]) {
-      const source = readFileSync(`${workerTools}/${tool}.ts`, "utf8");
+      const source = readFileSync(`${executorBrowser}/${tool}.ts`, "utf8");
       expect(source).toContain("defineTool(");
       expect(source).not.toContain("defineDynamic(");
       expect(source).toContain("requireWorkerScope(context)");
@@ -123,7 +127,7 @@ describe("root and worker capability boundaries", () => {
       false
     );
     const semanticBrowser = readFileSync(
-      `${workerTools}/semantic_browser.ts`,
+      `${executorBrowser}/semantic_browser.ts`,
       "utf8"
     );
     expect(semanticBrowser).toContain("defineDynamic(");
@@ -138,7 +142,7 @@ describe("root and worker capability boundaries", () => {
       "native `final_output` tool exactly once"
     );
     expect(workerInstructions).toContain(
-      "Never use the browser for general web search"
+      "explicitly delegated public-research task"
     );
     expect(workerInstructions).toContain(
       "Use `playwright_execute` as the primary browser execution surface"
@@ -161,14 +165,16 @@ describe("root and worker capability boundaries", () => {
       "computer_action",
       "manage_browsers",
     ]) {
-      const source = readFileSync(`${workerTools}/${tool}.ts`, "utf8");
+      const source = readFileSync(`${executorBrowser}/${tool}.ts`, "utf8");
       expect(source).toContain(
         'from "@agent/subagents/browser-agent/lib/kernel"'
       );
       expect(source).not.toContain("new Kernel(");
     }
-    expect(readFileSync(`${workerTools}/fill_from_vault.ts`, "utf8")).toContain(
-      'from "../lib/autofill/native"'
+    expect(
+      readFileSync(`${executorBrowser}/fill_from_vault.ts`, "utf8")
+    ).toContain(
+      'from "../../../agent/subagents/browser-agent/lib/autofill/native"'
     );
   });
 

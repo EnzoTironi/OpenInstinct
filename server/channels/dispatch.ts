@@ -22,15 +22,16 @@ export const dispatchItem = Effect.fn("dispatchItem")(function* <
 export const dispatchAuthFeedback = Effect.fn("dispatchAuthFeedback")(
   function* (
     event: Extract<InboundEvent, { kind: "command" }>,
-    confirmed: boolean
+    confirmed: boolean,
+    refusalMessage?: string
   ) {
+    const refusal =
+      refusalMessage ??
+      "This request cannot be confirmed here. Return to your original Zoen browser tab to check it or start a new request.";
     if (event.channel !== "telegram") return;
     const provider = yield* Telegram;
     if (event.command === "start") {
-      yield* provider.sendText(
-        event.chatId,
-        "This request cannot be confirmed here. Return to your original Zoen browser tab to check it or start a new request."
-      );
+      yield* provider.sendText(event.chatId, refusal);
       return;
     }
     if (!event.callbackQueryId) return;
@@ -41,7 +42,7 @@ export const dispatchAuthFeedback = Effect.fn("dispatchAuthFeedback")(
         event.callbackQueryId,
         confirmed
           ? "Confirmed. Return to your original Zoen browser tab to finish."
-          : "This request cannot be confirmed here. Return to your original Zoen browser tab to check it or start a new request.",
+          : refusal,
         !confirmed
       )
     );

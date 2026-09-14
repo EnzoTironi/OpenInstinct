@@ -63,8 +63,8 @@ Run the validation the task requests. When it does not establish the behavior yo
 ## Repository contract
 
 - The repository root owns the single Next.js application, Eve agent, and shared UI contract.
-- The workspace manager lives on `/` and the agent chat on `/chat`; browser execution belongs only to the declared browser-agent subagent's flat tool surface under `agent/subagents/browser-agent/tools`.
-- Keep each worker browser tool's schema and implementation together. Share the Kernel SDK client through `agent/subagents/browser-agent/lib/kernel.ts`; do not add a Kernel extension or root browser connection.
+- The workspace manager lives on `/` and the agent chat on `/chat`. Executor owns product tool and skill discovery; Eve mounts the coordinator and browser Code Mode entrypoints under their existing `tools/` directories.
+- Browser execution belongs only to the declared browser-agent's Executor surface. Keep each browser tool's schema and implementation together under `server/executor/browser`; share the Kernel SDK client through `agent/subagents/browser-agent/lib/kernel.ts`. The model must never choose the surface, and the coordinator cannot call browser tools directly.
 - `agent/subagents/browser-agent/lib` is for code genuinely shared by worker tools. Group a shared worker domain in a lower-case folder, such as `trace/domains.ts` or `autofill/provider.ts`; do not use it as a holding area for a tool's one-off logic.
 - Validate runtime environment variables through `shared/environment/env.ts`. `KERNEL_API_KEY` is optional for application startup and required when browser execution is invoked.
 - Run `pnpm check` and `pnpm build` before handing off changes.

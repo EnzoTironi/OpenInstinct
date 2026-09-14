@@ -3,6 +3,7 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { Schema } from "effect";
 import {
   SUPERVISOR_TEST_TIMEOUT_MS,
   waitForSupervisorClose,
@@ -10,188 +11,179 @@ import {
 } from "./helpers/supervisor-process";
 
 const temporaryDirectories: string[] = [];
-const supervisorTestOptions = { timeout: SUPERVISOR_TEST_TIMEOUT_MS };
 
 afterEach(async () => {
   await Promise.all(
-    temporaryDirectories.splice(0).map(async (directory) => {
-      await rm(directory, { force: true, recursive: true });
-    })
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { force: true, recursive: true }))
   );
 });
 
-describe("agent eval supervisor", supervisorTestOptions, () => {
-  it("runs migrations and the filtered suite against an isolated database", async () => {
-    const result = await runSupervisor({
-      AI_GATEWAY_API_KEY: "test-gateway-key",
-      KERNEL_API_KEY: "real-key-that-must-not-reach-evals",
+describe(
+  "native agent eval CLI",
+  { timeout: SUPERVISOR_TEST_TIMEOUT_MS },
+  () => {
+    it("lists selected cases without connecting to a database and filters child credentials", async () => {
+      const result = await runSupervisor([
+        "--list",
+        "--suite",
+        "launch",
+        "--tag",
+        "executor",
+      ]);
+      expect(result.code).toBe(0);
+      const command = Schema.decodeUnknownSync(
+        Schema.fromJsonString(
+          Schema.Struct({
+            args: Schema.Array(Schema.String),
+            environment: Schema.Array(Schema.String),
+          })
+        )
+      )(result.commands);
+      expect(command.args).toEqual([
+        "exec",
+        "eve",
+        "eval",
+        "launch",
+        "--tag",
+        "executor",
+        "--list",
+      ]);
+      expect(command.environment).toEqual(
+        expect.arrayContaining(["AI_GATEWAY_API_KEY", "PATH"])
+      );
+      for (const name of [
+        "TELEGRAM_BOT_TOKEN",
+        "KAPSO_API_KEY",
+        "GOOGLE_CLIENT_SECRET",
+        "STRIPE_SECRET_KEY",
+        "KERNEL_API_KEY",
+      ])
+        expect(command.environment).not.toContain(name);
     });
 
-    expect(result.code).toBe(0);
-    const lines = result.commands.trim().split("\n");
-    const project = projectFromComposeCommand(lines[0]);
-    expect(lines).toEqual([
-      `compose --project-name ${project} up --detach --wait postgres`,
-      `compose --project-name ${project} port postgres 5432`,
-      "pnpm db:migrate postgresql://postgres:postgres@127.0.0.1:49152/open_instinct development unused-by-agent-evals http://127.0.0.1:9 http://127.0.0.1:9",
-      "pnpm exec eve eval agent --strict --max-concurrency 1 --tag smoke postgresql://postgres:postgres@127.0.0.1:49152/open_instinct development unused-by-agent-evals http://127.0.0.1:9 http://127.0.0.1:9",
-      `compose --project-name ${project} down --volumes`,
-    ]);
-  });
-
-  it("requires model credentials before starting Docker", async () => {
-    const result = await runSupervisor();
-
-    expect(result.code).toBe(1);
-    expect(result.commands).toBe("");
-    expect(result.stderr).toContain(
-      "Agent evals require AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN."
+    it.each([
+      ["missing target", [], "Start the built app"],
+      [
+        "remote target",
+        ["--url", "https://example.com"],
+        "Production targets are refused",
+      ],
+      [
+        "target credentials",
+        ["--url", "http://user:pass@localhost:4351"],
+        "Production targets are refused",
+      ],
+      [
+        "target path",
+        ["--url", "http://localhost:4351/other"],
+        "Production targets are refused",
+      ],
+      [
+        "path traversal",
+        ["--suite", "launch/../../other"],
+        "Use --suite launch",
+      ],
+      [
+        "unsupported concurrency",
+        ["--max-concurrency", "8"],
+        "Unrecognized flag",
+      ],
+      ["unbounded repetitions", ["--repeat", "1000"], "20"],
+    ])(
+      "rejects %s before starting a provider or child process",
+      async (_name, args, message) => {
+        const result = await runSupervisor(args);
+        expect(result.code).not.toBe(0);
+        expect(result.commands).toBe("");
+        expect(result.output).toContain(message);
+      }
     );
-  });
 
-  it.each([
-    ["concurrency override", ["--max-concurrency", "8"]],
-    ["remote target", ["--url", "https://example.com"]],
-    ["different eval path", ["browser"]],
-  ])("rejects a %s before starting Docker", async (_description, args) => {
-    const result = await runSupervisor(
-      { AI_GATEWAY_API_KEY: "test-gateway-key" },
-      args
-    );
-
-    expect(result.code).toBe(1);
-    expect(result.commands).toBe("");
-    expect(result.stderr).toContain("Unsupported agent eval argument");
-  });
-
-  it("returns a failing eval exit code after stopping the database", async () => {
-    const result = await runSupervisor({
-      AI_GATEWAY_API_KEY: "test-gateway-key",
-      EVAL_EXIT_CODE: "1",
+    it("refuses a production database even with a loopback target", async () => {
+      const result = await runSupervisor(["--url", "http://127.0.0.1:4351"], {
+        database: "postgresql://test:test@example.com/companion_runtime_test",
+      });
+      expect(result.code).not.toBe(0);
+      expect(result.commands).toBe("");
+      expect(result.output).toContain("Production targets are refused");
     });
 
-    expect(result.code).toBe(1);
-    expect(result.commands.trim().split("\n").at(-1)).toMatch(
-      /^compose --project-name open-instinct-evals-[a-f0-9]{8}-[a-f0-9]{8} down --volumes$/u
-    );
-  });
-
-  it("returns a signal exit code after cleaning up interrupted startup", async () => {
-    const result = await runSupervisor({
-      AI_GATEWAY_API_KEY: "test-gateway-key",
-      EVAL_BLOCK_ACTION: "up",
+    it("propagates a failed native listing", async () => {
+      const result = await runSupervisor(["--list"], { exitCode: 1 });
+      expect(result.code).not.toBe(0);
+      expect(result.output).toContain("Eval listing failed");
     });
 
-    expect(result.code).toBe(130);
-    const lines = result.commands.trim().split("\n");
-    const project = projectFromComposeCommand(lines[0]);
-    expect(lines).toEqual([
-      `compose --project-name ${project} up --detach --wait postgres`,
-      `compose --project-name ${project} down --volumes`,
-    ]);
-  });
-
-  it("preserves the signal exit code when the eval process is interrupted", async () => {
-    const result = await runSupervisor({
-      AI_GATEWAY_API_KEY: "test-gateway-key",
-      EVAL_BLOCK_ACTION: "eval",
+    it("terminates its child when interrupted", async () => {
+      const result = await runSupervisor(["--list"], { interrupt: true });
+      expect(result.code).not.toBe(0);
+      expect(result.commands).toContain("terminated");
     });
-
-    expect(result.code).toBe(130);
-    const lines = result.commands.trim().split("\n");
-    const project = projectFromComposeCommand(lines[0]);
-    expect(lines).toEqual([
-      `compose --project-name ${project} up --detach --wait postgres`,
-      `compose --project-name ${project} port postgres 5432`,
-      "pnpm db:migrate postgresql://postgres:postgres@127.0.0.1:49152/open_instinct development unused-by-agent-evals http://127.0.0.1:9 http://127.0.0.1:9",
-      "pnpm exec eve eval agent --strict --max-concurrency 1 --tag smoke postgresql://postgres:postgres@127.0.0.1:49152/open_instinct development unused-by-agent-evals http://127.0.0.1:9 http://127.0.0.1:9",
-      `compose --project-name ${project} down --volumes`,
-    ]);
-  });
-});
-
-function projectFromComposeCommand(command: string | undefined) {
-  const project = command?.match(
-    /^compose --project-name (open-instinct-evals-[a-f0-9]{8}-[a-f0-9]{8}) /u
-  )?.[1];
-  if (!project) {
-    throw new Error(`Missing Compose project in: ${String(command)}`);
   }
-  return project;
-}
+);
 
 async function runSupervisor(
-  environment: Record<string, string> = {},
-  args = ["--tag", "smoke"]
+  args: string[],
+  options: { database?: string; exitCode?: number; interrupt?: boolean } = {}
 ) {
-  const directory = await mkdtemp(join(tmpdir(), "open-instinct-evals-"));
+  const directory = await mkdtemp(join(tmpdir(), "zoen-evals-cli-"));
   temporaryDirectories.push(directory);
   const logPath = join(directory, "commands.log");
-  const dockerPath = join(directory, "docker");
   const pnpmPath = join(directory, "pnpm");
-  await Promise.all([
-    writeFile(
-      dockerPath,
-      `#!/bin/sh
-printf '%s\n' "$*" >> "$EVAL_SUPERVISOR_LOG"
-if [ "$4" = "port" ]; then
-  printf '127.0.0.1:49152\n'
-fi
-if [ "$4" = "\${EVAL_BLOCK_ACTION:-never}" ]; then
-  trap 'exit 130' INT TERM HUP
-  while true; do /bin/sleep 0.1; done
-fi
+  await writeFile(
+    pnpmPath,
+    `#!${process.execPath}
+const fs = require("node:fs");
+const log = ${JSON.stringify(logPath)};
+fs.appendFileSync(log, JSON.stringify({ args: process.argv.slice(2), environment: Object.keys(process.env).sort() }) + "\\n");
+if (${String(options.interrupt ?? false)}) {
+  process.on("SIGTERM", () => { fs.appendFileSync(log, "terminated\\n"); process.exit(143); });
+  process.on("SIGINT", () => { fs.appendFileSync(log, "terminated\\n"); process.exit(130); });
+  setInterval(() => {}, 1000);
+} else process.exit(${String(options.exitCode ?? 0)});
 `
-    ),
-    writeFile(
-      pnpmPath,
-      `#!/bin/sh
-printf 'pnpm %s %s %s %s %s %s\n' "$*" "$DATABASE_URL" "$NODE_ENV" "$KERNEL_API_KEY" "$KERNEL_BASE_URL" "$BETTER_AUTH_URL" >> "$EVAL_SUPERVISOR_LOG"
-if [ "$1" = "exec" ]; then
-  if [ "\${EVAL_BLOCK_ACTION:-never}" = "eval" ]; then
-    trap 'exit 130' INT TERM HUP
-    while true; do /bin/sleep 0.1; done
-  fi
-  exit "\${EVAL_EXIT_CODE:-0}"
-fi
-`
-    ),
-  ]);
-  await Promise.all([chmod(dockerPath, 0o755), chmod(pnpmPath, 0o755)]);
-
+  );
+  await chmod(pnpmPath, 0o755);
   const supervisor = spawn(
     process.execPath,
     [
+      "--import",
+      "tsx",
       new URL("../scripts/run-agent-evals.ts", import.meta.url).pathname,
       ...args,
     ],
     {
       env: {
-        EVAL_SUPERVISOR_LOG: logPath,
-        NODE_ENV: "test",
         PATH: directory,
-        ...environment,
+        AI_GATEWAY_API_KEY: "synthetic-model-key",
+        TELEGRAM_BOT_TOKEN: "must-not-be-forwarded",
+        KAPSO_API_KEY: "must-not-be-forwarded",
+        GOOGLE_CLIENT_SECRET: "must-not-be-forwarded",
+        STRIPE_SECRET_KEY: "must-not-be-forwarded",
+        KERNEL_API_KEY: "must-not-be-forwarded",
+        NODE_ENV: "test",
+        DATABASE_URL: options.database,
       },
-      stdio: ["ignore", "ignore", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
     }
   );
-  supervisor.stderr.setEncoding("utf8");
-  let stderr = "";
-  supervisor.stderr.on("data", (chunk: string) => {
-    stderr += chunk;
-  });
-  const exitCode = waitForSupervisorClose(supervisor);
-  if (environment.EVAL_BLOCK_ACTION) {
-    await waitForSupervisorLogEntry(
-      logPath,
-      ` ${environment.EVAL_BLOCK_ACTION} `
-    );
+  let output = "";
+  for (const stream of [supervisor.stdout, supervisor.stderr]) {
+    stream.setEncoding("utf8");
+    stream.on("data", (chunk: string) => {
+      output += chunk;
+    });
+  }
+  const closed = waitForSupervisorClose(supervisor);
+  if (options.interrupt) {
+    await waitForSupervisorLogEntry(logPath, '"eval"');
     supervisor.kill("SIGINT");
   }
-
   return {
-    code: await exitCode,
+    code: await closed,
     commands: await readFile(logPath, "utf8").catch(() => ""),
-    stderr,
+    output,
   };
 }

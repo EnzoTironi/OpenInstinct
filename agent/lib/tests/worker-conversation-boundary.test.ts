@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ToolContext } from "eve/tools";
-import { privateMessageTool } from "../private-message-tool";
+import { privateMessageTool } from "../../../server/executor/native/private-message-tool";
 import { privateChannelEvents } from "../private-channel-events";
 
 const child: ToolContext = {

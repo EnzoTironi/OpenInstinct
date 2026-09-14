@@ -9,8 +9,11 @@ import {
   gmailSendMessageId,
   gmailUpdateLabels,
 } from "@agent/lib/google-workspace/gmail";
-import { calendarCreateEvent } from "@agent/tools/calendar";
-import { gmailSend, gmailUpdate } from "@agent/tools/gmail";
+import { calendarCreateEvent } from "../../../../server/executor/tools/calendar";
+import {
+  gmailSend,
+  gmailUpdate,
+} from "../../../../server/executor/tools/gmail";
 import { googleWorkspaceScopes } from "@shared/google-workspace/connection";
 
 describe("Google Workspace", () => {

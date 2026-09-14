@@ -1,7 +1,9 @@
 import type { PgClient } from "@effect/sql-pg";
+import { defineTool, type DynamicResolveContext } from "eve/tools";
 import { Effect, Schema } from "effect";
 import {
   requireWorkspaceAccess,
+  workspaceActorFromPrincipal,
   type WorkspaceActorSchema,
 } from "../workspaces/access";
 import { WorkspaceRepository } from "../workspaces/repository";
@@ -12,12 +14,21 @@ import { runWorkspaceCode } from "./runtime";
 import type { SandboxToolInvoker } from "../../vendor/executor/core";
 import { readOntology } from "../workspaces/ontology";
 import { readAgentGrantCapabilities } from "../workspaces/bots";
+import {
+  GoogleCalendarQuery,
+  GoogleSearchQuery,
+  invokeGoogleTool,
+} from "./google";
+import { serverRuntime } from "../runtime";
+import type { ExecutorCatalog } from "./definition";
+import { toolInputSchema } from "@agent/lib/tool-input-schema";
 
 const tools = [
   {
     path: "workspace.files.list",
     plugin: "files",
-    description: "List authored files and skills in this workspace.",
+    description:
+      "List knowledge documents, agent instructions and skills in this workspace, with its current Git head revision.",
     input: "{}",
   },
   {
@@ -45,7 +56,7 @@ const tools = [
     path: "workspace.ontology.read",
     plugin: "ontology",
     description:
-      "Read typed entities, relations, action definitions and source revisions.",
+      "Read workspace projects and other structured records: entities, current properties/status, relations, available actions and Git revision. Use this inventory before changing a project's status.",
     input: "{}",
   },
   {
@@ -80,6 +91,18 @@ const ReadFile = Schema.Struct({
     Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 262_144 }))
   ),
 });
+const NoArguments = Schema.Record(Schema.String, Schema.Never);
+const schemas = {
+  "workspace.files.list": NoArguments,
+  "workspace.files.read": ReadFile,
+  "workspace.files.search": Query,
+  "workspace.memory.search": Query,
+  "workspace.ontology.read": NoArguments,
+  "workspace.google.mail.search": GoogleSearchQuery,
+  "workspace.google.contacts.search": GoogleSearchQuery,
+  "workspace.google.calendar.list": GoogleCalendarQuery,
+};
+
 class ExecutorAccessDenied extends Schema.TaggedError<ExecutorAccessDenied>()(
   "ExecutorAccessDenied",
   {}
@@ -94,13 +117,20 @@ export const readExecutorCatalog = Effect.fn("Executor.catalog")(function* (
     : capabilities.enabled;
   return {
     revision: capabilities.revision,
-    tools: tools.filter(
-      (tool) =>
-        capabilities.enabled.includes(tool.plugin) &&
-        granted.includes(tool.plugin) &&
-        (!(actor.agentGrantId ?? actor.groupBindingId) ||
-          tool.plugin !== "memory")
-    ),
+    tools: tools
+      .filter(
+        (tool) =>
+          capabilities.enabled.includes(tool.plugin) &&
+          granted.includes(tool.plugin) &&
+          (!(actor.agentGrantId ?? actor.groupBindingId) ||
+            (tool.plugin !== "memory" && tool.plugin !== "google"))
+      )
+      .map((tool) => ({
+        path: tool.path,
+        plugin: tool.plugin,
+        description: tool.description,
+        input: tool.input,
+      })),
   };
 });
 
@@ -118,7 +148,7 @@ const invokeWorkspaceTool = Effect.fn("Executor.invokeWorkspaceTool")(
     const repository = yield* WorkspaceRepository;
     switch (call.path) {
       case "workspace.files.list": {
-        yield* Schema.decodeUnknownEffect(Schema.Struct({}))(call.args, {
+        yield* Schema.decodeUnknownEffect(NoArguments)(call.args, {
           onExcessProperty: "error",
         });
         return yield* repository.read(actor);
@@ -155,7 +185,7 @@ const invokeWorkspaceTool = Effect.fn("Executor.invokeWorkspaceTool")(
         return { results: memory.results.slice(0, 8) };
       }
       case "workspace.ontology.read": {
-        yield* Schema.decodeUnknownEffect(Schema.Struct({}))(call.args, {
+        yield* Schema.decodeUnknownEffect(NoArguments)(call.args, {
           onExcessProperty: "error",
         });
         const result = yield* readOntology(actor);
@@ -173,6 +203,41 @@ const invokeWorkspaceTool = Effect.fn("Executor.invokeWorkspaceTool")(
     }
   }
 );
+
+export const resolveWorkspaceTools = Effect.fn(
+  "Executor.resolveWorkspaceTools"
+)(function* (context: DynamicResolveContext) {
+  const actor = yield* workspaceActorFromPrincipal(
+    context.session.auth.current ?? context.session.auth.initiator ?? undefined
+  );
+  const catalog = yield* readExecutorCatalog(actor);
+  const resolved: ExecutorCatalog = Object.fromEntries(
+    catalog.tools.map((entry) => [
+      entry.path,
+      defineTool({
+        description: entry.description,
+        inputSchema: toolInputSchema(schemas[entry.path]),
+        execute: (input, execution) =>
+          serverRuntime.runPromise(
+            Effect.gen(function* () {
+              const current = yield* workspaceActorFromPrincipal(
+                execution.session.auth.current ??
+                  execution.session.auth.initiator ??
+                  undefined
+              );
+              return yield* invokeWorkspaceTool(
+                current,
+                { path: entry.path, args: input },
+                { invoke: (call) => invokeGoogleTool(call, execution) }
+              );
+            }),
+            { signal: execution.abortSignal }
+          ),
+      }),
+    ])
+  );
+  return resolved;
+});
 
 export const executeWorkspace = Effect.fn("Executor.executeWorkspace")(
   function* (

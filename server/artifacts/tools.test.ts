@@ -6,7 +6,7 @@ import {
   artifactDelete,
   artifactList,
   artifactRead,
-} from "../../agent/tools/artifacts";
+} from "../executor/tools/artifacts";
 import { authorizeApprovalResponse } from "../../agent/lib/approval-response";
 
 const validate = (

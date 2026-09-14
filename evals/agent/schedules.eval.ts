@@ -1,5 +1,6 @@
 import { defineEval } from "eve/evals";
 import { isDeepStrictEqual } from "node:util";
+import { executorInput } from "./executor";
 import {
   agentEvalTags,
   assertPlainTextDelivery,
@@ -42,8 +43,12 @@ export default cases.map((testCase) =>
       const turn = await t.send(testCase.prompt);
       turn.expectOk();
       turn.succeeded();
-      turn.calledTool("schedules-create", {
-        input: (input) => isDeepStrictEqual(input, testCase.expected),
+      turn.calledTool("execute", {
+        input: (input) =>
+          isDeepStrictEqual(
+            executorInput("schedules-create", input),
+            testCase.expected
+          ),
         status: "completed",
         count: 1,
       });

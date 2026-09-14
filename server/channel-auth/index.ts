@@ -84,6 +84,10 @@ const readLinkSession = Effect.fn("ChannelAuth.readLinkSession")(function* (
   return link;
 });
 const publicError = (error: ChannelAuthError | ChannelAccountError) => {
+  if (error.reason === "registration_closed")
+    return new APIError("FORBIDDEN", {
+      message: "Zoen is in a private beta. This account needs an invitation.",
+    });
   if (error.reason === "unavailable")
     return new APIError("SERVICE_UNAVAILABLE", {
       message: "Channel unavailable",

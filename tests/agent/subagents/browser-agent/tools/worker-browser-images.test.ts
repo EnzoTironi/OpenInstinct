@@ -58,7 +58,7 @@ vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
   }),
 }));
 
-import captureBrowserImage from "@agent/subagents/browser-agent/tools/capture_browser_image";
+import captureBrowserImage from "../../../../../server/executor/browser/capture_browser_image";
 
 const scope = { userId: "user-1", workspaceId: "workspace-1" };
 const reservation = {

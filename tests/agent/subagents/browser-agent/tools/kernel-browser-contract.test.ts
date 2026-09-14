@@ -16,7 +16,7 @@ import { getKernel } from "@agent/subagents/browser-agent/lib/kernel";
 import { toolContextFor } from "@tests/helpers/tool-context";
 import manageBrowsers, {
   kernelProfileNameForWorkspace,
-} from "@agent/subagents/browser-agent/tools/manage_browsers";
+} from "../../../../../server/executor/browser/manage_browsers";
 
 const serviceMocks = vi.hoisted(() => ({
   createBrowserSession: vi.fn<typeof createBrowserSession>(),

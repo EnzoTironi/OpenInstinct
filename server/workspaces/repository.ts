@@ -31,7 +31,7 @@ export const WorkspaceWriteSchema = Schema.Struct({
   content: Schema.NullOr(Schema.String.check(Schema.isMaxLength(262_144))),
 });
 
-class WorkspaceRepositoryError extends Schema.TaggedError<WorkspaceRepositoryError>()(
+export class WorkspaceRepositoryError extends Schema.TaggedError<WorkspaceRepositoryError>()(
   "WorkspaceRepositoryError",
   {
     reason: Schema.Literals([

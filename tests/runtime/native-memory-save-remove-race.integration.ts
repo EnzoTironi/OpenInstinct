@@ -10,7 +10,7 @@ import { fileMemory } from "eve/memory/file";
 import type { ToolContext } from "eve/tools";
 import { createMemoryDocumentBackend } from "../../agent/lib/memory-document-backend";
 import { authorizePersonalMemoryContext } from "../../agent/lib/personal-memory-access";
-import { personalMemoryProvider } from "../../agent/lib/personal-memory-provider";
+import { personalMemoryProvider } from "../../server/executor/memory/personal-memory-provider";
 import { PersonalMemoryError } from "../../server/personal-memory/access";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";

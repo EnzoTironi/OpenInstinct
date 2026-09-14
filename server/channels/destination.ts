@@ -63,8 +63,13 @@ export const conversationDestinations = Effect.all({
     Effect.map((username) => `https://t.me/${username}`),
     Effect.catch(() => Effect.succeed(null))
   ),
-  imessage: Config.string("MARKETING_IMESSAGE_NUMBER").pipe(
-    Config.orElse(() => Config.string("LINQ_PHONE_NUMBER")),
+  imessage: Config.string("LINQ_CONNECTOR").pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(InstallationId)),
+    Effect.flatMap(() =>
+      Config.string("MARKETING_IMESSAGE_NUMBER").pipe(
+        Config.orElse(() => Config.string("LINQ_PHONE_NUMBER"))
+      )
+    ),
     Effect.flatMap(
       Schema.decodeUnknownEffect(
         Schema.String.check(Schema.makeFilter(isE164PhoneNumber))

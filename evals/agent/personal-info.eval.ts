@@ -1,4 +1,3 @@
-import { requirePersonalMemoryMembership } from "../../server/personal-memory/access";
 import { defineEval } from "eve/evals";
 import { includes, satisfies } from "eve/evals/expect";
 import { isDeepStrictEqual } from "node:util";
@@ -8,8 +7,6 @@ import {
   requireDeliveredText,
 } from "@evals/agent/shared";
 import { accessScopeForUser } from "@shared/identity/access-scope";
-import { ensureScope } from "@db/services/scope";
-import { serverRuntime } from "../../server/runtime";
 
 const firstNameCanary = "Evalina";
 const lastNameCanary = "Canary";
@@ -113,6 +110,10 @@ export default [
     tags: [...agentEvalTags, "personal-info", "memory", "isolation"],
     async test(t) {
       const { patchUserProfile } = await import("@db/services/user-profile");
+      const { ensureScope } = await import("@db/services/scope");
+      const { requirePersonalMemoryMembership } =
+        await import("../../server/personal-memory/access");
+      const { serverRuntime } = await import("../../server/runtime");
       const isolatedScope = accessScopeForUser(
         "better-auth:isolated-agent-eval"
       );

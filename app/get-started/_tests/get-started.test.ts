@@ -13,6 +13,7 @@ const channelConfig = vi.hoisted(() => ({
   TELEGRAM_BOT_ID: "test-bot-id",
   TELEGRAM_BOT_USERNAME: "companion_test_bot",
   LINQ_PHONE_NUMBER: "+15557654321",
+  LINQ_CONNECTOR: "",
 }));
 
 vi.mock("../../../server/channels/destination", async (importOriginal) => {
@@ -40,6 +41,7 @@ beforeEach(() => {
   channelConfig.KAPSO_PHONE_NUMBER = "+15551234567";
   channelConfig.TELEGRAM_BOT_USERNAME = "companion_test_bot";
   channelConfig.LINQ_PHONE_NUMBER = "+15557654321";
+  channelConfig.LINQ_CONNECTOR = "";
 });
 
 describe("conversation entry", () => {
@@ -59,6 +61,7 @@ describe("conversation entry", () => {
             MARKETING_WHATSAPP_NUMBER: "+553798136141",
             MARKETING_TELEGRAM_USERNAME: "TryZoenBot",
             MARKETING_IMESSAGE_NUMBER: "+553798136141",
+            LINQ_CONNECTOR: "linq/synthetic-test",
           })
         )
       )
@@ -93,6 +96,7 @@ describe("conversation entry", () => {
     expect(redirect).toHaveBeenCalledWith("https://t.me/companion_test_bot");
   });
   it("opens Messages at the configured number without adding message content", async () => {
+    channelConfig.LINQ_CONNECTOR = "linq/synthetic-test";
     await expect(
       GetStartedPage({
         params: Promise.resolve({}),
@@ -100,6 +104,14 @@ describe("conversation entry", () => {
       })
     ).rejects.toThrow("redirect");
     expect(redirect).toHaveBeenCalledWith("sms:+15557654321");
+  });
+  it("keeps iMessage unavailable until Linq is activated, even with a marketing number", async () => {
+    const page = await GetStartedPage({
+      params: Promise.resolve({}),
+      searchParams: Promise.resolve({ channel: "imessage" }),
+    });
+    expect(redirect).not.toHaveBeenCalled();
+    expect(renderToStaticMarkup(page)).not.toContain('href="sms:');
   });
   it("uses Telegram when the default channel is unavailable", async () => {
     channelConfig.KAPSO_PHONE_NUMBER = "";

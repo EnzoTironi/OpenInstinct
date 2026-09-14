@@ -1,6 +1,6 @@
 import { defineEval } from "eve/evals";
-import { satisfies } from "eve/evals/expect";
-import { isDeepStrictEqual } from "node:util";
+import { equals, satisfies } from "eve/evals/expect";
+import { executorInput, executorInvocations } from "./executor";
 import { vaultSetupRequestSchema } from "@shared/vault/schema";
 import {
   agentEvalTags,
@@ -77,7 +77,7 @@ export default [
       );
       turn.expectOk();
       turn.succeeded();
-      turn.calledTool("web_fetch", { count: 1 });
+      t.check(executorInvocations(turn, "web_fetch"), equals(1));
       turn.notEvent("subagent.called", { data: { name: "browser-agent" } });
       const text = await requireDeliveredText(t, turn);
       t.check(
@@ -106,9 +106,11 @@ export default [
       );
       turn.expectOk();
       turn.succeeded();
-      turn.calledTool("request_vault_setup", {
+      turn.calledTool("execute", {
         input: (input) => {
-          const parsed = vaultSetupRequestSchema.safeParse(input);
+          const parsed = vaultSetupRequestSchema.safeParse(
+            executorInput("request_vault_setup", input)
+          );
           return (
             parsed.success &&
             parsed.data.kind === "login" &&
@@ -144,30 +146,43 @@ export default [
       const turn = await t.send(
         "Send an email to eval-recipient@example.com with subject 'Eval approval check' and body 'This should wait for approval.'"
       );
-      turn.calledTool("gmail-send", {
-        input: (input) =>
-          isDeepStrictEqual(input, {
-            bcc: [],
-            body: "This should wait for approval.",
-            cc: [],
-            subject: "Eval approval check",
-            to: ["eval-recipient@example.com"],
-          }),
+      turn.calledTool("execute", {
+        input: {
+          call: {
+            path: "gmail-send",
+            input: {
+              bcc: [],
+              body: "This should wait for approval.",
+              cc: [],
+              subject: "Eval approval check",
+              to: ["eval-recipient@example.com"],
+            },
+          },
+        },
         status: "pending",
         count: 1,
       });
       turn.notCalledTool("send_message");
       turn.parked();
       t.requireInputRequest({
-        toolName: "gmail-send",
+        toolName: "execute",
+        input: { call: { path: "gmail-send" } },
         optionIds: ["approve", "cancel"],
       });
 
       const cancelled = await t.respondAll("cancel");
       cancelled.expectOk();
       cancelled.succeeded();
-      t.calledTool("gmail-send", { status: "rejected", count: 1 });
-      t.calledTool("gmail-send", { status: "completed", count: 0 });
+      t.calledTool("execute", {
+        input: { call: { path: "gmail-send" } },
+        status: "rejected",
+        count: 1,
+      });
+      t.calledTool("execute", {
+        input: { call: { path: "gmail-send" } },
+        status: "completed",
+        count: 0,
+      });
     },
   }),
   defineEval({
@@ -177,34 +192,41 @@ export default [
       const turn = await t.send(
         "Create a private calendar event titled 'Eval planning' on September 15, 2099 from 2:00 PM to 2:30 PM America/New_York (start 2099-09-15T14:00:00-04:00, end 2099-09-15T14:30:00-04:00). It has no attendees."
       );
-      turn.calledTool("calendar-create-event", {
-        input: (input) =>
-          isDeepStrictEqual(input, {
-            attendees: [],
-            calendarId: "primary",
-            end: "2099-09-15T14:30:00-04:00",
-            start: "2099-09-15T14:00:00-04:00",
-            summary: "Eval planning",
-            timezone: "America/New_York",
-          }),
+      turn.calledTool("execute", {
+        input: {
+          call: {
+            path: "calendar-create-event",
+            input: {
+              attendees: [],
+              calendarId: "primary",
+              end: "2099-09-15T14:30:00-04:00",
+              start: "2099-09-15T14:00:00-04:00",
+              summary: "Eval planning",
+              timezone: "America/New_York",
+            },
+          },
+        },
         status: "pending",
         count: 1,
       });
       turn.notCalledTool("send_message");
       turn.parked();
       t.requireInputRequest({
-        toolName: "calendar-create-event",
+        toolName: "execute",
+        input: { call: { path: "calendar-create-event" } },
         optionIds: ["approve", "cancel"],
       });
 
       const cancelled = await t.respondAll("cancel");
       cancelled.expectOk();
       cancelled.succeeded();
-      t.calledTool("calendar-create-event", {
+      t.calledTool("execute", {
+        input: { call: { path: "calendar-create-event" } },
         status: "rejected",
         count: 1,
       });
-      t.calledTool("calendar-create-event", {
+      t.calledTool("execute", {
+        input: { call: { path: "calendar-create-event" } },
         status: "completed",
         count: 0,
       });

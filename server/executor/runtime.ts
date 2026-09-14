@@ -59,7 +59,9 @@ export const runWorkspaceCode = Effect.fn("Executor.runWorkspaceCode")(
     if (result.error)
       return {
         ok: false,
-        text: result.error.slice(0, 2000),
+        text:
+          result.error.split("\n\n")[0]?.slice(0, 2000) ??
+          "Code execution failed.",
         logs: result.logs ?? [],
       };
     if (result.result === undefined && !result.output?.length)

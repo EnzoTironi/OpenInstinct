@@ -17,6 +17,79 @@ import { readVerifiedWebhook } from "../../server/channels/webhook";
 import { serverRuntime } from "../../server/runtime";
 import { drainChannelInbox, handoffChannelMessage } from "./channel-session";
 import { privateChannelEvents } from "./private-channel-events";
+import type { ProviderInputError } from "../../server/channels/provider-errors";
+
+const acceptChannelMessage = Effect.fn("acceptChannelMessage")(function* (
+  event: Exclude<InboundEvent, { kind: "command" }>
+) {
+  const identity = yield* (yield* ChannelAccounts)
+    .resolveVerifiedSender({
+      channel: event.channel,
+      installationId: event.installationId,
+      senderId: event.senderId,
+    })
+    .pipe(
+      Effect.catchTag("ChannelAccountError", (error) =>
+        error.reason === "registration_closed"
+          ? Effect.succeed(null)
+          : Effect.fail(error)
+      )
+    );
+  // Refusing one beta signup must not discard other events in a buffered delivery.
+  if (!identity) return null;
+  const group =
+    event.chatKind === "group"
+      ? yield* bindGroupChannelIdentity({
+          identityId: identity.id,
+          channel: event.channel,
+          installationId: event.installationId,
+          senderId: event.senderId,
+          chatId: event.chatId,
+        })
+      : undefined;
+  const payload = {
+    ...event.payload,
+    sourceOccurredAtMs: DateTime.toEpochMillis(
+      DateTime.makeUnsafe(event.occurredAt)
+    ),
+  };
+  yield* (yield* Messaging).accept({
+    identityId: identity.id,
+    eventId: event.eventId,
+    sourceMessageId: event.messageId,
+    payload: group
+      ? {
+          ...payload,
+          deliveryTargetId: group.deliveryTargetId,
+          conversationScope: group.conversationScope,
+        }
+      : payload,
+  });
+  return identity;
+});
+
+function channelInputResponse(
+  channel: Identity["channel"],
+  error: ProviderInputError
+) {
+  if (
+    channel === "telegram" &&
+    ["invalid_command", "stale_event"].includes(error.reason)
+  )
+    return Effect.logInfo("Telegram update refused", {
+      reason: error.reason,
+    }).pipe(Effect.as(new Response("ignored")));
+  return Effect.logWarning("Channel input rejected", {
+    channel,
+    reason: error.reason,
+  }).pipe(
+    Effect.as(
+      new Response("invalid event", {
+        status: error.reason === "configuration" ? 503 : 400,
+      })
+    )
+  );
+}
 
 const acceptLoginCommand = Effect.fn("acceptLoginCommand")(
   function* (event: Extract<InboundEvent, { kind: "command" }>) {
@@ -46,7 +119,7 @@ const acceptLoginCommand = Effect.fn("acceptLoginCommand")(
           channel: event.channel,
           command: event.command,
           reason: error.reason,
-        }).pipe(Effect.as({ status: "refused" as const }))
+        }).pipe(Effect.as({ status: "refused" as const, reason: error.reason }))
       ),
       Effect.catchTag("ChannelAuthPromptError", (error) =>
         error.reason === "invalid_input" || error.reason === "conflict"
@@ -75,8 +148,6 @@ export function privateChannel(channel: Identity["channel"]) {
             const provider =
               channel === "telegram" ? yield* Telegram : yield* Kapso;
             const events = yield* provider.parse(body);
-            const accounts = yield* ChannelAccounts;
-            const messaging = yield* Messaging;
             const identities = new Map<string, Identity>();
             const prompts: string[] = [];
             for (const event of events) {
@@ -91,49 +162,20 @@ export function privateChannel(channel: Identity["channel"]) {
                         event.eventId,
                         dispatchAuthFeedback(
                           event,
-                          result.status === "confirmed"
+                          result.status === "confirmed",
+                          result.status === "refused" &&
+                            "reason" in result &&
+                            result.reason === "registration_closed"
+                            ? "Zoen is in a private beta. This account needs an invitation."
+                            : undefined
                         )
                       )
                     )
                   );
                 }
               } else {
-                const identity = yield* accounts.resolveVerifiedSender({
-                  channel: event.channel,
-                  installationId: event.installationId,
-                  senderId: event.senderId,
-                });
-                const group =
-                  event.chatKind === "group"
-                    ? yield* bindGroupChannelIdentity({
-                        identityId: identity.id,
-                        channel: event.channel,
-                        installationId: event.installationId,
-                        senderId: event.senderId,
-                        chatId: event.chatId,
-                      })
-                    : undefined;
-                const occurredAtMs = DateTime.toEpochMillis(
-                  DateTime.makeUnsafe(event.occurredAt)
-                );
-                const payload = group
-                  ? {
-                      ...event.payload,
-                      sourceOccurredAtMs: occurredAtMs,
-                      deliveryTargetId: group.deliveryTargetId,
-                      conversationScope: group.conversationScope,
-                    }
-                  : {
-                      ...event.payload,
-                      sourceOccurredAtMs: occurredAtMs,
-                    };
-                yield* messaging.accept({
-                  identityId: identity.id,
-                  eventId: event.eventId,
-                  sourceMessageId: event.messageId,
-                  payload,
-                });
-                identities.set(identity.id, identity);
+                const identity = yield* acceptChannelMessage(event);
+                if (identity) identities.set(identity.id, identity);
               }
             }
             // Both ordinary inputs and login prompts are durable before ACK.
@@ -175,18 +217,14 @@ export function privateChannel(channel: Identity["channel"]) {
                   new Response("rejected", { status: error.status })
                 ),
               ProviderInputError: (error) =>
-                channel === "telegram" &&
-                (error.reason === "invalid_command" ||
-                  error.reason === "stale_event")
-                  ? Effect.logInfo("Telegram update refused", {
-                      reason: error.reason,
-                    }).pipe(Effect.as(new Response("ignored")))
-                  : Effect.succeed(
-                      new Response("invalid event", { status: 400 })
-                    ),
-              ChannelAccountError: () =>
+                channelInputResponse(channel, error),
+              ChannelAccountError: (error) =>
                 Effect.succeed(
-                  new Response("invalid challenge or identity", { status: 400 })
+                  error.reason === "registration_closed"
+                    ? new Response("ignored")
+                    : new Response("invalid challenge or identity", {
+                        status: 400,
+                      })
                 ),
               PayloadConflict: () =>
                 Effect.succeed(

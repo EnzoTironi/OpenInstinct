@@ -1,4 +1,5 @@
 import { getI18n } from "@web/i18n/server";
+import { env } from "@shared/environment";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
@@ -158,6 +159,21 @@ async function AccountSection({
 }
 
 async function AccountPlan({ userId }: { readonly userId: string }) {
+  if (env.ZOEN_BILLING_MODE === "free-beta") {
+    const { t } = await getI18n();
+    return (
+      <section className={styles.sectionCard} aria-labelledby="beta-plan">
+        <h2 id="beta-plan" className="type-section-title">
+          {t("Beta gratuito")}
+        </h2>
+        <p className="type-supporting-body text-muted-foreground">
+          {t(
+            "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta."
+          )}
+        </p>
+      </section>
+    );
+  }
   const entitlement = await readEntitlement("user", userId).catch(() => ({
     plan: "free" as const,
     status: "active",

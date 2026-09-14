@@ -1,5 +1,5 @@
 import { createEnv } from "@t3-oss/env-nextjs";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { z } from "zod";
 import { isE164PhoneNumber } from "@shared/identity/phone-number";
 import { databaseUrlSchema } from "@shared/environment/database-url";
@@ -139,7 +139,27 @@ export const env = createEnv({
       )
     ),
 
-    // Optional Stripe (hosted consumer billing). Free plan works without these.
+    ZOEN_REGISTRATION_MODE: z.enum(["open", "closed"]).default("open"),
+    ZOEN_BETA_IDENTITIES: z
+      .string()
+      .default("")
+      .transform((value) =>
+        value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      )
+      .refine(
+        (identities) =>
+          identities.every((item) => /^(telegram|kapso):[+0-9]+$/u.test(item)),
+        "Use comma-separated verified telegram:ID or kapso:NUMBER identities"
+      ),
+    ZOEN_BILLING_MODE: Schema.toStandardSchemaV1(
+      Schema.Literals(["free-beta", "paid"]).pipe(
+        Schema.withDecodingDefault(Effect.succeed("free-beta" as const))
+      )
+    ),
+    // Paid billing requires an explicit mode change as well as credentials.
     STRIPE_SECRET_KEY: Schema.toStandardSchemaV1(
       Schema.optional(
         Schema.RedactedFromValue(Schema.NonEmptyString, {

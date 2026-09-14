@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { defineEval } from "eve/evals";
-import { includes } from "eve/evals/expect";
+import { equals, includes } from "eve/evals/expect";
+import { executorInvocations } from "./executor";
 import { agentEvalTags, requireDeliveredText } from "@evals/agent/shared";
 import { saveWorkstreamSchema } from "@shared/workstreams/schema";
 
@@ -43,7 +44,7 @@ export default [
         t.check(text, includes(/aisle/iu));
         t.check(text, includes(/(?:0?9(?::00)?|nine)/iu));
         t.check(text, includes(/(?:11(?::00)?|eleven)/iu));
-        later.notCalledTool("schedules-create");
+        t.check(executorInvocations(later, "schedules-create"), equals(0));
         later.notCalledTool("browser-agent");
       } finally {
         if (id) {
