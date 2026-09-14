@@ -1,5 +1,6 @@
 import type { DynamicResolveContext } from "eve";
 import { defineInstructions } from "eve/instructions";
+import { isSharedPrincipal } from "../../shared/identity/principal-scope";
 
 interface AgentModeContext {
   readonly session: {
@@ -25,7 +26,7 @@ function sessionAgentMode(auth: AgentModeContext["session"]["auth"]) {
     return "scheduled-worker" as const;
   }
   const caller = auth.current ?? auth.initiator;
-  if (caller?.attributes.groupBindingId) return "shared" as const;
+  if (caller && isSharedPrincipal(caller)) return "shared" as const;
   return agentMode(caller?.authenticator);
 }
 

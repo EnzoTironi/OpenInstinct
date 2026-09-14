@@ -2,7 +2,10 @@ import { defineHook, type HookContext } from "eve/hooks";
 import { saveChat } from "@db/services/chats";
 import { ensureScope } from "@db/services/scope";
 import { claimSession } from "@db/services/sessions";
-import { scopeFromPrincipal } from "../../shared/identity/principal-scope";
+import {
+  isSharedPrincipal,
+  scopeFromPrincipal,
+} from "../../shared/identity/principal-scope";
 import { serverRuntime } from "../../server/runtime";
 import { workspaceActorFromPrincipal } from "../../server/workspaces/access";
 import { bindProtocolSession } from "../../server/a2a/tasks";
@@ -28,6 +31,15 @@ export default defineHook({
 async function claimOwnedSession(ctx: HookContext) {
   const initiator = ctx.session.auth.initiator;
   if (!initiator) return undefined;
+
+  // Native group history belongs to its channel address, never to the sender's
+  // private chat list. Bound workspace groups use their explicit grant below.
+  if (
+    initiator.authenticator === "verified-channel" &&
+    isSharedPrincipal(initiator) &&
+    !initiator.attributes.groupBindingId
+  )
+    return undefined;
 
   const scope =
     initiator.authenticator === "a2a" || initiator.attributes.groupBindingId

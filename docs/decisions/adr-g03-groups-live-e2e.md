@@ -74,3 +74,28 @@ contract.
 - Unit/fixture: `server/channels/groups-e2e-harness.test.ts`,
   `group-policy.test.ts`, Kapso/Telegram channel tests.
 - Live artifacts (when run): `/tmp/companion-groups-live-e2e/REPORT.md`.
+
+## Native runtime follow-up — 2026-09-14
+
+Ingress acceptance alone did not prove the agent could respond. Unbound native
+groups reached initialization paths that expected the sender's personal
+workspace. The runtime now classifies them as shared, uses the installation's
+model after checking the sender's live channel identity, and omits private
+profile/memory providers and private chat indexing. Workspace-bound groups keep
+their explicit grants. An installation model must be configured for unbound
+group conversations.
+
+Unbound groups produce operational telemetry without a private workspace owner
+or captured message content. Workspace content policy applies after an explicit
+group binding; a group never inherits a member's private diagnostics policy.
+
+The isolated native-runtime proof uses a dedicated PostgreSQL instance, two
+synthetic linked users, two group addresses, the installed Codex Luna model, and
+a Telegram delivery fixture. It verifies five completed deliveries: the first
+group reply, a second member continuing the same conversation, a private reply,
+private-to-group isolation, and isolation between groups. It also verifies that
+unmentioned chatter is ignored, a revoked sender is rejected, group history is
+absent from private session indexes, and group metrics omit private ownership
+and message payloads. This is runtime/provider-fixture evidence; real Telegram
+delivery is a separate production check. WhatsApp provider availability remains
+a separate launch constraint.
