@@ -40,6 +40,9 @@ jobs:
         # Each compiler/linter/test process also uses its own CPU pool.
         run: pnpm check --concurrency=1
 
+      - name: List native evaluations without provider credentials
+        run: node --import tsx scripts/run-agent-evals.ts --list
+
       - name: Check isolated infrastructure
         run: |
           pnpm --dir infrastructure peers check
