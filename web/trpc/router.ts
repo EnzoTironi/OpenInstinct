@@ -11,6 +11,8 @@ import { saveChatSchema } from "@shared/chat/schema";
 import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 import { serverRuntime } from "../../server/runtime";
 import { disconnectGoogleWorkspace } from "../../server/google-workspace";
+import { activatePersonalGoogle } from "../../server/google-workspace/settings";
+import { resolveWorkspaceActor } from "../../server/workspaces/session";
 import { IdentitySchema } from "../../server/accounts";
 import { revokeLinkedChannelIdentity } from "../../server/accounts/controls";
 import { userProfileSchema } from "@shared/user-profile/schema";
@@ -64,22 +66,31 @@ export const appRouter = createTRPCRouter({
           })
         )
       )
-      .mutation(async ({ ctx, input }) => {
+      .mutation(async ({ ctx, input, signal }) => {
         const returnTo = googleWorkspaceReturnTo(input.returnTo);
         if (input.action === "disconnect") {
           await serverRuntime.runPromise(
-            disconnectGoogleWorkspace(ctx.requestHeaders)
+            disconnectGoogleWorkspace(ctx.requestHeaders),
+            { signal }
           );
           const query = new URLSearchParams({
             google: "disconnected",
             returnTo,
           });
-          return { redirectTo: `/?${query}` };
+          return { redirectTo: `/?${query}`, authorize: false };
         }
-
+        const activation = await serverRuntime.runPromise(
+          resolveWorkspaceActor(ctx.requestHeaders).pipe(
+            Effect.flatMap(activatePersonalGoogle)
+          ),
+          { signal }
+        );
+        if (!activation.authorize)
+          return { redirectTo: returnTo, authorize: false };
         const query = new URLSearchParams({ returnTo });
         return {
           redirectTo: `/api/google-workspace/connect?${query}`,
+          authorize: true,
         };
       }),
   },

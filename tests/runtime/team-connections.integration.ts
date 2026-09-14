@@ -1,4 +1,5 @@
 import type * as GoogleWorkspace from "../../server/google-workspace";
+import type * as Environment from "@shared/environment";
 import { randomUUID } from "node:crypto";
 import { auth as google } from "@googleapis/gmail";
 import { symmetricEncrypt } from "better-auth/crypto";
@@ -16,6 +17,13 @@ import { runtimeDatabase } from "./database";
 import { workspaceFixture } from "./workspace-fixture";
 
 const fixtureKey = "synthetic-google-connection-key-for-tests-only";
+vi.mock("@shared/environment", async (original) => {
+  const actual = await original<typeof Environment>();
+  return {
+    ...actual,
+    env: { ...actual.env, GOOGLE_CLIENT_ID: "synthetic-client" },
+  };
+});
 vi.mock("../../db/services/auth", async () => {
   const { Effect: Fx } = await import("effect");
   return {
@@ -45,7 +53,10 @@ const services = WorkspaceRepository.layer.pipe(
 );
 afterEach(() => vi.restoreAllMocks());
 
-const googleFixture = Effect.fn("teamGoogle.fixture")(function* () {
+const googleFixture = Effect.fn("teamGoogle.fixture")(function* (
+  verification: boolean | string | number | null = true,
+  audience?: string
+) {
   const fixture = yield* workspaceFixture();
   const subject = randomUUID();
   const refresh = yield* Effect.promise(() =>
@@ -53,54 +64,93 @@ const googleFixture = Effect.fn("teamGoogle.fixture")(function* () {
   );
   yield* fixture.sql`INSERT INTO account (id, issuer, "accountId", "providerId", "userId", "refreshToken", scope, "updatedAt")
     VALUES (${subject}, 'https://accounts.google.com', ${subject}, 'google', ${fixture.actor.userId.slice(12)}, ${refresh}, ${googleWorkspaceScopes.join(" ")}, now())`;
-  vi.spyOn(google.OAuth2.prototype, "getTokenInfo").mockResolvedValue({
+  const identity = {
     sub: subject,
     email: "team@example.invalid",
     email_verified: true,
-    aud: "synthetic-client",
+    aud: audience ?? "synthetic-client",
     expiry_date: Date.now() + 3600_000,
     scopes: [...googleWorkspaceScopes],
-  });
+  };
+  // The provider client returns the raw wire field without normalizing its type.
+  Reflect.set(identity, "email_verified", verification);
+  vi.spyOn(google.OAuth2.prototype, "getTokenInfo").mockResolvedValue(identity);
   return fixture;
 });
 
-test("an explicit verified Google share enables team tools without moving personal credentials", () =>
+test.each([true, "true"])(
+  "an explicit verified Google share (%s) enables team tools without moving personal credentials",
+  (verification) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const { actor, guest, sql } = yield* googleFixture(verification);
+        expect(
+          Result.isFailure(
+            yield* shareGoogleConnection(guest).pipe(Effect.result)
+          )
+        ).toBe(true);
+        yield* shareGoogleConnection(actor);
+        expect((yield* readWorkspaceCapabilities(guest)).enabled).toContain(
+          "google"
+        );
+        expect(
+          Redacted.value(yield* getWorkspaceGoogleToken(guest)).token
+        ).toBe("synthetic-access-token");
+        const stored = yield* sql<{
+          credentials: string;
+          label: string;
+        }>`SELECT credentials, label FROM workspace_connections WHERE workspace_id = ${actor.workspaceId}`;
+        expect(stored[0]?.label).toBe("team@example.invalid");
+        expect(stored[0]?.credentials).not.toContain("synthetic-access-token");
+        yield* sql`DELETE FROM organization_memberships WHERE user_id = ${guest.userId}`;
+        expect(
+          Result.isFailure(
+            yield* getWorkspaceGoogleToken(guest).pipe(Effect.result)
+          )
+        ).toBe(true);
+        yield* disconnectWorkspaceGoogle(actor);
+        expect(
+          Result.isFailure(
+            yield* getWorkspaceGoogleToken(actor).pipe(Effect.result)
+          )
+        ).toBe(true);
+        expect(
+          yield* sql`SELECT id FROM account WHERE ('better-auth:' || "userId") = ${actor.userId}`
+        ).toHaveLength(1);
+      }).pipe(Effect.scoped, Effect.provide(services))
+    )
+);
+
+test.each([false, "false", "TRUE", "1", 1, null, ""])(
+  "an unverified wire value (%s) cannot authorize sharing Google",
+  (verification) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const { actor, sql } = yield* googleFixture(verification);
+        expect(
+          Result.isFailure(
+            yield* shareGoogleConnection(actor).pipe(Effect.result)
+          )
+        ).toBe(true);
+        expect(
+          yield* sql`SELECT workspace_id FROM workspace_connections WHERE workspace_id = ${actor.workspaceId}`
+        ).toEqual([]);
+      }).pipe(Effect.scoped, Effect.provide(services))
+    )
+);
+
+test("a verified token issued to another OAuth client cannot authorize team sharing", () =>
   Effect.runPromise(
     Effect.gen(function* () {
-      const { actor, guest, sql } = yield* googleFixture();
+      const { actor, sql } = yield* googleFixture(true, "another-client");
       expect(
         Result.isFailure(
-          yield* shareGoogleConnection(guest).pipe(Effect.result)
-        )
-      ).toBe(true);
-      yield* shareGoogleConnection(actor);
-      expect((yield* readWorkspaceCapabilities(guest)).enabled).toContain(
-        "google"
-      );
-      expect(Redacted.value(yield* getWorkspaceGoogleToken(guest)).token).toBe(
-        "synthetic-access-token"
-      );
-      const stored = yield* sql<{
-        credentials: string;
-        label: string;
-      }>`SELECT credentials, label FROM workspace_connections WHERE workspace_id = ${actor.workspaceId}`;
-      expect(stored[0]?.label).toBe("team@example.invalid");
-      expect(stored[0]?.credentials).not.toContain("synthetic-access-token");
-      yield* sql`DELETE FROM organization_memberships WHERE user_id = ${guest.userId}`;
-      expect(
-        Result.isFailure(
-          yield* getWorkspaceGoogleToken(guest).pipe(Effect.result)
-        )
-      ).toBe(true);
-      yield* disconnectWorkspaceGoogle(actor);
-      expect(
-        Result.isFailure(
-          yield* getWorkspaceGoogleToken(actor).pipe(Effect.result)
+          yield* shareGoogleConnection(actor).pipe(Effect.result)
         )
       ).toBe(true);
       expect(
-        yield* sql`SELECT id FROM account WHERE ('better-auth:' || "userId") = ${actor.userId}`
-      ).toHaveLength(1);
+        yield* sql`SELECT workspace_id FROM workspace_connections WHERE workspace_id = ${actor.workspaceId}`
+      ).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(services))
   ));
 

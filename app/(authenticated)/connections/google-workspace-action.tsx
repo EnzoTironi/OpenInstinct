@@ -16,7 +16,7 @@ export function GoogleWorkspaceAction({
   children,
   className,
 }: {
-  readonly state?: "connected" | "disconnected" | "unavailable";
+  readonly state?: "connected" | "paused" | "disconnected" | "unavailable";
   readonly returnTo?: string;
   readonly children?: ReactNode;
   readonly className?: string;
@@ -29,9 +29,9 @@ export function GoogleWorkspaceAction({
     onError: () => {
       setFailed(true);
     },
-    onSuccess: ({ redirectTo }) => {
-      if (state === "connected") router.refresh();
-      else window.location.assign(redirectTo);
+    onSuccess: ({ redirectTo, authorize }) => {
+      if (authorize) window.location.assign(redirectTo);
+      else router.refresh();
     },
   });
 
@@ -59,7 +59,9 @@ export function GoogleWorkspaceAction({
         {children ??
           (state === "connected"
             ? t("Desconectar Google")
-            : t("Conectar Google"))}
+            : state === "paused"
+              ? t("Ativar Google")
+              : t("Conectar Google"))}
       </Button>
       {failed && (
         <Alert variant="destructive">

@@ -1,4 +1,5 @@
 import { getI18n } from "@web/i18n/server";
+import { headers } from "next/headers";
 import { Effect, Result } from "effect";
 import { CheckIcon } from "lucide-react";
 import Link from "next/link";
@@ -6,7 +7,8 @@ import { requireRequestScope } from "@web/auth/request-scope";
 import { Button } from "@web/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@web/components/ui/alert";
 import { serverRuntime } from "../../../server/runtime";
-import { readGoogleWorkspaceConnection } from "../../../server/google-workspace";
+import { readPersonalGoogleSettings } from "../../../server/google-workspace/settings";
+import { resolveWorkspaceActor } from "../../../server/workspaces/session";
 import { PanelIntro } from "../_components/panel-intro";
 import styles from "../_components/panel.module.css";
 import { accessScopeForUser } from "@shared/identity/access-scope";
@@ -33,7 +35,10 @@ export default async function MailPage() {
       </div>
     );
   const connection = await serverRuntime.runPromise(
-    readGoogleWorkspaceConnection(scope).pipe(Effect.result)
+    resolveWorkspaceActor(await headers()).pipe(
+      Effect.flatMap(readPersonalGoogleSettings),
+      Effect.result
+    )
   );
   const connected =
     Result.isSuccess(connection) && connection.success.state === "connected";

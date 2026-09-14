@@ -38,6 +38,8 @@ const accountSchema = Schema.Struct({
   refreshToken: Schema.NullOr(Schema.String),
   scope: Schema.NullOr(Schema.String),
 });
+// Google's tokeninfo wire response can contain "true" despite the SDK's boolean type.
+const verifiedGoogleEmail = Schema.is(Schema.Literals([true, "true"]));
 
 export const readWorkspaceConnections = Effect.fn("readWorkspaceConnections")(
   function* (actor: typeof WorkspaceActorSchema.Type) {
@@ -90,7 +92,8 @@ export const shareGoogleConnection = Effect.fn("shareGoogleConnection")(
     }).pipe(Effect.timeout("20 seconds"));
     if (
       !identity.email ||
-      identity.email_verified !== true ||
+      !verifiedGoogleEmail(identity.email_verified) ||
+      identity.aud !== env.GOOGLE_CLIENT_ID ||
       identity.sub !== account.accountId
     ) {
       return yield* new GoogleWorkspaceError({

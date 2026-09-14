@@ -21,6 +21,7 @@ export function ConnectionList({
   const { t } = useI18n();
   const [manageGoogle, setManageGoogle] = useState(false);
   const connectedGoogle = googleState === "connected";
+  const pausedGoogle = googleState === "paused";
   const availableChannels = (["telegram", "kapso"] as const).filter(
     (channel) => !identities.some((identity) => identity.channel === channel)
   );
@@ -61,19 +62,34 @@ export function ConnectionList({
               )}
             </div>
           )}
+          {pausedGoogle && (
+            <GoogleWorkspaceAction
+              state={googleState}
+              returnTo={returnTo}
+              className={styles.row}
+            >
+              <ConnectionIcon provider="google" />
+              <span className={styles.copy}>
+                <span>Google</span>
+                <small>{t("Pausado · ativar")}</small>
+              </span>
+              <PlusIcon className={styles.trailing} aria-hidden="true" />
+            </GoogleWorkspaceAction>
+          )}
           <LinkedChannels identities={identities} />
         </div>
-        {!connectedGoogle && identities.length === 0 && (
+        {!connectedGoogle && !pausedGoogle && identities.length === 0 && (
           <p className={styles.empty}>
             {t("Suas conexões vão aparecer aqui.")}
           </p>
         )}
       </section>
-      {(!connectedGoogle || availableChannels.length > 0) && (
+      {((!connectedGoogle && !pausedGoogle) ||
+        availableChannels.length > 0) && (
         <section className={styles.group} aria-label={t("Adicionar conexão")}>
           <h2 className={styles.label}>{t("Adicionar conexão")}</h2>
           <div className={styles.list}>
-            {!connectedGoogle && (
+            {!connectedGoogle && !pausedGoogle && (
               <GoogleWorkspaceAction
                 state={googleState}
                 returnTo={returnTo}

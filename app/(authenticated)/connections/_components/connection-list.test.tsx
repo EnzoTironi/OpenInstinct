@@ -51,4 +51,16 @@ describe("connection directory", () => {
     expect(markup).not.toContain("Shopify");
     expect(markup).not.toContain("Notion");
   });
+  it("offers one activation for an authorized but paused Google plugin", () => {
+    const markup = renderToStaticMarkup(
+      <ConnectionList googleState="paused" identities={[]} returnTo="/" />,
+      "en"
+    );
+    expect(markup).toContain("Paused · enable");
+    expect(markup.match(/>Google</g)).toHaveLength(1);
+    expect(markup.indexOf("Paused · enable")).toBeLessThan(
+      markup.indexOf("Add a connection")
+    );
+    expect(markup).not.toContain("Your connections will appear here.");
+  });
 });
