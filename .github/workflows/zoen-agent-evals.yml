@@ -59,11 +59,15 @@ jobs:
         env:
           DATABASE_URL_UNPOOLED: postgresql://zoen_migrator:eval-migration-password@127.0.0.1:5432/companion_runtime_test
         run: |
-          docker exec -i \
-            -e ZOEN_APPLICATION_DATABASE_PASSWORD=eval-runtime-password \
-            -e ZOEN_MIGRATION_DATABASE_PASSWORD=eval-migration-password \
-            '${{ job.services.postgres.id }}' bash < infrastructure/postgres/bootstrap-application.sh
+          bootstrap() {
+            docker exec -i \
+              -e ZOEN_APPLICATION_DATABASE_PASSWORD=eval-runtime-password \
+              -e ZOEN_MIGRATION_DATABASE_PASSWORD=eval-migration-password \
+              '${{ job.services.postgres.id }}' bash < infrastructure/postgres/bootstrap-application.sh
+          }
+          bootstrap
           node scripts/migrate-hosted.ts
+          bootstrap
       - name: Prepare only model and browser provider credentials
         env:
           EVAL_PROVIDERS: ${{ secrets.ZOEN_EVAL_PROVIDERS }}
