@@ -43,6 +43,60 @@ function run(body: Parameters<typeof fixture>[0]) {
   );
 }
 
+test("native conversations separate private history and groups while sharing one group across senders", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      const otherIdentity = randomUUID();
+      yield* sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
+        SELECT ${otherIdentity}, channel, installation_id, ${otherIdentity}, user_id
+        FROM channel_identity WHERE id = ${identityId}`;
+      const firstGroup = "group:telegram:messaging-proof:-101";
+      const otherGroup = "group:telegram:messaging-proof:-202";
+      const cases = [
+        { identity: identityId, scope: undefined, address: identityId },
+        { identity: identityId, scope: firstGroup, address: firstGroup },
+        { identity: otherIdentity, scope: firstGroup, address: firstGroup },
+        { identity: identityId, scope: otherGroup, address: otherGroup },
+      ];
+      for (const scenario of cases) {
+        const text = "Synthetic conversation isolation check";
+        const payload = scenario.scope
+          ? { text, conversationScope: scenario.scope }
+          : { text };
+        yield* messaging.accept({
+          identityId: scenario.identity,
+          eventId: randomUUID(),
+          sourceMessageId: randomUUID(),
+          payload,
+        });
+        const first = yield* messaging.claimInbox({
+          identityId: scenario.identity,
+          leaseSeconds: 30,
+        });
+        if (!first) throw new Error("Missing conversation claim");
+        expect(first.nativeInput?.address).toBe(scenario.address);
+        yield* sql`UPDATE channel_inbox SET lease_expires_at = now() - interval '1 second' WHERE id = ${first.id}`;
+        const recovered = yield* messaging.claimInbox({
+          identityId: scenario.identity,
+          leaseSeconds: 30,
+        });
+        if (!recovered) throw new Error("Missing recovered conversation claim");
+        expect(recovered.nativeInput).toEqual(first.nativeInput);
+        yield* messaging.markAccepted({
+          lease: {
+            identityId: scenario.identity,
+            id: recovered.id,
+            leaseToken: recovered.leaseToken,
+          },
+          receipt: {
+            status: "accepted",
+            sessionId: `synthetic:${scenario.address}`,
+          },
+        });
+      }
+    })
+  ));
+
 test("input response fence survives concurrent replay and refuses uncertain redispatch", () =>
   run((messaging, sql, identityId) =>
     Effect.gen(function* () {

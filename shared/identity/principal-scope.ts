@@ -28,7 +28,10 @@ export function scopeFromPrincipal(
   if (
     ("authenticator" in input && input.authenticator === "a2a") ||
     input.attributes?.agentGrantId ||
-    input.attributes?.groupBindingId
+    input.attributes?.groupBindingId ||
+    input.attributes?.chatKind === "group" ||
+    (Schema.is(Schema.String)(input.attributes?.conversationScope) &&
+      input.attributes.conversationScope.startsWith("group:"))
   ) {
     throw new PrincipalScopeError({
       message:

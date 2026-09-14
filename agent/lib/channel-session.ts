@@ -30,15 +30,16 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
     const messaging = yield* Messaging;
     const receipt = yield* messaging.checkInboxLease(lease);
     const snapshot = receipt.nativeInput;
+    const group = groupBindingFromPayload(receipt.payload);
     const principal = channelPrincipal(
       identity,
       receipt.sourceMessageId ?? undefined,
-      groupBindingFromPayload(receipt.payload)
+      group
     );
     if (
       !snapshot ||
       snapshot.inputId !== receipt.id ||
-      snapshot.address !== identity.id ||
+      snapshot.address !== (group?.conversationScope ?? identity.id) ||
       snapshot.channel !== channel ||
       snapshot.principalId !== principal.principalId
     )
@@ -89,7 +90,6 @@ export const handoffChannelMessage = Effect.fn("handoffChannelMessage")(
               yield* requireChannelPrincipal(channel, auth);
               yield* messaging.checkInboxLease(lease);
               const transport = yield* ChannelTransport;
-              const group = groupBindingFromPayload(receipt.payload);
               const unsupported = {
                 identityId: identity.id,
                 deliveryKey: `unsupported:${receipt.id}`,
