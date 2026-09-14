@@ -947,5 +947,20 @@
   "Encerrar para todos": "Cerrar para todos",
   "Esta sala deixará de receber mensagens.": "Esta sala dejará de recibir mensajes.",
   "Beta gratuito": "Beta gratuita",
-  "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta.": "Tu espacio para probar Zoen. Sin tarjeta ni cobros durante la beta."
+  "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta.": "Tu espacio para probar Zoen. Sin tarjeta ni cobros durante la beta.",
+  "Contas anteriores": "Cuentas anteriores",
+  "Seu histórico foi preservado. As novas conversas usam sua conta atual.": "Tu historial se conserva. Las nuevas conversaciones usan tu cuenta actual.",
+  "Nenhuma conta arquivada.": "No hay cuentas archivadas.",
+  "Baixar memórias anteriores": "Descargar memorias anteriores",
+  "Baixar arquivos e versões": "Descargar archivos y versiones",
+  "Conversas anteriores": "Conversaciones anteriores",
+  "Mais mensagens": "Más mensajes",
+  "Mais arquivos": "Más archivos",
+  "Anexo": "Adjunto",
+  "Preservar conta anterior e vincular": "Conservar la cuenta anterior y vincular",
+  "Use a conta atual para novas conversas. A conta anterior ficará como arquivo acessível; suas sessões e rotinas serão interrompidas. Memórias e acessos de equipes não serão misturados.": "Usa tu cuenta actual para nuevas conversaciones. Tu cuenta anterior quedará accesible como archivo; sus sesiones y rutinas se detendrán. Las memorias y los accesos a equipos permanecerán separados.",
+  "Use a conta aberta neste navegador e confirme a vinculação no mensageiro. Se houver outra conta, você poderá revisar a recuperação antes de continuar.": "Usa la cuenta abierta en este navegador y confirma la vinculación en tu mensajero. Si existe otra cuenta, podrás revisar la recuperación antes de continuar.",
+  "Esta conta tem conexões, cofre ou acesso a equipes. A vinculação precisa de uma revisão para preservar esses acessos.": "Esta cuenta tiene conexiones, una bóveda o acceso a equipos. La vinculación requiere una revisión para conservar esos permisos.",
+  "Aguarde as entregas em andamento terminarem e tente novamente.": "Espera a que terminen las entregas en curso y vuelve a intentarlo.",
+  "Este mensageiro já pertence a outra conta Zoen. Você pode preservar essa conta como arquivo e usar a conta atual para novas conversas.": "Este mensajero ya pertenece a otra cuenta Zoen. Puedes conservar esa cuenta como archivo y usar tu cuenta actual para nuevas conversaciones."
 }

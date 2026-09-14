@@ -97,6 +97,15 @@ const publicError = (error: ChannelAuthError | ChannelAccountError) => {
       message:
         "This messenger is already associated with another account. Accounts are not merged.",
     });
+  if (error.reason === "archive_requires_review")
+    return new APIError("PRECONDITION_FAILED", {
+      message:
+        "This account has connections or access that requires separate review.",
+    });
+  if (error.reason === "account_busy")
+    return new APIError("LOCKED", {
+      message: "Wait for current deliveries to finish before linking accounts.",
+    });
   if (error.reason === "internal")
     return new APIError("INTERNAL_SERVER_ERROR", {
       message: "Unable to complete channel authentication",

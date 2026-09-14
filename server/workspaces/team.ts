@@ -75,7 +75,8 @@ export const inviteWorkspaceMember = Effect.fn("inviteWorkspaceMember")(
         // Exact handles can receive invites. Directory search is separately opt-in.
         const targets = yield* sql<{
           id: string;
-        }>`SELECT user_id AS id FROM user_directory WHERE username = ${handle}`;
+        }>`SELECT user_id AS id FROM user_directory WHERE username = ${handle}
+          AND NOT EXISTS (SELECT 1 FROM account_archive WHERE source_user_id = user_directory.user_id)`;
         const target = targets[0];
         if (!target || `better-auth:${target.id}` === actor.userId)
           return yield* new WorkspaceAccessDenied();

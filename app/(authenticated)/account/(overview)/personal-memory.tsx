@@ -3,8 +3,8 @@ import { Effect, Result } from "effect";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { inspectPersonalMemory } from "../../../server/personal-memory/export";
-import { serverRuntime } from "../../../server/runtime";
+import { inspectPersonalMemory } from "../../../../server/personal-memory/export";
+import { serverRuntime } from "../../../../server/runtime";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { buttonVariants } from "@web/components/ui/button";
 

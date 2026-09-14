@@ -32,6 +32,19 @@ export function NativeDeviceForm({
   const action = useAuthorizationRequest();
   const [loading, setLoading] = useState(true);
   const [resumeError, setResumeError] = useState<ChannelAuthorizationError>();
+  const bind = (archivePreviousAccount?: true) => {
+    const input = { id, purpose, token: window.location.hash.slice(1) };
+    if (archivePreviousAccount)
+      Object.assign(input, { archivePreviousAccount });
+    action.run(bindNativeBrowser(input), (result) => {
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}?id=${encodeURIComponent(id)}&purpose=${purpose}`
+      );
+      setBound(result);
+    });
+  };
   useEffect(() => {
     const controller = new AbortController();
     void Effect.runPromise(
@@ -80,7 +93,7 @@ export function NativeDeviceForm({
       <p>
         {purpose === "link"
           ? t(
-              "Use the account recently signed in to this browser, then return to your messenger conversation to confirm the association. If your messenger belongs to another account, the request will be refused. Accounts and their data are not combined."
+              "Use a conta aberta neste navegador e confirme a vinculação no mensageiro. Se houver outra conta, você poderá revisar a recuperação antes de continuar."
             )
           : t(
               "Bind this browser, then return to your messenger conversation and tell the assistant you are ready. You will be asked to approve this browser’s sign-in there."
@@ -90,27 +103,31 @@ export function NativeDeviceForm({
         type="button"
         disabled={action.busy}
         onClick={() => {
-          action.run(
-            bindNativeBrowser({
-              id,
-              purpose,
-              token: window.location.hash.slice(1),
-            }),
-            (result) => {
-              window.history.replaceState(
-                null,
-                "",
-                `${window.location.pathname}?id=${encodeURIComponent(id)}&purpose=${purpose}`
-              );
-              setBound(result);
-            }
-          );
+          bind();
         }}
       >
         {action.busy ? t("Binding browser…") : t("Use this browser")}
       </Button>
       {action.error ? (
         <p role="alert">{t(channelFailureMessage(action.error, purpose))}</p>
+      ) : null}
+      {purpose === "link" && action.error?.status === 409 ? (
+        <section className="space-y-4">
+          <p>
+            {t(
+              "Use a conta atual para novas conversas. A conta anterior ficará como arquivo acessível; suas sessões e rotinas serão interrompidas. Memórias e acessos de equipes não serão misturados."
+            )}
+          </p>
+          <Button
+            type="button"
+            disabled={action.busy}
+            onClick={() => {
+              bind(true);
+            }}
+          >
+            {t("Preservar conta anterior e vincular")}
+          </Button>
+        </section>
       ) : null}
       {purpose === "link" && action.error?.status === 401 ? (
         <SignInAgain callbackUrl="/account" />

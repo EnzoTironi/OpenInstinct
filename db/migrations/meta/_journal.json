@@ -281,6 +281,13 @@
       "when": 1789315589190,
       "tag": "0039_matrix_rooms",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1789359353889,
+      "tag": "0040_account-archives",
+      "breakpoints": true
     }
   ]
 }

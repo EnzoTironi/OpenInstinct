@@ -94,6 +94,7 @@ export const deviceRequestSchema = Schema.Struct({
 export const deviceBindingSchema = Schema.Struct({
   ...deviceRequestSchema.fields,
   token: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{43}$/u)),
+  archivePreviousAccount: Schema.optionalKey(Schema.Literal(true)),
 });
 export const deviceBoundSchema = Schema.Struct({
   ...deviceRequestSchema.fields,

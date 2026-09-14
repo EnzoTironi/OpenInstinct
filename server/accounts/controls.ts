@@ -21,22 +21,22 @@ const linkedIdentitySchema = Schema.Struct({
   senderId: IdentitySchema.fields.senderId,
 });
 
-const requireControlSession = Effect.fn("requireControlSession")(function* (
-  headers: Headers
-) {
-  const session = yield* readAuthSession(headers);
-  if (!session)
-    return yield* new AccountControlError({ reason: "unauthenticated" });
-  const scope = accessScopeForUser(`better-auth:${session.user.id}`);
-  const sql = yield* PgClient.PgClient;
-  const rows = yield* sql`
+export const requireControlSession = Effect.fn("requireControlSession")(
+  function* (headers: Headers) {
+    const session = yield* readAuthSession(headers);
+    if (!session)
+      return yield* new AccountControlError({ reason: "unauthenticated" });
+    const scope = accessScopeForUser(`better-auth:${session.user.id}`);
+    const sql = yield* PgClient.PgClient;
+    const rows = yield* sql`
     SELECT s.id FROM public.session s
     INNER JOIN workspace_memberships m ON m.user_id = ${scope.userId} AND m.workspace_id = ${scope.workspaceId}
     WHERE s.id = ${session.session.id} AND s."userId" = ${session.user.id} AND s."expiresAt" > clock_timestamp()`;
-  if (rows.length !== 1)
-    return yield* new AccountControlError({ reason: "unauthenticated" });
-  return session;
-});
+    if (rows.length !== 1)
+      return yield* new AccountControlError({ reason: "unauthenticated" });
+    return session;
+  }
+);
 
 export const readLinkedChannelIdentities = Effect.fn(
   "readLinkedChannelIdentities"

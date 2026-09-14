@@ -5,7 +5,7 @@
 # Never prints secrets.
 set -euo pipefail
 
-BASE_URL="${COMPANION_UPTIME_BASE_URL:-https://companion.tironi.xyz}"
+BASE_URL="${COMPANION_UPTIME_BASE_URL:-https://zoen.tironi.xyz}"
 ALERT=1
 QUIET=0
 
@@ -15,6 +15,7 @@ Usage: scripts/companion-uptime-probe.sh [--no-alert] [--quiet]
 
 Probes:
   GET  $BASE_URL/welcome                     expect HTTP 200
+  GET  $BASE_URL/eve/v1/health               expect HTTP 200
   POST $BASE_URL/api/channels/telegram       unsigned JSON → expect HTTP 401
   POST $BASE_URL/api/channels/kapso          unsigned JSON → expect HTTP 401
 
@@ -57,7 +58,7 @@ http_code() {
   # usage: http_code METHOD URL [curl args...]
   local method="$1" url="$2"
   shift 2
-  curl -sS -o /dev/null -w '%{http_code}' --max-time 25 -X "$method" "$url" "$@"
+  curl -sS -o /dev/null -w '%{http_code}' --max-time 25 -X "$method" "$url" "$@" || true
 }
 
 failures=()
@@ -128,6 +129,10 @@ push_alert() {
 
 need_curl
 check_welcome
+runtime_code="$(http_code GET "${BASE_URL}/eve/v1/health")"
+if [[ "$runtime_code" != "200" ]]; then
+  failures+=("GET /eve/v1/health → ${runtime_code} (expected 200)")
+fi
 check_unsigned_channel "/api/channels/telegram" "tg" '{"update_id":1}'
 check_unsigned_channel "/api/channels/kapso" "kapso" '{}'
 

@@ -75,9 +75,16 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
             .update(JSON.stringify([input.sourceMessageId, canonical.hash]))
             .digest("hex")
         : canonical.hash;
+    const identityScope =
+      lane === "inbox"
+        ? sql`identity_id IN (SELECT previous.id FROM channel_identity previous
+          JOIN channel_identity current ON current.channel = previous.channel
+            AND current.installation_id = previous.installation_id AND current.sender_id = previous.sender_id
+          WHERE current.id = ${input.identityId})`
+        : sql`identity_id = ${input.identityId}`;
     const existing = yield* sql<{ id: string; hash: string }>`
       SELECT id, ${sql(queue.hash)} AS hash FROM ${table}
-      WHERE identity_id = ${input.identityId} AND ${sql(queue.key)} = ${input.key}`;
+      WHERE ${identityScope} AND ${sql(queue.key)} = ${input.key}`;
     const previous = existing[0];
     if (previous) {
       if (previous.hash !== hash) {

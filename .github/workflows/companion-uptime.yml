@@ -2,12 +2,17 @@
 # Manual curl checklists are NOT enough alone — this schedule fails the job
 # (GitHub Actions failure notification) and optionally posts to a webhook/ntfy
 # when repo secrets are configured. Never print secret values.
-name: Companion uptime
+name: Zoen uptime
 
 on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+    inputs:
+      alert_drill:
+        description: Exercise the incident notification path without interrupting production
+        type: boolean
+        default: false
 
 concurrency:
   group: companion-uptime
@@ -50,3 +55,41 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.ZOEN_FLY_OPERATIONS_TOKEN }}
         run: node operations.ts check
+
+  incident:
+    name: Report failure or recovery
+    if: always() && github.ref == 'refs/heads/main'
+    needs: [probe, postgres]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      PROBE: ${{ needs.probe.result }}
+      POSTGRES: ${{ needs.postgres.result }}
+      DRILL: ${{ inputs.alert_drill }}
+    steps:
+      - name: Maintain one actionable incident
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          const gh = args => execFileSync('gh', args, { encoding: 'utf8' }).trim();
+          const title = '[Zoen uptime] Service incident';
+          const open = JSON.parse(gh(['issue', 'list', '--state', 'open', '--search', '"[Zoen uptime]" in:title', '--json', 'number,title'])).find(issue => issue.title === title);
+          const healthy = process.env.PROBE === 'success' && process.env.POSTGRES === 'success';
+          const drill = process.env.DRILL === 'true';
+          const body = (drill && healthy ? 'ALERT DRILL: production is healthy. This exercises notification and recovery.\n\n' : '') +
+            `Public service: ${process.env.PROBE}\nDatabase, backup and private services: ${process.env.POSTGRES}\n\n[Run evidence](${process.env.RUN_URL})\n`;
+          writeFileSync('incident.md', body);
+          if ((!healthy || drill) && !open) {
+            gh(['issue', 'create', '--title', title, '--body-file', 'incident.md', '--assignee', process.env.GH_REPO.split('/')[0]]);
+          } else if (healthy && !drill && open) {
+            writeFileSync('incident.md', 'RECOVERED: both probes passed.\n\n' + body);
+            gh(['issue', 'comment', String(open.number), '--body-file', 'incident.md']);
+            gh(['issue', 'close', String(open.number), '--reason', 'completed']);
+          }
+          JS

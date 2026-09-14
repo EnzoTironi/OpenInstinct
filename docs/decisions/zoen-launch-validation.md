@@ -1,11 +1,61 @@
 # Zoen launch validation
 
-Status: Executor ownership is merged and deployed. Final native validation is
-blocked by the configured model's usage quota; cross-account messenger linking
-and the other unchecked journeys remain incomplete. This is not launch approval.
+Status: the launch candidate implements guarded messenger account recovery and
+passes the isolated account/team journeys in all three languages. Hosted checks,
+fresh native evals, production promotion and the live pilot remain release gates.
+This ledger is evidence, not launch approval.
 Baseline: `601014ec894fb7ae482373495400cfe796c860af`.
 This ledger tracks the launch work after the verified team-agents release.
 A passing component test is not a completed user journey or a live-provider proof.
+
+## 2026-09-14 launch candidate: requested points 1, 3, 4 and 5
+
+- Recovery requires an explicit browser choice, a fresh Better Auth session and
+  an exact native approval in the existing messenger session. The previous account
+  remains a private archive. New channel identity IDs prevent old continuations
+  and approvals from acquiring the target account's authority. Old browser sessions,
+  routines and agent grants are revoked or paused; team permissions are not copied.
+- Automatic recovery refuses verified email/phone accounts, Google/credential
+  accounts, vaults, web conversations and organization/team memberships. The current
+  pilot's WhatsApp account has no Google connection, organization, vault or web chat;
+  Telegram and WhatsApp still belong to separate accounts in production.
+- Tests cover missing recovery consent, stale or substituted sessions, a changed
+  eligibility state at consumption, deliveries in flight, concurrent consumption,
+  native confirmation without the recovery flag, old native addresses, duplicate
+  provider events, altered replay payloads, archive ownership and session revocation.
+- Actual 390 × 844 browser flows passed in PT-BR, English and Spanish: sign-in,
+  username, company creation, invitation, acceptance, personal/work switching,
+  archive recovery, reading preserved history, and removing a member. Messenger
+  confirmations in these isolated flows are simulated through the real native-auth
+  service; this does not claim a completed live WhatsApp/Telegram journey. Google
+  sharing/revocation and refresh races pass against real PostgreSQL with a provider
+  fixture; a fresh live Google journey remains separate evidence.
+- `pnpm check`: 1,360 passing tests, three intentional skips, types/lint/format/dead
+  code checks passed. Runtime: 137 passing tests, including a real isolated Synapse
+  homeserver. `pnpm build` passed. No production database was used for these tests.
+- A warm local production build served 480 read-only requests across readiness,
+  Eve health, welcome and sign-in, at concurrency 1/5/20, with zero failures. At 20
+  concurrent requests, throughput was 360.61 requests/s, p95 92.79 ms and p99 134.15 ms.
+  These are local application/storage measurements, not production capacity or LLM
+  response latency. After an abrupt SIGKILL of the isolated PostgreSQL container,
+  readiness correctly returned 503, recovered to 200 after restart, and retained
+  all 24 identities, three archives and nine invitations in that fixture database.
+- Production inspection: backup repository and WAL archiving healthy; 26 backups,
+  3% database disk usage, 9,402,148 KiB available. Available VM memory was about
+  1.13 GB for web and 0.70/0.66/0.69 GB for PostgreSQL/Mem0/Matrix respectively.
+  This is one observation at idle, not a sustained production load claim.
+- A new Alchemy restore drill is running against an isolated temporary machine:
+  [recovery run](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34807631468).
+  The uptime workflow now maintains an assigned incident issue on failure and closes
+  it after recovery, with an explicit alert-drill input. The end-to-end notification
+  drill must still be executed after this workflow reaches main.
+- Migration `0040` is additive except for allowing historical revoked identities
+  alongside one active provider address. Once recovery has been used, deploy only
+  versions which prefer the active identity; older lookup code is not a safe rollback
+  target. Preserve both source data and archive records during a forward repair.
+- Spark quota is available again. The models remain unchanged. A successful native
+  evaluation on the exact merged commit is still required by the Alchemy deploy
+  workflow; no gate or provider limit has been bypassed.
 
 ## Release gates
 
