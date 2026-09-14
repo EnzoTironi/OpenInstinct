@@ -1,8 +1,10 @@
 # Zoen launch validation
 
-Status: the launch candidate implements guarded messenger account recovery and
-passes the isolated account/team journeys in all three languages. Hosted checks,
-fresh native evals, production promotion and the live pilot remain release gates.
+Status: guarded messenger recovery is merged and its hosted checks passed. The
+isolated account/team journeys pass in all three languages. A live Google pilot
+found two additional activation/sharing defects, now covered by regression tests.
+Native browser evaluation is blocked by provider credits; production promotion
+and the complete live messenger recovery journey remain release gates.
 This ledger is evidence, not launch approval.
 Baseline: `601014ec894fb7ae482373495400cfe796c860af`.
 This ledger tracks the launch work after the verified team-agents release.
@@ -44,11 +46,15 @@ A passing component test is not a completed user journey or a live-provider proo
   3% database disk usage, 9,402,148 KiB available. Available VM memory was about
   1.13 GB for web and 0.70/0.66/0.69 GB for PostgreSQL/Mem0/Matrix respectively.
   This is one observation at idle, not a sustained production load claim.
-- A new Alchemy restore drill is running against an isolated temporary machine:
+- A new Alchemy restore drill passed against an isolated temporary machine,
+  including PostgreSQL `amcheck`:
   [recovery run](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34807631468).
   The uptime workflow now maintains an assigned incident issue on failure and closes
-  it after recovery, with an explicit alert-drill input. The end-to-end notification
-  drill must still be executed after this workflow reaches main.
+  it after recovery. The live [alert drill](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34808229422)
+  opened assigned [incident #90](https://github.com/EnzoTironi/OpenInstinct/issues/90),
+  and the following [healthy run](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34808443382)
+  commented and closed it automatically. This proves the GitHub incident path,
+  not receipt of an email or push notification on the owner's device.
 - Migration `0040` is additive except for allowing historical revoked identities
   alongside one active provider address. Once recovery has been used, deploy only
   versions which prefer the active identity; older lookup code is not a safe rollback
@@ -56,6 +62,47 @@ A passing component test is not a completed user journey or a live-provider proo
 - Spark quota is available again. The models remain unchanged. A successful native
   evaluation on the exact merged commit is still required by the Alchemy deploy
   workflow; no gate or provider limit has been bypassed.
+
+### Fresh hosted and live evidence
+
+- [Recovery PR #89](https://github.com/EnzoTironi/OpenInstinct/pull/89) is merged as
+  `4b050e85143845aeae37fdd9f41a0c80a33ee737`. Its [main checks](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34808180699)
+  and [Alchemy plan](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34808540182)
+  passed. A plan does not deploy the application.
+- The [native run on that exact commit](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34808227600)
+  passed four of five scenarios. Browser execution failed before tool use because
+  OpenRouter rejected the configured output budget for insufficient credits.
+  The release gate remains failed; models, token budget and approval requirements
+  have not been weakened to obtain a passing score.
+- A short public production probe completed 600 requests at concurrency five,
+  with zero errors, p95 86.40 ms and p99 138.15 ms. It exercised `/welcome`,
+  `/sign-in` and Eve health through Cloudflare over 6.84 seconds. This is neither
+  a sustained model benchmark nor proof of messenger throughput. The new database
+  readiness route is not yet deployed; the old release redirects it to sign-in.
+- The actual pilot's Google credentials were connected while the workspace's
+  Google plugin was disabled, leaving native discovery without Google tools.
+  After explicit activation through the UI, production receipts show successful
+  `gmail-search` (1,018 ms) and `calendar-list-events` (650 ms). The queries used a
+  synthetic message ID and a one-minute window in 2099, returned zero records and
+  performed no external mutations. Connection and mail screens now distinguish
+  paused authorization; the connect action enables the personal plugin, and can
+  resume an existing grant without another OAuth redirect. Reads never reactivate
+  an explicitly disabled plugin or share credentials with a team.
+- Live team sharing failed before storing a team credential. Google's tokeninfo
+  endpoint supplied `email_verified` as the string `"true"`, despite the SDK's
+  boolean declaration. The fix accepts only boolean `true` or exact string `"true"`,
+  verifies the subject and OAuth audience, and rejects false/string-false/other
+  truthy values. Provider-fixture regressions include revocation and token-refresh
+  races; successful live sharing/revocation still requires the fixed deployment.
+- The served application remains `5c18eaaa5da24039350e683f6da22e18242f7e86`.
+  No production identities were consolidated or source histories rewritten during
+  these checks. The archived-account flow must be exercised after promotion.
+- Google follow-up validation: `pnpm check` passed with 1,361 tests and three
+  intentional skips; all 149 runtime tests passed against isolated PostgreSQL
+  and Matrix; the production build passed. In the built UI, a synthetic account
+  with an existing OAuth grant showed Google as paused, then reactivated it with
+  one click while retaining the open connections sheet and avoiding another OAuth
+  redirect. This UI fixture is distinct from the live-provider receipts above.
 
 ## Release gates
 

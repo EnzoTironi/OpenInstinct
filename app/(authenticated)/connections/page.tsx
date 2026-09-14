@@ -7,7 +7,8 @@ import { cn } from "@web/components/class-names";
 import { getI18n } from "@web/i18n/server";
 import { googleWorkspaceReturnTo } from "@shared/google-workspace/connection";
 import { serverRuntime } from "../../../server/runtime";
-import { readGoogleWorkspaceConnection } from "../../../server/google-workspace";
+import { readPersonalGoogleSettings } from "../../../server/google-workspace/settings";
+import { resolveWorkspaceActor } from "../../../server/workspaces/session";
 import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 import { Alert, AlertTitle, AlertDescription } from "@web/components/ui/alert";
 import { ConnectionList } from "./_components/connection-list";
@@ -33,7 +34,10 @@ export default async function ConnectionsPage({
   const requestHeaders = await headers();
   const [google, messengers] = await Promise.all([
     serverRuntime.runPromise(
-      readGoogleWorkspaceConnection(scope).pipe(Effect.result)
+      resolveWorkspaceActor(requestHeaders).pipe(
+        Effect.flatMap(readPersonalGoogleSettings),
+        Effect.result
+      )
     ),
     serverRuntime.runPromise(
       readLinkedChannelIdentities(requestHeaders).pipe(Effect.result)
