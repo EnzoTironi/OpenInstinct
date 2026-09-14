@@ -54,7 +54,18 @@ jobs:
           node --input-type=module <<'JS'
           import { mkdirSync, writeFileSync } from 'node:fs';
           import { join } from 'node:path';
+          import { parseEnv } from 'node:util';
           if (!process.env.ZOEN_PRODUCTION_ENV || !process.env.ZOEN_ALCHEMY_STATE) throw new Error('Production configuration is missing');
+          const mask = value => {
+            if (typeof value === 'string' && value.length >= 8) {
+              console.log('::add-mask::' + value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A'));
+              try { const nested = JSON.parse(value); if (nested && typeof nested === 'object') mask(nested); } catch {}
+            } else if (value && typeof value === 'object') {
+              Object.values(value).forEach(mask);
+            }
+          };
+          mask(parseEnv(process.env.ZOEN_PRODUCTION_ENV));
+          mask(process.env.ZOEN_ALCHEMY_STATE);
           const directory = join(process.env.HOME, '.alchemy');
           mkdirSync(join(directory, 'credentials', 'ci'), { recursive: true, mode: 0o700 });
           writeFileSync(join(directory, 'profiles.json'), JSON.stringify({version: 0, profiles: {ci: {Fly: {method: 'env'}, Cloudflare: {method: 'env'}}}}), {mode: 0o600});
