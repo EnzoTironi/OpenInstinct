@@ -21,6 +21,12 @@ import {
   searchWorkspaceBots,
 } from "../../server/workspaces/bots";
 import {
+  DelegateVaultItemSchema,
+  delegateVaultItem,
+  listDelegatedVaultItems,
+  revokeVaultDelegation,
+} from "../../server/workspaces/vault";
+import {
   disconnectWorkspaceGoogle,
   readWorkspaceConnections,
   shareGoogleConnection,
@@ -202,5 +208,48 @@ export const workspaceAgentsRouter = {
     disconnectGoogle: workspaceProcedure.mutation(({ ctx, signal }) =>
       serverRuntime.runPromise(disconnectWorkspaceGoogle(ctx.actor), { signal })
     ),
+  },
+  vault: {
+    list: workspaceProcedure.query(({ ctx, signal }) =>
+      serverRuntime.runPromise(
+        listDelegatedVaultItems({
+          userId: ctx.actor.userId,
+          workspaceId: ctx.actor.workspaceId,
+        }).pipe(
+          Effect.catchTag("WorkspaceAccessDenied", () =>
+            Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+          )
+        ),
+        { signal }
+      )
+    ),
+    delegate: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(DelegateVaultItemSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          delegateVaultItem(ctx.actor, input).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            )
+          ),
+          { signal }
+        )
+      ),
+    revoke: workspaceProcedure
+      .input(
+        Schema.toStandardSchemaV1(
+          Schema.Struct({ id: Schema.String.check(Schema.isUUID()) })
+        )
+      )
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          revokeVaultDelegation(ctx.actor, input.id).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            )
+          ),
+          { signal }
+        )
+      ),
   },
 };

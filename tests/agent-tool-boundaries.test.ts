@@ -176,6 +176,16 @@ describe("root and worker capability boundaries", () => {
     ).toContain(
       'from "../../../agent/subagents/browser-agent/lib/autofill/native"'
     );
+    expect(
+      readFileSync(`${executorBrowser}/fill_from_vault.ts`, "utf8")
+    ).toContain("releaseDelegatedSecret");
+    expect(
+      readFileSync(`${executorBrowser}/fill_from_vault.ts`, "utf8")
+    ).not.toContain("readVaultSecret");
+    expect(existsSync(`${executorBrowser}/get_password.ts`)).toBe(false);
+    expect(existsSync(`${executorBrowser}/get_totp.ts`)).toBe(false);
+    expect(existsSync(`${workerTools}/get_password.ts`)).toBe(false);
+    expect(existsSync(`${workerTools}/get_totp.ts`)).toBe(false);
   });
 
   it("requires structured completion for initial and resumed worker calls", () => {
