@@ -21,8 +21,8 @@ importers:
         specifier: 2.0.0-beta.76
         version: 2.0.0-beta.76(@effect/platform-node@4.0.0-rc.112(effect@4.0.0-rc.112)(redis@6.2.1))(@types/node@24.10.4)(effect@4.0.0-rc.112)(hono@4.13.5)(vite@8.2.2(@types/node@24.10.4)(esbuild@0.28.2)(yaml@2.9.0))
       '@distilled.cloud/fly-io':
-        specifier: 1.0.0-rc.8
-        version: 1.0.0-rc.8(effect@4.0.0-rc.112)
+        specifier: 1.0.0-rc.9
+        version: 1.0.0-rc.9(effect@4.0.0-rc.112)
       '@effect/platform-node':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(redis@6.2.1)
@@ -272,8 +272,18 @@ packages:
     peerDependencies:
       effect: '>=4.0.0-rc.112 || >=4.0.0'
 
+  '@distilled.cloud/core@1.0.0-rc.9':
+    resolution: {integrity: sha512-42JhW0d0cD1U3vO6gZ7QiXjtHtzd+SNz9hYrznIcL/R61cl6tLePs6C6zfOjGAgO2xp4/E/FAFzi3iNx0eEBGw==}
+    peerDependencies:
+      effect: '>=4.0.0-rc.112 || >=4.0.0'
+
   '@distilled.cloud/fly-io@1.0.0-rc.8':
     resolution: {integrity: sha512-0HqVLIpBxmuvrIrnmziz8iK39F5cBxkHlz43WR2s+tFidbPlCzmnci6gxixxiwMBCzcmiRmv57xQxuQzgfDQMw==}
+    peerDependencies:
+      effect: '>=4.0.0-rc.112 || >=4.0.0'
+
+  '@distilled.cloud/fly-io@1.0.0-rc.9':
+    resolution: {integrity: sha512-MchXCinyJKfscWMCbJi6Vw94PJj2Q4OptyxcIvZ8odCNNCbS43RB3spSSeZihX79xenVn8SFJYtwonEJmSvkZg==}
     peerDependencies:
       effect: '>=4.0.0-rc.112 || >=4.0.0'
 
@@ -2384,9 +2394,18 @@ snapshots:
     dependencies:
       effect: 4.0.0-rc.112
 
+  '@distilled.cloud/core@1.0.0-rc.9(effect@4.0.0-rc.112)':
+    dependencies:
+      effect: 4.0.0-rc.112
+
   '@distilled.cloud/fly-io@1.0.0-rc.8(effect@4.0.0-rc.112)':
     dependencies:
       '@distilled.cloud/core': 1.0.0-rc.8(effect@4.0.0-rc.112)
+      effect: 4.0.0-rc.112
+
+  '@distilled.cloud/fly-io@1.0.0-rc.9(effect@4.0.0-rc.112)':
+    dependencies:
+      '@distilled.cloud/core': 1.0.0-rc.9(effect@4.0.0-rc.112)
       effect: 4.0.0-rc.112
 
   '@distilled.cloud/hetzner@1.0.0-rc.8(effect@4.0.0-rc.112)':
