@@ -24,9 +24,9 @@ Fly vault secrets; they do not enter Git, image layers or public CI artifacts.
 
 The root agent keeps the `codex-local` profile. Browser execution has its own
 explicit provider and vision model: production uses `codex-local` with
-`gpt-5.6-luna` at low reasoning through the existing ChatGPT login. Spark remains
-the coordinator: live validation confirmed that Spark rejects images while Luna
-accepts them. The native launch suite uses this same pair. Other
+`gpt-5.6-luna` at low reasoning through the existing ChatGPT login. The coordinator
+also uses Luna after it passed all 55 native launch gates; Spark remains configurable
+but failed the Spanish persistence scenario and does not accept images. The native launch suite uses this same pair. Other
 installations default to Gateway with `meta/muse-spark-1.3`; set
 `COMPANION_BROWSER_MODEL_PROVIDER` and `COMPANION_BROWSER_MODEL` to change that
 selection. There is no automatic provider or model fallback. The browser resolves

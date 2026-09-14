@@ -1,6 +1,8 @@
 # Codex subscription launch profile
 
-The launch profile uses `gpt-5.3-codex-spark` for the coordinator and `gpt-5.6-luna` with `reasoning: low` for the browser worker. Both use Eve's existing ChatGPT authentication adapter. This configuration is identical in Alchemy and the native evaluation workflow.
+The launch profile uses `gpt-5.6-luna` with `reasoning: low` for the coordinator and browser worker. Both use Eve's existing ChatGPT authentication adapter. This configuration is identical in Alchemy and the native evaluation workflow. Spark remains a supported configuration option.
+
+The native launch comparison on 2026-09-14 kept the same five scenarios and gates. Spark as coordinator passed four scenarios but did not persist the Spanish procedure's result; its other two language scenarios recovered from failed tool attempts. Luna passed all five scenarios and all 55 gates, with no failed tool attempts across English, Portuguese and Spanish. These isolated runs justify the launch default, not a general ranking of the models. The exact-commit hosted gate still requires repeated runs before deployment.
 
 A live probe on 2026-09-14 used synthetic arithmetic and the existing Zoen avatar. Spark answered the text request in 2.04 s but rejected the image request. Luna answered the text request in 1.63 s and identified the green character in 2.25 s. These are individual capability probes, not comparative quality benchmarks. The account's model catalog reports 128,000 tokens for Spark and 272,000 for Luna. The full native launch suite remains the publication gate.
 

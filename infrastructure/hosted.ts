@@ -263,6 +263,7 @@ export const hosted = Effect.gen(function* () {
       EVE_NEXT_PRODUCTION_PORT: "4274",
       PRIMARY_REGION: region,
       COMPANION_MODEL_PROVIDER: "codex-local",
+      COMPANION_CODEX_MODEL: "gpt-5.6-luna",
       COMPANION_BROWSER_MODEL_PROVIDER: "codex-local",
       COMPANION_BROWSER_MODEL: "gpt-5.6-luna",
       ZOEN_REGISTRATION_MODE: "closed",
