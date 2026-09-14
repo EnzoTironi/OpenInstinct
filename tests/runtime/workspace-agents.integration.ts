@@ -48,7 +48,7 @@ test("bot discovery is opt-in and grants never cross bot or workspace boundaries
     Effect.gen(function* () {
       const { actor, guest, personal } = yield* workspaceFixture();
       const bot = yield* saveWorkspaceBot(actor, profile());
-      expect(yield* searchWorkspaceBots(bot.username)).toEqual([]);
+      expect(yield* searchWorkspaceBots(actor, bot.username)).toEqual([]);
       denied(yield* readAgentCard(bot.username, null).pipe(Effect.result));
       denied(yield* saveWorkspaceBot(guest, profile()).pipe(Effect.result));
       denied(yield* issueAgentGrant(guest, grantInput).pipe(Effect.result));
@@ -78,7 +78,9 @@ test("bot discovery is opt-in and grants never cross bot or workspace boundaries
         }).pipe(Effect.result)
       );
       yield* saveWorkspaceBot(actor, { ...bot, discoverable: true });
-      expect(yield* searchWorkspaceBots(bot.username)).toHaveLength(1);
+      expect(yield* searchWorkspaceBots(actor, bot.username)).toHaveLength(1);
+      expect(yield* searchWorkspaceBots(guest, bot.username)).toHaveLength(1);
+      expect(yield* searchWorkspaceBots(personal, bot.username)).toEqual([]);
       expect(
         (yield* readAgentCard(bot.username, null)).supportedInterfaces[0]
           ?.protocolVersion

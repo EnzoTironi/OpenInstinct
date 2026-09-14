@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import {
   OntologySchema,
   OntologyActionSchema,
@@ -8,7 +9,7 @@ import {
   publishOntology,
   readOntology,
 } from "../../server/workspaces/ontology";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { serverRuntime } from "../../server/runtime";
 import {
   AgentGrantInputSchema,
@@ -24,6 +25,17 @@ import {
   readWorkspaceConnections,
   shareGoogleConnection,
 } from "../../server/workspaces/connections";
+import {
+  AnswerPersonalTrustSchema,
+  ContactNetworkBotSchema,
+  PersonalTrustUsernameSchema,
+  answerPersonalTrust,
+  blockPersonalTrust,
+  contactNetworkBot,
+  endPersonalTrust,
+  invitePersonalTrust,
+  listPersonalNetwork,
+} from "../../server/workspaces/network";
 import { workspaceProcedure } from "./workspace-procedure";
 
 const revisionFields = {
@@ -76,8 +88,10 @@ export const workspaceAgentsRouter = {
           })
         )
       )
-      .query(({ input, signal }) =>
-        serverRuntime.runPromise(searchWorkspaceBots(input.query), { signal })
+      .query(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(searchWorkspaceBots(ctx.actor, input.query), {
+          signal,
+        })
       ),
     grant: workspaceProcedure
       .input(Schema.toStandardSchemaV1(AgentGrantInputSchema))
@@ -94,6 +108,88 @@ export const workspaceAgentsRouter = {
         serverRuntime.runPromise(revokeAgentGrant(ctx.actor, input.id), {
           signal,
         })
+      ),
+  },
+  network: {
+    list: workspaceProcedure.query(({ ctx, signal }) =>
+      serverRuntime.runPromise(
+        listPersonalNetwork(ctx.actor).pipe(
+          Effect.catchTag("WorkspaceAccessDenied", () =>
+            Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+          )
+        ),
+        { signal }
+      )
+    ),
+    invite: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(PersonalTrustUsernameSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          invitePersonalTrust(ctx.actor, input).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            )
+          ),
+          { signal }
+        )
+      ),
+    answer: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(AnswerPersonalTrustSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          answerPersonalTrust(ctx.actor, input).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            )
+          ),
+          { signal }
+        )
+      ),
+    end: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(PersonalTrustUsernameSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          endPersonalTrust(ctx.actor, input).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            )
+          ),
+          { signal }
+        )
+      ),
+    block: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(PersonalTrustUsernameSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          blockPersonalTrust(ctx.actor, input).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            )
+          ),
+          { signal }
+        )
+      ),
+    contact: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(ContactNetworkBotSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          contactNetworkBot(ctx.actor, input).pipe(
+            Effect.map((result) => ({
+              task: result.task,
+              dest: result.dest,
+              network: result.network,
+            })),
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            ),
+            Effect.catchTag("A2AError", (error) =>
+              Effect.fail(
+                new TRPCError({ code: "BAD_REQUEST", message: error.message })
+              )
+            )
+          ),
+          { signal }
+        )
       ),
   },
   connections: {
