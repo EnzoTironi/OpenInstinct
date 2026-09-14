@@ -30,6 +30,7 @@ jobs:
       OPERATION: ${{ github.event_name == 'schedule' && 'recovery' || inputs.operation }}
       # The CLI resolves its profile before loading --env-file.
       ALCHEMY_PROFILE: ci
+      ZOEN_OPERATOR_EMAILS: ${{ secrets.ZOEN_OPERATOR_EMAILS }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6

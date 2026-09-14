@@ -12,6 +12,7 @@ import {
   UserRoundIcon,
   MonitorIcon,
   ArchiveIcon,
+  ActivityIcon,
 } from "lucide-react";
 import { getAuthSession } from "@db/services/auth/session";
 import { readEntitlement } from "@db/services/billing";
@@ -25,6 +26,7 @@ import {
 import { AccountBillingSection } from "./_components/billing-section";
 import { AccountPrivacyWipeSection } from "./_components/privacy-wipe-section";
 import { AuthenticatedAccountControl } from "./_components/account-control";
+import { ModelConnections } from "../../_components/model-connections";
 import { ModelSelector } from "./_components/model-selector";
 import { PanelIntro } from "../../_components/panel-intro";
 import { LanguagePicker } from "@web/i18n/language-picker";
@@ -66,6 +68,7 @@ const preferenceLinks = [
     icon: ShieldCheckIcon,
   },
   { href: "/tasks", label: "Atividade no navegador", icon: MonitorIcon },
+  { href: "/insights", label: "Visão geral", icon: ActivityIcon },
 ] as const;
 
 export default async function AccountPage({
@@ -146,6 +149,8 @@ async function AccountSection({
     case "privacy":
       return <AccountPrivacyWipeSection />;
     case "advanced":
+      if (env.COMPANION_MODEL_PROVIDER !== "gateway")
+        return <ModelConnections />;
       return (
         <section className={styles.sectionCard}>
           <h2 className="type-section-title mb-4">

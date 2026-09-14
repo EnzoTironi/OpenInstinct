@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import { CheckIcon, ChevronRightIcon } from "lucide-react";
 import { ConnectionIcon } from "./connection-icon";
-import styles from "../connections.module.css";
+import styles from "../../_components/connections.module.css";
 
 interface LinkedChannelIdentity {
   readonly id: string;

@@ -19,3 +19,5 @@ export * from "./user-directory";
 export * from "./workstreams";
 export * from "./workspace-agents";
 export * from "./matrix";
+export * from "./model-connections";
+export * from "./telemetry";

@@ -12,7 +12,7 @@ import { useI18n } from "@web/i18n/context";
 import { Button } from "@web/components/ui/button";
 import { ConnectionIcon } from "./connection-icon";
 import { PanelLink } from "../../_components/panel-link";
-import styles from "../connections.module.css";
+import styles from "../../_components/connections.module.css";
 
 export function TeamConnections() {
   const { t } = useI18n();

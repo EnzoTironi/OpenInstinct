@@ -22,8 +22,12 @@ import {
 } from "@shared/vault/schema";
 import { createTRPCRouter, protectedProcedure } from "./init";
 import { workspacesRouter } from "./workspaces";
+import { modelsRouter } from "./models";
+import { insightsRouter } from "./insights";
 
 export const appRouter = createTRPCRouter({
+  modelConnections: modelsRouter,
+  insights: insightsRouter,
   workspaces: workspacesRouter,
   accountChannels: {
     revoke: protectedProcedure

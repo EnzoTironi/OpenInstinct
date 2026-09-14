@@ -75,16 +75,15 @@ describe("evlog hook", () => {
           ],
         },
       },
-      message: {
-        received: "email mason@example.com card 4111111111111111",
-        response: "full response mason@example.com",
-      },
+      message: { responseChars: 31 },
     });
     expect(capturedEvents[1]).toMatchObject({
       channel: { kind: "linq" },
-      message: { received: "next turn", response: "next response" },
+      message: { responseChars: 13 },
     });
     expect(capturedEvents[1]).not.toHaveProperty("channel.linq");
+    expect(JSON.stringify(capturedEvents)).not.toContain("mason@example.com");
+    expect(JSON.stringify(capturedEvents)).not.toContain("4111111111111111");
   });
 });
 

@@ -7,6 +7,7 @@ import { requireRequestScope } from "@web/auth/request-scope";
 import { TRPCProvider } from "@web/trpc/client";
 import { PanelShell } from "./_components/panel-shell";
 import { HomeOverview } from "./_components/home-overview";
+import { ExperienceRecorder } from "./_components/experience-recorder";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -25,6 +26,7 @@ export default async function AuthenticatedLayout({
 
   return (
     <TRPCProvider>
+      <ExperienceRecorder />
       <PanelShell background={<HomeOverview />}>{children}</PanelShell>
     </TRPCProvider>
   );

@@ -431,7 +431,7 @@
   background: #ffffff06;
   overflow: hidden;
 }
-.actionList a {
+.actionList > :is(a, button) {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -439,13 +439,13 @@
   font-size: 14px;
   transition: background 0.2s;
 }
-.actionList a + a {
+.actionList > :is(a, button) + :is(a, button) {
   border-top: 1px solid var(--border);
 }
-.actionList a:hover {
+.actionList > :is(a, button):hover {
   background: #ffffff0b;
 }
-.actionList a:focus-visible {
+.actionList > :is(a, button):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -3px;
 }
@@ -558,7 +558,7 @@
     height: calc(100svh - 134px);
     min-height: 430px;
   }
-  .actionList a {
+  .actionList > :is(a, button) {
     padding: 19px 18px;
   }
 }

@@ -144,6 +144,19 @@ export const env = createEnv({
     ),
 
     ZOEN_REGISTRATION_MODE: z.enum(["open", "closed"]).default("open"),
+    ZOEN_BETA_FULL_TELEMETRY: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    ZOEN_OPERATOR_EMAILS: z
+      .string()
+      .default("")
+      .transform((value) =>
+        value
+          .split(",")
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean)
+      ),
     ZOEN_BETA_IDENTITIES: z
       .string()
       .default("")
