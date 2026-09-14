@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Schema } from "effect";
-import { inputSchema } from "../../tools/respond-to-approval";
+import responseTool, { inputSchema } from "../../tools/respond-to-approval";
 
 describe("natural approval tool input boundary", () => {
   const decode = Schema.toStandardSchemaV1(inputSchema, {
@@ -44,4 +44,41 @@ describe("natural approval tool input boundary", () => {
   ])("rejects an incomplete or unsupported decision %j", async (value) => {
     expect(await decode(value)).toHaveProperty("issues");
   });
+});
+
+describe("approval responder availability", () => {
+  const resolve = responseTool.events["step.started"];
+  if (!resolve) throw new Error("Approval tool resolver required");
+  test.each([
+    ["authjs", "web", "fresh", false],
+    ["authjs", "telegram", "fresh", false],
+    ["verified-channel", "telegram", "fresh", true],
+    ["verified-channel", "kapso", "fresh", true],
+    ["verified-channel", "telegram", "", false],
+    ["matrix", "matrix", "fresh", false],
+  ] as const)(
+    "%s/%s requires a fresh native user message",
+    async (authenticator, conversationChannel, sourceMessageId, visible) => {
+      const tool = await resolve(
+        {},
+        {
+          channel: { kind: conversationChannel, metadata: {} },
+          messages: [],
+          session: {
+            id: "synthetic-session",
+            auth: {
+              initiator: null,
+              current: {
+                authenticator,
+                principalId: "synthetic-user",
+                principalType: "user",
+                attributes: { conversationChannel, sourceMessageId },
+              },
+            },
+          },
+        }
+      );
+      expect(tool !== null).toBe(visible);
+    }
+  );
 });

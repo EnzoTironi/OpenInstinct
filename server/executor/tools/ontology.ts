@@ -10,6 +10,16 @@ import { workspaceActorFromPrincipal } from "../../workspaces/access";
 import { applyOntologyAction } from "../../workspaces/ontology";
 import { GitRevisionSchema } from "../../workspaces/git";
 
+export const ontologyActionInputSchema = Schema.Struct({
+  ...OntologyActionSchema.fields,
+  expectedRevision: GitRevisionSchema,
+  approvalMessage: Schema.String.check(
+    Schema.isPattern(/\S/u),
+    Schema.isMinLength(1),
+    Schema.isMaxLength(16_384)
+  ),
+});
+
 export default defineDynamic({
   events: {
     "turn.started": (_event, context) => {
@@ -19,17 +29,7 @@ export default defineDynamic({
           description:
             "Propose a declared action to a structured entity. First read workspace.ontology.read through Executor. Invoke this tool with the entity, action, proposed value, revision and approvalMessage; Eve presents the exact native approval before any mutation. Do not request approval by sending a chat message. Only workspace admins can execute actions. A stale revision must be re-read and approved again.",
           approval: { request: always(), response: authorizeApprovalResponse },
-          inputSchema: toolInputSchema(
-            Schema.Struct({
-              ...OntologyActionSchema.fields,
-              expectedRevision: GitRevisionSchema,
-              approvalMessage: Schema.String.check(
-                Schema.isTrimmed(),
-                Schema.isMinLength(1),
-                Schema.isMaxLength(16_384)
-              ),
-            })
-          ),
+          inputSchema: toolInputSchema(ontologyActionInputSchema),
           execute: (input, execution) =>
             serverRuntime.runPromise(
               Effect.gen(function* () {

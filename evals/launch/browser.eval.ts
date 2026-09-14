@@ -1,5 +1,6 @@
 import { defineEval } from "eve/evals";
 import { equals, includes } from "eve/evals/expect";
+import { Schema } from "effect";
 import { requireWorkerSessionId } from "@evals/browser/session";
 import { readTaskCompletion } from "@evals/browser/worker-events";
 
@@ -32,10 +33,30 @@ export default defineEval({
     child
       .calledTool("execute", {
         status: "completed",
-        input: { call: { path: "playwright_execute" } },
+        input: (input) =>
+          Schema.is(
+            Schema.Struct({
+              call: Schema.Struct({
+                path: Schema.Literal("playwright_execute"),
+              }),
+            })
+          )(input) ||
+          (Schema.is(
+            Schema.Struct({
+              call: Schema.Struct({
+                path: Schema.Literal("computer_action"),
+                input: Schema.Struct({
+                  actions: Schema.Array(Schema.Struct({ type: Schema.String })),
+                }),
+              }),
+            })
+          )(input) &&
+            input.call.input.actions.some(
+              (action) => action.type === "screenshot"
+            )),
         count: (count) => count >= 1,
       })
-      .label("real browser page inspection");
+      .label("real browser page inspection through DOM or screenshot");
     const completion = readTaskCompletion(child.events);
     t.check(completion?.status, equals("success"));
     t.check(completion?.message, includes("Example Domain"));
