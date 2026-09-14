@@ -13,8 +13,9 @@ export const production = {
   },
   web: {
     app: "companion-tironi",
-    machine: "683d14eefe9778",
-    name: "spring-river-9055",
+    legacyMachine: "683d14eefe9778",
+    name: "zoen-web",
+    authVolume: "vol_40o00zpwel2plln4",
   },
   memory: {
     app: "zoen-memory-tironi",

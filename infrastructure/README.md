@@ -89,11 +89,25 @@ pnpm exec alchemy deploy --stage prod --env-file "$PWD/.env.prod" --yes
 pnpm check:production
 ```
 
-Inspect the plan: existing production machines and volumes must never be
-replaced. Their exact IDs are pinned in `production.ts`. Changes to those IDs are
-recovery operations, not routine deployment. Apps, machines, volumes, backup
+Inspect the plan: production database and memory volumes must never be replaced.
+Their exact IDs are pinned in `production.ts`. Changes to those IDs are recovery
+operations, not routine deployment. Apps, machines, volumes, backup
 storage and encryption keys are retained on stack removal. Do not use `--force`
 or `destroy` as a way to clear an adoption error.
+
+The web service uses `WebPersistent` and a dedicated encrypted `model_auth`
+volume. Fly cannot attach a volume on another physical host to an existing
+machine. The first migration creates `zoen-web` on that volume, checks its exact
+image, mount and `alive` readiness check, then removes public services from the
+legacy machine and stops it. Alchemy retains the old machine for recovery; the
+database is unchanged. Repeated deployments update the persistent web machine.
+If readiness fails, the cutover never stops the serving legacy machine.
+
+For an application rollback, keep this infrastructure definition and set
+`ZOEN_WEB_IMAGE` to a previously verified immutable image digest, then plan and
+deploy through Alchemy. Do not revert the infrastructure to the old unmounted
+machine or undo database migrations. Check migration compatibility before using
+an older image. Clear the image override before the next normal release.
 
 Local/dev stages use Docker through `local.ts`, preserving the existing
 CompanionLocal stack and volumes. They do not use the hosted production database.
