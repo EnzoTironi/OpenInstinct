@@ -14,6 +14,7 @@ import { PrepareServiceDatabases } from "./database.ts";
 import { MigrateApplication } from "./migrations.ts";
 import { provisionMatrix, deployMatrix } from "./matrix.ts";
 import { ReconcileChannelWebhooks } from "./webhooks.ts";
+import { RetireLegacyWeb } from "./web-cutover.ts";
 
 export const hosted = Effect.gen(function* () {
   const policy = yield* CompanionStagePolicy;
@@ -250,12 +251,14 @@ export const hosted = Effect.gen(function* () {
     image: webImage,
     prepared: databases,
   });
-  const web = yield* Fly.Machine("Web", {
+  const web = yield* Fly.Machine("WebPersistent", {
     app: webApp,
     name: prod ? production.web.name : "web",
     region,
     count: 1,
-    existingMachineIds: prod ? [production.web.machine] : undefined,
+    existingVolumeIds: prod
+      ? { "/root/.eve/auth": production.web.authVolume }
+      : undefined,
     image: webImage,
     guest: { cpuKind: "shared", cpus: 2, memoryMb: 2048 },
     env: {
@@ -326,6 +329,15 @@ export const hosted = Effect.gen(function* () {
       ).pipe(Output.map((digests) => JSON.stringify(digests))),
     },
   }).pipe(retain(true));
+  if (prod) {
+    yield* RetireLegacyWeb({
+      app: webName,
+      replacement: web.machineId,
+      legacy: production.web.legacyMachine,
+      release: webImage,
+      volume: production.web.authVolume,
+    });
+  }
   const ipv4 = yield* Fly.IpAssignment("WebIpv4", {
     app: webApp,
     type: "shared_v4",
