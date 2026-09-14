@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { internalCallbackBodies } from "../../internal/callback-auth";
 import { serverRuntime } from "../../runtime";
 import { channelProviderSchema } from "../../../shared/identity/channel-auth";
@@ -12,7 +12,7 @@ export const inputSchema = Schema.Struct({
   decision: callback.fields.decision,
 });
 
-export default defineTool({
+const respond = defineTool({
   description:
     "Submit the current user's explicit approval or cancellation of one pending proposal already delivered in this conversation. Resolve the reference from the conversation; ask for clarification when ambiguous. For a correction, cancel the old proposal and wait for confirmed cancellation before proposing a replacement. Acceptance of this submission does not confirm execution or cancellation. Never repeat an uncertain submission.",
   inputSchema: {
@@ -54,5 +54,26 @@ export default defineTool({
       }),
       { signal: context.abortSignal }
     );
+  },
+});
+
+export default defineDynamic({
+  events: {
+    "step.started": (_event, context) => {
+      const principal = context.session.auth.current;
+      if (
+        principal?.authenticator !== "verified-channel" ||
+        principal.attributes.groupBindingId
+      )
+        return null;
+      if (
+        !Schema.is(channelProviderSchema)(
+          principal.attributes.conversationChannel
+        ) ||
+        !Schema.is(Schema.NonEmptyString)(principal.attributes.sourceMessageId)
+      )
+        return null;
+      return respond;
+    },
   },
 });

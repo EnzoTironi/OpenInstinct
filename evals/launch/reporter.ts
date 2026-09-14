@@ -13,7 +13,8 @@ const receipts = Schema.Struct({ calls: Schema.Array(ExecutorReceiptSchema) });
 // Classify provider diagnostics without exporting their messages, URLs or payloads.
 function failureCategory(message: string) {
   if (/workspace revision changed/iu.test(message)) return "workspace-conflict";
-  if (/invalid tool arguments/iu.test(message)) return "invalid-tool-input";
+  if (/No action ran|invalid tool arguments/iu.test(message))
+    return "invalid-tool-input";
   if (
     /usage limit|quota|insufficient.*(?:credit|balance)|\b402\b/iu.test(message)
   )
