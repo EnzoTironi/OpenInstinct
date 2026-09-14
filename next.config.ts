@@ -92,6 +92,10 @@ export default function companionConfig(
                     source: `/internal/scheduled-run/${operation}`,
                     destination: `${destination}/internal/scheduled-run/${operation}`,
                   })),
+                  {
+                    source: "/internal/channel-input/respond",
+                    destination: `${destination}/internal/channel-input/respond`,
+                  },
                 ],
               };
             })

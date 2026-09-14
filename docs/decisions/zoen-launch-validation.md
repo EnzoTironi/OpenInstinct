@@ -29,9 +29,14 @@ A passing component test is not a completed user journey or a live-provider proo
   A normal link challenge correctly refuses this conflict. The browser currently
   waits until expiry while the native chat reports refusal; this is not a passed
   recovery journey. Consolidation still requires the explicit archive flow.
-- An old native approval interrupted the legacy WhatsApp conversation. The
-  cancellation was followed by successful ordinary replies. This observation
-  does not establish automatic approval expiry or universal stuck-session recovery.
+- An old native approval interrupted the legacy WhatsApp conversation. Ordinary
+  replies continued, but an explicit cancellation exposed a routing defect:
+  `/internal/channel-input/respond` returned a browser sign-in redirect instead
+  of reaching the signed Eve endpoint. The callback now has an exact proxy
+  exception and a rewrite to Eve; the signature, recipient, current-turn and
+  delivered-proposal checks remain unchanged. Unit tests protect the exact path
+  and CI checks that the built app returns 401 for an unsigned callback. Actual
+  cancellation and subsequent tool use must still be proved after deployment.
 - [Group PR #97](https://github.com/EnzoTironi/tryzoen/pull/97) is merged at
   `b8e121d340e1009f10471b760a2cba253e9b9996`; its
   [main checks](https://github.com/EnzoTironi/tryzoen/actions/runs/34880079345) passed.

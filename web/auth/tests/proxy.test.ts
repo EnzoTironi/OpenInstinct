@@ -61,6 +61,28 @@ describe("auth proxy matcher", () => {
     expect(getAuthSession).not.toHaveBeenCalled();
   });
 
+  it("leaves native approval callback authentication to its signed Eve endpoint", async () => {
+    const response = await proxy(
+      new NextRequest("https://example.com/internal/channel-input/respond", {
+        method: "POST",
+        body: "{}",
+      })
+    );
+
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.has("location")).toBe(false);
+    expect(getAuthSession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "/internal/channel-input/other",
+    "/internal/channel-input/respond/other",
+  ])("does not open unrelated internal path %s", async (path) => {
+    const response = await proxy(new NextRequest(`https://example.com${path}`));
+    expect(response.status).toBe(307);
+    expect(getAuthSession).toHaveBeenCalledOnce();
+  });
+
   it("allows consumer get-started without a browser session", async () => {
     const response = await proxy(
       new NextRequest("https://example.com/get-started")

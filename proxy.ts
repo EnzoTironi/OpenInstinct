@@ -13,6 +13,7 @@ const publicExact = new Set([
   "/api/health",
   "/api/channels/telegram",
   "/api/channels/kapso",
+  "/internal/channel-input/respond",
   "/eve/v1/health",
   "/eve/v1/dev/schedules/dynamic",
 ]);
