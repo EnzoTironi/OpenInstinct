@@ -32,7 +32,7 @@ import { Messaging } from "../../server/messaging";
 import { channelAuthPlugin } from "../../server/channel-auth";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import {
-  channelConversationEntrySchema,
+  channelChallengeSchema,
   deviceBoundSchema,
 } from "../../shared/identity/channel-auth";
 import { runtimeDatabase } from "./database";
@@ -212,14 +212,15 @@ test("native linking and archive recovery pin both proofs, preserve data and rej
       purpose: "link",
     });
     assert.equal(start.status, 200);
-    const entry = Schema.decodeUnknownSync(channelConversationEntrySchema)(
+    const entry = Schema.decodeUnknownSync(channelChallengeSchema)(
       await start.json()
     );
-    assert.equal(
-      new URL(entry.conversationUrl).searchParams.get("text"),
-      "quero vincular meu WhatsApp à conta aberta no navegador"
+    assert.equal(entry.channel, "kapso");
+    assert.match(
+      new URL(entry.deepLink).searchParams.get("text") ?? "",
+      /^\/start [A-Za-z0-9_-]{43}$/u
     );
-    assert.equal(start.headers.getSetCookie().length, 0);
+    assert.ok(cookieHeader(start));
     const callId = randomUUID();
     const issued = await issue("link", callId);
     assert.ok(issued.entryToken);
