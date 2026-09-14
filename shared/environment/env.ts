@@ -6,6 +6,7 @@ import { databaseUrlSchema } from "@shared/environment/database-url";
 import {
   browserModelProviderSchema,
   browserModelSchema,
+  codexModelSchema,
   installationModelProviderSchema,
 } from "@shared/environment/model-provider";
 
@@ -72,6 +73,9 @@ export const env = createEnv({
     KERNEL_API_KEY: requiredValue.optional(),
     COMPANION_MODEL_PROVIDER: Schema.toStandardSchemaV1(
       Schema.optional(installationModelProviderSchema)
+    ),
+    COMPANION_CODEX_MODEL: Schema.toStandardSchemaV1(
+      Schema.optional(codexModelSchema)
     ),
     COMPANION_BROWSER_MODEL_PROVIDER: Schema.toStandardSchemaV1(
       Schema.optional(browserModelProviderSchema)

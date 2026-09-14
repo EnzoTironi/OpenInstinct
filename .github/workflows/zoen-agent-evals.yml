@@ -40,9 +40,9 @@ jobs:
       BETTER_AUTH_URL: http://127.0.0.1:4351
       COMPANION_PUBLIC_BASE_URL: http://127.0.0.1:4351
       COMPANION_MODEL_PROVIDER: codex-local
-      COMPANION_BROWSER_MODEL_PROVIDER: openrouter
-      COMPANION_BROWSER_MODEL: openai/gpt-5-mini
-      COMPANION_BROWSER_MODEL_MAX_OUTPUT_TOKENS: "4096"
+      COMPANION_CODEX_MODEL: gpt-5.6-luna
+      COMPANION_BROWSER_MODEL_PROVIDER: codex-local
+      COMPANION_BROWSER_MODEL: gpt-5.6-luna
       WORKFLOW_LOCAL_BASE_URL: http://127.0.0.1:4352
       EVE_NEXT_PRODUCTION_PORT: "4352"
       WORKFLOW_POSTGRES_WORKER_CONCURRENCY: "3"
@@ -91,7 +91,7 @@ jobs:
           };
           mask(source);
           const selected = {};
-          for (const name of ['CHATGPT_AUTH_JSON', 'OPENROUTER_API_KEY', 'KERNEL_API_KEY']) {
+          for (const name of ['CHATGPT_AUTH_JSON', 'KERNEL_API_KEY']) {
             if (!source[name]) throw new Error(`Missing eval provider: ${name}`);
             selected[name] = source[name];
           }

@@ -156,9 +156,51 @@ describe("browser model configuration", () => {
     ).rejects.toBeInstanceOf(Config.ConfigError);
   });
 
+  it.each([
+    ["gpt-5.3-codex-spark", 128_000],
+    ["gpt-5.6-luna", 272_000],
+  ] as const)(
+    "uses %s without hosted provider credentials",
+    async (model, window) => {
+      expect(
+        await selectBrowserModel({
+          COMPANION_BROWSER_MODEL_PROVIDER: "codex-local",
+          COMPANION_BROWSER_MODEL: model,
+        })
+      ).toMatchObject({
+        model: { modelId: model },
+        modelContextWindowTokens: window,
+      });
+      expect(
+        await selectModel({
+          COMPANION_MODEL_PROVIDER: "codex-local",
+          COMPANION_CODEX_MODEL: model,
+        })
+      ).toMatchObject({
+        model: { modelId: model },
+        modelContextWindowTokens: window,
+      });
+    }
+  );
+
+  it("rejects provider/model mismatches instead of silently changing the provider", async () => {
+    await expect(
+      selectBrowserModel({
+        COMPANION_BROWSER_MODEL_PROVIDER: "codex-local",
+        COMPANION_BROWSER_MODEL: "openai/gpt-5-mini",
+      })
+    ).rejects.toBeInstanceOf(Config.ConfigError);
+    await expect(
+      selectBrowserModel({
+        COMPANION_BROWSER_MODEL_PROVIDER: "openrouter",
+        COMPANION_BROWSER_MODEL: "gpt-5.3-codex-spark",
+      })
+    ).rejects.toBeInstanceOf(Config.ConfigError);
+  });
+
   it("rejects an unsupported browser provider", async () => {
     await expect(
-      selectBrowserModel({ COMPANION_BROWSER_MODEL_PROVIDER: "codex-local" })
+      selectBrowserModel({ COMPANION_BROWSER_MODEL_PROVIDER: "unknown" })
     ).rejects.toBeInstanceOf(Config.ConfigError);
   });
 
@@ -204,7 +246,11 @@ describe("browser model configuration", () => {
       throw new Error("Expected a direct model.");
     const result = await generateText({
       model: selected.model,
-      providerOptions: selected.modelOptions.providerOptions,
+      providerOptions: Schema.decodeUnknownSync(
+        Schema.Struct({
+          openrouter: Schema.Struct({ max_tokens: Schema.Number }),
+        })
+      )(selected.modelOptions.providerOptions),
       maxOutputTokens: 65_536,
       prompt: "Reply OK.",
     });
