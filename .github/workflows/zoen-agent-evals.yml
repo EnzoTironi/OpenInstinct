@@ -72,7 +72,9 @@ jobs:
           mkdir -p .eve
           node --input-type=module <<'JS'
           import { randomBytes } from 'node:crypto';
-          import { writeFileSync } from 'node:fs';
+          import { mkdirSync, writeFileSync } from 'node:fs';
+          import { homedir } from 'node:os';
+          import { join } from 'node:path';
           import { parseEnv } from 'node:util';
           const source = parseEnv(process.env.EVAL_PROVIDERS ?? '');
           const mask = value => {
@@ -85,12 +87,16 @@ jobs:
           };
           mask(source);
           const selected = {};
-          for (const name of ['CODEX_AUTH_JSON', 'OPENROUTER_API_KEY', 'KERNEL_API_KEY']) {
+          for (const name of ['CHATGPT_AUTH_JSON', 'OPENROUTER_API_KEY', 'KERNEL_API_KEY']) {
             if (!source[name]) throw new Error(`Missing eval provider: ${name}`);
             selected[name] = source[name];
           }
           selected.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
           selected.SECRET_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+          mask(selected);
+          const authDirectory = join(homedir(), '.eve', 'auth');
+          mkdirSync(authDirectory, { recursive: true, mode: 0o700 });
+          writeFileSync(join(authDirectory, 'chatgpt.json'), selected.CHATGPT_AUTH_JSON, { mode: 0o600 });
           const lines = Object.entries(selected).map(([key, value]) => {
             const quote = ['"', "'", '`'].find(candidate => !value.includes(candidate));
             if (!quote) throw new Error(`Cannot encode eval provider: ${key}`);
@@ -114,10 +120,16 @@ jobs:
           trap 'kill -TERM "$app_pid" 2>/dev/null || true; wait "$app_pid" || true; rm -f .eve/eval.env' EXIT
           for attempt in {1..60}; do
             if curl --fail --silent http://127.0.0.1:4351/eve/v1/health; then break; fi
-            kill -0 "$app_pid"
+            if ! kill -0 "$app_pid"; then
+              tail -n 60 .eve/agent-server.log
+              exit 1
+            fi
             sleep 1
           done
-          curl --fail --silent http://127.0.0.1:4351/eve/v1/health
+          if ! curl --fail --silent http://127.0.0.1:4351/eve/v1/health; then
+            tail -n 60 .eve/agent-server.log
+            exit 1
+          fi
           node --env-file=.eve/eval.env --import tsx scripts/run-agent-evals.ts \
             --url http://127.0.0.1:4351 --suite launch --repeat "$REPETITIONS" --timeout 240000 --junit .eve/launch.xml
       - name: Upload sanitized benchmark receipts
@@ -132,4 +144,4 @@ jobs:
           retention-days: 14
       - name: Remove ephemeral credentials
         if: always()
-        run: rm -f .eve/eval.env
+        run: rm -f .eve/eval.env "$HOME/.eve/auth/chatgpt.json"

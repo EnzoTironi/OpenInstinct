@@ -146,6 +146,25 @@ jobs:
         run: pnpm test:runtime
       - name: Build web app and agent
         run: pnpm build --force
+      - name: Start the built web app and native Eve runtime
+        env:
+          COMPANION_MODEL_PROVIDER: codex-local
+          COMPANION_BROWSER_MODEL_PROVIDER: openrouter
+          OPENROUTER_API_KEY: synthetic-startup-key-no-external-requests
+        run: |
+          set -euo pipefail
+          node scripts/start.ts --port 3000 --eve-port 4274 > .eve/runtime-start.log 2>&1 &
+          app_pid=$!
+          trap 'kill -TERM "$app_pid" 2>/dev/null || true; wait "$app_pid" || true' EXIT
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/eve/v1/health; then break; fi
+            if ! kill -0 "$app_pid"; then
+              tail -n 60 .eve/runtime-start.log
+              exit 1
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3000/eve/v1/health
 
   memory:
     name: Private Mem0 service
