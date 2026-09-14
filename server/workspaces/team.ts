@@ -158,10 +158,28 @@ export const removeWorkspaceMember = Effect.fn("removeWorkspaceMember")(
         const removed =
           yield* sql`DELETE FROM workspace_memberships WHERE workspace_id = ${actor.workspaceId} AND user_id = ${targetUserId} AND role = 'member' RETURNING user_id`;
         if (!removed.length) return yield* new WorkspaceAccessDenied();
+        // Authority the member issued inside this workspace ends with the membership.
+        const pausedJobs =
+          yield* sql`UPDATE scheduled_agent_jobs SET status = 'paused', updated_at = clock_timestamp()
+      WHERE workspace_id = ${actor.workspaceId} AND created_by_user_id = ${targetUserId} AND status = 'active' RETURNING id`;
+        const revokedGrants =
+          yield* sql`UPDATE workspace_agent_grants g SET revoked_at = clock_timestamp() FROM workspace_bots b
+      WHERE b.id = g.bot_id AND b.workspace_id = ${actor.workspaceId} AND g.issued_by = ${targetUserId} AND g.revoked_at IS NULL RETURNING g.id`;
+        const canceledTasks =
+          yield* sql`UPDATE agent_protocol_tasks t SET state = 'TASK_STATE_CANCELED', updated_at = now()
+      FROM workspace_agent_grants g JOIN workspace_bots b ON b.id = g.bot_id
+      WHERE t.grant_id = g.id AND b.workspace_id = ${actor.workspaceId} AND g.issued_by = ${targetUserId}
+        AND t.state IN ('TASK_STATE_SUBMITTED', 'TASK_STATE_WORKING', 'TASK_STATE_INPUT_REQUIRED') RETURNING t.id`;
         yield* sql`DELETE FROM workspace_memory_namespace WHERE workspace_id = ${actor.workspaceId} AND user_id = ${targetUserId}`;
         yield* sql`UPDATE workspace_invites SET status = 'revoked' WHERE workspace_id = ${actor.workspaceId} AND ('better-auth:' || target_user_id) = ${targetUserId} AND status = 'pending'`;
         yield* sql`INSERT INTO organization_audit_receipts(id, organization_id, actor_user_id, action, target_user_id, metadata)
-      VALUES (${randomUUID()}, ${access.organizationId}, ${actor.userId}, 'member_removed', ${targetUserId}, ${sql.json({})})`;
+      VALUES (${randomUUID()}, ${access.organizationId}, ${actor.userId}, 'member_removed', ${targetUserId}, ${sql.json(
+        {
+          pausedJobs: pausedJobs.length,
+          revokedGrants: revokedGrants.length,
+          canceledTasks: canceledTasks.length,
+        }
+      )})`;
         return { removed: true };
       })
     );
