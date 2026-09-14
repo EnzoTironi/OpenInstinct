@@ -29,6 +29,76 @@ const base = {
 const parse = (value: Schema.Json) =>
   Effect.runPromise(parseKapsoWebhook(value, installation, now));
 
+test("private device requests and native confirmation buttons stay out of agent input", async () => {
+  const token = "a".repeat(43);
+  const started = await parse({
+    ...base,
+    message: { ...baseMessage, text: { body: `/start ${token}` } },
+  });
+  expect(started[0]).toMatchObject({
+    kind: "command",
+    command: "start",
+    token,
+  });
+  const confirmation = {
+    ...baseMessage,
+    type: "interactive",
+    interactive: {
+      type: "button_reply",
+      button_reply: {
+        id: `confirm:${token}`,
+        title: "Display text never selects authority",
+      },
+    },
+  };
+  expect((await parse({ ...base, message: confirmation }))[0]).toMatchObject({
+    kind: "command",
+    command: "confirm",
+    token,
+    senderId: "15550002222",
+  });
+  expect(
+    await parse({
+      ...base,
+      message: {
+        ...confirmation,
+        kapso: { ...baseMessage.kapso, origin: "history_sync" },
+      },
+    })
+  ).toEqual([]);
+  expect(
+    await parse({
+      ...base,
+      conversation: { ...base.conversation, type: "group", is_group: true },
+      message: {
+        ...confirmation,
+        kapso: { ...baseMessage.kapso, mentioned_business: true },
+      },
+    })
+  ).toEqual([]);
+  expect(
+    await parse({
+      ...base,
+      message: {
+        ...confirmation,
+        kapso: { ...baseMessage.kapso, direction: "outbound" },
+      },
+    })
+  ).toEqual([]);
+  expect(
+    await parse({
+      ...base,
+      message: {
+        ...confirmation,
+        interactive: {
+          type: "button_reply",
+          button_reply: { id: "unrelated-action" },
+        },
+      },
+    })
+  ).toEqual([]);
+});
+
 test("preserves wamid/from and ignores display names and derived content", async () => {
   const events = await parse({
     ...base,
@@ -256,8 +326,9 @@ test("accepts the live inbound delivery with null context and delivered status",
   );
   expect(events).toHaveLength(1);
   expect(events[0]).toMatchObject({
-    kind: "message",
-    payload: { text: `/start ${"a".repeat(43)}` },
+    kind: "command",
+    command: "start",
+    token: "a".repeat(43),
     senderId: "15550002222",
     installationId: "123456789",
   });

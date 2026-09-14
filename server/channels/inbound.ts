@@ -77,7 +77,8 @@ export const normalizeInbound = Effect.fn("normalizeInbound")(function* (
     if (/^\/(?:start|confirm)(?:@|\s|$)/i.test(text)) return null;
   }
   const command =
-    coordinates.channel === "telegram" && coordinates.chatKind !== "group"
+    coordinates.chatKind !== "group" &&
+    (coordinates.channel === "telegram" || /^\/start\s/i.test(text))
       ? /^\/(start|confirm)(?:@([A-Za-z0-9_]+))?(?:\s+(\S+))?\s*$/i.exec(text)
       : null;
   if (command?.[2] && command[2].toLowerCase() !== botUsername?.toLowerCase())

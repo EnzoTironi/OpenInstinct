@@ -136,7 +136,7 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
       lane === "inbox"
         ? sql`, native_input = COALESCE(native_input, jsonb_build_object(
           'protocol', 'eve-keyed-input-v1', 'inputId', id::text,
-          'channel', ${identities[0].channel}::text, 'address', identity_id::text,
+          'channel', ${identities[0].channel}::text, 'address', COALESCE(payload->>'conversationScope', identity_id::text),
           'principalId', ${identities[0].principalId}::text, 'content', NULL))`
         : sql``;
     // lease_expires_at on queued rows is a not-before time for rate-limit deferral.

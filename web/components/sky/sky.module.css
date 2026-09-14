@@ -1,0 +1,39 @@
+.skyBackdrop {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.skyLayer {
+  object-fit: cover;
+  object-position: center bottom;
+  opacity: 0;
+  transition: opacity 3s ease;
+}
+.skyVisible {
+  opacity: 1;
+}
+.embedded {
+  position: absolute;
+  opacity: 0.22;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skyLayer,
+  .skyBackdrop::after {
+    transition: none;
+  }
+}
+.skyBackdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #07132170, #071321ab);
+  opacity: 1;
+  transition: opacity 3s ease;
+}
+.skyBackdrop[data-sky="midnight"]::after,
+.skyBackdrop[data-sky="predawn"]::after {
+  opacity: 0.45;
+}

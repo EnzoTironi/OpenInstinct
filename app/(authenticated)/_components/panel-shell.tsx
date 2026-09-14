@@ -24,9 +24,9 @@ import {
   DrawerContent,
   DrawerTitle,
 } from "@web/components/ui/drawer";
-import { useLocalTime } from "./use-local-time";
-import { getLocalDay } from "./local-day";
-import { PanelSky } from "./panel-sky";
+import { useLocalTime } from "@web/components/sky/use-local-time";
+import { getLocalDay } from "@web/components/sky/local-day";
+import { Sky } from "@web/components/sky/sky";
 import styles from "./panel.module.css";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { workspaceHref } from "@web/workspaces/navigation";
@@ -66,7 +66,7 @@ export function PanelShell({
       }}
     >
       <div className={styles.shell} lang={locale}>
-        <PanelSky phase={sky} />
+        <Sky phase={sky} />
         <a className={styles.skipLink} href="#panel-content">
           {t("Pular para o conteúdo")}
         </a>
@@ -130,7 +130,7 @@ export function PanelShell({
             )}
             lang={locale}
           >
-            <PanelSky phase={sky} />
+            <Sky phase={sky} embedded />
             <DrawerTitle className="sr-only">
               {t("Seu espaço Zoen")}
             </DrawerTitle>

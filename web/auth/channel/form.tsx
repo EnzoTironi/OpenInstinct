@@ -35,9 +35,11 @@ export function ChannelAuthForm({
   callbackUrl,
   purpose,
   children,
+  onComplete,
 }: {
   readonly callbackUrl: string;
   readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
+  readonly onComplete?: (channel: typeof channelProviderSchema.Type) => void;
   readonly children?: (request: {
     start: (channel: typeof channelProviderSchema.Type) => void;
     busy: boolean;
@@ -62,6 +64,7 @@ export function ChannelAuthForm({
         challenge={challenge}
         callbackUrl={callbackUrl}
         purpose={purpose}
+        onComplete={onComplete}
         onRestart={() => {
           setChallenge(undefined);
         }}
@@ -147,6 +150,7 @@ export function PendingAuthorization({
   callbackUrl,
   purpose,
   onRestart,
+  onComplete,
 }: {
   readonly challenge:
     | typeof channelChallengeSchema.Type
@@ -154,6 +158,7 @@ export function PendingAuthorization({
   readonly callbackUrl: string;
   readonly purpose: typeof channelChallengeRequestSchema.Type.purpose;
   readonly onRestart: () => void;
+  readonly onComplete?: (channel: typeof channelProviderSchema.Type) => void;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -229,6 +234,10 @@ export function PendingAuthorization({
     }
     action.run(completeChannelAuthorization(challenge.id), () => {
       if (purpose === "link") onRestart();
+      if (onComplete) {
+        onComplete(challenge.channel);
+        return;
+      }
       router.replace(safeCallbackUrl(callbackUrl));
       router.refresh();
     });

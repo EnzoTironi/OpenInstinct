@@ -3,6 +3,20 @@ import { scopeFromPrincipal } from "../../../shared/identity/principal-scope";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 
 describe("principal scope", () => {
+  it.each([
+    ["chatKind", "group"],
+    ["conversationScope", "group:telegram:123:-456"],
+  ])("denies private tools from an unbound group %s", (attribute, value) => {
+    const scope = accessScopeForUser("better-auth:alice");
+    expect(() =>
+      scopeFromPrincipal({
+        authenticator: "verified-channel",
+        principalType: "user",
+        principalId: scope.userId,
+        attributes: { workspaceId: scope.workspaceId, [attribute]: value },
+      })
+    ).toThrow("explicitly granted workspace tool");
+  });
   it("accepts the workspace derived from the authenticated user", () => {
     const scope = accessScopeForUser("better-auth:user-1");
     expect(

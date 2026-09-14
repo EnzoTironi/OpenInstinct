@@ -171,7 +171,13 @@ export const NativeInboxHandoffSchema = Schema.Struct({
   protocol: Schema.Literal("eve-keyed-input-v1"),
   inputId: IdentityId,
   channel: channelProviderSchema,
-  address: IdentityId,
+  // A private identity or an exact group conversation. The channel boundary
+  // validates this persisted address against the verified source before send.
+  address: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(320),
+    Schema.isTrimmed()
+  ),
   principalId: Schema.NonEmptyString,
   content: Schema.NullOr(NativeInboxContentSchema),
 }).annotate({ parseOptions: { onExcessProperty: "error" } });

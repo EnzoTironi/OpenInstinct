@@ -302,6 +302,13 @@
       "when": 1789389410703,
       "tag": "0042_curly_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1789404079168,
+      "tag": "0043_group-conversation-boundary",
+      "breakpoints": true
     }
   ]
 }

@@ -78,7 +78,9 @@ const findAccount = Effect.fn("findGoogleWorkspaceAccount")(
     FROM account a
     INNER JOIN workspace_memberships m ON m.user_id = ${scope.userId} AND m.workspace_id = ${scope.workspaceId}
     WHERE a."userId" = ${userId} AND a."providerId" = 'google'
-      AND a.issuer = 'https://accounts.google.com' ORDER BY a."createdAt", a.id LIMIT 2`;
+      AND a.issuer = 'https://accounts.google.com'
+      AND a.scope ~ '(^|[ ,])https://www.googleapis.com/auth/'
+      ORDER BY a."createdAt", a.id LIMIT 2`;
     const accounts = yield* Schema.decodeUnknownEffect(
       Schema.Array(accountSchema)
     )(rows);
@@ -212,7 +214,10 @@ export const connectGoogleWorkspace = Effect.fn("connectGoogleWorkspace")(
     });
     if (!result.response.url)
       return yield* new GoogleWorkspaceError({ reason: "unavailable" });
-    return { url: result.response.url, headers: result.headers };
+    const url = new URL(result.response.url);
+    // Refreshable Workspace access is granted explicitly in Connections.
+    url.searchParams.set("prompt", "consent select_account");
+    return { url: url.href, headers: result.headers };
   }
 );
 
@@ -267,11 +272,17 @@ export const disconnectGoogleWorkspace = Effect.fn("disconnectGoogleWorkspace")(
         )
       );
     }
-    yield* Effect.tryPromise({
-      try: () =>
-        auth.api.unlinkAccount({ headers, body: { accountId: account.id } }),
-      catch: () => new GoogleWorkspaceError({ reason: "unavailable" }),
-    });
+    // Keep issuer + subject: this identity may be the person's only sign-in.
+    // A newer grant created during revocation must not be silently cleared.
+    const cleared = yield* sql`
+      UPDATE account SET "accessToken" = NULL, "refreshToken" = NULL,
+        "idToken" = NULL, "accessTokenExpiresAt" = NULL,
+        "refreshTokenExpiresAt" = NULL, scope = '', "updatedAt" = now()
+      WHERE id = ${account.id} AND "userId" = ${session.user.id}
+        AND COALESCE("refreshToken", "accessToken") IS NOT DISTINCT FROM ${encrypted ?? null}
+      RETURNING id`;
+    if (cleared.length !== 1)
+      return yield* new GoogleWorkspaceError({ reason: "unavailable" });
     return yield* Effect.void;
   },
   Effect.catchTag(

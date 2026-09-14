@@ -21,8 +21,9 @@ const initializeAuth = Effect.fn("initializeAuth")(function* () {
   return yield* Effect.try({
     try: () =>
       betterAuth({
-        appName: "Companion",
+        appName: "Zoen",
         baseURL: betterAuthBaseURL(),
+        advanced: { disableOriginCheck: false, disableCSRFCheck: false },
         database: drizzleAdapter(db, {
           provider: "pg",
           schema: { account, session, user, verification },
@@ -35,18 +36,32 @@ const initializeAuth = Effect.fn("initializeAuth")(function* () {
                   clientId: env.GOOGLE_CLIENT_ID,
                   clientSecret: Redacted.value(env.GOOGLE_CLIENT_SECRET),
                   accessType: "offline",
-                  prompt: "consent",
-                  disableSignUp: true,
+                  prompt: "select_account",
+                  includeGrantedScopes: false,
                 },
               }
             : {},
         account: {
           encryptOAuthTokens: true,
+          // Signing in must not replace the separate Gmail/Calendar grant.
+          updateAccountOnSignIn: false,
           accountLinking: {
             enabled: true,
             disableImplicitLinking: true,
             allowDifferentEmails: true,
             allowUnlinkingAll: true,
+          },
+        },
+        databaseHooks: {
+          user: {
+            create: {
+              before: async (identity) =>
+                identity.emailVerified &&
+                (env.ZOEN_REGISTRATION_MODE === "open" ||
+                  env.ZOEN_BETA_IDENTITIES.includes(
+                    `google:${identity.email.toLowerCase()}`
+                  )),
+            },
           },
         },
         disabledPaths: [
@@ -61,7 +76,6 @@ const initializeAuth = Effect.fn("initializeAuth")(function* () {
           "/reset-password/:token",
           "/send-verification-email",
           "/sign-in/email",
-          "/sign-in/social",
           "/sign-up/email",
           "/verify-email",
         ],

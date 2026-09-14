@@ -11,13 +11,13 @@ export function WorkspaceSwitcher() {
   const { t } = useI18n();
   const router = useRouter();
   const selected = useSearchParams().get("space");
-  const { data } = api.workspaces.list.useQuery(undefined, {
+  const { data, isPending } = api.workspaces.list.useQuery(undefined, {
     staleTime: 30_000,
   });
   const active =
     data?.find((workspace) => workspace.id === selected) ??
     data?.find((workspace) => !workspace.organizationId);
-  const work = !!active?.organizationId;
+  const work = active ? !!active.organizationId : !!selected;
   return (
     <label className={styles.switcher}>
       {work ? (
@@ -25,10 +25,13 @@ export function WorkspaceSwitcher() {
       ) : (
         <HomeIcon aria-hidden="true" />
       )}
-      <span className={styles.label}>{work ? active.name : t("Pessoal")}</span>
+      <span className={styles.label}>
+        {work ? (active?.name ?? t("Seu espaço")) : t("Pessoal")}
+      </span>
       <ChevronDownIcon aria-hidden="true" />
       <select
         aria-label={t("Trocar espaço")}
+        disabled={isPending}
         value={selected ?? "personal"}
         onChange={(event) => {
           const value = event.currentTarget.value;
@@ -45,6 +48,9 @@ export function WorkspaceSwitcher() {
             );
         }}
       >
+        {isPending && selected && (
+          <option value={selected}>{t("Seu espaço")}</option>
+        )}
         <option value="personal">{t("Pessoal")}</option>
         {data
           ?.filter((workspace) => workspace.organizationId)

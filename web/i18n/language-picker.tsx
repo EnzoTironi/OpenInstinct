@@ -13,7 +13,11 @@ import { localeNames } from "./locale";
 import { changeLocale } from "./actions";
 import { useI18n } from "./context";
 
-export function LanguagePicker() {
+export function LanguagePicker({
+  compact = false,
+}: {
+  readonly compact?: boolean;
+}) {
   const { locale, t } = useI18n();
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState(false);
@@ -39,7 +43,9 @@ export function LanguagePicker() {
           className="h-11 w-full rounded-2xl px-4"
         >
           <LanguagesIcon aria-hidden="true" />
-          <SelectValue>{localeNames[locale]}</SelectValue>
+          <SelectValue>
+            {compact ? locale.toUpperCase() : localeNames[locale]}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {Object.entries(localeNames).map(([value, label]) => (

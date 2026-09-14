@@ -163,13 +163,18 @@ export const env = createEnv({
       .transform((value) =>
         value
           .split(",")
-          .map((item) => item.trim())
+          .map((item) => item.trim().toLowerCase())
           .filter(Boolean)
       )
       .refine(
         (identities) =>
-          identities.every((item) => /^(telegram|kapso):[+0-9]+$/u.test(item)),
-        "Use comma-separated verified telegram:ID or kapso:NUMBER identities"
+          identities.every(
+            (item) =>
+              /^(telegram|kapso):[+0-9]+$/u.test(item) ||
+              (item.startsWith("google:") &&
+                z.email().safeParse(item.slice(7)).success)
+          ),
+        "Use comma-separated telegram:ID, kapso:NUMBER or google:EMAIL identities"
       ),
     ZOEN_BILLING_MODE: Schema.toStandardSchemaV1(
       Schema.Literals(["free-beta", "paid"]).pipe(

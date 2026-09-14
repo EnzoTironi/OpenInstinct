@@ -1,3 +1,7 @@
+import Image from "next/image";
+import { OnboardingShell } from "@web/auth/onboarding/shell";
+import { cn } from "@web/components/class-names";
+import styles from "@web/auth/onboarding/onboarding.module.css";
 import { getI18n } from "@web/i18n/server";
 import type { Metadata } from "next";
 import { Schema } from "effect";
@@ -8,8 +12,8 @@ import { DeviceSignInUnavailable } from "./_components/unavailable";
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return {
-    title: t("Sign in | Companion"),
-    description: t("Finish Companion sign-in on this browser."),
+    title: t("Sign in | Zoen"),
+    description: t("Finish Zoen sign-in on this browser."),
   };
 }
 
@@ -27,8 +31,17 @@ export default async function DeviceSignInPage({
     purpose: params.purpose,
   });
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-sm space-y-6">
+    <OnboardingShell>
+      <section className={cn(styles.card, styles.deviceCard)}>
+        <div className={styles.deviceScene}>
+          <Image
+            alt=""
+            src="/marketing/panel/zoen-integration.png"
+            fill
+            unoptimized
+            sizes="440px"
+          />
+        </div>
         <h1 className="type-page-title">
           {purpose === "link"
             ? t("Confirm your account association")
@@ -36,6 +49,6 @@ export default async function DeviceSignInPage({
         </h1>
         <NativeDeviceForm id={id} purpose={purpose} />
       </section>
-    </main>
+    </OnboardingShell>
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import { LanguagePicker } from "@web/i18n/language-picker";
-
+import { useState } from "react";
 import { useI18n } from "@web/i18n/context";
 import Link from "next/link";
 import { MessageCircleIcon } from "lucide-react";
 import { Button } from "@web/components/ui/button";
-import { Logo } from "@web/components/ui/logo";
+import { OnboardingFrame } from "@web/auth/onboarding/frame";
+import styles from "@web/auth/onboarding/onboarding.module.css";
 
 export function GetStartedPanel({
   whatsappUrl,
@@ -18,27 +18,17 @@ export function GetStartedPanel({
   readonly imessageUrl: string | null;
 }) {
   const { t } = useI18n();
+  const [step, setStep] = useState(1);
   const available = Boolean(whatsappUrl ?? telegramUrl ?? imessageUrl);
   return (
-    <section className="w-full max-w-md space-y-8 text-center">
-      <Link
-        className="inline-flex items-center gap-2 type-label"
-        href="/welcome"
-      >
-        <Logo /> Zoen
-      </Link>
-      <header className="space-y-3">
-        <h1 className="type-page-title">{t("Tudo começa com um oi.")}</h1>
-        <p className="type-supporting-body text-muted-foreground">
-          {available
-            ? t(
-                "Abra a conversa e faça seu primeiro pedido. Seu Zoen começa com você."
-              )
-            : t(
-                "A conversa ainda não está disponível por aqui. Volte em breve para conhecer seu Zoen."
-              )}
+    <OnboardingFrame step={step} onStep={setStep}>
+      {!available && (
+        <p className="type-supporting-body mb-5 text-center text-muted-foreground">
+          {t(
+            "A conversa ainda não está disponível por aqui. Volte em breve para conhecer seu Zoen."
+          )}
         </p>
-      </header>
+      )}
       {available ? (
         <div className="flex flex-col gap-3">
           {[
@@ -69,17 +59,17 @@ export function GetStartedPanel({
           nativeButton={false}
           render={<Link href="/welcome" />}
           size="lg"
+          className="w-full"
         >
           {t("Conhecer o Zoen")}
         </Button>
       )}
-      <p className="type-caption text-muted-foreground">
+      <p className={styles.note}>
         {t("Já usa o Zoen?")}{" "}
         <Link className="underline underline-offset-4" href="/sign-in">
           {t("Acessar minha conta")}
         </Link>
       </p>
-      <LanguagePicker />
-    </section>
+    </OnboardingFrame>
   );
 }

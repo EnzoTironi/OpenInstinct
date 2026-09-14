@@ -13,7 +13,6 @@ import {
   channelChallengeIdSchema,
   channelChallengeRequestSchema,
   channelChallengeSchema,
-  channelConversationEntrySchema,
   deviceBindingSchema,
   deviceRequestSchema,
   deviceBoundSchema,
@@ -174,15 +173,6 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                   ctx.body.purpose === "link"
                     ? yield* readLinkSession(ctx)
                     : null;
-                if (ctx.body.channel === "kapso") {
-                  ctx.setHeader("Cache-Control", "no-store");
-                  return yield* Schema.decodeUnknownEffect(
-                    channelConversationEntrySchema
-                  )({
-                    channel: "kapso",
-                    conversationUrl: `${destination.url}?text=${encodeURIComponent(ctx.body.purpose === "link" ? "quero vincular meu WhatsApp à conta aberta no navegador" : "quero abrir minha conta no navegador")}`,
-                  });
-                }
                 const accounts = yield* ChannelAccounts;
                 const browserSecret = yield* Effect.sync(() =>
                   randomBytes(32).toString("base64url")
@@ -204,7 +194,10 @@ export const channelAuthPlugin = (runEffect: ChannelAuthRunEffect) =>
                         browserSecret,
                       }
                 );
-                const message = challenge.token;
+                const message =
+                  ctx.body.channel === "kapso"
+                    ? `/start ${challenge.token}`
+                    : challenge.token;
                 const response = yield* Schema.decodeUnknownEffect(
                   channelChallengeSchema
                 )({

@@ -104,7 +104,10 @@ export const channelInbox = pgTable(
         jsonb_typeof(${table.nativeInput}) = 'object'
         AND ${table.nativeInput}->>'protocol' = 'eve-keyed-input-v1'
         AND ${table.nativeInput}->>'inputId' = ${table.id}::text
-        AND ${table.nativeInput}->>'address' = ${table.identityId}::text, false)`
+        AND (
+          ${table.nativeInput}->>'address' = COALESCE(${table.payload}->>'conversationScope', ${table.identityId}::text)
+          OR (${table.status} IN ('accepted', 'failed') AND ${table.nativeInput}->>'address' = ${table.identityId}::text)
+        ), false)`
     ),
     check("channel_inbox_attempts_check", sql`${table.attempts} >= 0`),
     check(

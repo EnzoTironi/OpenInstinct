@@ -22,8 +22,8 @@ describe("marketing landing", () => {
     expect(html).not.toContain("poke.com");
     expect(html).not.toContain("Ver todos os planos");
     expect(html).toContain("Começar agora");
-    expect(html).toContain('aria-haspopup="dialog"');
-    expect(html).not.toContain('href="/get-started"');
+    expect(html).not.toContain('aria-haspopup="dialog"');
+    expect(html).toContain('href="/get-started"');
     expect(html).not.toContain('href="/pricing"');
     expect(html).toContain('href="/docs"');
     expect(html).toContain('href="https://wa.me/15551234567"');

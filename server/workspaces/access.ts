@@ -142,6 +142,13 @@ export const workspaceActorFromPrincipal = Effect.fn(
 )(function* (principal: SessionAuthContext | undefined) {
   if (principal?.principalType !== "user")
     return yield* new WorkspaceAccessDenied();
+  if (
+    (principal.attributes.chatKind === "group" ||
+      (Schema.is(Schema.String)(principal.attributes.conversationScope) &&
+        principal.attributes.conversationScope.startsWith("group:"))) &&
+    !principal.attributes.groupBindingId
+  )
+    return yield* new WorkspaceAccessDenied();
   const actor = yield* Schema.decodeUnknownEffect(WorkspaceActorSchema)({
     userId: principal.principalId,
     workspaceId: principal.attributes.workspaceId,
