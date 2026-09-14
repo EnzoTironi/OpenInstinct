@@ -29,6 +29,9 @@ export default defineEval({
       "Set the Beta release project's status to active in this workspace."
     );
     proposed.parked();
+    t.check((await inspect()).revision, equals(before.revision)).label(
+      "no mutation before approval"
+    );
     const first = t.requireInputRequest({
       toolName: "execute",
       optionIds: ["approve", "cancel"],
@@ -45,9 +48,6 @@ export default defineEval({
       },
     });
     t.check(first.kind, equals("tool-approval"));
-    t.check((await inspect()).revision, equals(before.revision)).label(
-      "no mutation before approval"
-    );
     const rejected = await t.respond([
       { requestId: first.requestId, optionId: "cancel" },
     ]);

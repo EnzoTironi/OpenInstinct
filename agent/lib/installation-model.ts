@@ -1,6 +1,7 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { Config, Effect, Redacted, Schema } from "effect";
 import { chatgpt } from "eve/models/openai";
+import { withModelDeadline } from "./model-deadline";
 import {
   browserModelProviderSchema,
   browserModelSchema,
@@ -20,7 +21,7 @@ export const installationModel = Effect.gen(function* () {
   if (provider === "gateway") return null;
   if (provider === "codex-local")
     return {
-      model: chatgpt("gpt-5.3-codex-spark"),
+      model: withModelDeadline(chatgpt("gpt-5.3-codex-spark")),
       modelContextWindowTokens: 128_000,
       modelOptions: {
         providerOptions: { openai: { reasoningSummary: null } },
@@ -39,7 +40,7 @@ export const installationModel = Effect.gen(function* () {
     },
   });
   return {
-    model: openrouter("nvidia/nemotron-3.5-lightning:free"),
+    model: withModelDeadline(openrouter("nvidia/nemotron-3.5-lightning:free")),
     modelContextWindowTokens: 1_000_000,
   };
 });
@@ -62,7 +63,7 @@ export const browserInstallationModel = Effect.gen(function* () {
     extraBody: { provider: { allow_fallbacks: false } },
   });
   return {
-    model: openrouter(model),
+    model: withModelDeadline(openrouter(model)),
     modelContextWindowTokens:
       model === "meta/muse-spark-1.3" ? 1_048_576 : 400_000,
     modelOptions: { providerOptions: { openrouter: { max_tokens: 4_096 } } },
