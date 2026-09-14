@@ -11,6 +11,7 @@ import {
 import { Command, Flag } from "effect/unstable/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { randomUUID } from "node:crypto";
+import { execPath } from "node:process";
 import { Client } from "eve/client";
 
 class EvalFailed extends Schema.TaggedError<EvalFailed>()("EvalFailed", {
@@ -86,8 +87,8 @@ const command = Command.make(
     if (options.list) {
       const child = yield* spawner.spawn(
         ChildProcess.make(
-          "pnpm",
-          ["exec", "eve", "eval", ...selected, "--list"],
+          execPath,
+          ["node_modules/eve/bin/eve.js", "eval", ...selected, "--list"],
           {
             env: environment,
             extendEnv: false,
@@ -159,8 +160,7 @@ const command = Command.make(
         });
         const report = `${output}/run-${String(index + 1)}.json`;
         const args = [
-          "exec",
-          "eve",
+          "node_modules/eve/bin/eve.js",
           "eval",
           ...selected,
           "--url",
@@ -181,7 +181,7 @@ const command = Command.make(
             : []),
         ];
         const child = yield* spawner.spawn(
-          ChildProcess.make("pnpm", args, {
+          ChildProcess.make(execPath, args, {
             env: {
               ...environment,
               EVE_EVAL_AUTH_TOKEN: target.token,

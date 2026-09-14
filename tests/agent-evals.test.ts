@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -24,7 +24,7 @@ describe(
   "native agent eval CLI",
   { timeout: SUPERVISOR_TEST_TIMEOUT_MS },
   () => {
-    it("lists selected cases without connecting to a database and filters child credentials", async () => {
+    it("runs the installed native CLI without a package manager and filters child credentials", async () => {
       const result = await runSupervisor([
         "--list",
         "--suite",
@@ -42,8 +42,6 @@ describe(
         )
       )(result.commands);
       expect(command.args).toEqual([
-        "exec",
-        "eve",
         "eval",
         "launch",
         "--tag",
@@ -131,11 +129,11 @@ async function runSupervisor(
   const directory = await mkdtemp(join(tmpdir(), "zoen-evals-cli-"));
   temporaryDirectories.push(directory);
   const logPath = join(directory, "commands.log");
-  const pnpmPath = join(directory, "pnpm");
+  const cliDirectory = join(directory, "node_modules", "eve", "bin");
+  await mkdir(cliDirectory, { recursive: true });
   await writeFile(
-    pnpmPath,
-    `#!${process.execPath}
-const fs = require("node:fs");
+    join(cliDirectory, "eve.js"),
+    `const fs = require("node:fs");
 const log = ${JSON.stringify(logPath)};
 fs.appendFileSync(log, JSON.stringify({ args: process.argv.slice(2), environment: Object.keys(process.env).sort() }) + "\\n");
 if (${String(options.interrupt ?? false)}) {
@@ -145,16 +143,16 @@ if (${String(options.interrupt ?? false)}) {
 } else process.exit(${String(options.exitCode ?? 0)});
 `
   );
-  await chmod(pnpmPath, 0o755);
   const supervisor = spawn(
     process.execPath,
     [
       "--import",
-      "tsx",
+      import.meta.resolve("tsx"),
       new URL("../scripts/run-agent-evals.ts", import.meta.url).pathname,
       ...args,
     ],
     {
+      cwd: directory,
       env: {
         PATH: directory,
         AI_GATEWAY_API_KEY: "synthetic-model-key",
