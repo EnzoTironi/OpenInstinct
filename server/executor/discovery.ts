@@ -49,7 +49,7 @@ export const discoverExecutor = Effect.fn("Executor.discover")(function* (
     const input = yield* Schema.decodeUnknownEffect(Describe)(args, {
       onExcessProperty: "error",
     });
-    return yield* loadExecutorSkill(actor, input.path);
+    return yield* loadExecutorSkill(actor, input.path, Object.keys(native));
   }
   const tools = Object.entries(native).map(([name, tool]) => ({
     kind: "tool" as const,

@@ -10,6 +10,13 @@ import {
   WorkspaceWriteSchema,
 } from "../../server/workspaces/repository";
 import {
+  listSkillProposals,
+  publishSkillProposal,
+  PublishSkillProposalSchema,
+  rollbackSkill,
+  RollbackSkillSchema,
+} from "../../server/workspaces/skills";
+import {
   GitRevisionSchema,
   WorkspacePathSchema,
 } from "../../server/workspaces/git";
@@ -264,4 +271,57 @@ export const workspacesRouter = {
         { signal }
       )
     ),
+  skills: {
+    proposals: workspaceProcedure.query(({ ctx, signal }) =>
+      serverRuntime.runPromise(listSkillProposals(ctx.actor), { signal })
+    ),
+    publish: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(PublishSkillProposalSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          publishSkillProposal(ctx.actor, input).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            ),
+            Effect.catchTag("WorkspaceRepositoryError", (error) =>
+              Effect.fail(
+                new TRPCError({
+                  code:
+                    error.reason === "conflict" ? "CONFLICT" : "BAD_REQUEST",
+                  message:
+                    error.reason === "conflict"
+                      ? "This file changed. Reload it before saving."
+                      : "Unable to publish this skill.",
+                })
+              )
+            )
+          ),
+          { signal }
+        )
+      ),
+    rollback: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(RollbackSkillSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          rollbackSkill(ctx.actor, input).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            ),
+            Effect.catchTag("WorkspaceRepositoryError", (error) =>
+              Effect.fail(
+                new TRPCError({
+                  code:
+                    error.reason === "conflict" ? "CONFLICT" : "BAD_REQUEST",
+                  message:
+                    error.reason === "conflict"
+                      ? "This file changed. Reload it before saving."
+                      : "Unable to restore this skill.",
+                })
+              )
+            )
+          ),
+          { signal }
+        )
+      ),
+  },
 };

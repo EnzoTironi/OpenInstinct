@@ -9,7 +9,7 @@ export const workspaceGitLimits = {
 } as const;
 export const WorkspacePathSchema = Schema.String.check(
   Schema.isPattern(
-    /^(?:(?:knowledge|skills|agent)\/[a-zA-Z0-9][a-zA-Z0-9_./-]{0,180}\.md|(?:plugins|ontology)\/workspace\.json)$/
+    /^(?:(?:knowledge|skills|agent|proposals\/skills)\/[a-zA-Z0-9][a-zA-Z0-9_./-]{0,180}\.md|(?:plugins|ontology)\/workspace\.json)$/
   ),
   Schema.isPattern(/^(?!.*(?:\/\.|\.\.|\/\/)).*$/)
 );
@@ -212,10 +212,17 @@ export const publishWorkspaceGit = Effect.fn("publishWorkspaceGit")(
     readonly path: string;
     readonly content: string | null;
     readonly message: string;
+    readonly remove?: string;
   }) {
     const path = yield* Schema.decodeUnknownEffect(WorkspacePathSchema)(
       input.path
     );
+    const removed =
+      input.remove === undefined
+        ? null
+        : yield* Schema.decodeUnknownEffect(WorkspacePathSchema)(input.remove);
+    if (removed === path)
+      return yield* new WorkspaceGitError({ reason: "invalid_file" });
     const parent =
       input.parent === null
         ? null
@@ -247,6 +254,8 @@ export const publishWorkspaceGit = Effect.fn("publishWorkspaceGit")(
         `100644,${blob},${path}`,
       ]);
     }
+    if (removed)
+      yield* git(repository, ["update-index", "--force-remove", "--", removed]);
     const tree = (yield* git(repository, ["write-tree"])).trim();
     const files = (yield* git(repository, [
       "ls-tree",

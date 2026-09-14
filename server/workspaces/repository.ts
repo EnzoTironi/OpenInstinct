@@ -23,6 +23,13 @@ import {
   searchWorkspaceGit,
   WorkspacePathSchema,
 } from "./git";
+import {
+  isSkillContentPath,
+  PublishedSkillPath,
+  SkillDocumentSchema,
+  SkillProposalPath,
+  skillPathFromProposal,
+} from "./skill-document";
 
 export const WorkspaceWriteSchema = Schema.Struct({
   operationId: Schema.String.check(Schema.isUUID()),
@@ -263,7 +270,11 @@ const makeRepository = Effect.gen(function* () {
               readonly kind: "import";
               readonly filename: string;
               readonly bytes: Uint8Array;
-            } = { kind: "editor" }
+            }
+          | { readonly kind: "publication"; readonly proposal: string }
+          | { readonly kind: "rollback"; readonly revision: string } = {
+          kind: "editor",
+        }
       ) {
         if (
           actor.agentGrantId ||
@@ -281,9 +292,33 @@ const makeRepository = Effect.gen(function* () {
           yield* Schema.decodeUnknownEffect(
             Schema.fromJsonString(WorkspaceCapabilitiesSchema)
           )(input.content, { onExcessProperty: "error" });
+        if (isSkillContentPath(input.path) && input.content !== null)
+          yield* Schema.decodeUnknownEffect(SkillDocumentSchema)(
+            input.content
+          ).pipe(
+            Effect.mapError(
+              () => new WorkspaceRepositoryError({ reason: "invalid_input" })
+            )
+          );
+        if (source.kind === "publication") {
+          if (
+            !Schema.is(SkillProposalPath)(source.proposal) ||
+            skillPathFromProposal(source.proposal) !== input.path
+          )
+            return yield* new WorkspaceRepositoryError({
+              reason: "invalid_input",
+            });
+        }
         if (
-          (input.path.startsWith("agent/") ||
-            input.path.startsWith("skills/")) &&
+          source.kind === "rollback" &&
+          (!Schema.is(PublishedSkillPath)(input.path) ||
+            !Schema.is(GitRevisionSchema)(source.revision))
+        )
+          return yield* new WorkspaceRepositoryError({
+            reason: "invalid_input",
+          });
+        if (
+          (input.path.startsWith("agent/") || isSkillContentPath(input.path)) &&
           (input.content?.length ?? 0) > 16_000
         )
           return yield* new WorkspaceRepositoryError({
@@ -307,6 +342,10 @@ const makeRepository = Effect.gen(function* () {
                 sha256: sourceSha,
                 filename: original?.filename,
                 action: source.kind === "ontology" ? source.action : undefined,
+                proposal:
+                  source.kind === "publication" ? source.proposal : undefined,
+                revision:
+                  source.kind === "rollback" ? source.revision : undefined,
               },
             })
           )
@@ -315,7 +354,8 @@ const makeRepository = Effect.gen(function* () {
           Effect.gen(function* () {
             yield* requireWorkspaceAccess(
               actor,
-              !input.path.startsWith("knowledge/")
+              !input.path.startsWith("knowledge/") &&
+                !input.path.startsWith("proposals/skills/")
             );
             const prior = yield* replay(
               actor.workspaceId,
@@ -328,18 +368,46 @@ const makeRepository = Effect.gen(function* () {
         if (initial.prior) return { revision: initial.prior };
         if ((initial.stored?.head ?? null) !== input.expectedRevision)
           return yield* new WorkspaceRepositoryError({ reason: "conflict" });
-        const candidate = yield* publishWorkspaceGit({
+        const metadata =
+          source.kind === "ontology"
+            ? {
+                actor: actor.userId,
+                operation: input.operationId,
+                action: source.action,
+              }
+            : source.kind === "publication"
+              ? {
+                  actor: actor.userId,
+                  operation: input.operationId,
+                  source: "publication",
+                  proposal: source.proposal,
+                }
+              : source.kind === "rollback"
+                ? {
+                    actor: actor.userId,
+                    operation: input.operationId,
+                    source: "rollback",
+                    revision: source.revision,
+                  }
+                : { actor: actor.userId, operation: input.operationId };
+        const gitInput = {
           bundle: initial.stored?.bundle ?? null,
           parent: input.expectedRevision,
           path: input.path,
           content: input.content,
-          message: `${input.content === null ? "Remove" : "Update"} ${input.path}\n\nZoen-Metadata: ${JSON.stringify({ actor: actor.userId, operation: input.operationId, action: source.kind === "ontology" ? source.action : undefined })}`,
-        });
+          message: `${input.content === null ? "Remove" : "Update"} ${input.path}\n\nZoen-Metadata: ${JSON.stringify(metadata)}`,
+        };
+        const candidate = yield* publishWorkspaceGit(
+          source.kind === "publication"
+            ? { ...gitInput, remove: source.proposal }
+            : gitInput
+        );
         return yield* sql.withTransaction(
           Effect.gen(function* () {
             yield* requireWorkspaceAccess(
               actor,
-              !input.path.startsWith("knowledge/")
+              !input.path.startsWith("knowledge/") &&
+                !input.path.startsWith("proposals/skills/")
             );
             const prior = yield* replay(
               actor.workspaceId,
