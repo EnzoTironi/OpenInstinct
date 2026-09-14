@@ -28,6 +28,7 @@ const denied = <A, E>(result: Result.Result<A, E>) => {
 const login = (label: string, password: string) => ({
   kind: "login" as const,
   label,
+  account: "",
   secret: serializeLoginVaultPayload({
     version: 2,
     kind: "login",
