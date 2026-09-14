@@ -10,6 +10,44 @@ import {
 
 const receipts = Schema.Struct({ calls: Schema.Array(ExecutorReceiptSchema) });
 
+// Classify provider diagnostics without exporting their messages, URLs or payloads.
+function failureCategory(message: string) {
+  if (/rate.?limit|too many requests|\b429\b/iu.test(message))
+    return "rate-limit";
+  if (
+    /unauthori[sz]ed|authentication|invalid.*(?:key|token)|\b40[13]\b/iu.test(
+      message
+    )
+  )
+    return "authentication";
+  if (/timed? ?out|timeout|ETIMEDOUT/iu.test(message)) return "timeout";
+  if (/\b50[0234]\b|overloaded|unavailable|ECONNRESET/iu.test(message))
+    return "provider-unavailable";
+  if (/schema|invalid.*request|\b400\b|unsupported/iu.test(message))
+    return "invalid-request";
+  return "unclassified";
+}
+
+function caseOutcome(result: EveEvalResult["result"]) {
+  return {
+    status: result.status,
+    parked: result.derived.parked,
+    inputRequestsRaised: result.derived.inputRequests.length,
+    failures: result.events.flatMap((event) =>
+      event.type === "step.failed" || event.type === "turn.failed"
+        ? [
+            {
+              event: event.type,
+              code: event.data.code,
+              category: failureCategory(event.data.message),
+            },
+          ]
+        : []
+    ),
+    eventTypes: result.events.map((event) => event.type),
+  };
+}
+
 function caseMetrics(entry: EveEvalResult) {
   const steps = entry.result.events.filter(
     (event) => event.type === "step.completed"
@@ -21,6 +59,15 @@ function caseMetrics(entry: EveEvalResult) {
   return {
     id: entry.id,
     verdict: entry.verdict,
+    outcome: caseOutcome(entry.result),
+    gates: {
+      passed: entry.assertions.filter(
+        (assertion) => assertion.severity === "gate" && assertion.passed
+      ).length,
+      failed: entry.assertions.filter(
+        (assertion) => assertion.severity === "gate" && !assertion.passed
+      ).length,
+    },
     durationMs: Date.parse(entry.completedAt) - Date.parse(entry.startedAt),
     steps: steps.length,
     failedAttempts: executorAttemptFailures(tools),

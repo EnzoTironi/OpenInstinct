@@ -1,6 +1,10 @@
 # Agent evals
 
-The eval tree has two intentionally separate tiers:
+The eval tree has three tiers:
+
+- `launch/` is the required native-Eve release suite: Executor discovery and
+  Git-backed skills in English, Portuguese and Spanish, exact native approval,
+  and a live Kernel browser. It uses synthetic workspace data and live models.
 
 - `agent/` is the behavioral regression suite for the root coordinator. It
   covers conversation quality, tool routing, safety and approval boundaries,
@@ -21,36 +25,40 @@ List every discovered case without making model calls:
 pnpm eval:list
 ```
 
-Run the root-agent suite locally, including soft judge thresholds as failures:
+List launch cases without credentials:
 
 ```sh
-pnpm eval:agent
+pnpm eval:agent --list
 ```
 
-Run one family while iterating:
+Run the launch suite against a prepared isolated app:
 
 ```sh
-pnpm eval:agent --tag safety
-pnpm eval:agent --tag routing
+pnpm eval:agent --url http://127.0.0.1:4351 --repeat 3
 ```
 
 Produce JUnit output for CI:
 
 ```sh
-pnpm eval:ci
+pnpm eval:ci --url http://127.0.0.1:4351
 ```
 
-The agent command loads `.env.local`, starts an isolated Docker Compose
-PostgreSQL service, runs migrations, executes the suite, and then stops the
-service. It requires `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN`; the behavior
-suite forces an unusable Kernel placeholder because browser work belongs in the
-separate benchmark. Its Kernel and application callback origins are pinned to an
-unreachable loopback address so worker-routing evals cannot reach the external
-browser service and background callbacks cannot escape the isolated target.
-Agent cases run serially so memory cases cannot leak state into a concurrently
-executing case, and memory cases remove their canaries.
-Judge-backed cases use the judge model in `evals.config.ts`. Full
-event streams and assertion details are written to `.eve/evals/`.
+The launcher uses the installed Eve CLI directly, creates a temporary synthetic
+Better Auth identity and workspace for each repetition, and refuses non-loopback
+targets or databases other than `companion_runtime_test`. The app and migrated
+PostgreSQL instance must already be running. It preserves the app's chosen models;
+browser cases also require Kernel on the server. The **Zoen native agent evals**
+GitHub workflow prepares and removes this complete isolated environment.
+
+Use `--suite agent --tag safety` or `--suite agent --tag routing` to select a
+behavioral family. These older families are not implied by a passing launch run.
+Judge-backed cases use the judge in `evals.config.ts` and need that provider's
+credentials. Full native traces stay in `.eve/evals/`; only summary receipts and
+JUnit are uploaded by CI. Summaries omit model replies, inputs, provider error
+messages and credentials. All requested repetitions run, and any failed or
+skipped required case fails the command. See the
+[launch ledger](../docs/decisions/zoen-launch-validation.md) for coverage and
+current results.
 
 Run the browser benchmark separately because it uses Kernel, real websites,
 and a longer completion loop:

@@ -145,6 +145,7 @@ jobs:
             .eve/launch-*/run-*.json
             .eve/launch.xml*
           if-no-files-found: ignore
+          include-hidden-files: true
           retention-days: 14
       - name: Remove ephemeral credentials
         if: always()
