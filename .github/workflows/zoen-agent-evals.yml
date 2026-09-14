@@ -75,6 +75,15 @@ jobs:
           import { writeFileSync } from 'node:fs';
           import { parseEnv } from 'node:util';
           const source = parseEnv(process.env.EVAL_PROVIDERS ?? '');
+          const mask = value => {
+            if (typeof value === 'string' && value.length >= 8) {
+              console.log('::add-mask::' + value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A'));
+              try { const nested = JSON.parse(value); if (nested && typeof nested === 'object') mask(nested); } catch {}
+            } else if (value && typeof value === 'object') {
+              Object.values(value).forEach(mask);
+            }
+          };
+          mask(source);
           const selected = {};
           for (const name of ['CODEX_AUTH_JSON', 'OPENROUTER_API_KEY', 'KERNEL_API_KEY']) {
             if (!source[name]) throw new Error(`Missing eval provider: ${name}`);
