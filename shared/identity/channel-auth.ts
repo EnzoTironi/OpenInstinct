@@ -54,7 +54,7 @@ export const channelChallengeSchema = Schema.Struct({
 
 export const channelChallengeIdSchema = Schema.Struct({ id: challengeId });
 
-export const channelConversationEntrySchema = Schema.Struct({
+const channelConversationEntrySchema = Schema.Struct({
   channel: Schema.Literal("kapso"),
   conversationUrl: Schema.String.check(
     Schema.makeFilter((value) => {
