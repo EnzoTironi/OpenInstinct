@@ -1,15 +1,12 @@
-import { LanguagePicker } from "@web/i18n/language-picker";
 import { getI18n } from "@web/i18n/server";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import Link from "next/link";
-import { ChannelAuthForm } from "@web/auth/channel/form";
 import { safeCallbackUrl } from "@web/auth/channel/client";
 import { getAuthSession } from "@db/services/auth/session";
 import { env } from "@shared/environment";
-import { GoogleSignInButton } from "@web/auth/google-button";
-import { Logo } from "@web/components/ui/logo";
+import { OnboardingSignIn } from "@web/auth/onboarding/sign-in";
+import { OnboardingShell } from "@web/auth/onboarding/shell";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -33,20 +30,11 @@ export default async function SignInPage({
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
   );
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-sm space-y-6">
-        <Link
-          className="inline-flex items-center gap-2 type-label"
-          href="/welcome"
-        >
-          <Logo /> Zoen
-        </Link>
-        <div className="space-y-3">
-          <h1 className="type-page-title">{t("Your space awaits.")}</h1>
-          <p className="type-supporting-body text-muted-foreground">
-            {t("One account for your personal space and your teams.")}
-          </p>
-        </div>
+    <OnboardingShell>
+      <OnboardingSignIn
+        googleAvailable={googleAvailable}
+        callbackUrl={callbackUrl}
+      >
         {params.error ? (
           <p role="alert" className="type-caption text-destructive">
             {t(
@@ -61,23 +49,7 @@ export default async function SignInPage({
             )}
           </output>
         ) : null}
-        {googleAvailable ? (
-          <>
-            <GoogleSignInButton callbackUrl={callbackUrl} />
-            <details className="border-t border-border pt-5">
-              <summary className="cursor-pointer type-label text-muted-foreground">
-                {t("Use a linked messenger")}
-              </summary>
-              <div className="pt-4">
-                <ChannelAuthForm purpose="login" callbackUrl={callbackUrl} />
-              </div>
-            </details>
-          </>
-        ) : (
-          <ChannelAuthForm purpose="login" callbackUrl={callbackUrl} />
-        )}
-        <LanguagePicker />
-      </section>
-    </main>
+      </OnboardingSignIn>
+    </OnboardingShell>
   );
 }

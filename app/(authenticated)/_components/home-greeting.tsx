@@ -1,8 +1,8 @@
 "use client";
 import { useI18n } from "@web/i18n/context";
 import { cn } from "@web/components/class-names";
-import { getLocalDay } from "./local-day";
-import { useLocalTime } from "./use-local-time";
+import { getLocalDay } from "@web/components/sky/local-day";
+import { useLocalTime } from "@web/components/sky/use-local-time";
 import styles from "./home.module.css";
 
 export function HomeGreeting() {

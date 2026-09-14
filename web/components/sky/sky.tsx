@@ -1,15 +1,21 @@
 import Image from "next/image";
 import { cn } from "@web/components/class-names";
 import { type getLocalDay, skyPhases } from "./local-day";
-import styles from "./panel.module.css";
+import styles from "./sky.module.css";
 
-export function PanelSky({
+export function Sky({
   phase,
+  embedded = false,
 }: {
   readonly phase: ReturnType<typeof getLocalDay>["sky"];
+  readonly embedded?: boolean;
 }) {
   return (
-    <div aria-hidden="true" className={styles.skyBackdrop} data-sky={phase}>
+    <div
+      aria-hidden="true"
+      className={cn(styles.skyBackdrop, embedded && styles.embedded)}
+      data-sky={phase}
+    >
       {skyPhases.map((sky) => (
         <Image
           alt=""

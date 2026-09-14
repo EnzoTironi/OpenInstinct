@@ -120,9 +120,7 @@ describe("conversation entry", () => {
         searchParams: Promise.resolve({}),
       })
     ).rejects.toThrow("redirect");
-    expect(redirect).toHaveBeenCalledWith(
-      "/sign-in?callbackUrl=%2Fconnections"
-    );
+    expect(redirect).toHaveBeenCalledWith("/sign-in?callbackUrl=%2Fonboarding");
   });
   it("never treats a query parameter as a redirect destination", async () => {
     const page = await GetStartedPage({
