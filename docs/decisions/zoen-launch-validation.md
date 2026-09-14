@@ -108,6 +108,15 @@ Production rollout on 2026-09-13:
   needed its build port aligned, Eve's own credential file prepared, and runtime
   queue grants applied after migrations. These failures are retained; they are
   not counted as passing evaluations.
+- The first hosted run to reach all cases, [34797091226](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34797091226),
+  passed 13/15 scenarios. One browser model call failed before invoking tools;
+  one approval case ended without a pending approval. All nine skill cases
+  passed, with recovered tool attempts. The release gate remains failed. The
+  upload action had excluded hidden files, so this run's console evidence is
+  retained but its detailed receipts were not uploaded. Explicit hidden-file
+  inclusion is limited to the receipt/JUnit paths; subsequent summaries also
+  retain event types, failure categories and mandatory assertion counts without
+  exporting provider messages or model payloads.
 
 Local validation on 2026-09-13:
 
