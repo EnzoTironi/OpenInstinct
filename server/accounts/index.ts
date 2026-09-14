@@ -8,6 +8,9 @@ import {
 } from "../../shared/identity/channel-auth.ts";
 import { accessScopeForUser } from "../../shared/identity/access-scope.ts";
 import { env } from "@shared/environment/env";
+import { ChannelAccountError } from "./errors";
+import { archiveChannelAccount } from "./archive-transfer";
+export { ChannelAccountError } from "./errors";
 
 const Identifier = Schema.NonEmptyString.check(Schema.isTrimmed());
 const Uuid = Schema.String.check(Schema.isUUID());
@@ -56,21 +59,6 @@ const RevokeIdentity = Schema.Struct({
   userId: Identifier,
 });
 
-export class ChannelAccountError extends Schema.TaggedError<ChannelAccountError>()(
-  "ChannelAccountError",
-  {
-    reason: Schema.Literals([
-      "invalid_input",
-      "identity_inactive",
-      "invalid_challenge",
-      "account_conflict",
-      "session_invalid",
-      "last_access",
-      "registration_closed",
-    ]),
-  }
-) {}
-
 export const IdentitySchema = Schema.Struct({
   id: Uuid,
   userId: Identifier,
@@ -87,6 +75,7 @@ const ChallengeRow = Schema.Struct({
   channel: channelProviderSchema,
   installationId: Identifier,
   targetUserId: Schema.NullOr(Identifier),
+  sourceUserId: Schema.NullOr(Identifier),
   requestingSessionId: Schema.NullOr(Identifier),
   identityId: Schema.NullOr(Uuid),
   confirmedSenderId: Schema.NullOr(Identifier),
@@ -189,7 +178,8 @@ export class ChannelAccounts extends Context.Service<
         >`SELECT id, user_id AS "userId", channel,
         installation_id AS "installationId", sender_id AS "senderId", revoked_at IS NOT NULL AS revoked
         FROM public.channel_identity WHERE channel = ${sender.channel}
-        AND installation_id = ${sender.installationId} AND sender_id = ${sender.senderId}`;
+        AND installation_id = ${sender.installationId} AND sender_id = ${sender.senderId}
+        ORDER BY revoked_at NULLS FIRST, created_at DESC LIMIT 1`;
         return rows[0];
       });
       const requireSession = Effect.fn("ChannelAccounts.requireSession")(
@@ -342,7 +332,7 @@ export class ChannelAccounts extends Context.Service<
               const rows = yield* sql<
                 typeof ChallengeRow.Type
               >`SELECT id, purpose, channel, installation_id AS "installationId",
-          target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
+          target_user_id AS "targetUserId", source_user_id AS "sourceUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
           FROM public.channel_auth_challenge WHERE token_hash = ${hash(request.token)}
           AND intended_identity_id IS NULL
           AND consumed_at IS NULL AND cancelled_at IS NULL AND confirmed_at IS NULL
@@ -409,7 +399,7 @@ export class ChannelAccounts extends Context.Service<
               const rows = yield* sql<
                 typeof ChallengeRow.Type
               >`SELECT id, purpose, channel, installation_id AS "installationId",
-          target_user_id AS "targetUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
+          target_user_id AS "targetUserId", source_user_id AS "sourceUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
           FROM public.channel_auth_challenge WHERE id = ${request.challengeId}
           AND browser_secret_hash = ${hash(request.browserSecret)} AND confirmed_at IS NOT NULL
           AND consumed_at IS NULL AND cancelled_at IS NULL AND expires_at > clock_timestamp() FOR UPDATE`;
@@ -429,6 +419,18 @@ export class ChannelAccounts extends Context.Service<
                   true
                 );
               }
+              if (challenge.sourceUserId && challenge.targetUserId) {
+                yield* archiveChannelAccount({
+                  sourceUserId: challenge.sourceUserId,
+                  targetUserId: challenge.targetUserId,
+                  challengeId: challenge.id,
+                  sender: {
+                    channel: challenge.channel,
+                    installationId: challenge.installationId,
+                    senderId: challenge.confirmedSenderId,
+                  },
+                }).pipe(Effect.provideService(PgClient.PgClient, sql));
+              }
               const identity = yield* provision(
                 {
                   channel: challenge.channel,
@@ -437,7 +439,8 @@ export class ChannelAccounts extends Context.Service<
                 },
                 challenge.targetUserId ?? undefined
               );
-              yield* sql`UPDATE public.channel_auth_challenge SET identity_id = ${identity.id}, consumed_at = clock_timestamp() WHERE id = ${challenge.id}`;
+              yield* sql`UPDATE public.channel_auth_challenge SET identity_id = CASE WHEN source_user_id IS NULL THEN ${identity.id} ELSE intended_identity_id END,
+                consumed_at = clock_timestamp() WHERE id = ${challenge.id}`;
               const principalId = `better-auth:${identity.userId}`;
               const scope = accessScopeForUser(principalId);
               return {

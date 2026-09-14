@@ -12,9 +12,23 @@ import {
   Schema,
 } from "effect";
 import { Pool } from "pg";
-import { test } from "vitest";
+import { test, vi } from "vitest";
+import { readAuthSession } from "../../db/services/auth/session";
+import { AuthUnavailable } from "../../db/services/auth";
+import {
+  readAccountArchive,
+  readAccountArchives,
+  downloadAccountArchive,
+} from "../../server/accounts/archives";
+import { Mem0 } from "../../server/memory/mem0";
+import { requireWorkspaceAccess } from "../../server/workspaces/access";
+
+vi.mock("../../db/services/auth/session", () => ({
+  readAuthSession: vi.fn<typeof readAuthSession>(),
+}));
 import { NativeDeviceAuth } from "../../server/accounts/device";
 import { ChannelAccounts } from "../../server/accounts";
+import { Messaging } from "../../server/messaging";
 import { channelAuthPlugin } from "../../server/channel-auth";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import {
@@ -33,7 +47,7 @@ const BrowserSession = Schema.Struct({
   session: Schema.Struct({ id: Schema.String }),
 });
 
-test("native account linking pins purpose, both proofs and one browser session without merging accounts", async () => {
+test("native linking and archive recovery pin both proofs, preserve data and reject replay", async () => {
   const databaseUrl = await Effect.runPromise(
     Config.string("DATABASE_URL").pipe(Effect.provide(runtimeDatabase))
   );
@@ -43,6 +57,7 @@ test("native account linking pins purpose, both proofs and one browser session w
   const runtime = ManagedRuntime.make(
     NativeDeviceAuth.layer.pipe(
       Layer.provideMerge(ChannelAccounts.layer),
+      Layer.provideMerge(Messaging.layer),
       Layer.provideMerge(
         ResolvedInstallationSecrets.layerFromResolved({
           betterAuthSecret: secret,
@@ -60,7 +75,7 @@ test("native account linking pins purpose, both proofs and one browser session w
     operation: Effect.Effect<
       A,
       E,
-      NativeDeviceAuth | ChannelAccounts | PgClient.PgClient
+      NativeDeviceAuth | ChannelAccounts | Messaging | PgClient.PgClient
     >
   ) =>
     runtime.runPromise(
@@ -77,6 +92,12 @@ test("native account linking pins purpose, both proofs and one browser session w
     advanced: { disableOriginCheck: false, disableCSRFCheck: false },
     plugins: [channelAuthPlugin(run)],
   });
+  vi.mocked(readAuthSession).mockImplementation((headers) =>
+    Effect.tryPromise({
+      try: () => auth.api.getSession({ headers }),
+      catch: () => new AuthUnavailable(),
+    })
+  );
   const request = (path: string, cookie: string, body?: Schema.Json) => {
     const init: RequestInit = {
       method: body === undefined ? "GET" : "POST",
@@ -109,6 +130,7 @@ test("native account linking pins purpose, both proofs and one browser session w
     );
   const owner = await createIdentity();
   const other = await createIdentity();
+  const outsider = await createIdentity();
   const issue = (
     purpose: "login" | "link",
     callId = randomUUID(),
@@ -131,17 +153,21 @@ test("native account linking pins purpose, both proofs and one browser session w
     id: string,
     boundAt: string,
     purpose: "login" | "link" = "link",
-    source = owner.source
+    source = owner.source,
+    archivePreviousAccount?: true
   ) =>
     run(
       Effect.gen(function* () {
         const devices = yield* NativeDeviceAuth;
-        return yield* devices.confirm({
+        const confirmation = {
           ...source,
           challengeId: id,
           browserBoundAt: boundAt,
           purpose,
-        });
+        };
+        if (archivePreviousAccount)
+          Object.assign(confirmation, { archivePreviousAccount });
+        return yield* devices.confirm(confirmation);
       })
     );
   const signIn = async (source = owner.source) => {
@@ -177,6 +203,7 @@ test("native account linking pins purpose, both proofs and one browser session w
     };
   };
   try {
+    const outsiderBrowser = await signIn(outsider.source);
     const browser = await signIn();
     const wrongBrowser = await signIn();
     const foreignBrowser = await signIn(other.source);
@@ -312,7 +339,7 @@ test("native account linking pins purpose, both proofs and one browser session w
     );
     assert.deepEqual(
       owners.rows,
-      [owner.identity, other.identity]
+      [owner.identity, other.identity, outsider.identity]
         .map(({ id, userId }) => ({ id, userId }))
         .toSorted((a, b) => a.id.localeCompare(b.id))
     );
@@ -404,7 +431,303 @@ test("native account linking pins purpose, both proofs and one browser session w
       ).status,
       400
     );
+
+    // Recovery preserves the source account instead of merging its access or native sessions.
+    const recovery = await issue("link", randomUUID(), other.source);
+    assert.ok(recovery.entryToken);
+    const recoveryInput = {
+      id: recovery.challenge.id,
+      token: recovery.entryToken,
+      purpose: "link",
+    };
+    assert.equal(
+      (await request("device-bind", fresh.cookie, recoveryInput)).status,
+      409
+    );
+    await pool.query(
+      'UPDATE public.user SET "emailVerified" = true WHERE id = $1',
+      [other.identity.userId]
+    );
+    assert.equal(
+      (
+        await request("device-bind", fresh.cookie, {
+          ...recoveryInput,
+          archivePreviousAccount: true,
+        })
+      ).status,
+      412
+    );
+    await pool.query(
+      'UPDATE public.user SET "emailVerified" = false WHERE id = $1',
+      [other.identity.userId]
+    );
+    const messaging = await run(Messaging);
+    const event = {
+      identityId: other.identity.id,
+      eventId: randomUUID(),
+      sourceMessageId: randomUUID(),
+      payload: { text: "Archived conversation", attachments: [] },
+    };
+    const original = await run(messaging.accept(event));
+    const lease = await run(
+      messaging.claimInbox({ identityId: other.identity.id, leaseSeconds: 60 })
+    );
+    assert.ok(lease);
+    assert.equal(
+      (
+        await request("device-bind", fresh.cookie, {
+          ...recoveryInput,
+          archivePreviousAccount: true,
+        })
+      ).status,
+      423
+    );
+    await run(
+      messaging.markAccepted({
+        lease: {
+          id: lease.id,
+          identityId: lease.identityId,
+          leaseToken: lease.leaseToken,
+        },
+        receipt: { status: "accepted", sessionId: other.source.sessionId },
+      })
+    );
+    const recoveryBinding = await request("device-bind", fresh.cookie, {
+      ...recoveryInput,
+      archivePreviousAccount: true,
+    });
+    assert.equal(recoveryBinding.status, 200);
+    const recoveryCookie = `${fresh.cookie}; ${cookieHeader(recoveryBinding)}`;
+    const recoveryBound = await run(
+      Effect.gen(function* () {
+        const devices = yield* NativeDeviceAuth;
+        return (yield* devices.pending(other.source)).find(
+          (item) => item.id === recovery.challenge.id
+        );
+      })
+    );
+    assert.ok(recoveryBound?.browserBoundAt);
+    assert.equal(recoveryBound.archivePreviousAccount, true);
+    await assert.rejects(
+      confirm(
+        recoveryBound.id,
+        recoveryBound.browserBoundAt,
+        "link",
+        other.source
+      )
+    );
+    await confirm(
+      recoveryBound.id,
+      recoveryBound.browserBoundAt,
+      "link",
+      other.source,
+      true
+    );
+    // Eligibility is checked again at consumption, not just when the browser opens.
+    await pool.query(
+      'UPDATE public.user SET "emailVerified" = true WHERE id = $1',
+      [other.identity.userId]
+    );
+    assert.equal(
+      (await request("complete", recoveryCookie, { id: recoveryBound.id }))
+        .status,
+      412
+    );
+    assert.equal(
+      (
+        await pool.query<{ count: number }>(
+          "SELECT count(*)::int AS count FROM account_archive WHERE source_user_id = $1",
+          [other.identity.userId]
+        )
+      ).rows[0]?.count,
+      0
+    );
+    await pool.query(
+      'UPDATE public.user SET "emailVerified" = false WHERE id = $1',
+      [other.identity.userId]
+    );
+    const completions = await Promise.all([
+      request("complete", recoveryCookie, { id: recoveryBound.id }),
+      request("complete", recoveryCookie, { id: recoveryBound.id }),
+    ]);
+    assert.deepEqual(
+      completions.map((result) => result.status).toSorted((a, b) => a - b),
+      [200, 400]
+    );
+    const archived = (
+      await pool.query<{ target_user_id: string; workspace_id: string }>(
+        "SELECT target_user_id, workspace_id FROM account_archive WHERE source_user_id = $1",
+        [other.identity.userId]
+      )
+    ).rows[0];
+    assert.ok(archived);
+    assert.equal(archived.target_user_id, owner.identity.userId);
+    assert.equal(archived.workspace_id, other.scope.workspaceId);
+    assert.equal(
+      (
+        await pool.query<{ count: number }>(
+          'SELECT count(*)::int AS count FROM public.session WHERE "userId" = $1',
+          [other.identity.userId]
+        )
+      ).rows[0]?.count,
+      0
+    );
+    const current = await run(
+      Effect.gen(function* () {
+        const accounts = yield* ChannelAccounts;
+        return yield* accounts.getActiveIdentity({
+          channel: other.identity.channel,
+          installationId: other.identity.installationId,
+          senderId: other.identity.senderId,
+        });
+      })
+    );
+    assert.equal(current.userId, owner.identity.userId);
+    assert.notEqual(current.id, other.identity.id);
+    await assert.rejects(issue("login", randomUUID(), other.source));
+    await assert.rejects(
+      run(messaging.accept({ ...event, eventId: randomUUID() }))
+    );
+    const replay = await run(
+      messaging.accept({ ...event, identityId: current.id })
+    );
+    assert.equal(replay.id, original.id);
+    await assert.rejects(
+      run(
+        messaging.accept({
+          ...event,
+          identityId: current.id,
+          payload: { text: "Tampered replay", attachments: [] },
+        })
+      )
+    );
+    await run(
+      messaging.accept({
+        ...event,
+        identityId: current.id,
+        eventId: randomUUID(),
+      })
+    );
+    const newLease = await run(
+      messaging.claimInbox({ identityId: current.id, leaseSeconds: 60 })
+    );
+    assert.ok(newLease);
+    assert.equal(newLease.nativeInput?.principalId, owner.scope.userId);
+    assert.equal(newLease.nativeInput.address, current.id);
+    await run(
+      messaging.markAccepted({
+        lease: {
+          id: newLease.id,
+          identityId: newLease.identityId,
+          leaseToken: newLease.leaseToken,
+        },
+        receipt: { status: "accepted", sessionId: randomUUID() },
+      })
+    );
+    assert.equal(
+      (
+        await pool.query<{ count: number }>(
+          "SELECT count(*)::int AS count FROM channel_inbox WHERE identity_id = $1",
+          [other.identity.id]
+        )
+      ).rows[0]?.count,
+      1
+    );
+    assert.equal(
+      (
+        await pool.query<{ count: number }>(
+          "SELECT count(*)::int AS count FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2",
+          [other.scope.workspaceId, other.scope.userId]
+        )
+      ).rows[0]?.count,
+      1
+    );
+
+    await assert.rejects(
+      run(
+        Effect.gen(function* () {
+          const sql = yield* PgClient.PgClient;
+          return yield* sql.withTransaction(
+            requireWorkspaceAccess({
+              ...other.scope,
+              channelIdentityId: other.identity.id,
+            })
+          );
+        })
+      )
+    );
+    const archiveHeaders = new Headers({ cookie: fresh.cookie });
+    const archives = await run(readAccountArchives(archiveHeaders));
+    assert.equal(archives.length, 1);
+    assert.ok(archives[0]);
+    const archiveId = archives[0].id;
+    const history = await run(readAccountArchive(archiveHeaders, archiveId));
+    assert.equal(history.messages[0]?.text, "Archived conversation");
+    assert.equal(history.messages.length, 1);
+    assert.deepEqual(
+      await run(
+        readAccountArchives(new Headers({ cookie: outsiderBrowser.cookie }))
+      ),
+      []
+    );
+    await assert.rejects(
+      run(
+        readAccountArchive(
+          new Headers({ cookie: outsiderBrowser.cookie }),
+          archiveId
+        )
+      )
+    );
+    await assert.rejects(
+      run(
+        readAccountArchive(
+          new Headers({ cookie: foreignBrowser.cookie }),
+          archiveId
+        )
+      )
+    );
+    await assert.rejects(
+      run(readAccountArchive(archiveHeaders, archiveId, "-1"))
+    );
+    const exported = await run(
+      downloadAccountArchive(archiveHeaders, archiveId, "memory").pipe(
+        Effect.provide(Mem0.layer)
+      )
+    );
+    assert.equal(exported.headers.get("cache-control"), "private, no-store");
+    assert.deepEqual(await exported.json(), {
+      profile: null,
+      documents: [],
+      learned: [],
+    });
+    await assert.rejects(
+      run(
+        downloadAccountArchive(
+          archiveHeaders,
+          archiveId,
+          "attachment",
+          randomUUID()
+        ).pipe(Effect.provide(Mem0.layer))
+      )
+    );
+    await pool.query("DELETE FROM public.session WHERE id = $1", [
+      fresh.session.id,
+    ]);
+    // The archive survives removal of its initiating session, but a revoked cookie cannot read it.
+    assert.equal(
+      (
+        await pool.query<{ count: number }>(
+          "SELECT count(*)::int AS count FROM account_archive WHERE id = $1",
+          [archiveId]
+        )
+      ).rows[0]?.count,
+      1
+    );
+    await assert.rejects(run(readAccountArchive(archiveHeaders, archiveId)));
   } finally {
+    await pool.query("DELETE FROM account_archive WHERE source_user_id = $1", [
+      other.identity.userId,
+    ]);
     await pool.query(
       "DELETE FROM channel_auth_challenge WHERE installation_id = $1",
       [installationId]
@@ -414,11 +737,16 @@ test("native account linking pins purpose, both proofs and one browser session w
       [installationId]
     );
     await pool.query("DELETE FROM workspaces WHERE id = ANY($1)", [
-      [owner.scope.workspaceId, other.scope.workspaceId],
+      [
+        owner.scope.workspaceId,
+        other.scope.workspaceId,
+        outsider.scope.workspaceId,
+      ],
     ]);
     await pool.query('DELETE FROM public."user" WHERE id = ANY($1)', [
-      [owner.identity.userId, other.identity.userId],
+      [owner.identity.userId, other.identity.userId, outsider.identity.userId],
     ]);
+    vi.resetAllMocks();
     await runtime.dispose();
     await pool.end();
   }

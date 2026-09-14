@@ -947,5 +947,20 @@
   "Encerrar para todos": "Close for everyone",
   "Esta sala deixará de receber mensagens.": "This room will stop receiving messages.",
   "Beta gratuito": "Free beta",
-  "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta.": "Your space to try Zoen. No card and no charges during the beta."
+  "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta.": "Your space to try Zoen. No card and no charges during the beta.",
+  "Contas anteriores": "Previous accounts",
+  "Seu histórico foi preservado. As novas conversas usam sua conta atual.": "Your history is preserved. New conversations use your current account.",
+  "Nenhuma conta arquivada.": "No archived accounts.",
+  "Baixar memórias anteriores": "Download previous memories",
+  "Baixar arquivos e versões": "Download files and versions",
+  "Conversas anteriores": "Previous conversations",
+  "Mais mensagens": "More messages",
+  "Mais arquivos": "More files",
+  "Anexo": "Attachment",
+  "Preservar conta anterior e vincular": "Preserve previous account and link",
+  "Use a conta atual para novas conversas. A conta anterior ficará como arquivo acessível; suas sessões e rotinas serão interrompidas. Memórias e acessos de equipes não serão misturados.": "Use your current account for new conversations. Your previous account will remain accessible as an archive; its sessions and routines will stop. Memories and team access will stay separate.",
+  "Use a conta aberta neste navegador e confirme a vinculação no mensageiro. Se houver outra conta, você poderá revisar a recuperação antes de continuar.": "Use the account open in this browser and confirm the link in your messenger. If another account exists, you can review the recovery before continuing.",
+  "Esta conta tem conexões, cofre ou acesso a equipes. A vinculação precisa de uma revisão para preservar esses acessos.": "This account has connections, a vault, or team access. Linking needs a review to preserve those permissions.",
+  "Aguarde as entregas em andamento terminarem e tente novamente.": "Wait for active deliveries to finish, then try again.",
+  "Este mensageiro já pertence a outra conta Zoen. Você pode preservar essa conta como arquivo e usar a conta atual para novas conversas.": "This messenger already belongs to another Zoen account. You can preserve that account as an archive and use your current account for new conversations."
 }

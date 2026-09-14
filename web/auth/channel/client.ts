@@ -77,7 +77,7 @@ export function channelHttpError(
   status: number,
   retryAfter: string | null = null
 ) {
-  const terminal = [400, 401, 403, 404, 409, 410].includes(status);
+  const terminal = [400, 401, 403, 404, 409, 410, 412].includes(status);
   return new ChannelAuthorizationError({
     status,
     retryAfter,
@@ -250,11 +250,15 @@ export function channelFailureMessage(
   failure: ChannelAuthorizationError,
   purpose: typeof channelChallengeRequestSchema.Type.purpose
 ) {
+  if (failure.status === 412)
+    return "Esta conta tem conexões, cofre ou acesso a equipes. A vinculação precisa de uma revisão para preservar esses acessos.";
+  if (failure.status === 423)
+    return "Aguarde as entregas em andamento terminarem e tente novamente.";
   if (purpose === "login") return failure.message;
   if (failure.status === 401)
     return "Sign in again before linking another channel, then return to Account to start a new request.";
   if (failure.status === 409)
-    return "This messenger is already associated with another Companion account. Accounts cannot be combined here. Sign in to its existing account instead.";
+    return "Este mensageiro já pertence a outra conta Zoen. Você pode preservar essa conta como arquivo e usar a conta atual para novas conversas.";
   if (failure.category === "terminal")
     return "This account-linking request could not be verified. Start a new request and confirm it in the messenger account you want to link.";
   return failure.message;

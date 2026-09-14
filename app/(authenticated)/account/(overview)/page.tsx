@@ -11,6 +11,7 @@ import {
   SlidersHorizontalIcon,
   UserRoundIcon,
   MonitorIcon,
+  ArchiveIcon,
 } from "lucide-react";
 import { getAuthSession } from "@db/services/auth/session";
 import { readEntitlement } from "@db/services/billing";
@@ -20,15 +21,15 @@ import { PersonalMemorySection } from "./personal-memory";
 import {
   isStripeBillingConfigured,
   isStripePortalConfigured,
-} from "../../../server/billing/stripe";
+} from "../../../../server/billing/stripe";
 import { AccountBillingSection } from "./_components/billing-section";
 import { AccountPrivacyWipeSection } from "./_components/privacy-wipe-section";
 import { AuthenticatedAccountControl } from "./_components/account-control";
 import { ModelSelector } from "./_components/model-selector";
-import { PanelIntro } from "../_components/panel-intro";
+import { PanelIntro } from "../../_components/panel-intro";
 import { LanguagePicker } from "@web/i18n/language-picker";
-import styles from "../_components/panel.module.css";
-import { PanelLink } from "../_components/panel-link";
+import styles from "../../_components/panel.module.css";
+import { PanelLink } from "../../_components/panel-link";
 
 const sections = [
   { id: "channels", label: "Seus mensageiros." },
@@ -47,6 +48,7 @@ const accountLinks = [
   },
   { href: "/space/memory", label: "Memória", icon: BrainIcon },
   { href: "/space/profile", label: "Seu username", icon: UserRoundIcon },
+  { href: "/account/archives", label: "Contas anteriores", icon: ArchiveIcon },
   {
     href: "/account?section=preferences",
     label: "Preferências",

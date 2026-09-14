@@ -99,7 +99,7 @@ describe("shared channel authorization", () => {
       "Sign in again"
     );
     expect(channelFailureMessage(channelHttpError(409), "link")).toContain(
-      "another Companion account"
+      "outra conta Zoen"
     );
     const original = channelHttpError(403);
     expect(channelFailureMessage(original, "login")).toBe(original.message);

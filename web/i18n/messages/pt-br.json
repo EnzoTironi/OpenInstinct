@@ -947,5 +947,20 @@
   "Encerrar para todos": "Encerrar para todos",
   "Esta sala deixará de receber mensagens.": "Esta sala deixará de receber mensagens.",
   "Beta gratuito": "Beta gratuito",
-  "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta.": "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta."
+  "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta.": "Seu espaço para experimentar o Zoen. Sem cartão e sem cobranças durante o beta.",
+  "Contas anteriores": "Contas anteriores",
+  "Seu histórico foi preservado. As novas conversas usam sua conta atual.": "Seu histórico foi preservado. As novas conversas usam sua conta atual.",
+  "Nenhuma conta arquivada.": "Nenhuma conta arquivada.",
+  "Baixar memórias anteriores": "Baixar memórias anteriores",
+  "Baixar arquivos e versões": "Baixar arquivos e versões",
+  "Conversas anteriores": "Conversas anteriores",
+  "Mais mensagens": "Mais mensagens",
+  "Mais arquivos": "Mais arquivos",
+  "Anexo": "Anexo",
+  "Preservar conta anterior e vincular": "Preservar conta anterior e vincular",
+  "Use a conta atual para novas conversas. A conta anterior ficará como arquivo acessível; suas sessões e rotinas serão interrompidas. Memórias e acessos de equipes não serão misturados.": "Use a conta atual para novas conversas. A conta anterior ficará como arquivo acessível; suas sessões e rotinas serão interrompidas. Memórias e acessos de equipes não serão misturados.",
+  "Use a conta aberta neste navegador e confirme a vinculação no mensageiro. Se houver outra conta, você poderá revisar a recuperação antes de continuar.": "Use a conta aberta neste navegador e confirme a vinculação no mensageiro. Se houver outra conta, você poderá revisar a recuperação antes de continuar.",
+  "Esta conta tem conexões, cofre ou acesso a equipes. A vinculação precisa de uma revisão para preservar esses acessos.": "Esta conta tem conexões, cofre ou acesso a equipes. A vinculação precisa de uma revisão para preservar esses acessos.",
+  "Aguarde as entregas em andamento terminarem e tente novamente.": "Aguarde as entregas em andamento terminarem e tente novamente.",
+  "Este mensageiro já pertence a outra conta Zoen. Você pode preservar essa conta como arquivo e usar a conta atual para novas conversas.": "Este mensageiro já pertence a outra conta Zoen. Você pode preservar essa conta como arquivo e usar a conta atual para novas conversas."
 }

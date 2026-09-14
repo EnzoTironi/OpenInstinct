@@ -10,6 +10,7 @@ const publicExact = new Set([
   "/docs",
   "/icon",
   "/favicon.ico",
+  "/api/health",
   "/api/channels/telegram",
   "/api/channels/kapso",
   "/eve/v1/health",

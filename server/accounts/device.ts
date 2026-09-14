@@ -9,6 +9,7 @@ import { PgClient } from "@effect/sql-pg";
 import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import { ChannelAccountError, ChannelAccounts } from "./index";
+import { requireArchivableAccount } from "./archive-transfer";
 
 const Identifier = Schema.NonEmptyString.check(Schema.isTrimmed());
 const Id = Schema.String.check(Schema.isUUID());
@@ -41,6 +42,7 @@ const Selection = Schema.Struct({
   challengeId: Id,
   purpose: Purpose,
   browserBoundAt: Identifier,
+  archivePreviousAccount: deviceBindingSchema.fields.archivePreviousAccount,
 });
 const Device = Schema.Struct({
   id: Id,
@@ -49,6 +51,7 @@ const Device = Schema.Struct({
   expiresAt: Schema.String,
   browserBoundAt: Schema.NullOr(Schema.String),
   confirmedAt: Schema.NullOr(Schema.String),
+  archivePreviousAccount: Schema.Boolean,
 });
 type Failure = ChannelAccountError | SqlError;
 const invalid = () => new ChannelAccountError({ reason: "invalid_challenge" });
@@ -133,7 +136,7 @@ export class NativeDeviceAuth extends Context.Service<
           typeof BrowserSession.Type
         >`SELECT target_user_id AS "userId", requesting_session_id AS "sessionId"
           FROM public.channel_auth_challenge WHERE id = ${id} AND purpose = 'link'
-          AND target_user_id = ${userId} AND requesting_session_id IS NOT NULL`;
+          AND (target_user_id = ${userId} OR source_user_id = ${userId}) AND requesting_session_id IS NOT NULL`;
         const session = rows[0];
         if (
           !session ||
@@ -150,7 +153,8 @@ export class NativeDeviceAuth extends Context.Service<
         const rows = yield* sql<typeof Device.Type>`SELECT id, purpose, channel,
         to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "expiresAt",
         to_char(browser_bound_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "browserBoundAt",
-        to_char(confirmed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "confirmedAt"
+        to_char(confirmed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "confirmedAt",
+        source_user_id IS NOT NULL AS "archivePreviousAccount"
         FROM public.channel_auth_challenge WHERE id = ${id} AND intended_identity_id IS NOT NULL
         AND expires_at > clock_timestamp() AND cancelled_at IS NULL AND consumed_at IS NULL`;
         if (!rows[0]) return yield* invalid();
@@ -221,10 +225,17 @@ export class NativeDeviceAuth extends Context.Service<
                   reason: "session_invalid",
                 });
               yield* accounts.requireFreshSession(request.link);
-              if (owner.userId !== request.link.userId)
-                return yield* new ChannelAccountError({
-                  reason: "account_conflict",
-                });
+              if (owner.userId !== request.link.userId) {
+                if (!request.archivePreviousAccount)
+                  return yield* new ChannelAccountError({
+                    reason: "account_conflict",
+                  });
+                yield* requireArchivableAccount(
+                  owner.userId,
+                  request.link.userId
+                ).pipe(Effect.provideService(PgClient.PgClient, sql));
+              } else if (request.archivePreviousAccount)
+                return yield* invalid();
               if (
                 row.requestingSessionId !== null &&
                 row.requestingSessionId !== request.link.sessionId
@@ -232,7 +243,8 @@ export class NativeDeviceAuth extends Context.Service<
                 return yield* new ChannelAccountError({
                   reason: "session_invalid",
                 });
-            } else if (request.link) return yield* invalid();
+            } else if (request.link || request.archivePreviousAccount)
+              return yield* invalid();
             if (row.browserSecretHash !== null) {
               if (row.browserSecretHash !== hash(request.browserSecret))
                 return yield* invalid();
@@ -243,6 +255,7 @@ export class NativeDeviceAuth extends Context.Service<
             yield* sql`UPDATE public.channel_auth_challenge SET browser_secret_hash = ${hash(request.browserSecret)},
           browser_bound_at = clock_timestamp(), entry_token_hash = NULL,
           target_user_id = ${request.link?.userId ?? null}, requesting_session_id = ${request.link?.sessionId ?? null}
+          , source_user_id = ${request.archivePreviousAccount ? owner.userId : null}
           WHERE id = ${request.id}`;
             return yield* select(request.id);
           })
@@ -305,6 +318,11 @@ export class NativeDeviceAuth extends Context.Service<
             const owner = yield* sourceIdentity(request);
             const device = yield* select(request.challengeId);
             if (device.purpose !== request.purpose) return yield* invalid();
+            if (
+              (request.archivePreviousAccount === true) !==
+              device.archivePreviousAccount
+            )
+              return yield* invalid();
             if (device.purpose === "link")
               yield* requireBoundSession(request.challengeId, owner.userId);
             const rows = yield* sql`UPDATE public.channel_auth_challenge

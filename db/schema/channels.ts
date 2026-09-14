@@ -35,11 +35,9 @@ export const channelIdentities = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("channel_identity_sender_uidx").on(
-      table.channel,
-      table.installationId,
-      table.senderId
-    ),
+    uniqueIndex("channel_identity_sender_uidx")
+      .on(table.channel, table.installationId, table.senderId)
+      .where(sql`${table.revokedAt} IS NULL`),
     unique("channel_identity_installation_key").on(
       table.id,
       table.channel,
@@ -71,6 +69,9 @@ export const channelAuthChallenges = pgTable(
     sourceCallId: text("source_call_id"),
     targetUserId: text("target_user_id").references(() => user.id, {
       onDelete: "cascade",
+    }),
+    sourceUserId: text("source_user_id").references(() => user.id, {
+      onDelete: "restrict",
     }),
     requestingSessionId: text("requesting_session_id").references(
       () => session.id,
@@ -120,6 +121,10 @@ export const channelAuthChallenges = pgTable(
         channelIdentities.installationId,
       ],
     }).onDelete("cascade"),
+    check(
+      "channel_auth_challenge_archive_check",
+      sql`${table.sourceUserId} IS NULL OR (${table.purpose} = 'link' AND ${table.intendedIdentityId} IS NOT NULL AND ${table.browserBoundAt} IS NOT NULL AND ${table.sourceUserId} <> ${table.targetUserId})`
+    ),
     check(
       "channel_auth_challenge_channel_check",
       sql`${table.channel} IN ('telegram', 'kapso') AND length(trim(${table.installationId})) > 0`
