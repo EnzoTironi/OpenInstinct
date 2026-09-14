@@ -155,13 +155,20 @@ export const removeWorkspaceMember = Effect.fn("removeWorkspaceMember")(
         const access = yield* requireWorkspaceAccess(actor, true);
         if (!access.organizationId || targetUserId === actor.userId)
           return yield* new WorkspaceAccessDenied();
-        const removed =
-          yield* sql`DELETE FROM workspace_memberships WHERE workspace_id = ${actor.workspaceId} AND user_id = ${targetUserId} AND role = 'member' RETURNING user_id`;
-        if (!removed.length) return yield* new WorkspaceAccessDenied();
-        // Authority the member issued inside this workspace ends with the membership.
-        const pausedJobs =
-          yield* sql`UPDATE scheduled_agent_jobs SET status = 'paused', updated_at = clock_timestamp()
-      WHERE workspace_id = ${actor.workspaceId} AND created_by_user_id = ${targetUserId} AND status = 'active' RETURNING id`;
+        const memberships =
+          yield* sql`SELECT user_id FROM workspace_memberships WHERE workspace_id = ${actor.workspaceId} AND user_id = ${targetUserId} AND role = 'member' FOR UPDATE`;
+        if (!memberships.length) return yield* new WorkspaceAccessDenied();
+        // Sessions, jobs, runs and report outputs cascade from the membership row, so
+        // everything that must be counted or cancelled through them happens first.
+        const sessions =
+          yield* sql`SELECT session_id FROM agent_sessions WHERE workspace_id = ${actor.workspaceId} AND created_by_user_id = ${targetUserId}`;
+        const jobs =
+          yield* sql`SELECT id FROM scheduled_agent_jobs WHERE workspace_id = ${actor.workspaceId} AND created_by_user_id = ${targetUserId} AND status <> 'deleted'`;
+        const cancelledOutbox =
+          yield* sql`UPDATE channel_outbox q SET status = 'cancelled', lease_token = NULL, lease_expires_at = NULL, last_error = 'member_removed'
+      FROM scheduled_agent_report_outputs o JOIN scheduled_agent_runs r ON r.id = o.run_id JOIN scheduled_agent_jobs j ON j.id = r.job_id
+      WHERE q.id = o.outbox_id AND j.workspace_id = ${actor.workspaceId} AND j.created_by_user_id = ${targetUserId}
+        AND q.status IN ('queued', 'dispatching') RETURNING q.id`;
         const revokedGrants =
           yield* sql`UPDATE workspace_agent_grants g SET revoked_at = clock_timestamp() FROM workspace_bots b
       WHERE b.id = g.bot_id AND b.workspace_id = ${actor.workspaceId} AND g.issued_by = ${targetUserId} AND g.revoked_at IS NULL RETURNING g.id`;
@@ -170,12 +177,15 @@ export const removeWorkspaceMember = Effect.fn("removeWorkspaceMember")(
       FROM workspace_agent_grants g JOIN workspace_bots b ON b.id = g.bot_id
       WHERE t.grant_id = g.id AND b.workspace_id = ${actor.workspaceId} AND g.issued_by = ${targetUserId}
         AND t.state IN ('TASK_STATE_SUBMITTED', 'TASK_STATE_WORKING', 'TASK_STATE_INPUT_REQUIRED') RETURNING t.id`;
+        yield* sql`DELETE FROM workspace_memberships WHERE workspace_id = ${actor.workspaceId} AND user_id = ${targetUserId} AND role = 'member'`;
         yield* sql`DELETE FROM workspace_memory_namespace WHERE workspace_id = ${actor.workspaceId} AND user_id = ${targetUserId}`;
         yield* sql`UPDATE workspace_invites SET status = 'revoked' WHERE workspace_id = ${actor.workspaceId} AND ('better-auth:' || target_user_id) = ${targetUserId} AND status = 'pending'`;
         yield* sql`INSERT INTO organization_audit_receipts(id, organization_id, actor_user_id, action, target_user_id, metadata)
       VALUES (${randomUUID()}, ${access.organizationId}, ${actor.userId}, 'member_removed', ${targetUserId}, ${sql.json(
         {
-          pausedJobs: pausedJobs.length,
+          removedSessions: sessions.length,
+          removedJobs: jobs.length,
+          cancelledOutbox: cancelledOutbox.length,
           revokedGrants: revokedGrants.length,
           canceledTasks: canceledTasks.length,
         }
