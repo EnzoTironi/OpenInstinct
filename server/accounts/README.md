@@ -56,10 +56,22 @@ retaining the entry token in browser storage.
 
 This flow confirms an existing same-account association. A messenger already
 associated with a different account returns an explicit conflict; no identity,
-conversation, memory, integration or quota is transferred. Every first native
-conversation already provisions an internal account, so joining two separately
-created accounts requires a future explicit merge and transfer policy. It is
-not implemented or implied by this flow.
+conversation, memory, integration or quota is transferred.
+
+A first message from an unlinked messenger never creates a user or a workspace.
+`resolveVerifiedSender` returns `{ status: "unlinked" }`, the webhook records the
+address in `channel_pending_sender` through `recordUnlinkedContact`, and the
+sender receives one instruction per 24 hours to sign in with Google and link the
+messenger from the account page. Group messages from unlinked senders are ignored
+without a database write. `login` challenges require an already linked identity
+and fail with `sender_unlinked` otherwise. New `channel_identity` rows are written
+only while a `link` challenge is consumed: `linkIdentity` inserts the confirmed
+address and deletes its pending row, and `archive-transfer.ts` re-points the
+addresses of an archived channel-first account.
+`tests/runtime/unlinked-sender.integration.ts` and the unlinked-sender cases in
+`tests/runtime/channel-webhook.integration.ts` are the integration proof. Accounts
+that a channel-first contact created before this rule can still be joined to a
+Google account only through the explicit archive path below.
 
 `device-link.integration.ts` exercises real PostgreSQL and Better Auth for the
 same-account path, purpose changes, two accounts, browser-session substitution,
