@@ -36,6 +36,11 @@ jobs:
       - name: Install isolated infrastructure dependencies
         run: pnpm --dir infrastructure install --frozen-lockfile
 
+      - name: Audit application and infrastructure dependencies
+        run: |
+          pnpm audit --audit-level=low
+          pnpm --dir infrastructure audit --audit-level=low
+
       - name: Run checks
         # Each compiler/linter/test process also uses its own CPU pool.
         run: pnpm check --concurrency=1

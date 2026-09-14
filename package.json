@@ -87,7 +87,6 @@
     "tsx": "4.21.0",
     "turbo": "2.10.12",
     "typescript": "7.0.2",
-    "vercel": "^59.6.2",
     "vitest": "4.1.11"
   },
   "engines": {

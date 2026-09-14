@@ -56,8 +56,6 @@ export default {
         "eslint-plugin-react-hooks",
         "eslint-plugin-turbo",
         "oxlint-tailwindcss",
-        // Invoked as a CLI.
-        "vercel",
       ],
       project: ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "!infrastructure/**"],
     },

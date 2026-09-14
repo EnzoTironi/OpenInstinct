@@ -23,6 +23,12 @@ allowBuilds:
   node-liblzma: false
   protobufjs: false
   sharp: true
+overrides:
+  # Security fixes within the existing parser majors.
+  "js-yaml@>=4.0.0 <4.3.2": 4.3.2
+  "qs@<6.16.0": 6.16.0
+  # Drizzle's legacy loader only uses transform; do not retain its vulnerable dev server.
+  "@esbuild-kit/core-utils>esbuild": 0.25.12
 patchedDependencies:
   "@linqapp/chat-sdk-adapter@0.5.1": patches/@linqapp__chat-sdk-adapter@0.5.1.patch
   "@workflow/world-postgres@5.0.0-beta.39": patches/@workflow__world-postgres@5.0.0-beta.39.patch

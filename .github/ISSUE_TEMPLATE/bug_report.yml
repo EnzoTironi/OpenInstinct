@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a reproducible problem in Zoen.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials or private conversations. Report vulnerabilities through the Security tab instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version and environment
+      description: Commit or deployment, hosted/self-hosted, browser or messenger, and device.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Use synthetic examples another contributor can repeat.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include a redacted error or screenshot if helpful.
+    validations:
+      required: true

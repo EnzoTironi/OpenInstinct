@@ -1,31 +1,60 @@
-# Companion
+<p align="center"><img src="public/marketing/zoen-avatar.webp" width="88" alt="Zoen mascot" /></p>
 
-A personal assistant for Telegram, WhatsApp through Kapso, and web chat. This
-private fork of OpenInstinct is being rebuilt around Effect application services,
-verified accounts, durable messaging, and Eve's session runtime.
+# Zoen
 
-This is an implementation in progress, not a finished release or an admitted
-user pilot. The [product direction](docs/product-direction.md) defines the
-experience; the [blueprint](docs/companion-blueprint.md) defines package contracts
-and acceptance gates. The [runtime evidence](docs/local-runtime-setup.md) records
-what has actually been exercised and what remains unqualified.
+**Less on your mind. More in your life.**
 
-For recipe and integration work, start with the
-[agent research package](docs/recipe-integrations/README.md): agreed experience,
-public competitor catalogs, source revisions, reuse constraints and acceptance
-patterns.
+Zoen is an open-source assistant for personal and team workspaces. Talk to it in
+the web app or a connected messenger, give it useful skills, and keep control of
+the accounts, files and actions it can access.
+
+[![Checks](https://github.com/EnzoTironi/tryzoen/actions/workflows/checks.yml/badge.svg)](https://github.com/EnzoTironi/tryzoen/actions/workflows/checks.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+**Stage: free closed beta.** This repository is actively developed. The
+[launch ledger](docs/decisions/zoen-launch-validation.md) separates passing tests,
+live-provider evidence and remaining launch gates. It is the source of truth for
+qualification; a green badge alone does not mean every integration is available.
+
+## What it does
+
+- A visual web app in English, Spanish and Brazilian Portuguese, with personal
+  and work spaces, conversations, recipes, connections and account controls.
+- Google sign-in through Better Auth; Telegram and WhatsApp use short-lived
+  requests confirmed in the user's private messenger conversation.
+- An owned Executor catalog for tools, plugins and Git-backed skills. Eve uses
+  Code Mode to discover capabilities and performs mutations through exact-input
+  approvals and current workspace permissions.
+- Versioned files and agent instructions, personal memory through Mem0, scheduled
+  work, browser tasks and explicit Google Workspace connections.
+- Operational traces, scoped diagnostics and configurable beta telemetry to
+  investigate failed journeys without making private workspaces public.
+
+Telegram group support is being qualified. Ordinary WhatsApp groups are **not
+enabled** by the current Kapso Cloud API setup. iMessage and paid checkout are
+unavailable during this beta. Vaultwarden and Beeper are evaluations, not shipped
+integrations. Reference catalogs under `docs/recipe-integrations/` are research,
+not a list of activated product capabilities.
+
+## Architecture
+
+| Layer                      | Responsibility                                              |
+| -------------------------- | ----------------------------------------------------------- |
+| Next.js + React            | App, onboarding and authenticated browser interface         |
+| Better Auth + PostgreSQL   | Identity, sessions, memberships and access boundaries       |
+| Eve + owned Executor       | Durable agent execution, discovery, approval and tool calls |
+| Git + Mem0                 | Versioned durable content and scoped memory                 |
+| Matrix + A2A adapters      | Collaboration and agent interoperability boundaries         |
+| Alchemy + Fly + Cloudflare | Declared deployment, private services, TLS and operations   |
+
+Git branches are not authorization boundaries. Personal credentials and memories
+do not become team or group data just because the same person uses both spaces.
+Secrets stay outside Git. Operon is not required for the current architecture.
 
 ## Run locally
 
-**Self-host / ops (Release-1):** see [docs/self-host.md](docs/self-host.md) and R2 checklists under [docs/ops/](docs/ops/README.md) for
-Alchemy `local`/`dev`/`staging`/`prod`, install/migrate/run, `.env.local` **names**,
-Telegram/Google/Kapso pointers, Graphile fencing / SIGKILL, quotas ADR, account
-delete limits, and live qualification gaps. Always-on **off-Mac** Fly compute +
-Alchemy Docker Postgres (Mac LaunchAgent remains optional):
-[docs/ops/hosted-fly.md](docs/ops/hosted-fly.md).
-
-Use Node.js 24 and pnpm 11.24.0. PostgreSQL stores application records and the
-compatible Workflow world. Start with:
+Use **Node.js 24**, **pnpm 11.24.0** and PostgreSQL. Docker is needed for the
+isolated infrastructure and integration tests.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -33,69 +62,61 @@ cp .env.example .env.local
 chmod 600 .env.local
 ```
 
-For a local PostgreSQL instance, use the [Alchemy and Effect stack](infrastructure/README.md).
-It creates a named data volume and exposes PostgreSQL only on loopback.
+Set the database URLs, application URL and independent authentication/encryption
+keys in `.env.local`. Choose and authenticate a supported model provider. Never
+reuse production credentials or a production database for local tests.
 
-Configure your PostgreSQL URLs, public application URL, and independent random
-Better Auth and encryption secrets in `.env.local`. Follow the exact setup in
-[local runtime setup](docs/local-runtime-setup.md#build-and-run-locally), including
-both database migrations:
+Follow [self-hosting](docs/self-host.md) and the
+[Alchemy infrastructure guide](infrastructure/README.md) to provision PostgreSQL,
+roles, optional services and provider configuration. With that environment ready:
 
 ```sh
-pnpm db:migrate
-pnpm workflow:migrate
-pnpm build
+node --env-file=.env.local --run db:migrate
+node --env-file=.env.local --run workflow:migrate
+node --env-file=.env.local --run build
 pnpm start --port 3000
 ```
 
-The launcher runs Next and Eve together and stops the sibling if either exits.
-Eve stays on loopback. Expose Next through your own TLS proxy when required;
-internal Workflow callbacks need a separately qualified authentication boundary.
+The launcher owns both Next and Eve and stops the sibling if either exits. Eve's
+internal interface stays on loopback. Connectors need their own credentials and
+verified webhook setup. Provider subscriptions, terms and quotas still apply when
+you bring an existing model account.
 
-For the locally exercised model, set `COMPANION_MODEL_PROVIDER=codex-local` and
-use an existing authenticated Codex installation. Eve's native provider selects
-`gpt-5.3-codex-spark` with low reasoning. The default `gateway` profile uses AI
-Gateway credentials. An explicit model profile does not silently fall back to a
-different provider. Browser execution, Google connections and messaging delivery
-require their own credentials and separate qualification.
+Production deployment uses the **Zoen infrastructure** GitHub workflow and
+Alchemy. Promotion requires successful checks and native evaluations on the exact
+source revision, then performs an isolated recovery drill and live health checks.
+See the [operations guide](docs/ops/README.md). The Vercel CLI is not part of this
+installation's deployment toolchain.
 
-Telegram/Kapso sign-in uses a browser-bound challenge confirmed in the user's
-private provider conversation. Configure the corresponding bot/number and
-webhook credentials before using that flow. Do not redirect an existing webhook
-to an unqualified installation.
-
-## Current evidence
-
-Authenticated native Spark turns have saved a PostgreSQL profile note and
-recalled it in a new session after a full service restart. The corrected scenario
-produced one response per turn. The dedicated PostgreSQL profile exercises
-account linking, inbox/outbox leases, identity revocation, memory conflicts and
-cancellation. Unit regression, real storage tests and external-provider evidence
-are reported separately.
-
-Scheduled execution, interrupted-step recovery, native approvals, media and real
-Telegram/Kapso end-to-end delivery are still being qualified. A crash after Eve
-acceptance but before the application receipt can leave an entry uncertain; such
-entries are not automatically resent. See the blueprint before treating any
-package as complete.
-
-## Validation
+## Validate and contribute
 
 ```sh
-pnpm check
+pnpm check --concurrency=1
 pnpm db:check
-pnpm test:runtime
-pnpm build
+pnpm audit
+pnpm --dir infrastructure audit
 ```
 
-The runtime test profile requires a dedicated database named
-`companion_runtime_test` and its own ignored `.env.runtime.local`; see the setup
-instructions before running it. The inherited unit suite includes mocks and is
-regression evidence only. Passing it does not establish provider delivery,
-restart recovery or production readiness.
+`pnpm test:runtime` requires the dedicated `companion_runtime_test` database and
+an ignored `.env.runtime.local`. It must never run against production. Native
+agent evaluations additionally need isolated fixtures and authorized model/browser
+credentials; see [reproduction instructions](docs/decisions/zoen-launch-validation.md#reproducing-native-evaluations).
 
-## Origin and license
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. Use issue forms
+for reproducible bugs and feature proposals, and keep credentials and real
+customer conversations out of public reports. Security concerns go through
+[private vulnerability reporting](SECURITY.md), not public issues.
 
-Based on [Merit Systems' OpenInstinct](https://github.com/Merit-Systems/OpenInstinct).
-Upstream license and attribution remain in [LICENSE](LICENSE) and
-[third-party notices](THIRD_PARTY_NOTICES.md).
+## Project policies
+
+- [Security and supported versions](SECURITY.md)
+- [Contribution guide](CONTRIBUTING.md) and [community conduct](CODE_OF_CONDUCT.md)
+- [Hosted beta terms](TERMS.md) and [privacy notice](PRIVACY.md)
+- [Architecture decisions](docs/decisions/) and [current launch evidence](docs/decisions/zoen-launch-validation.md)
+
+## License
+
+Code is distributed under the [MIT license](LICENSE), with required copyright
+notices preserved. Dependencies and artwork may have separate terms; consult
+[third-party notices](THIRD_PARTY_NOTICES.md) before redistributing them. Product
+names and third-party brand assets are not granted by the code license.

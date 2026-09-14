@@ -53,6 +53,17 @@ A passing component test is not a completed user journey or a live-provider proo
 - The owner cancelled the recording requirement. Functional provider evidence
   remains required. WhatsApp ordinary groups are not supported by the current
   Kapso Cloud API configuration; no WhatsApp Web bridge is deployed.
+- Fresh dependency audits initially found four application production advisories
+  and additional development/infrastructure advisories. Patched parser releases
+  and compatible infrastructure dependency overrides remove the reported issues;
+  the unused Vercel CLI and its dependency tree were removed. Both full dependency
+  audits now report zero advisories. CI audits application and infrastructure
+  lockfiles without severity exclusions. This is an advisory-database check, not
+  proof that all application code is free of security flaws.
+- The public repository now has a Zoen README, contribution/security/conduct
+  policies, beta terms/privacy notice, PR and issue templates, and automated
+  dependency-update configuration. Private vulnerability reporting is enabled.
+  Existing copyright and third-party license notices remain intact.
 
 The dated sections below retain earlier evidence and failures. Their historical
 deployment and provider-quota statements do not supersede this current status.
