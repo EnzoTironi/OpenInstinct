@@ -14,7 +14,7 @@ vi.mock("@agent/lib/google-workspace/gmail", async (importOriginal) => ({
   updateGmail: gmail.update,
 }));
 
-import { gmailUpdate } from "@agent/tools/gmail";
+import { gmailUpdate } from "../../../server/executor/tools/gmail";
 
 describe("Google Workspace tools", () => {
   it("reports the selected Gmail update without an action discriminator", async () => {

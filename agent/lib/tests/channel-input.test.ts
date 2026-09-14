@@ -57,6 +57,36 @@ describe("native input responses", () => {
       request.action.input.approvalMessage
     );
   });
+  test("renders the exact proposal nested inside an Executor action", () => {
+    expect(
+      renderChannelInput({
+        ...request,
+        action: {
+          ...request.action,
+          toolName: "execute",
+          input: {
+            call: {
+              path: request.action.toolName,
+              input: request.action.input,
+            },
+          },
+        },
+      })
+    ).toBe(request.action.input.approvalMessage);
+    expect(() =>
+      renderChannelInput({
+        ...request,
+        action: {
+          ...request.action,
+          toolName: "execute",
+          input: {
+            code: "return 'pretend approval';",
+            approvalMessage: "unbound proposal",
+          },
+        },
+      })
+    ).toThrow(ZodError);
+  });
   test.each([undefined, "", "  ", "x".repeat(16385)])(
     "refuses an absent or invalid authored proposal",
     (approvalMessage) => {

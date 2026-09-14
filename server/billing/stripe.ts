@@ -6,14 +6,19 @@ export class StripeNotConfiguredError extends Error {
   readonly _tag = "StripeNotConfiguredError";
   constructor() {
     super(
-      "Stripe is not configured. Set STRIPE_SECRET_KEY and plan price IDs to enable paid upgrades."
+      "Paid billing is disabled. It requires ZOEN_BILLING_MODE=paid and configured Stripe credentials."
     );
   }
 }
 
+function requirePaidConfiguration<T>(value: T | undefined) {
+  if (env.ZOEN_BILLING_MODE !== "paid" || !value)
+    throw new StripeNotConfiguredError();
+  return value;
+}
+
 export function requireStripe(): Stripe {
-  const key = env.STRIPE_SECRET_KEY;
-  if (!key) throw new StripeNotConfiguredError();
+  const key = requirePaidConfiguration(env.STRIPE_SECRET_KEY);
   return new Stripe(Redacted.value(key), {
     apiVersion: "2025-08-27.basil",
     typescript: true,
@@ -21,21 +26,18 @@ export function requireStripe(): Stripe {
 }
 
 export function stripePriceIdForPlan(plan: "pro" | "org") {
-  const priceId =
-    plan === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_ORG_SEAT;
-  if (!priceId) throw new StripeNotConfiguredError();
-  return priceId;
+  return requirePaidConfiguration(
+    plan === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_ORG_SEAT
+  );
 }
 
 export function stripeWebhookSecret() {
-  const secret = env.STRIPE_WEBHOOK_SECRET;
-  if (!secret) throw new StripeNotConfiguredError();
-  return Redacted.value(secret);
+  return Redacted.value(requirePaidConfiguration(env.STRIPE_WEBHOOK_SECRET));
 }
 
 /** True when Checkout can run for a paid plan (secret + that plan's Price id). */
 export function isStripeCheckoutConfigured(plan: "pro" | "org"): boolean {
-  if (!env.STRIPE_SECRET_KEY) return false;
+  if (env.ZOEN_BILLING_MODE !== "paid" || !env.STRIPE_SECRET_KEY) return false;
   return plan === "pro"
     ? Boolean(env.STRIPE_PRICE_PRO)
     : Boolean(env.STRIPE_PRICE_ORG_SEAT);
@@ -48,5 +50,5 @@ export function isStripeBillingConfigured(): boolean {
 
 /** Customer Portal needs the Stripe secret; CTAs should stay off without it. */
 export function isStripePortalConfigured(): boolean {
-  return Boolean(env.STRIPE_SECRET_KEY);
+  return env.ZOEN_BILLING_MODE === "paid" && Boolean(env.STRIPE_SECRET_KEY);
 }

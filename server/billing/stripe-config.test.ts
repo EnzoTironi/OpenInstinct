@@ -20,6 +20,7 @@ describe("Stripe billing configuration gates", () => {
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
     vi.stubEnv("STRIPE_PRICE_PRO", "");
     vi.stubEnv("STRIPE_PRICE_ORG_SEAT", "");
+    vi.stubEnv("ZOEN_BILLING_MODE", "free-beta");
   });
 
   afterEach(() => {
@@ -40,6 +41,7 @@ describe("Stripe billing configuration gates", () => {
   });
 
   it("enables Pro Checkout when secret and Pro price are set", async () => {
+    vi.stubEnv("ZOEN_BILLING_MODE", "paid");
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_synthetic");
     vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_synthetic");
     const {
@@ -51,5 +53,25 @@ describe("Stripe billing configuration gates", () => {
     expect(isStripeCheckoutConfigured("pro")).toBe(true);
     expect(isStripeCheckoutConfigured("org")).toBe(false);
     expect(isStripePortalConfigured()).toBe(true);
+  });
+
+  it("locks every paid entrypoint during the beta even when credentials exist", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_synthetic");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_synthetic");
+    vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_synthetic");
+    vi.stubEnv("STRIPE_PRICE_ORG_SEAT", "price_org_synthetic");
+    const billing = await import("./stripe");
+    expect(billing.isStripeBillingConfigured()).toBe(false);
+    expect(billing.isStripePortalConfigured()).toBe(false);
+    expect(billing.requireStripe).toThrow(billing.StripeNotConfiguredError);
+    expect(billing.stripeWebhookSecret).toThrow(
+      billing.StripeNotConfiguredError
+    );
+    expect(() => billing.stripePriceIdForPlan("pro")).toThrow(
+      billing.StripeNotConfiguredError
+    );
+    expect(() => billing.stripePriceIdForPlan("org")).toThrow(
+      billing.StripeNotConfiguredError
+    );
   });
 });

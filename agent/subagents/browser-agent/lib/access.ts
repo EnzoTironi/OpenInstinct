@@ -3,9 +3,9 @@ import { isSessionOwned } from "@db/services/sessions";
 import { scopeFromPrincipal } from "../../../../shared/identity/principal-scope";
 import { assertLiveWorkerAuthority } from "./live-authority";
 
-export async function requireWorkerScope(
-  context: Pick<SessionContext, "session">
-) {
+export async function requireWorkerScope(context: {
+  readonly session: Pick<SessionContext["session"], "id" | "auth" | "parent">;
+}) {
   const parent = context.session.parent;
   if (!parent) throw new Error("Browser tools require a delegated worker.");
 

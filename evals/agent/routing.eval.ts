@@ -1,5 +1,8 @@
 import { defineEval } from "eve/evals";
-import { includes } from "eve/evals/expect";
+import { equals, includes } from "eve/evals/expect";
+import { executorInvocations } from "./executor";
+import { requireWorkerSessionId } from "@evals/browser/session";
+import { readTaskCompletion } from "@evals/browser/worker-events";
 import {
   agentEvalTags,
   assertPlainTextDelivery,
@@ -16,7 +19,7 @@ export default [
       );
       turn.expectOk();
       turn.succeeded();
-      turn.calledTool("web_fetch", { count: 1 });
+      t.check(executorInvocations(turn, "web_fetch"), equals(1));
       turn.notCalledTool("web_search");
       turn.notEvent("subagent.called", { data: { name: "browser-agent" } });
       const text = await requireDeliveredText(t, turn);
@@ -25,7 +28,8 @@ export default [
     },
   }),
   defineEval({
-    description: "Uses public search for discovery instead of a browser worker",
+    description:
+      "Uses available public research capabilities to find a primary source",
     tags: [...agentEvalTags, "routing"],
     async test(t) {
       const turn = await t.send(
@@ -33,17 +37,16 @@ export default [
       );
       turn.expectOk();
       turn.succeeded();
-      turn.calledTool("web_search");
-      turn.notEvent("subagent.called", { data: { name: "browser-agent" } });
-      const text = await requireDeliveredText(t, turn);
-      t.judge.autoevals
-        .closedQA(
-          "The response identifies Brooklyn Botanic Garden and gives its official website URL, without claiming to have interacted with the site.",
-          { on: text }
-        )
-        .label("public discovery result")
-        .atLeast(0.8);
-      assertPlainTextDelivery(t, text);
+      t.check(executorInvocations(turn, "gmail-send"), equals(0));
+      const childId = await requireWorkerSessionId(t, turn);
+      const child = await t.target.attachSession(childId);
+      child.succeeded();
+      const completion = readTaskCompletion(child.events);
+      t.check(completion?.status, equals("success"));
+      t.check(
+        completion?.message,
+        includes(/https?:\/\/(?:www\.)?bbg\.org\b/iu)
+      );
     },
   }),
   defineEval({
@@ -55,7 +58,7 @@ export default [
       );
       turn.expectOk();
       turn.succeeded();
-      turn.notCalledTool("gmail-send");
+      t.check(executorInvocations(turn, "gmail-send"), equals(0));
       turn.notEvent("subagent.called", { data: { name: "browser-agent" } });
       const text = await requireDeliveredText(t, turn);
       t.judge.autoevals

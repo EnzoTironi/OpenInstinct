@@ -1,5 +1,9 @@
 import type { HookEvent } from "eve/hooks";
 import { z } from "zod";
+import {
+  executorActionName,
+  executorActionResult,
+} from "@shared/chat/executor";
 
 export interface TraceTimelineRow {
   readonly at: string;
@@ -47,7 +51,7 @@ export function traceTimelineRows(event: HookEvent): TraceTimelineRow[] {
         id: `${id}:${String(index)}`,
         label:
           action.kind === "tool-call" || action.kind === "workflow-tool-call"
-            ? action.toolName
+            ? executorActionName(action.toolName, action.input)
             : action.kind === "load-skill"
               ? "Load skill"
               : action.name,
@@ -55,16 +59,20 @@ export function traceTimelineRows(event: HookEvent): TraceTimelineRow[] {
       }));
     case "action.result": {
       const result = event.data.result;
+      const resolved =
+        result.kind === "tool-result"
+          ? executorActionResult(result.toolName, result.output)
+          : null;
       const name =
         result.kind === "tool-result"
-          ? result.toolName
+          ? (resolved?.toolName ?? result.toolName)
           : result.kind === "subagent-result"
             ? result.subagentName
             : "load-skill";
       return [
         row(
           `${name} → ${result.isError ? "error" : "result"}`,
-          compactJson(result.output)
+          compactJson(resolved?.output ?? result.output)
         ),
       ];
     }

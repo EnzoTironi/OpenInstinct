@@ -17,8 +17,10 @@ host-side log arrays.
 Zoen owns the invocation gate in `server/executor`: an explicit catalog, live
 workspace authorization, bounded input/output/calls and no ambient filesystem,
 network or credentials inside QuickJS. Unknown tool paths are denied; names are
-never guessed to be GET/read-only. Native application actions keep their typed
-Eve tools and approval contracts.
+never guessed to be GET/read-only. The owned catalog includes product tools and
+Git-backed skills; Eve mounts `execute` for discovery and composition. Actions
+use its structured `call` input so Eve approves and persists the exact arguments.
+Questions, delivery and task lifecycle retain their native runtime adapters.
 
 Vendor changes are kept separate from application changes. Do not upgrade this
 pin incidentally. The inherited upstream tests run with the application's

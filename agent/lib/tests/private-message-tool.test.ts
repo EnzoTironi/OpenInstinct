@@ -10,7 +10,7 @@ import {
   serializeInputSchema,
   toInputSchema,
 } from "../../../node_modules/eve/dist/src/tools/schema.js";
-import { privateMessageTool } from "../private-message-tool";
+import { privateMessageTool } from "../../../server/executor/native/private-message-tool";
 
 const decodeJsonObject = Schema.decodeSync(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))

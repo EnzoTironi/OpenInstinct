@@ -1,4 +1,5 @@
 import { approvalMessageSchema } from "./approval-message";
+import { z } from "zod";
 import type { Session } from "eve/channels";
 import { ASK_QUESTION_INPUT_SCHEMA } from "eve/tools/ask_question";
 import {
@@ -17,6 +18,16 @@ export const channelQuestionSchema = ASK_QUESTION_INPUT_SCHEMA.refine(
 
 export function renderChannelInput(request: InputRequest) {
   if (request.kind === "tool-approval") {
+    if (request.action.toolName === "execute") {
+      const action = z
+        .object({
+          call: z.object({
+            input: z.object({ approvalMessage: approvalMessageSchema }),
+          }),
+        })
+        .parse(request.action.input);
+      return action.call.input.approvalMessage;
+    }
     return approvalMessageSchema.parse(request.action.input.approvalMessage);
   }
   return approvalMessageSchema.parse(channelQuestionText(request));

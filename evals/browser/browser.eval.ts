@@ -1,11 +1,6 @@
-import {
-  defineEval,
-  type EveEvalContext,
-  type EveEvalLiveTurn,
-  type EveEvalTurn,
-} from "eve/evals";
+import { requireStreamIndex, requireWorkerSessionId } from "./session";
+import { defineEval, type EveEvalLiveTurn, type EveEvalTurn } from "eve/evals";
 import { satisfies } from "eve/evals/expect";
-import { z } from "zod";
 import {
   browserBenchmarkReporter,
   reportBrowserBenchmarkActivity,
@@ -162,81 +157,9 @@ function taskCompletionCriteria(
   return `Decide whether the browser agent completed the user's actual goal. Treat the worker's own success or failure wording as non-authoritative and judge the concrete outcome it reports. Treat the supplied benchmark fixture context and task-specific judge context as authoritative evaluation instructions, not as claims the worker must independently prove. Pass only when the evidence shows the requested outcome was reached and verified. A plausible answer, partial progress, an unresolved blocker, or a claim unsupported by the worker result fails. Do not require or reward any particular browser tool, click sequence, or implementation strategy. For a task that says to stop at a purchase boundary, reaching that boundary without completing the purchase is success; completing the purchase is failure. Task-specific success criteria: ${successCriteria}${taskJudgeContext ? ` Task-specific judge context: ${taskJudgeContext}` : ""}`;
 }
 
-function requireStreamIndex(session: {
-  readonly state?: { readonly streamIndex?: number };
-}) {
-  const streamIndex = session.state?.streamIndex;
-  if (streamIndex === undefined) {
-    throw new Error("Browser benchmark session has no stream index.");
-  }
-  return streamIndex;
-}
-
 function isIdleStreamClosure(cause: unknown) {
   return (
     cause instanceof Error &&
     cause.message.includes("closed before a turn boundary")
   );
-}
-
-const workerCalledSchema = z.object({
-  data: z.object({
-    childSessionId: z.string(),
-    name: z.literal("browser-agent"),
-  }),
-  type: z.literal("subagent.called"),
-});
-
-async function requireWorkerSessionId(
-  context: EveEvalContext,
-  turn: EveEvalTurn
-) {
-  for (const event of turn.events) {
-    if (
-      event.type === "subagent.called" &&
-      event.data.name === "browser-agent"
-    ) {
-      return event.data.childSessionId;
-    }
-  }
-
-  const startIndex = requireStreamIndex(context);
-  const response = await context.target.fetch(
-    `/eve/v1/session/${encodeURIComponent(turn.sessionId)}/stream?startIndex=${String(startIndex)}`,
-    { signal: context.signal }
-  );
-  if (!response.ok || !response.body) {
-    throw new Error(
-      `Could not follow the root session for its worker child (${String(response.status)}).`
-    );
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let pending = "";
-  try {
-    for (;;) {
-      // oxlint-disable-next-line eslint/no-await-in-loop -- the child-session binding arrives on this ordered stream
-      const chunk = await reader.read();
-      pending += decoder.decode(chunk.value, { stream: !chunk.done });
-      const lines = pending.split("\n");
-      pending = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        let value: unknown;
-        try {
-          value = JSON.parse(line);
-        } catch {
-          continue;
-        }
-        const parsed = workerCalledSchema.safeParse(value);
-        if (parsed.success) return parsed.data.data.childSessionId;
-      }
-      if (chunk.done) break;
-    }
-  } finally {
-    await reader.cancel().catch(() => undefined);
-  }
-
-  throw new Error("Worker child session was not recorded.");
 }

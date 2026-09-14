@@ -18,9 +18,9 @@ import { PersonalMemory } from "../../server/personal-memory";
 import { inspectPersonalMemory } from "../../server/personal-memory/export";
 import { serverRuntime } from "../../server/runtime";
 import { createMemoryDocumentBackend } from "../../agent/lib/memory-document-backend";
-import { personalMemoryProvider } from "../../agent/lib/personal-memory-provider";
+import { personalMemoryProvider } from "../../server/executor/memory/personal-memory-provider";
 import { channelPrincipal } from "../../server/channels/principal";
-import { inspectStoredPersonalMemory } from "../../agent/tools/personal-memory";
+import { inspectStoredPersonalMemory } from "../../server/executor/tools/personal-memory";
 import { GET } from "../../app/api/account/personal-memory/export/route";
 import { runtimeDatabase } from "./database";
 

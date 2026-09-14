@@ -13,6 +13,7 @@ import { backupSecrets } from "./backups.ts";
 import { PrepareServiceDatabases } from "./database.ts";
 import { MigrateApplication } from "./migrations.ts";
 import { provisionMatrix, deployMatrix } from "./matrix.ts";
+import { ReconcileChannelWebhooks } from "./webhooks.ts";
 
 export const hosted = Effect.gen(function* () {
   const policy = yield* CompanionStagePolicy;
@@ -264,6 +265,11 @@ export const hosted = Effect.gen(function* () {
       COMPANION_MODEL_PROVIDER: "codex-local",
       COMPANION_BROWSER_MODEL_PROVIDER: "openrouter",
       COMPANION_BROWSER_MODEL: "openai/gpt-5-mini",
+      ZOEN_REGISTRATION_MODE: "closed",
+      ZOEN_BILLING_MODE: "free-beta",
+      ZOEN_BETA_IDENTITIES: yield* Config.string("ZOEN_BETA_IDENTITIES").pipe(
+        Config.withDefault("")
+      ),
       BETTER_AUTH_URL: `https://${hostname}`,
       COMPANION_PUBLIC_BASE_URL: `https://${hostname}`,
       WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:3000",
@@ -332,6 +338,13 @@ export const hosted = Effect.gen(function* () {
       content: ipv6.ip,
       proxied: false,
     }).pipe(adopt(true), retain(true));
+    yield* ReconcileChannelWebhooks({
+      baseUrl: `https://${hostname}`,
+      legacyBaseUrl: "https://companion.tironi.xyz",
+      machine: web.machineId,
+      release: webImage,
+      credentialVersion: webSecrets,
+    });
   }
   return {
     stage: policy.stage,

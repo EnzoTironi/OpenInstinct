@@ -37,7 +37,7 @@ import schedules, {
   createSchedule,
   listSchedules,
   updateSchedule,
-} from "@agent/tools/schedules";
+} from "../../../server/executor/tools/schedules";
 
 describe("schedule tools", () => {
   beforeEach(() => {

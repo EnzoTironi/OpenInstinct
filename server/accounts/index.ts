@@ -7,6 +7,7 @@ import {
   type channelChallengeStatusSchema,
 } from "../../shared/identity/channel-auth.ts";
 import { accessScopeForUser } from "../../shared/identity/access-scope.ts";
+import { env } from "@shared/environment/env";
 
 const Identifier = Schema.NonEmptyString.check(Schema.isTrimmed());
 const Uuid = Schema.String.check(Schema.isUUID());
@@ -65,6 +66,7 @@ export class ChannelAccountError extends Schema.TaggedError<ChannelAccountError>
       "account_conflict",
       "session_invalid",
       "last_access",
+      "registration_closed",
     ]),
   }
 ) {}
@@ -157,6 +159,9 @@ const publicIdentity = ({
   installationId,
   senderId,
 }: Identity): Identity => ({ id, userId, channel, installationId, senderId });
+const registrationAllowed = (sender: typeof VerifiedSender.Type) =>
+  env.ZOEN_REGISTRATION_MODE === "open" ||
+  env.ZOEN_BETA_IDENTITIES.includes(`${sender.channel}:${sender.senderId}`);
 
 /** Transport verification and explicit channel confirmation belong to the caller. */
 export class ChannelAccounts extends Context.Service<
@@ -218,6 +223,8 @@ export class ChannelAccounts extends Context.Service<
         }
         const userId = targetUserId ?? randomUUID();
         if (!targetUserId) {
+          if (!registrationAllowed(sender))
+            return yield* fail("registration_closed");
           yield* sql`INSERT INTO public."user"
         (id, name, email, "emailVerified", "createdAt", "updatedAt")
         VALUES (${userId}, 'Companion user', ${`${userId}@accounts.invalid`}, false, clock_timestamp(), clock_timestamp())`;
@@ -301,6 +308,12 @@ export class ChannelAccounts extends Context.Service<
               if (!preview) return yield* fail("invalid_challenge");
               const existing = yield* findIdentity(request.sender);
               if (existing?.revoked) return yield* fail("identity_inactive");
+              if (
+                !existing &&
+                !preview.targetUserId &&
+                !registrationAllowed(request.sender)
+              )
+                return yield* fail("registration_closed");
               if (preview.purpose === "link") {
                 if (!preview.targetUserId || !preview.requestingSessionId)
                   return yield* fail("invalid_challenge");
@@ -357,6 +370,12 @@ export class ChannelAccounts extends Context.Service<
                 existing.userId !== challenge.targetUserId
               )
                 return yield* fail("account_conflict");
+              if (
+                !existing &&
+                !challenge.targetUserId &&
+                !registrationAllowed(request.sender)
+              )
+                return yield* fail("registration_closed");
               yield* sql`UPDATE public.channel_auth_challenge
                 SET confirmed_sender_id = ${request.sender.senderId}, confirmed_at = clock_timestamp()
                 WHERE id = ${challenge.id}`;

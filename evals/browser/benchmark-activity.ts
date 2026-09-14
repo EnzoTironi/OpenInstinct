@@ -1,6 +1,10 @@
 import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import {
+  executorActionName,
+  executorActionResult,
+} from "@shared/chat/executor";
+import {
   browserActivityKindForTool,
   type BrowserActivityKind,
   sumBrowserActivityDurations,
@@ -53,7 +57,9 @@ export function browserBenchmarkActivity(
         if (action.kind === "load-skill")
           return "Loading the browser procedure";
         if (action.kind === "tool-call")
-          return activityForTool(action.toolName);
+          return activityForTool(
+            executorActionName(action.toolName, action.input)
+          );
         return "Coordinating browser work";
       });
       return [...new Set(activities)].join(" and ");
@@ -61,7 +67,7 @@ export function browserBenchmarkActivity(
     if (event.type === "action.result") {
       const result = event.data.result;
       if (result.kind === "tool-result") {
-        return `Reviewing ${activityForTool(result.toolName).toLowerCase()} result`;
+        return `Reviewing ${activityForTool(executorActionResult(result.toolName, result.output).toolName).toLowerCase()} result`;
       }
     }
     if (event.type === "input.requested") return "Waiting for required input";
@@ -89,13 +95,10 @@ export function browserBenchmarkLiveViewUrl(
   for (const event of events.toReversed()) {
     if (event.type !== "action.result") continue;
     const result = event.data.result;
-    if (
-      result.kind !== "tool-result" ||
-      result.toolName !== "manage_browsers"
-    ) {
-      continue;
-    }
-    const parsed = managedBrowserOutputSchema.safeParse(result.output);
+    if (result.kind !== "tool-result") continue;
+    const resolved = executorActionResult(result.toolName, result.output);
+    if (resolved.toolName !== "manage_browsers") continue;
+    const parsed = managedBrowserOutputSchema.safeParse(resolved.output);
     if (!parsed.success) continue;
     try {
       const url = new URL(parsed.data.browser.browser_live_view_url);
@@ -127,7 +130,9 @@ function activityKindForEvent(
     event.data.actions.map((action) => {
       if (action.kind === "load-skill") return "setup";
       if (action.kind === "tool-call") {
-        return browserActivityKindForTool(action.toolName);
+        return browserActivityKindForTool(
+          executorActionName(action.toolName, action.input)
+        );
       }
       return "other";
     })

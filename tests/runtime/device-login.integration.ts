@@ -1,4 +1,4 @@
-import { deviceAuthStatus } from "../../agent/tools/device-auth";
+import { deviceAuthStatus } from "../../server/executor/tools/device-auth";
 import { channelPrincipal } from "../../server/channels/principal";
 import type { ToolContext } from "eve/tools";
 import assert from "node:assert/strict";

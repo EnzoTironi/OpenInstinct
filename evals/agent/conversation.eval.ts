@@ -1,6 +1,7 @@
 import { Result, Schema } from "effect";
 import { defineEval, type EveEvalContext } from "eve/evals";
-import { includes, satisfies } from "eve/evals/expect";
+import { equals, includes, satisfies } from "eve/evals/expect";
+import { executorInvocations } from "./executor";
 import { sendMessageOutputSchema } from "@shared/chat/message-delivery";
 import { reactToMessageOutputSchema } from "@shared/chat/reaction";
 import {
@@ -89,7 +90,7 @@ const textEvals = cases.map((testCase) =>
       turn.succeeded();
       turn.calledTool("send_message", { count: 1 });
       turn.notCalledTool("web_search");
-      turn.notCalledTool("web_fetch");
+      t.check(executorInvocations(turn, "web_fetch"), equals(0));
       turn.notEvent("subagent.called", { data: { name: "browser-agent" } });
       turn.maxToolCalls(1);
       const text = await requireDeliveredText(t, turn);
