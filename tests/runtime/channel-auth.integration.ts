@@ -18,7 +18,6 @@ import { test, vi } from "vitest";
 import { channelAuthorizationPollIntervalMs } from "../../web/auth/channel/client";
 import {
   channelChallengeSchema,
-  channelConversationEntrySchema,
   type channelChallengeIdSchema,
   type channelChallengeRequestSchema,
 } from "../../shared/identity/channel-auth.ts";
@@ -282,17 +281,28 @@ test("real BetterAuth router, signed browser challenge and database session", as
       purpose: "login",
     });
     assert.equal(kapsoStarted.status, 200);
-    const entry = Schema.decodeUnknownSync(channelConversationEntrySchema)(
+    const entry = Schema.decodeUnknownSync(channelChallengeSchema)(
       await kapsoStarted.json()
     );
-    const whatsapp = new URL(entry.conversationUrl);
+    const whatsapp = new URL(entry.deepLink);
     assert.equal(whatsapp.origin, "https://wa.me");
     assert.equal(whatsapp.pathname, "/5511999999999");
-    assert.equal(
-      whatsapp.searchParams.get("text"),
-      "quero abrir minha conta no navegador"
+    assert.match(
+      whatsapp.searchParams.get("text") ?? "",
+      /^\/start [A-Za-z0-9_-]{43}$/u
     );
-    assert.equal(kapsoStarted.headers.getSetCookie().length, 0);
+    assert.equal(kapsoStarted.headers.getSetCookie().length, 1);
+    const waBrowser = cookieHeader(kapsoStarted);
+    assert.equal(
+      (await request(`/channel-auth/status?id=${entry.id}`, "GET")).status,
+      400
+    );
+    const waiting = await request(
+      `/channel-auth/status?id=${entry.id}`,
+      "GET",
+      waBrowser
+    );
+    assert.deepEqual(await waiting.json(), { status: "pending" });
   } finally {
     await runtime.runPromise(
       Effect.gen(function* () {

@@ -19,13 +19,15 @@ export default async function GetStartedPage({
 }: PageProps<"/get-started">) {
   const { locale } = await getI18n();
   const params = await searchParams;
+  if (params.channel === undefined)
+    redirect("/sign-in?callbackUrl=%2Fconnections");
   const destinations = await Effect.runPromise(conversationDestinations);
   const destination =
     params.channel === "imessage"
       ? destinations.imessage
       : params.channel === "telegram"
         ? destinations.telegram
-        : params.channel === "whatsapp" || params.channel === undefined
+        : params.channel === "whatsapp"
           ? (destinations.whatsapp ??
             destinations.telegram ??
             destinations.imessage)

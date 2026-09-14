@@ -1003,5 +1003,14 @@
   "Pode melhorar": "Puede mejorar",
   "Tente novamente.": "Inténtalo de nuevo.",
   "Exportar registros carregados": "Exportar registros cargados",
-  "Servidor": "Servidor"
+  "Servidor": "Servidor",
+  "Sign in | Zoen": "Entrar | Zoen",
+  "Your space awaits.": "Tu espacio te espera.",
+  "One account for your personal space and your teams.": "Una cuenta para ti y tus equipos.",
+  "Continue with Google": "Continuar con Google",
+  "Opening Google…": "Abriendo Google…",
+  "Could not open Google. Please try again.": "No se pudo abrir Google. Inténtalo de nuevo.",
+  "Could not sign in. During beta, use the Google account on your invitation.": "No se pudo iniciar sesión. Durante la beta, usa la cuenta de Google de tu invitación.",
+  "Channel disconnected. Sign in again with Google or another linked messenger.": "Mensajería desconectada. Entra de nuevo con Google u otra mensajería vinculada.",
+  "Use a linked messenger": "Entrar con una mensajería vinculada"
 }

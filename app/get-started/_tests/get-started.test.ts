@@ -74,12 +74,12 @@ describe("conversation entry", () => {
     expect(result.authorization.url).toBe("https://t.me/companion_test_bot");
     expect(result.authorization.installationId).toBe("test-bot-id");
   });
-  it("opens the configured WhatsApp without issuing browser authorization", async () => {
+  it("opens the configured WhatsApp when explicitly selected", async () => {
     channelConfig.KAPSO_PHONE_NUMBER_ID = "";
     await expect(
       GetStartedPage({
         params: Promise.resolve({}),
-        searchParams: Promise.resolve({}),
+        searchParams: Promise.resolve({ channel: "whatsapp" }),
       })
     ).rejects.toThrow("redirect");
     expect(redirect).toHaveBeenCalledWith(
@@ -113,15 +113,16 @@ describe("conversation entry", () => {
     expect(redirect).not.toHaveBeenCalled();
     expect(renderToStaticMarkup(page)).not.toContain('href="sms:');
   });
-  it("uses Telegram when the default channel is unavailable", async () => {
-    channelConfig.KAPSO_PHONE_NUMBER = "";
+  it("starts a single account flow before linking messengers", async () => {
     await expect(
       GetStartedPage({
         params: Promise.resolve({}),
         searchParams: Promise.resolve({}),
       })
     ).rejects.toThrow("redirect");
-    expect(redirect).toHaveBeenCalledWith("https://t.me/companion_test_bot");
+    expect(redirect).toHaveBeenCalledWith(
+      "/sign-in?callbackUrl=%2Fconnections"
+    );
   });
   it("never treats a query parameter as a redirect destination", async () => {
     const page = await GetStartedPage({
@@ -142,7 +143,7 @@ describe("conversation entry", () => {
     channelConfig.LINQ_PHONE_NUMBER = "+15557654321?body=evil";
     const page = await GetStartedPage({
       params: Promise.resolve({}),
-      searchParams: Promise.resolve({}),
+      searchParams: Promise.resolve({ channel: "whatsapp" }),
     });
     expect(redirect).not.toHaveBeenCalled();
     const html = renderToStaticMarkup(page);

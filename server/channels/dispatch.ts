@@ -1,6 +1,7 @@
 import { Config, Effect } from "effect";
 import { ChannelAuthPrompts } from "../channel-auth/prompts";
 import { Telegram } from "./telegram";
+import { Kapso } from "./kapso";
 import { ProviderInputError } from "./provider-errors";
 import type { InboundEvent } from "./inbound";
 
@@ -28,7 +29,15 @@ export const dispatchAuthFeedback = Effect.fn("dispatchAuthFeedback")(
     const refusal =
       refusalMessage ??
       "This request cannot be confirmed here. Return to your original Zoen browser tab to check it or start a new request.";
-    if (event.channel !== "telegram") return;
+    if (event.channel === "kapso") {
+      yield* (yield* Kapso).sendText(
+        event.senderId,
+        confirmed
+          ? "Confirmado. Volte à aba do Zoen onde você começou para continuar."
+          : refusal
+      );
+      return;
+    }
     const provider = yield* Telegram;
     if (event.command === "start") {
       yield* provider.sendText(event.chatId, refusal);
@@ -59,18 +68,16 @@ export const dispatchAuthPrompt = Effect.fn("dispatchAuthPrompt")(function* (
   const claim = yield* prompts.claim(challengeId);
   if (!claim) return;
   const send = Effect.gen(function* () {
-    if (claim.channel !== "telegram")
-      return yield* new ProviderInputError({
-        provider: claim.channel,
-        reason: "invalid_command",
-      });
-    const installation = yield* Config.string("TELEGRAM_BOT_ID");
+    const installation = yield* Config.string(
+      claim.channel === "telegram" ? "TELEGRAM_BOT_ID" : "KAPSO_PHONE_NUMBER_ID"
+    );
     if (installation !== claim.installationId)
       return yield* new ProviderInputError({
         provider: claim.channel,
         reason: "wrong_installation",
       });
-    const provider = yield* Telegram;
+    const provider =
+      claim.channel === "telegram" ? yield* Telegram : yield* Kapso;
     yield* prompts.checkLease(claim.lease);
     return yield* provider.sendLoginConfirmation(
       claim.senderId,

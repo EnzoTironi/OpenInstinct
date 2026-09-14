@@ -681,6 +681,7 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
     parse: unusedAdapterMethod,
     downloadMedia: unusedAdapterMethod,
     sendText: unusedAdapterMethod,
+    sendLoginConfirmation: unusedAdapterMethod,
   } satisfies Kapso["Service"];
   const idleKapso = Layer.succeed(Kapso, idleKapsoService);
   const localDependencies = Layer.mergeAll(

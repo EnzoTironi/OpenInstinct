@@ -7,14 +7,15 @@ import Link from "next/link";
 import { ChannelAuthForm } from "@web/auth/channel/form";
 import { safeCallbackUrl } from "@web/auth/channel/client";
 import { getAuthSession } from "@db/services/auth/session";
+import { env } from "@shared/environment";
+import { GoogleSignInButton } from "@web/auth/google-button";
+import { Logo } from "@web/components/ui/logo";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return {
-    title: t("Sign in | Companion"),
-    description: t(
-      "Sign in to Companion through Telegram or WhatsApp. No phone number to type."
-    ),
+    title: t("Sign in | Zoen"),
+    description: t("One account for your personal space and your teams."),
   };
 }
 
@@ -28,42 +29,53 @@ export default async function SignInPage({
     Array.isArray(callbackValue) ? callbackValue[0] : callbackValue
   );
   if (await getAuthSession(await headers())) redirect(callbackUrl);
+  const googleAvailable = Boolean(
+    env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+  );
   return (
     <main className="flex min-h-svh items-center justify-center bg-background px-4 py-8 text-foreground">
       <section className="w-full max-w-sm space-y-6">
-        <div className="space-y-2">
-          <p className="type-caption text-muted-foreground">
-            {t("Your assistant, one conversation away")}
-          </p>
-          <h1 className="type-page-title">{t("Pick up the conversation")}</h1>
+        <Link
+          className="inline-flex items-center gap-2 type-label"
+          href="/welcome"
+        >
+          <Logo /> Zoen
+        </Link>
+        <div className="space-y-3">
+          <h1 className="type-page-title">{t("Your space awaits.")}</h1>
           <p className="type-supporting-body text-muted-foreground">
-            {t(
-              "Sign in through the messenger you use with your assistant. New here? See the"
-            )}{" "}
-            <Link
-              className="text-foreground underline underline-offset-4"
-              href="/welcome"
-            >
-              {t("product overview")}
-            </Link>{" "}
-            {t("or start with")}{" "}
-            <Link
-              className="text-foreground underline underline-offset-4"
-              href="/get-started"
-            >
-              {t("Get started")}
-            </Link>{" "}
-            {t("to create your account and bind a channel in one flow.")}
+            {t("One account for your personal space and your teams.")}
           </p>
         </div>
+        {params.error ? (
+          <p role="alert" className="type-caption text-destructive">
+            {t(
+              "Could not sign in. During beta, use the Google account on your invitation."
+            )}
+          </p>
+        ) : null}
         {params.reason === "channel-unlinked" ? (
           <output className="type-supporting-body block text-muted-foreground">
             {t(
-              "Channel disconnected. You were signed out of all browsers. Use a remaining linked channel to sign in again."
+              "Channel disconnected. Sign in again with Google or another linked messenger."
             )}
           </output>
         ) : null}
-        <ChannelAuthForm purpose="login" callbackUrl={callbackUrl} />
+        {googleAvailable ? (
+          <>
+            <GoogleSignInButton callbackUrl={callbackUrl} />
+            <details className="border-t border-border pt-5">
+              <summary className="cursor-pointer type-label text-muted-foreground">
+                {t("Use a linked messenger")}
+              </summary>
+              <div className="pt-4">
+                <ChannelAuthForm purpose="login" callbackUrl={callbackUrl} />
+              </div>
+            </details>
+          </>
+        ) : (
+          <ChannelAuthForm purpose="login" callbackUrl={callbackUrl} />
+        )}
         <LanguagePicker />
       </section>
     </main>

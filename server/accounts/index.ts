@@ -344,6 +344,11 @@ export class ChannelAccounts extends Context.Service<
                 challenge.installationId !== request.sender.installationId
               )
                 return yield* fail("invalid_challenge");
+              const prompts = yield* sql<{ senderId: string }>`
+                SELECT sender_id AS "senderId" FROM public.channel_auth_prompt
+                WHERE challenge_id = ${challenge.id}`;
+              if (prompts[0] && prompts[0].senderId !== request.sender.senderId)
+                return yield* fail("invalid_challenge");
               if (challenge.purpose === "link") {
                 if (!challenge.targetUserId || !challenge.requestingSessionId)
                   return yield* fail("invalid_challenge");

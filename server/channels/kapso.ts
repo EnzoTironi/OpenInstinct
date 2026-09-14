@@ -14,6 +14,7 @@ import {
 } from "effect/unstable/http";
 import {
   normalizeInbound,
+  LoginTokenSchema,
   ProviderReferenceSchema,
   validateEventAge,
   type InboundEvent,
@@ -54,6 +55,12 @@ const message = Schema.Struct({
   from: Schema.optionalKey(Schema.String),
   to: Schema.optionalKey(Schema.String),
   text: Schema.optionalKey(Schema.Struct({ body: Schema.String })),
+  interactive: Schema.optionalKey(
+    Schema.Struct({
+      type: Schema.String,
+      button_reply: Schema.optionalKey(Schema.Struct({ id: Schema.String })),
+    })
+  ),
   context: Schema.optionalKey(
     Schema.NullOr(
       Schema.Struct({
@@ -187,6 +194,35 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
     Number(incoming.timestamp),
     nowMs
   );
+  const coordinates = {
+    channel: "kapso" as const,
+    installationId: installation.phoneNumberId,
+    eventId: incoming.id,
+    messageId: incoming.id,
+    senderId,
+    occurredAt,
+    chatKind,
+    chatId:
+      chatKind === "group"
+        ? (incoming.group_id ??
+          item.conversation.id ??
+          item.conversation.phone_number ??
+          senderId)
+        : senderId,
+  };
+  if (incoming.type === "interactive") {
+    const reply = incoming.interactive;
+    if (
+      chatKind !== "private" ||
+      reply?.type !== "button_reply" ||
+      !reply.button_reply?.id.startsWith("confirm:")
+    )
+      return null;
+    const token = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
+      reply.button_reply.id.slice(8)
+    ).pipe(Effect.mapError(malformed));
+    return { ...coordinates, kind: "command", command: "confirm", token };
+  }
   let attachment: typeof media.Type | undefined;
   switch (incoming.type) {
     case "text":
@@ -227,25 +263,7 @@ const normalizeEnvelope = Effect.fn("Kapso.normalizeEnvelope")(function* (
       : [],
     replyToMessageId: incoming.context?.id,
   };
-  return yield* normalizeInbound(
-    {
-      channel: "kapso",
-      installationId: installation.phoneNumberId,
-      eventId: incoming.id,
-      messageId: incoming.id,
-      senderId,
-      occurredAt,
-      chatKind,
-      chatId:
-        chatKind === "group"
-          ? (incoming.group_id ??
-            item.conversation.id ??
-            item.conversation.phone_number ??
-            senderId)
-          : senderId,
-    },
-    payload
-  );
+  return yield* normalizeInbound(coordinates, payload);
 });
 
 /** Parses signed v2 body data; webhook event headers never select authority. */
@@ -323,10 +341,11 @@ const downloadableMedia = Schema.Struct({
 
 const makeKapso = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
-  const sendText = Effect.fn("Kapso.sendText")(function* (
+  const send = Effect.fn("Kapso.send")(function* (
     targetId: string,
     text: string,
-    reply?: string
+    reply?: string,
+    confirmation?: { token: string; purpose: "login" | "link" }
   ) {
     const input = yield* Schema.decodeUnknownEffect(sendInput)({
       targetId,
@@ -356,6 +375,28 @@ const makeKapso = Effect.gen(function* () {
       text: { body: input.text, preview_url: false },
     };
     if (input.reply) body.context = { message_id: input.reply };
+    if (confirmation) {
+      body.type = "interactive";
+      delete body.text;
+      body.interactive = {
+        type: "button",
+        body: { text: input.text },
+        action: {
+          buttons: [
+            {
+              type: "reply",
+              reply: {
+                id: `confirm:${confirmation.token}`,
+                title:
+                  confirmation.purpose === "login"
+                    ? "Confirmar entrada"
+                    : "Confirmar vínculo",
+              },
+            },
+          ],
+        },
+      };
+    }
     const result = yield* requestProviderJson(
       http,
       "kapso",
@@ -446,7 +487,25 @@ const makeKapso = Effect.gen(function* () {
         yield* Clock.currentTimeMillis
       );
     }),
-    sendText,
+    sendText: (targetId: string, text: string, reply?: string) =>
+      send(targetId, text, reply),
+    sendLoginConfirmation: Effect.fn("Kapso.sendLoginConfirmation")(function* (
+      targetId: string,
+      token: string,
+      purpose: "login" | "link"
+    ) {
+      const valid = yield* Schema.decodeUnknownEffect(LoginTokenSchema)(
+        token
+      ).pipe(Effect.mapError(malformed));
+      return yield* send(
+        targetId,
+        purpose === "login"
+          ? "Você pediu para entrar no Zoen? Confirme abaixo. A aba onde você começou vai abrir sua conta. Se não foi você, ignore."
+          : "Você pediu para vincular este WhatsApp à sua conta Zoen? Confirme abaixo e volte à aba onde começou. Se não foi você, ignore.",
+        undefined,
+        { token: valid, purpose }
+      );
+    }),
   };
 });
 
