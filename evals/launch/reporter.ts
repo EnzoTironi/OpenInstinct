@@ -12,6 +12,8 @@ const receipts = Schema.Struct({ calls: Schema.Array(ExecutorReceiptSchema) });
 
 // Classify provider diagnostics without exporting their messages, URLs or payloads.
 function failureCategory(message: string) {
+  if (/workspace revision changed/iu.test(message)) return "workspace-conflict";
+  if (/invalid tool arguments/iu.test(message)) return "invalid-tool-input";
   if (
     /usage limit|quota|insufficient.*(?:credit|balance)|\b402\b/iu.test(message)
   )
@@ -44,6 +46,16 @@ function caseOutcome(result: EveEvalResult["result"]) {
               event: event.type,
               code: event.data.code,
               category: failureCategory(event.data.message),
+            },
+          ]
+        : []
+    ),
+    actionFailures: result.events.flatMap((event) =>
+      event.type === "action.result" && event.data.status === "failed"
+        ? [
+            {
+              code: event.data.error?.code ?? "unknown",
+              category: failureCategory(event.data.error?.message ?? ""),
             },
           ]
         : []
