@@ -34,6 +34,25 @@ export default defineAgent({
         }
         const caller = ctx.session.auth.current ?? ctx.session.auth.initiator;
         if (!caller) throw new Error("An authenticated user is required.");
+        const channel = caller.attributes.conversationChannel;
+        if (channel === "telegram" || channel === "kapso") {
+          const identity = await serverRuntime.runPromise(
+            requireChannelPrincipal(channel, caller)
+          );
+          if (
+            caller.attributes.conversationId !== identity.id &&
+            !caller.attributes.groupBindingId
+          ) {
+            // A verified group can converse using the installation's model.
+            // Reading a member's private model settings would grant extra scope.
+            const model = await Effect.runPromise(installationModel);
+            if (!model)
+              throw new Error(
+                "A model must be configured for group conversations."
+              );
+            return model;
+          }
+        }
         const actor =
           caller.authenticator === "authjs" ||
           caller.authenticator === "verified-channel" ||
@@ -44,12 +63,6 @@ export default defineAgent({
                 workspaceActorFromPrincipal(caller)
               )
             : undefined;
-        const channel = caller.attributes.conversationChannel;
-        if (channel === "telegram" || channel === "kapso") {
-          await serverRuntime.runPromise(
-            requireChannelPrincipal(channel, caller)
-          );
-        }
         const scope =
           caller.authenticator === "a2a" || caller.attributes.groupBindingId
             ? await serverRuntime.runPromise(

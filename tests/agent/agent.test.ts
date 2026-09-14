@@ -5,10 +5,25 @@ import { Effect } from "effect";
 import type { isScheduledAgentRunLeaseActive } from "@db/services/scheduled-agent-run-leases";
 import type { workspaceActorFromPrincipal } from "../../server/workspaces/access";
 import type { getGatewayModel } from "@db/services/settings";
+import type { requireChannelPrincipal } from "../../server/channels/principal";
+import type * as installationModelModule from "@agent/lib/installation-model";
 
 const services = vi.hoisted(() => ({
+  modelConfiguration: {
+    COMPANION_MODEL_PROVIDER: "gateway",
+    COMPANION_CODEX_MODEL: "gpt-5.6-luna",
+  },
   getModel: vi.fn<typeof getGatewayModel>(),
   isActive: vi.fn<typeof isScheduledAgentRunLeaseActive>(),
+  verifyChannel:
+    vi.fn<
+      (
+        ...args: Parameters<typeof requireChannelPrincipal>
+      ) => Effect.Effect<
+        Effect.Success<ReturnType<typeof requireChannelPrincipal>>,
+        Error
+      >
+    >(),
   resolveActor:
     vi.fn<
       (
@@ -29,6 +44,9 @@ vi.mock("@db/services/settings", () => ({
 vi.mock("../../server/workspaces/access", () => ({
   workspaceActorFromPrincipal: services.resolveActor,
 }));
+vi.mock("../../server/channels/principal", () => ({
+  requireChannelPrincipal: services.verifyChannel,
+}));
 vi.mock("../../server/runtime", async () => {
   const { Effect: runtimeEffect } = await import("effect");
   return { serverRuntime: { runPromise: runtimeEffect.runPromise } };
@@ -36,6 +54,21 @@ vi.mock("../../server/runtime", async () => {
 vi.mock("@agent/lib/workspace-model", async () => {
   const { Effect: Fx } = await import("effect");
   return { workspaceModel: () => Fx.succeed(null) };
+});
+vi.mock("@agent/lib/installation-model", async (importOriginal) => {
+  const actual = await importOriginal<typeof installationModelModule>();
+  const { Effect: Fx, ConfigProvider } = await import("effect");
+  return {
+    ...actual,
+    installationModel: Fx.suspend(() =>
+      actual.installationModel.pipe(
+        Fx.provideService(
+          ConfigProvider.ConfigProvider,
+          ConfigProvider.fromUnknown(services.modelConfiguration)
+        )
+      )
+    ),
+  };
 });
 
 import agent from "@agent/agent";
@@ -46,6 +79,7 @@ const retryLeaseToken = "00000000-0000-4000-8000-000000000003";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  services.modelConfiguration.COMPANION_MODEL_PROVIDER = "gateway";
   services.getModel.mockResolvedValue("openai/gpt-5.6-sol-fast");
   services.resolveActor.mockReturnValue(
     Effect.succeed({
@@ -54,9 +88,49 @@ beforeEach(() => {
       organizationId: null,
     })
   );
+  services.verifyChannel.mockReturnValue(
+    Effect.succeed({
+      id: "00000000-0000-4000-8000-000000000004",
+      userId: "user-1",
+      channel: "telegram",
+      installationId: "bot",
+      senderId: "123",
+    })
+  );
 });
 
 describe("root agent model resolution", () => {
+  it("uses the installation model for a verified group without reading private settings", async () => {
+    services.modelConfiguration.COMPANION_MODEL_PROVIDER = "codex-local";
+    const ctx = groupContext();
+    const model = await agent.model.events["step.started"]?.({}, ctx);
+    expect(model).toMatchObject({ model: { modelId: "gpt-5.6-luna" } });
+    expect(services.verifyChannel).toHaveBeenCalledExactlyOnceWith(
+      "telegram",
+      ctx.session.auth.current
+    );
+    expect(services.resolveActor).not.toHaveBeenCalled();
+    expect(services.getModel).not.toHaveBeenCalled();
+  });
+
+  it("refuses a revoked group sender before choosing a model", async () => {
+    services.verifyChannel.mockReturnValue(
+      Effect.fail(new Error("Identity revoked"))
+    );
+    await expect(
+      agent.model.events["step.started"]?.({}, groupContext())
+    ).rejects.toThrow("Identity revoked");
+    expect(services.resolveActor).not.toHaveBeenCalled();
+    expect(services.getModel).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to a member's model when group service is unconfigured", async () => {
+    await expect(
+      agent.model.events["step.started"]?.({}, groupContext())
+    ).rejects.toThrow("A model must be configured for group conversations.");
+    expect(services.resolveActor).not.toHaveBeenCalled();
+    expect(services.getModel).not.toHaveBeenCalled();
+  });
   it("accepts a valid retry lease forwarded into an older Eve session", async () => {
     services.isActive.mockImplementation(async (_runId, leaseToken) => {
       return leaseToken === retryLeaseToken;
@@ -102,6 +176,29 @@ describe("root agent model resolution", () => {
     expect(services.getModel).not.toHaveBeenCalled();
   });
 });
+
+function groupContext(): DynamicResolveContext {
+  const principal = {
+    attributes: {
+      workspaceId: accessScopeForUser("user-1").workspaceId,
+      conversationChannel: "telegram",
+      conversationId: "group:telegram:bot:-1001",
+      conversationScope: "group:telegram:bot:-1001",
+      chatKind: "group",
+    },
+    authenticator: "verified-channel",
+    principalId: "user-1",
+    principalType: "user",
+  };
+  return {
+    channel: { kind: "channel:telegram" },
+    messages: [],
+    session: {
+      auth: { current: principal, initiator: principal },
+      id: "group-session",
+    },
+  };
+}
 
 function scheduledWorkerContext(): DynamicResolveContext {
   return {

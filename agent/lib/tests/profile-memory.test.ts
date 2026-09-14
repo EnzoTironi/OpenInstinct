@@ -6,6 +6,7 @@ import {
 } from "eve/memory";
 import { describe, expect, it } from "vitest";
 import personalInfoMemory from "@agent/memory/personal_info";
+import workstreamMemory from "@agent/memory/workstreams";
 import {
   preserveProfileMemoryCancellation,
   resolveProfileMemoryScope,
@@ -15,6 +16,25 @@ import { accessScopeForUser } from "@shared/identity/access-scope";
 const derivedWorkspaceId = accessScopeForUser("better-auth:user").workspaceId;
 
 describe("profile memory", () => {
+  it.each<ReturnType<typeof userPrincipal>["attributes"]>([
+    { chatKind: "group" },
+    { conversationScope: "group:telegram:bot:-1001" },
+  ])("omits private providers in a native group (%j)", async (attributes) => {
+    const principal = {
+      ...userPrincipal("verified-channel", derivedWorkspaceId),
+      attributes: { workspaceId: derivedWorkspaceId, ...attributes },
+    };
+    const context = memoryContext(principal);
+    expect(resolveProfileMemoryScope(context)).toBeNull();
+    expect(personalInfoMemory.scope(context)).toBeNull();
+    expect(workstreamMemory.scope(context)).toBeNull();
+    expect(
+      await personalInfoMemory.provider.tools(memoryToolsContext(principal))
+    ).toBeNull();
+    expect(
+      await workstreamMemory.provider.tools(memoryToolsContext(principal))
+    ).toBeNull();
+  });
   it.each(["a2a", "matrix"])(
     "omits personal memory before resolving a %s shared principal",
     async (authenticator) => {

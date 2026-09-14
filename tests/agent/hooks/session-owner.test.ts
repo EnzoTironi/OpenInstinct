@@ -58,6 +58,37 @@ beforeEach(() => {
 });
 
 describe("session ownership hook", () => {
+  it("keeps native group history out of the sender's private chat list", async () => {
+    await sessionOwner.events?.["message.received"]?.(
+      {
+        data: { message: "group hello", sequence: 0, turnId: "turn-1" },
+        meta: { at: "2026-09-14T00:00:00.000Z", id: "group-event-1" },
+        type: "message.received",
+      },
+      {
+        ...context,
+        channel: { kind: "channel:telegram" },
+        session: {
+          ...context.session,
+          auth: {
+            ...context.session.auth,
+            initiator: {
+              ...context.session.auth.initiator,
+              authenticator: "verified-channel",
+              attributes: {
+                workspaceId: scope.workspaceId,
+                chatKind: "group",
+                conversationScope: "group:telegram:bot:-1001",
+              },
+            },
+          },
+        },
+      }
+    );
+    expect(mocks.ensureScope).not.toHaveBeenCalled();
+    expect(mocks.claimSession).not.toHaveBeenCalled();
+    expect(mocks.saveChat).not.toHaveBeenCalled();
+  });
   it("repairs ownership before indexing a received message", async () => {
     const handler = sessionOwner.events?.["message.received"];
     expect(handler).toBeDefined();

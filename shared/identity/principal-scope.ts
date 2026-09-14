@@ -22,17 +22,24 @@ class PrincipalScopeError extends Schema.TaggedError<PrincipalScopeError>()(
   { message: Schema.String }
 ) {}
 
-export function scopeFromPrincipal(
+/** Shared executions must not inherit the sender's private workspace. */
+export function isSharedPrincipal(
   input: SessionAuthContext | Extract<ConnectionPrincipal, { type: "user" }>
 ) {
-  if (
+  return (
     ("authenticator" in input && input.authenticator === "a2a") ||
-    input.attributes?.agentGrantId ||
-    input.attributes?.groupBindingId ||
+    Boolean(input.attributes?.agentGrantId) ||
+    Boolean(input.attributes?.groupBindingId) ||
     input.attributes?.chatKind === "group" ||
     (Schema.is(Schema.String)(input.attributes?.conversationScope) &&
       input.attributes.conversationScope.startsWith("group:"))
-  ) {
+  );
+}
+
+export function scopeFromPrincipal(
+  input: SessionAuthContext | Extract<ConnectionPrincipal, { type: "user" }>
+) {
+  if (isSharedPrincipal(input)) {
     throw new PrincipalScopeError({
       message:
         "Shared agent executions require an explicitly granted workspace tool.",
