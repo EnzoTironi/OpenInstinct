@@ -1,6 +1,7 @@
 # Zoen launch validation
 
-Status: local release gates passed; hosted CI and production rollout pending.
+Status: Executor ownership is merged and deployed; final native CI and channel
+journey verification remain in progress. This is not a blanket launch approval.
 Baseline: `601014ec894fb7ae482373495400cfe796c860af`.
 This ledger tracks the launch work after the verified team-agents release.
 A passing component test is not a completed user journey or a live-provider proof.
@@ -84,6 +85,29 @@ model-generated text. File and skill receipts identify the path/revision actuall
 read. Program text cannot forge an executed operation or source revision.
 
 ## Evidence and coverage
+
+Production rollout on 2026-09-13:
+
+- [Executor ownership PR #81](https://github.com/EnzoTironi/OpenInstinct/pull/81)
+  is merged. The [Alchemy deployment](https://github.com/EnzoTironi/OpenInstinct/actions/runs/34794922115)
+  passed checks, plan, deployment, isolated recovery and public health verification
+  for `5c18eaaa5da24039350e683f6da22e18242f7e86`.
+- Web, PostgreSQL, Mem0 and Matrix machines are started with immutable image
+  digests. The application role remains `zoen_app`, without superuser or public
+  schema creation rights. There are 40 application and 23 workflow migrations.
+- Telegram reauthentication completed through the actual private bot and browser.
+  The production account panel shows the free beta without a checkout action;
+  personal connections expose Google, Telegram and WhatsApp, with iMessage absent.
+- A real WhatsApp request reached the new endpoint with HTTP 200 on its first
+  delivery attempt, and the bot replied. Its initial account-link interpretation
+  incorrectly delegated to WhatsApp Web. The coordinator instructions now route
+  Zoen account authentication through Executor's native device-auth tools. The
+  complete account-link journey is still a separate, unpassed gate.
+- CI now starts the built application and native Eve server in addition to
+  compiling them. Early hosted eval attempts failed before scoring: the runner
+  needed its build port aligned, Eve's own credential file prepared, and runtime
+  queue grants applied after migrations. These failures are retained; they are
+  not counted as passing evaluations.
 
 Local validation on 2026-09-13:
 
