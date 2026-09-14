@@ -217,3 +217,53 @@ test("transient provider errors preserve bounded SDK retries and never expose re
   expect(JSON.stringify(error)).not.toContain("Private synthetic prompt");
   expect(error.requestBodyValues).toEqual({ model: "gpt-5.6-luna" });
 });
+
+test("an unauthorized response refreshes once, then rechecks workspace authorization before retrying", async () => {
+  const connection = {
+    provider: "chatgpt",
+    model: "gpt-5.6-luna",
+    revision: "refresh-proof",
+    tokens,
+  } as const;
+  mocks.credentials
+    .mockReturnValueOnce(Effect.succeed(connection))
+    .mockReturnValueOnce(Effect.succeed(connection))
+    .mockReturnValue(
+      Effect.succeed({
+        ...connection,
+        tokens: { ...tokens, accessToken: "renewed-access" },
+      })
+    );
+  const authorizations: (string | null)[] = [];
+  const fetcher = vi
+    .fn<typeof fetch>()
+    .mockImplementation(async (_input, init) => {
+      authorizations.push(new Headers(init?.headers).get("authorization"));
+      return authorizations.length === 1
+        ? new Response(null, { status: 401 })
+        : new Response(answer, {
+            headers: { "content-type": "text/event-stream" },
+          });
+    });
+  vi.stubGlobal("fetch", fetcher);
+  const selected = await Effect.runPromise(
+    workspaceModel(actor).pipe(Effect.provide(runtimeDatabase))
+  );
+  if (!selected) throw new Error("Expected model");
+  expect(
+    await streamText({
+      model: selected.model,
+      prompt: "Reply 42",
+      maxRetries: 0,
+    }).text
+  ).toBe("42");
+  expect(authorizations).toEqual([
+    "Bearer synthetic-access",
+    "Bearer renewed-access",
+  ]);
+  expect(mocks.credentials).toHaveBeenLastCalledWith(
+    actor,
+    "refresh-proof",
+    "synthetic-access"
+  );
+});

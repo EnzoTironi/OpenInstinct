@@ -211,7 +211,8 @@ export const disconnectModel = Effect.fn("model.connection.disconnect")(
 export const modelCredentials = Effect.fn("model.connection.credentials")(
   function* (
     actor: typeof WorkspaceActorSchema.Type,
-    expectedRevision?: string
+    expectedRevision?: string,
+    rejectedAccessToken?: string
   ) {
     const sql = yield* PgClient.PgClient;
     return yield* sql.withTransaction(
@@ -240,7 +241,10 @@ export const modelCredentials = Effect.fn("model.connection.credentials")(
         );
         let tokens = yield* decodeTokens(plain);
         const now = yield* DateTime.nowAsDate;
-        if (tokens.expiresAt < now.getTime() + 300_000) {
+        if (
+          tokens.expiresAt < now.getTime() + 300_000 ||
+          tokens.accessToken === rejectedAccessToken
+        ) {
           tokens = yield* refreshModelOAuth(connection.provider, tokens);
           const encrypted = yield* sealModelSecret(
             actor.workspaceId,

@@ -136,6 +136,20 @@ test("parallel workers refresh a rotating credential once; removed members lose 
           )
         ).toBe(true);
         expect(refresh).toHaveBeenCalledTimes(1);
+        const rotated = { ...tokens, accessToken: "renewed-after-rejection" };
+        refresh.mockReturnValue(Effect.succeed(rotated));
+        const retried = yield* Effect.all(
+          results.map((result) =>
+            modelCredentials(actor, result?.revision, tokens.accessToken)
+          ),
+          { concurrency: 2 }
+        );
+        expect(
+          retried.every(
+            (result) => result?.tokens.accessToken === rotated.accessToken
+          )
+        ).toBe(true);
+        expect(refresh).toHaveBeenCalledTimes(2);
         yield* sql`DELETE FROM workspace_memberships WHERE workspace_id = ${actor.workspaceId} AND user_id = ${guest.userId}`;
         expect(
           Result.isFailure(yield* modelCredentials(guest).pipe(Effect.result))

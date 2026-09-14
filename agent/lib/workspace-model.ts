@@ -64,12 +64,33 @@ export const workspaceModel = Effect.fn("model.workspace.select")(function* (
         connection.provider === "chatgpt"
           ? "https://chatgpt.com/backend-api/codex/responses"
           : "https://api.x.ai/v1/responses";
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         ...init,
         headers,
         body,
         redirect: "error",
       });
+      if (response.status === 401) {
+        await response.body?.cancel();
+        const refreshed = await serverRuntime.runPromise(
+          modelCredentials(
+            actor,
+            connection.revision,
+            current.tokens.accessToken
+          ),
+          { signal: init?.signal ?? undefined }
+        );
+        if (!refreshed) throw new ModelConnectionError({ reason: "changed" });
+        headers.set("authorization", `Bearer ${refreshed.tokens.accessToken}`);
+        if (connection.provider === "chatgpt" && refreshed.tokens.accountId)
+          headers.set("ChatGPT-Account-Id", refreshed.tokens.accountId);
+        response = await fetch(url, {
+          ...init,
+          headers,
+          body,
+          redirect: "error",
+        });
+      }
       if (!response.ok) {
         await response.body?.cancel();
         const failure = new ModelConnectionError({
