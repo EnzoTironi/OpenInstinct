@@ -229,9 +229,17 @@ A coleta ampla da beta não inclui senhas, sementes/códigos TOTP, tokens OAuth,
 
 Seguir `AGENTS.md`: Effect 4, schemas derivados, serviços existentes, browser no subagente declarado, ferramentas no Executor. Ler a documentação instalada de Eve/Next pertinente antes de alterar APIs. Reusar os componentes visuais e i18n existentes. Verificar compatibilidade por funcionalidade antes de adotar pacote do registry.
 
-No repo, com Node 24 e dependências fixadas, executar os comandos existentes:
+No repo, usar Node 24 e instalar as dependências da aplicação e da infraestrutura
+separadamente com seus lockfiles. Preparar `DATABASE_URL`,
+`DATABASE_URL_UNPOOLED` e `BETTER_AUTH_URL` para o ambiente de teste; o checkout
+novo não deve reutilizar credenciais de produção para compilar. Seguir o
+[guia de instalação](../../self-host.md) para os serviços necessários.
+
+Executar os comandos existentes:
 
 ```sh
+pnpm install --frozen-lockfile
+pnpm --dir infrastructure install --frozen-lockfile
 pnpm check
 pnpm build
 pnpm db:check
