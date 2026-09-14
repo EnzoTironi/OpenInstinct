@@ -37,7 +37,10 @@ export default defineEval({
           Schema.is(
             Schema.Struct({
               call: Schema.Struct({
-                path: Schema.Literal("playwright_execute"),
+                path: Schema.Literals([
+                  "playwright_execute",
+                  "browser_snapshot",
+                ]),
               }),
             })
           )(input) ||

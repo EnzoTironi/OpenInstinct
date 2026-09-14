@@ -17,6 +17,41 @@ const challenge = {
 };
 
 describe("shared channel authorization", () => {
+  it.each([
+    {
+      channel: "telegram" as const,
+      deepLink: "https://t.me/assistant_bot?start=proof_with-characters",
+      appHref:
+        "tg://resolve?domain=assistant_bot&amp;start=proof_with-characters",
+    },
+    {
+      channel: "kapso" as const,
+      deepLink:
+        "https://wa.me/553798136141?text=%2Fstart+proof_with-characters",
+      appHref:
+        "whatsapp://send?phone=553798136141&amp;text=%2Fstart+proof_with-characters",
+    },
+  ])(
+    "opens $channel in its app while retaining the browser challenge",
+    ({ channel, deepLink, appHref }) => {
+      const html = renderToStaticMarkup(
+        createElement(ChannelStatus, {
+          challenge: { ...challenge, channel, deepLink },
+          purpose: "link",
+          status: "pending",
+          busy: false,
+          error: undefined,
+          onContinue: () => undefined,
+          onRestart: () => undefined,
+        })
+      );
+      const appLink = /<a\b[^>]*href="(?:tg|whatsapp):[^>]*>/u.exec(html)?.[0];
+      expect(appLink).toContain(`href="${appHref}"`);
+      expect(appLink).not.toContain("target=");
+      expect(html).toContain("Use the web version");
+      expect(html).toContain(`href="${deepLink}"`);
+    }
+  );
   it("offers explicit linking actions without starting a challenge during render", () => {
     const html = renderToStaticMarkup(
       createElement(ChannelAuthForm, {
