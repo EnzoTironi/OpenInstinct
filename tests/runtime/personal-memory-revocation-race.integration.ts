@@ -8,6 +8,7 @@ import type { ToolContext } from "eve/tools";
 import { getAuth } from "../../db/services/auth";
 import { applicationOrigin } from "../../shared/environment/origin";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
+import { linkedIdentity } from "./identity-fixture";
 import { channelChallengeSchema } from "../../shared/identity/channel-auth";
 import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
@@ -65,6 +66,7 @@ for (const authority of ["channel", "web"] as const) {
         installationId,
         senderId: randomUUID(),
       };
+      await serverRuntime.runPromise(linkedIdentity(sender));
       await serverRuntime.runPromise(
         accounts.confirmChallenge({ token, sender })
       );

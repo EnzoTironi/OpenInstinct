@@ -16,6 +16,7 @@ import {
 } from "../../server/channel-auth/prompts.ts";
 
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const rejected = <A>(
   operation: Effect.Effect<
@@ -64,6 +65,7 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
         installationId,
         browserSecret: randomBytes(32).toString("base64url"),
       });
+      const owner = yield* linkedIdentity(sender);
       try {
         const unavailableKey = yield* issue;
         const unavailableLive = ChannelAuthPrompts.layer.pipe(
@@ -119,9 +121,6 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
           count: number;
         }>`SELECT count(*)::int AS count FROM public."user"`;
         assert.equal(afterUsers[0]?.count, beforeUsers[0]?.count);
-        const identities =
-          yield* sql`SELECT id FROM public.channel_identity WHERE installation_id = ${installationId}`;
-        assert.equal(identities.length, 0);
         const encrypted = yield* sql<{
           tokenCiphertext: string;
           count: number;
@@ -329,6 +328,8 @@ test("encrypted confirmation outbox is idempotent, fenced and never retries unce
       } finally {
         yield* sql`DELETE FROM public.channel_auth_prompt WHERE installation_id = ${installationId}`;
         yield* sql`DELETE FROM public.channel_auth_challenge WHERE installation_id = ${installationId}`;
+        yield* sql`DELETE FROM workspaces WHERE id = ${accessScopeForUser(`better-auth:${owner.userId}`).workspaceId}`;
+        yield* sql`DELETE FROM public."user" WHERE id = ${owner.userId}`;
       }
     }).pipe(Effect.provide(live))
   );
@@ -357,7 +358,7 @@ test("prompt preparation delegates revoked link rejection to account preview", a
         installationId,
         senderId: "revoked-sender",
       };
-      const owner = yield* accounts.resolveVerifiedSender(sender);
+      const owner = yield* linkedIdentity(sender);
       try {
         yield* sql`INSERT INTO public.channel_identity (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)
         VALUES (${randomUUID()}, 'telegram', ${installationId}, 'backup', ${owner.userId}, clock_timestamp(), clock_timestamp(), clock_timestamp())`;

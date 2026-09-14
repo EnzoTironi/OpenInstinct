@@ -12,6 +12,7 @@ import { Kapso } from "../../server/channels/kapso";
 import { loadChannelContent } from "../../server/channels/media/content";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const infrastructure = Layer.mergeAll(
   ChannelAccounts.layer,
@@ -27,7 +28,7 @@ const input = Effect.fn("artifacts.intakeFixture")(function* (
   bytes: Uint8Array
 ) {
   const sql = yield* PgClient.PgClient;
-  const owner = yield* (yield* ChannelAccounts).resolveVerifiedSender({
+  const owner = yield* linkedIdentity({
     channel: "telegram",
     installationId: "artifact-no-provider",
     senderId: randomUUID(),

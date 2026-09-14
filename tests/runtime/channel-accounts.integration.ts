@@ -18,6 +18,7 @@ import {
   ChannelAccountError,
 } from "../../server/accounts/index.ts";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const secret = () => randomBytes(32).toString("base64url");
 
@@ -52,33 +53,12 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.resolveVerifiedSender({ ...sender, senderId: " 12345" }),
           "invalid_input"
         );
-        const beforeUsers = yield* sql<{
-          id: string;
-        }>`SELECT id FROM public."user"`;
-        const results = yield* Effect.all(
-          Array.from({ length: 12 }, () =>
-            accounts.resolveVerifiedSender(sender)
-          ),
-          { concurrency: "unbounded" }
-        );
-        const first = results[0];
-        assert.ok(first);
+        const first = yield* linkedIdentity(sender);
         userIds.add(first.userId);
-        assert.equal(new Set(results.map((identity) => identity.id)).size, 1);
-        const created = yield* sql<{
-          count: number;
-        }>`SELECT count(*)::int AS count FROM public.channel_identity WHERE installation_id = ${installationId}`;
-        assert.equal(created[0]?.count, 1);
-        const afterUsers = yield* sql<{
-          id: string;
-        }>`SELECT id FROM public."user"`;
-        const previousIds = new Set(beforeUsers.map((user) => user.id));
-        const newIds = afterUsers.filter((user) => !previousIds.has(user.id));
-        for (const user of newIds) userIds.add(user.id);
-        assert.deepEqual(
-          newIds.map((user) => user.id),
-          [first.userId]
-        );
+        assert.deepEqual(yield* accounts.resolveVerifiedSender(sender), {
+          status: "linked",
+          identity: first,
+        });
         const browserSecret = secret();
         const challenge = yield* accounts.issueChallenge({
           purpose: "login" as const,
@@ -87,9 +67,16 @@ test("channel identities, browser binding, races and revocation against migrated
           browserSecret,
         });
         const previewSender = { ...sender, senderId: "preview-only" };
+        yield* rejected(
+          accounts.previewChallenge({
+            token: challenge.token,
+            sender: previewSender,
+          }),
+          "sender_unlinked"
+        );
         const preview = yield* accounts.previewChallenge({
           token: challenge.token,
-          sender: previewSender,
+          sender,
         });
         assert.deepEqual(preview, {
           id: challenge.challengeId,
@@ -167,8 +154,15 @@ test("channel identities, browser binding, races and revocation against migrated
           "invalid_challenge"
         );
         yield* accounts.confirmChallenge({ token: challenge.token, sender });
+        assert.deepEqual(
+          yield* accounts.confirmChallenge({ token: challenge.token, sender }),
+          { challengeId: challenge.challengeId }
+        );
         yield* rejected(
-          accounts.confirmChallenge({ token: challenge.token, sender }),
+          accounts.confirmChallenge({
+            token: challenge.token,
+            sender: { ...sender, senderId: "67890" },
+          }),
           "invalid_challenge"
         );
         yield* rejected(
@@ -230,10 +224,7 @@ test("channel identities, browser binding, races and revocation against migrated
           }),
           "last_access"
         );
-        const other = yield* accounts.resolveVerifiedSender({
-          ...sender,
-          senderId: "67890",
-        });
+        const other = yield* linkedIdentity({ ...sender, senderId: "67890" });
         userIds.add(other.userId);
         yield* rejected(
           accounts.revokeIdentity({
@@ -403,38 +394,11 @@ test("channel identities, browser binding, races and revocation against migrated
           accounts.getActiveIdentity(staleSender),
           "identity_inactive"
         );
-        const newLoginSender = {
+        const unlinkedSender = {
           ...sender,
-          senderId: "new-login-at-consumption",
+          senderId: "unlinked-login-proof",
         };
-        const newLogin = yield* accounts.issueChallenge({
-          purpose: "login" as const,
-          channel: "telegram",
-          installationId,
-          browserSecret,
-        });
-        yield* accounts.confirmChallenge({
-          token: newLogin.token,
-          sender: newLoginSender,
-        });
-        yield* rejected(
-          accounts.getActiveIdentity(newLoginSender),
-          "identity_inactive"
-        );
-        const activatedLogin = yield* accounts.consumeChallenge({
-          challengeId: newLogin.challengeId,
-          browserSecret,
-        });
-        userIds.add(activatedLogin.userId);
-        assert.equal(
-          (yield* accounts.getActiveIdentity(newLoginSender)).userId,
-          activatedLogin.userId
-        );
-        const abandonedSender = {
-          ...sender,
-          senderId: "abandoned-login-proof",
-        };
-        const abandoned = yield* accounts.issueChallenge({
+        const unlinkedLogin = yield* accounts.issueChallenge({
           purpose: "login" as const,
           channel: "telegram",
           installationId,
@@ -443,40 +407,34 @@ test("channel identities, browser binding, races and revocation against migrated
         const beforeProofUsers = yield* sql<{
           count: number;
         }>`SELECT count(*)::int AS count FROM public."user"`;
-        yield* accounts.confirmChallenge({
-          token: abandoned.token,
-          sender: abandonedSender,
-        });
         yield* rejected(
-          accounts.getActiveIdentity(abandonedSender),
+          accounts.confirmChallenge({
+            token: unlinkedLogin.token,
+            sender: unlinkedSender,
+          }),
+          "sender_unlinked"
+        );
+        yield* rejected(
+          accounts.getActiveIdentity(unlinkedSender),
           "identity_inactive"
         );
         const afterProofUsers = yield* sql<{
           count: number;
         }>`SELECT count(*)::int AS count FROM public."user"`;
         assert.equal(afterProofUsers[0]?.count, beforeProofUsers[0]?.count);
-        yield* rejected(
-          accounts.consumeChallenge({
-            challengeId: abandoned.challengeId,
-            browserSecret: secret(),
+        assert.deepEqual(
+          yield* accounts.getChallengeStatus({
+            challengeId: unlinkedLogin.challengeId,
+            browserSecret,
           }),
-          "invalid_challenge"
+          { status: "pending" }
         );
-        yield* rejected(
-          accounts.getActiveIdentity(abandonedSender),
-          "identity_inactive"
-        );
-        yield* sql`UPDATE public.channel_auth_challenge SET created_at = clock_timestamp() - interval '6 minutes', expires_at = clock_timestamp() - interval '1 second' WHERE id = ${abandoned.challengeId}`;
         yield* rejected(
           accounts.consumeChallenge({
-            challengeId: abandoned.challengeId,
+            challengeId: unlinkedLogin.challengeId,
             browserSecret,
           }),
           "invalid_challenge"
-        );
-        yield* rejected(
-          accounts.getActiveIdentity(abandonedSender),
-          "identity_inactive"
         );
         const expiring = yield* accounts.issueChallenge({
           purpose: "login" as const,
@@ -613,8 +571,9 @@ test("session issuance serializes with revocation across real PostgreSQL connect
         const sender = {
           channel: "telegram" as const,
           installationId,
-          senderId: "first-contact",
+          senderId: "linked-sender",
         };
+        yield* linkedIdentity(sender);
         yield* accounts.confirmChallenge({ token: challenge.token, sender });
         const owner = yield* accounts.consumeChallenge({
           challengeId: challenge.challengeId,

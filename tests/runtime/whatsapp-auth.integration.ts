@@ -8,6 +8,7 @@ import { privateChannel } from "../../agent/lib/private-channel";
 import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
+import { linkedIdentity } from "./identity-fixture";
 
 test("signed WhatsApp button confirms only its recipient and original browser without running the agent", async () => {
   const installationId = String(randomInt(100_000_000, 999_999_999));
@@ -62,7 +63,7 @@ test("signed WhatsApp button confirms only its recipient and original browser wi
       }>`SELECT current_database() AS name`;
       assert.equal(database?.name, "companion_runtime_test");
       const accounts = yield* ChannelAccounts;
-      const identity = yield* accounts.resolveVerifiedSender(sender);
+      const identity = yield* linkedIdentity(sender);
       const challenge = yield* accounts.issueChallenge({
         ...sender,
         purpose: "login",

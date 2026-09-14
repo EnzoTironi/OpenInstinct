@@ -5,6 +5,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -51,6 +52,42 @@ export const channelIdentities = pgTable(
     check(
       "channel_identity_address_check",
       sql`length(trim(${table.installationId})) > 0 AND length(trim(${table.senderId})) > 0`
+    ),
+  ]
+);
+
+export const channelPendingSenders = pgTable(
+  "channel_pending_sender",
+  {
+    channel: text("channel").notNull(),
+    installationId: text("installation_id").notNull(),
+    senderId: text("sender_id").notNull(),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    contactCount: integer("contact_count").default(1).notNull(),
+    promptedAt: timestamp("prompted_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({
+      name: "channel_pending_sender_pkey",
+      columns: [table.channel, table.installationId, table.senderId],
+    }),
+    check(
+      "channel_pending_sender_channel_check",
+      sql`${table.channel} IN ('telegram', 'kapso')`
+    ),
+    check(
+      "channel_pending_sender_address_check",
+      sql`length(trim(${table.installationId})) > 0 AND length(trim(${table.senderId})) > 0`
+    ),
+    check("channel_pending_sender_count_check", sql`${table.contactCount} > 0`),
+    check(
+      "channel_pending_sender_seen_check",
+      sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.promptedAt} IS NULL OR ${table.promptedAt} >= ${table.firstSeenAt})`
     ),
   ]
 );

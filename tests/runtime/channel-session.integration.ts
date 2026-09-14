@@ -12,6 +12,7 @@ import {
   requireChannelPrincipal,
 } from "../../server/channels/principal";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 
 const infrastructure = Layer.mergeAll(
@@ -25,9 +26,8 @@ const live = ChannelTransport.layer.pipe(Layer.provideMerge(infrastructure));
 test("channel callbacks require the current identity, owner, workspace and conversation", () =>
   Effect.runPromise(
     Effect.gen(function* () {
-      const accounts = yield* ChannelAccounts;
       const sql = yield* PgClient.PgClient;
-      const identity = yield* accounts.resolveVerifiedSender({
+      const identity = yield* linkedIdentity({
         channel: "telegram",
         installationId: randomUUID(),
         senderId: "918273",

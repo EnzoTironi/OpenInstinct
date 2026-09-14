@@ -7,7 +7,6 @@ import {
   type channelChallengeStatusSchema,
 } from "../../shared/identity/channel-auth.ts";
 import { accessScopeForUser } from "../../shared/identity/access-scope.ts";
-import { env } from "@shared/environment/env";
 import { ChannelAccountError } from "./errors";
 import { archiveChannelAccount } from "./archive-transfer";
 export { ChannelAccountError } from "./errors";
@@ -65,6 +64,12 @@ export const IdentitySchema = Schema.Struct({
   ...VerifiedSender.fields,
 });
 export type Identity = typeof IdentitySchema.Type;
+const SenderResolutionSchema = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("linked"), identity: IdentitySchema }),
+  Schema.Struct({ status: Schema.Literal("unlinked"), sender: VerifiedSender }),
+]);
+type SenderResolution = typeof SenderResolutionSchema.Type;
+const UnlinkedContact = Schema.Struct({ prompt: Schema.Boolean });
 const IdentityRow = Schema.Struct({
   ...IdentitySchema.fields,
   revoked: Schema.Boolean,
@@ -103,7 +108,10 @@ interface Accounts {
   ) => Effect.Effect<void, Failure>;
   readonly resolveVerifiedSender: (
     input: typeof VerifiedSender.Type
-  ) => Effect.Effect<Identity, Failure>;
+  ) => Effect.Effect<SenderResolution, Failure>;
+  readonly recordUnlinkedContact: (
+    input: typeof VerifiedSender.Type
+  ) => Effect.Effect<typeof UnlinkedContact.Type, Failure>;
   readonly getActiveIdentity: (
     input: typeof VerifiedSender.Type
   ) => Effect.Effect<Identity, Failure>;
@@ -148,11 +156,12 @@ const publicIdentity = ({
   installationId,
   senderId,
 }: Identity): Identity => ({ id, userId, channel, installationId, senderId });
-const registrationAllowed = (sender: typeof VerifiedSender.Type) =>
-  env.ZOEN_REGISTRATION_MODE === "open" ||
-  env.ZOEN_BETA_IDENTITIES.includes(`${sender.channel}:${sender.senderId}`);
 
-/** Transport verification and explicit channel confirmation belong to the caller. */
+/**
+ * Transport verification and explicit channel confirmation belong to the caller.
+ * Google sign-in creates the user; a messenger only becomes usable through a
+ * consumed link challenge. First contact never creates a user or a workspace.
+ */
 export class ChannelAccounts extends Context.Service<
   ChannelAccounts,
   Accounts
@@ -162,7 +171,7 @@ export class ChannelAccounts extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient;
       // All account lifecycle writers take this lock. Short DB-only transactions
-      // serialize revocation against confirmation/consumption, including first contact.
+      // serialize revocation against confirmation, consumption and pending-sender bookkeeping.
       const transaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         sql.withTransaction(
           Effect.gen(function* () {
@@ -200,41 +209,72 @@ export class ChannelAccounts extends Context.Service<
           requireSession(request.userId, request.sessionId, true)
         );
       });
-      const provision = Effect.fn("ChannelAccounts.provision")(function* (
+      const linkIdentity = Effect.fn("ChannelAccounts.linkIdentity")(function* (
         sender: typeof VerifiedSender.Type,
-        targetUserId?: string
+        userId: string
       ) {
         const existing = yield* findIdentity(sender);
         if (existing?.revoked) return yield* fail("identity_inactive");
         if (existing) {
-          if (targetUserId && targetUserId !== existing.userId)
+          if (existing.userId !== userId)
             return yield* fail("account_conflict");
           return publicIdentity(existing);
-        }
-        const userId = targetUserId ?? randomUUID();
-        if (!targetUserId) {
-          if (!registrationAllowed(sender))
-            return yield* fail("registration_closed");
-          yield* sql`INSERT INTO public."user"
-        (id, name, email, "emailVerified", "createdAt", "updatedAt")
-        VALUES (${userId}, 'Companion user', ${`${userId}@accounts.invalid`}, false, clock_timestamp(), clock_timestamp())`;
-          const scope = accessScopeForUser(`better-auth:${userId}`);
-          yield* sql`INSERT INTO workspaces (id) VALUES (${scope.workspaceId})`;
-          yield* sql`INSERT INTO workspace_memberships (workspace_id, user_id, role)
-            VALUES (${scope.workspaceId}, ${scope.userId}, 'owner')`;
         }
         const id = randomUUID();
         yield* sql`INSERT INTO public.channel_identity
         (id, channel, installation_id, sender_id, user_id, verified_at, created_at, updated_at)
         VALUES (${id}, ${sender.channel}, ${sender.installationId}, ${sender.senderId}, ${userId},
           clock_timestamp(), clock_timestamp(), clock_timestamp())`;
+        yield* sql`DELETE FROM public.channel_pending_sender WHERE channel = ${sender.channel}
+        AND installation_id = ${sender.installationId} AND sender_id = ${sender.senderId}`;
         return { id, userId, ...sender };
+      });
+      const requireLinkedIdentity = Effect.fn(
+        "ChannelAccounts.requireLinkedIdentity"
+      )(function* (sender: typeof VerifiedSender.Type) {
+        const existing = yield* findIdentity(sender);
+        if (!existing) return yield* fail("sender_unlinked");
+        if (existing.revoked) return yield* fail("identity_inactive");
+        return publicIdentity(existing);
       });
       const resolveVerifiedSender = Effect.fn(
         "ChannelAccounts.resolveVerifiedSender"
       )(function* (input: typeof VerifiedSender.Type) {
         const sender = yield* decode(VerifiedSender, input);
-        return yield* transaction(provision(sender));
+        const existing = yield* findIdentity(sender);
+        if (existing?.revoked) return yield* fail("identity_inactive");
+        if (existing)
+          return {
+            status: "linked" as const,
+            identity: publicIdentity(existing),
+          };
+        return { status: "unlinked" as const, sender };
+      });
+      const recordUnlinkedContact = Effect.fn(
+        "ChannelAccounts.recordUnlinkedContact"
+      )(function* (input: typeof VerifiedSender.Type) {
+        const sender = yield* decode(VerifiedSender, input);
+        return yield* transaction(
+          Effect.gen(function* () {
+            // now() is transaction-stable, so the RETURNING comparison is exact.
+            const rows = yield* sql<typeof UnlinkedContact.Type>`
+              INSERT INTO public.channel_pending_sender
+                (channel, installation_id, sender_id, first_seen_at, last_seen_at, contact_count, prompted_at)
+              SELECT ${sender.channel}, ${sender.installationId}, ${sender.senderId}, now(), now(), 1, now()
+              WHERE NOT EXISTS (SELECT 1 FROM public.channel_identity WHERE channel = ${sender.channel}
+                AND installation_id = ${sender.installationId} AND sender_id = ${sender.senderId})
+              ON CONFLICT (channel, installation_id, sender_id) DO UPDATE SET
+                last_seen_at = now(),
+                contact_count = public.channel_pending_sender.contact_count + 1,
+                prompted_at = CASE WHEN public.channel_pending_sender.prompted_at IS NULL
+                  OR public.channel_pending_sender.prompted_at <= now() - interval '24 hours' THEN now()
+                  ELSE public.channel_pending_sender.prompted_at END
+              RETURNING (prompted_at = now()) AS prompt`;
+            const contact = rows[0];
+            if (!contact) return { prompt: false };
+            return yield* decode(UnlinkedContact, contact);
+          })
+        );
       });
       const getActiveIdentity = Effect.fn("ChannelAccounts.getActiveIdentity")(
         function* (input: typeof VerifiedSender.Type) {
@@ -298,12 +338,8 @@ export class ChannelAccounts extends Context.Service<
               if (!preview) return yield* fail("invalid_challenge");
               const existing = yield* findIdentity(request.sender);
               if (existing?.revoked) return yield* fail("identity_inactive");
-              if (
-                !existing &&
-                !preview.targetUserId &&
-                !registrationAllowed(request.sender)
-              )
-                return yield* fail("registration_closed");
+              if (preview.purpose === "login" && !existing)
+                return yield* fail("sender_unlinked");
               if (preview.purpose === "link") {
                 if (!preview.targetUserId || !preview.requestingSessionId)
                   return yield* fail("invalid_challenge");
@@ -335,7 +371,7 @@ export class ChannelAccounts extends Context.Service<
           target_user_id AS "targetUserId", source_user_id AS "sourceUserId", requesting_session_id AS "requestingSessionId", identity_id AS "identityId", confirmed_sender_id AS "confirmedSenderId"
           FROM public.channel_auth_challenge WHERE token_hash = ${hash(request.token)}
           AND intended_identity_id IS NULL
-          AND consumed_at IS NULL AND cancelled_at IS NULL AND confirmed_at IS NULL
+          AND consumed_at IS NULL AND cancelled_at IS NULL
           AND expires_at > clock_timestamp() FOR UPDATE`;
               const challenge = rows[0];
               if (
@@ -344,6 +380,11 @@ export class ChannelAccounts extends Context.Service<
                 challenge.installationId !== request.sender.installationId
               )
                 return yield* fail("invalid_challenge");
+              if (challenge.confirmedSenderId) {
+                if (challenge.confirmedSenderId !== request.sender.senderId)
+                  return yield* fail("invalid_challenge");
+                return { challengeId: challenge.id };
+              }
               const prompts = yield* sql<{ senderId: string }>`
                 SELECT sender_id AS "senderId" FROM public.channel_auth_prompt
                 WHERE challenge_id = ${challenge.id}`;
@@ -365,12 +406,8 @@ export class ChannelAccounts extends Context.Service<
                 existing.userId !== challenge.targetUserId
               )
                 return yield* fail("account_conflict");
-              if (
-                !existing &&
-                !challenge.targetUserId &&
-                !registrationAllowed(request.sender)
-              )
-                return yield* fail("registration_closed");
+              if (challenge.purpose === "login" && !existing)
+                return yield* fail("sender_unlinked");
               yield* sql`UPDATE public.channel_auth_challenge
                 SET confirmed_sender_id = ${request.sender.senderId}, confirmed_at = clock_timestamp()
                 WHERE id = ${challenge.id}`;
@@ -411,39 +448,42 @@ export class ChannelAccounts extends Context.Service<
               const challenge = rows[0];
               if (!challenge?.confirmedSenderId)
                 return yield* fail("invalid_challenge");
-              if (challenge.purpose === "link") {
-                if (
-                  !challenge.targetUserId ||
-                  !challenge.requestingSessionId ||
-                  challenge.requestingSessionId !== request.currentSessionId
-                )
-                  return yield* fail("session_invalid");
-                yield* requireSession(
-                  challenge.targetUserId,
-                  challenge.requestingSessionId,
-                  true
-                );
-              }
-              if (challenge.sourceUserId && challenge.targetUserId) {
-                yield* archiveChannelAccount({
-                  sourceUserId: challenge.sourceUserId,
-                  targetUserId: challenge.targetUserId,
-                  challengeId: challenge.id,
-                  sender: {
-                    channel: challenge.channel,
-                    installationId: challenge.installationId,
-                    senderId: challenge.confirmedSenderId,
-                  },
-                }).pipe(Effect.provideService(PgClient.PgClient, sql));
-              }
-              const identity = yield* provision(
-                {
-                  channel: challenge.channel,
-                  installationId: challenge.installationId,
-                  senderId: challenge.confirmedSenderId,
-                },
-                challenge.targetUserId ?? undefined
-              );
+              const sender = {
+                channel: challenge.channel,
+                installationId: challenge.installationId,
+                senderId: challenge.confirmedSenderId,
+              };
+              const identity = yield* Effect.gen(function* () {
+                switch (challenge.purpose) {
+                  case "link": {
+                    if (
+                      !challenge.targetUserId ||
+                      !challenge.requestingSessionId ||
+                      challenge.requestingSessionId !== request.currentSessionId
+                    )
+                      return yield* fail("session_invalid");
+                    yield* requireSession(
+                      challenge.targetUserId,
+                      challenge.requestingSessionId,
+                      true
+                    );
+                    if (challenge.sourceUserId)
+                      yield* archiveChannelAccount({
+                        sourceUserId: challenge.sourceUserId,
+                        targetUserId: challenge.targetUserId,
+                        challengeId: challenge.id,
+                        sender,
+                      }).pipe(Effect.provideService(PgClient.PgClient, sql));
+                    return yield* linkIdentity(sender, challenge.targetUserId);
+                  }
+                  case "login":
+                    return yield* requireLinkedIdentity(sender);
+                  default: {
+                    const purpose: never = challenge.purpose;
+                    return purpose;
+                  }
+                }
+              });
               yield* sql`UPDATE public.channel_auth_challenge SET identity_id = CASE WHEN source_user_id IS NULL THEN ${identity.id} ELSE intended_identity_id END,
                 consumed_at = clock_timestamp() WHERE id = ${challenge.id}`;
               const principalId = `better-auth:${identity.userId}`;
@@ -513,6 +553,7 @@ export class ChannelAccounts extends Context.Service<
       return ChannelAccounts.of({
         requireFreshSession,
         resolveVerifiedSender,
+        recordUnlinkedContact,
         getActiveIdentity,
         issueChallenge,
         confirmChallenge,

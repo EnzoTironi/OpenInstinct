@@ -3,7 +3,6 @@ import { PgClient } from "@effect/sql-pg";
 import { Effect } from "effect";
 import type { ToolContext } from "eve/tools";
 import { expect, test } from "vitest";
-import { ChannelAccounts } from "../../server/accounts";
 import { channelPrincipal } from "../../server/channels/principal";
 import {
   confirmEmail,
@@ -18,12 +17,12 @@ import {
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 test("the PostgreSQL bridge checks the native owner, exact confirmation and revocation", async () => {
   await Effect.runPromise(Effect.void.pipe(Effect.provide(runtimeDatabase)));
-  const accounts = await serverRuntime.runPromise(ChannelAccounts);
   const identity = await serverRuntime.runPromise(
-    accounts.resolveVerifiedSender({
+    linkedIdentity({
       channel: "telegram",
       installationId: randomUUID(),
       senderId: randomUUID(),
