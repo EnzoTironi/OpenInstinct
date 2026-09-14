@@ -92,7 +92,7 @@ installation's deployment toolchain.
 
 ```sh
 pnpm check --concurrency=1
-pnpm db:check
+node --env-file=.env.local --run db:check
 pnpm audit
 pnpm --dir infrastructure audit
 ```

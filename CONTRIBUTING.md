@@ -20,7 +20,8 @@ permissions, provider verification or native approval controls.
 ## Before opening a pull request
 
 1. Make one coherent change with a clear problem and resulting behavior.
-2. Run `pnpm check --concurrency=1`, `pnpm db:check` and relevant build/runtime
+2. Run `pnpm check --concurrency=1`,
+   `node --env-file=.env.local --run db:check` and relevant build/runtime
    checks. Runtime tests require `companion_runtime_test`; never use production.
 3. Cover changed permissions, durable state or failures with regression tests.
    Distinguish fixture results from live-provider evidence.
