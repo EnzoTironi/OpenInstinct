@@ -6,5 +6,11 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: false
   workerd: false
+overrides:
+  # Keep Alchemy's embedded provider tools on patched releases in their existing majors.
+  "hono@<4.13.5": 4.13.5
+  "@hono/node-server@<1.19.15": 1.19.15
+  "lodash@<4.18.1": 4.18.1
+  "valibot@>=1.0.0 <1.4.2": 1.4.2
 patchedDependencies:
   alchemy@2.0.0-beta.76: patches/alchemy@2.0.0-beta.76.patch

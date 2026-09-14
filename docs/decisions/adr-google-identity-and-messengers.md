@@ -75,6 +75,9 @@ starts at Google sign-in before directing the person to Connections.
 - The existing Telegram webhook, browser-cookie, prompt lease and account-lifecycle
   suites remain part of the runtime validation.
 
-These are integration proofs, not a recording of a new customer using Google,
-Telegram or WhatsApp. A live recording and the current provider's WhatsApp group
-enablement remain separate release requirements.
+These are integration proofs, not a new customer's complete live journey.
+Existing-account Google and WhatsApp sign-in have subsequently been verified in
+production; see the [current launch ledger](zoen-launch-validation.md). The owner
+cancelled the recording requirement. Functional real-provider qualification is
+still required. Ordinary WhatsApp groups remain unavailable with the current
+provider configuration; they must not be advertised as enabled.

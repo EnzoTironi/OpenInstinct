@@ -60,23 +60,7 @@ export function ChannelStatus({
                     )}
             </p>
             {"deepLink" in challenge ? (
-              <Button
-                className="mt-4 w-full"
-                nativeButton={false}
-                render={
-                  <a
-                    aria-label={t("Abrir {messenger} para confirmar", {
-                      messenger,
-                    })}
-                    href={challenge.deepLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    referrerPolicy="no-referrer"
-                  />
-                }
-              >
-                {t("Open")} {messenger}
-              </Button>
+              <ChannelLaunch challenge={challenge} />
             ) : null}
             <p className="mt-3 type-caption text-muted-foreground">
               {t("Waiting for your confirmation. This request expires at")}{" "}
@@ -153,6 +137,50 @@ export function ChannelStatus({
       <p className="type-caption text-muted-foreground">
         {t("Keep this tab open until the request is complete.")}
       </p>
+    </div>
+  );
+}
+
+function ChannelLaunch({
+  challenge,
+}: {
+  readonly challenge: typeof channelChallengeSchema.Type;
+}) {
+  const { t } = useI18n();
+  const telegram = challenge.channel === "telegram";
+  const messenger = telegram ? "Telegram" : "WhatsApp";
+  // The challenge schema has already verified the channel's HTTPS host.
+  const web = new URL(challenge.deepLink);
+  const app = new URL(telegram ? "tg://resolve" : "whatsapp://send");
+  app.searchParams.set(telegram ? "domain" : "phone", web.pathname.slice(1));
+  const parameter = telegram ? "start" : "text";
+  const value = web.searchParams.get(parameter);
+  if (value !== null) app.searchParams.set(parameter, value);
+
+  return (
+    <div className="mt-4 space-y-3 text-center">
+      <Button
+        className="w-full"
+        nativeButton={false}
+        render={
+          <a
+            aria-label={t("Abrir {messenger} para confirmar", { messenger })}
+            href={app.href}
+            referrerPolicy="no-referrer"
+          />
+        }
+      >
+        {t("Open")} {messenger}
+      </Button>
+      <a
+        className="type-caption text-muted-foreground underline underline-offset-4"
+        href={challenge.deepLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        referrerPolicy="no-referrer"
+      >
+        {t("Usar a versão web")}
+      </a>
     </div>
   );
 }

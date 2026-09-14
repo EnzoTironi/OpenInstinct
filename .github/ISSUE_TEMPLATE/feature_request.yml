@@ -1,0 +1,23 @@
+name: Feature proposal
+description: Suggest an improvement with a clear user need.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to accomplish?
+      description: Describe who needs this and what currently gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: Describe the experience and relevant account or workspace boundaries.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and references
+      description: Public references or approaches you considered. No private data.

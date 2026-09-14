@@ -1,14 +1,77 @@
 # Zoen launch validation
 
-Status: guarded messenger recovery is merged and its hosted checks passed. The
-isolated account/team journeys pass in all three languages. A live Google pilot
-found two additional activation/sharing defects, now covered by regression tests.
-Native browser evaluation is blocked by provider credits; production promotion
-and the complete live messenger recovery journey remain release gates.
+Status (2026-09-14): the Google-first onboarding release is deployed. Existing
+Google and WhatsApp accounts have completed real sign-in, and a WhatsApp reply is
+visible in both the native app and web history. Telegram group isolation fixes
+are merged; their production promotion and a real group reply remain pending.
+Explicit consolidation of the separate pilot accounts is not yet qualified.
 This ledger is evidence, not launch approval.
-Baseline: `601014ec894fb7ae482373495400cfe796c860af`.
+Deployed baseline: `94b1f1e117ea7e3d49d1ff923097bd0883d2d8aa`.
 This ledger tracks the launch work after the verified team-agents release.
 A passing component test is not a completed user journey or a live-provider proof.
+
+## Current functional qualification
+
+- [Onboarding PR #96](https://github.com/EnzoTironi/tryzoen/pull/96) passed
+  [main checks](https://github.com/EnzoTironi/tryzoen/actions/runs/34873440706),
+  [15/15 native scenarios](https://github.com/EnzoTironi/tryzoen/actions/runs/34873442312)
+  and [Alchemy deployment](https://github.com/EnzoTironi/tryzoen/actions/runs/34874759715),
+  including isolated PostgreSQL recovery and live health verification.
+- Actual Google sign-in requested only OpenID, email and profile. It returned to
+  the existing pilot account with its personal/team spaces and linked Telegram
+  identity intact. This proves an existing-account round trip, not a new invitee's
+  full onboarding or new Gmail/Calendar consent.
+- Actual WhatsApp login delivered an interactive confirmation, consumed it in
+  the originating browser and opened the existing account. A later ordinary
+  message received an agent reply visible in WhatsApp and the web history. The
+  provider's registered phone number is valid; no number or database was reset.
+- The pilot's Google/Telegram account and legacy WhatsApp account are separate.
+  A normal link challenge correctly refuses this conflict. The browser currently
+  waits until expiry while the native chat reports refusal; this is not a passed
+  recovery journey. Consolidation still requires the explicit archive flow.
+- An old native approval interrupted the legacy WhatsApp conversation. Ordinary
+  replies continued, but an explicit cancellation exposed a routing defect:
+  `/internal/channel-input/respond` returned a browser sign-in redirect instead
+  of reaching the signed Eve endpoint. The callback now has an exact proxy
+  exception and a rewrite to Eve; the signature, recipient, current-turn and
+  delivered-proposal checks remain unchanged. Unit tests protect the exact path
+  and CI checks that the built app returns 401 for an unsigned callback. Actual
+  cancellation and subsequent tool use must still be proved after deployment.
+- [Group PR #97](https://github.com/EnzoTironi/tryzoen/pull/97) is merged at
+  `b8e121d340e1009f10471b760a2cba253e9b9996`; its
+  [main checks](https://github.com/EnzoTironi/tryzoen/actions/runs/34880079345) passed.
+  Five live-model group replies passed through real signed webhook, Eve and
+  PostgreSQL paths with only outbound Telegram HTTP replaced. Two senders share
+  group context; private DM and other-group canaries remain isolated. Unmentioned
+  and revoked messages are rejected or ignored. This is a provider fixture, not
+  actual Telegram delivery.
+- The [group native evaluation](https://github.com/EnzoTironi/tryzoen/actions/runs/34880453682)
+  passed 14/15 cases. Its browser inspection succeeded through `browser_snapshot`,
+  but the assertion recognized only the older DOM tool or a screenshot. The
+  matcher now includes the current DOM snapshot tool; every other outcome and
+  authorization assertion is retained. A new exact-commit run must pass before
+  deployment; this failed run is not reclassified as a pass.
+- Messenger launch buttons now use native application links, preserving the exact
+  challenge token, with a separate HTTPS web fallback. Rendering tests cover both
+  messengers. Automated browser policy prevented native-scheme navigation, so
+  those tests do not claim a successful OS handoff.
+- The owner cancelled the recording requirement. Functional provider evidence
+  remains required. WhatsApp ordinary groups are not supported by the current
+  Kapso Cloud API configuration; no WhatsApp Web bridge is deployed.
+- Fresh dependency audits initially found four application production advisories
+  and additional development/infrastructure advisories. Patched parser releases
+  and compatible infrastructure dependency overrides remove the reported issues;
+  the unused Vercel CLI and its dependency tree were removed. Both full dependency
+  audits now report zero advisories. CI audits application and infrastructure
+  lockfiles without severity exclusions. This is an advisory-database check, not
+  proof that all application code is free of security flaws.
+- The public repository now has a Zoen README, contribution/security/conduct
+  policies, beta terms/privacy notice, PR and issue templates, and automated
+  dependency-update configuration. Private vulnerability reporting is enabled.
+  Existing copyright and third-party license notices remain intact.
+
+The dated sections below retain earlier evidence and failures. Their historical
+deployment and provider-quota statements do not supersede this current status.
 
 ## 2026-09-14 launch candidate: requested points 1, 3, 4 and 5
 
