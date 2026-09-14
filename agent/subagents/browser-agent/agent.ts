@@ -1,6 +1,9 @@
 import { defineAgent, defineDynamic } from "eve";
 import { Effect } from "effect";
 import { browserInstallationModel } from "@agent/lib/installation-model";
+import { workspaceModel } from "@agent/lib/workspace-model";
+import { serverRuntime } from "../../../server/runtime";
+import { workspaceActorFromPrincipal } from "../../../server/workspaces/access";
 import { resolveModeValue } from "@agent/lib/mode";
 import { taskCompletionSchema } from "@agent/subagents/browser-agent/lib/completion";
 
@@ -12,7 +15,7 @@ export default defineAgent({
   },
   model: defineDynamic({
     events: {
-      "step.started": (_event, context) => {
+      "step.started": async (_event, context) => {
         if (
           !(context.session.auth.current ?? context.session.auth.initiator) ||
           !resolveModeValue(context, {
@@ -24,7 +27,16 @@ export default defineAgent({
             "Browser execution requires an authenticated personal or scheduled session."
           );
         }
-        return Effect.runPromise(browserInstallationModel);
+        const caller =
+          context.session.auth.current ?? context.session.auth.initiator;
+        if (!caller) throw new Error("An authenticated user is required.");
+        return (
+          (await serverRuntime.runPromise(
+            workspaceActorFromPrincipal(caller).pipe(
+              Effect.flatMap((actor) => workspaceModel(actor, true))
+            )
+          )) ?? Effect.runPromise(browserInstallationModel)
+        );
       },
     },
   }),

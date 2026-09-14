@@ -4,6 +4,24 @@ import type { DynamicResolveContext } from "eve";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import browserAgent from "@agent/subagents/browser-agent/agent";
+vi.mock("@agent/lib/workspace-model", async () => {
+  const { Effect } = await import("effect");
+  return { workspaceModel: () => Effect.succeed(null) };
+});
+vi.mock("../server/workspaces/access", async () => {
+  const { Effect } = await import("effect");
+  return {
+    workspaceActorFromPrincipal: () =>
+      Effect.succeed({
+        userId: "browser-test-user",
+        workspaceId: "browser-test-workspace",
+      }),
+  };
+});
+vi.mock("../server/runtime", async () => {
+  const { Effect } = await import("effect");
+  return { serverRuntime: { runPromise: Effect.runPromise } };
+});
 
 const resolveBrowserModel = browserAgent.model.events["step.started"];
 if (!resolveBrowserModel)
@@ -55,25 +73,25 @@ describe("worker input bubbling", () => {
 
   it.each(["a2a", "matrix", "scheduled-result"])(
     "denies browser execution for %s before resolving any model or credentials",
-    (authenticator) => {
+    async (authenticator) => {
       vi.stubEnv(
         "COMPANION_BROWSER_MODEL_PROVIDER",
         "invalid-must-not-be-read"
       );
-      expect(() =>
+      await expect(
         resolveBrowserModel({}, browserContext(authenticator))
-      ).toThrow(
+      ).rejects.toThrow(
         "Browser execution requires an authenticated personal or scheduled session."
       );
     }
   );
 
-  it("denies group-bound and unauthenticated sessions", () => {
+  it("denies group-bound and unauthenticated sessions", async () => {
     const grouped = browserContext("authjs", "private-team-room");
-    expect(() => resolveBrowserModel({}, grouped)).toThrow(
+    await expect(resolveBrowserModel({}, grouped)).rejects.toThrow(
       "Browser execution requires an authenticated personal or scheduled session."
     );
-    expect(() =>
+    await expect(
       resolveBrowserModel(
         {},
         {
@@ -84,7 +102,7 @@ describe("worker input bubbling", () => {
           },
         }
       )
-    ).toThrow(
+    ).rejects.toThrow(
       "Browser execution requires an authenticated personal or scheduled session."
     );
   });

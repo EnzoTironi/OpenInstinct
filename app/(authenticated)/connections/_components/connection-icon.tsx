@@ -1,5 +1,5 @@
 import Image from "next/image";
-import styles from "../connections.module.css";
+import styles from "../../_components/connections.module.css";
 
 export function ConnectionIcon({
   provider,

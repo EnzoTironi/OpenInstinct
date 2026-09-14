@@ -13,9 +13,10 @@ import { readLinkedChannelIdentities } from "../../../server/accounts/controls";
 import { Alert, AlertTitle, AlertDescription } from "@web/components/ui/alert";
 import { ConnectionList } from "./_components/connection-list";
 import styles from "../_components/panel.module.css";
-import connections from "./connections.module.css";
+import connections from "../_components/connections.module.css";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import { TeamConnections } from "./_components/team-connections";
+import { ModelConnections } from "../_components/model-connections";
 
 export default async function ConnectionsPage({
   searchParams,
@@ -29,6 +30,7 @@ export default async function ConnectionsPage({
       <div className={styles.page}>
         <h1 className="type-page-title">{t("Conexões da equipe")}</h1>
         <TeamConnections />
+        <ModelConnections />
       </div>
     );
   const requestHeaders = await headers();
@@ -74,6 +76,7 @@ export default async function ConnectionsPage({
           {t("Voltar para a conversa")}
         </Link>
       )}
+      <ModelConnections />
     </div>
   );
 }

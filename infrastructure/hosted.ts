@@ -268,6 +268,10 @@ export const hosted = Effect.gen(function* () {
       COMPANION_BROWSER_MODEL: "gpt-5.6-luna",
       ZOEN_REGISTRATION_MODE: "closed",
       ZOEN_BILLING_MODE: "free-beta",
+      ZOEN_BETA_FULL_TELEMETRY: "true",
+      ZOEN_OPERATOR_EMAILS: yield* Config.string("ZOEN_OPERATOR_EMAILS").pipe(
+        Config.withDefault("")
+      ),
       ZOEN_BETA_IDENTITIES: yield* Config.string("ZOEN_BETA_IDENTITIES").pipe(
         Config.withDefault("")
       ),
@@ -278,6 +282,16 @@ export const hosted = Effect.gen(function* () {
       ZOEN_MATRIX_URL: `http://${matrixSecrets.name}.internal:8008`,
       ZOEN_MATRIX_SERVER_NAME: matrixServerName,
     },
+    mounts: [
+      {
+        path: "/root/.eve/auth",
+        name: "model_auth",
+        sizeGb: 1,
+        encrypted: true,
+        autoBackupEnabled: true,
+        snapshotRetention: 14,
+      },
+    ],
     services: [
       {
         protocol: "tcp",

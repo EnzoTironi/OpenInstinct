@@ -2,10 +2,10 @@ import { defineEvlogHook } from "evlog/eve";
 
 export default defineEvlogHook({
   init: {
-    env: { service: "open-instinct" },
-    redact: false,
+    env: { service: "zoen" },
+    redact: true,
   },
-  message: "full",
-  redact: false,
+  message: "omit",
+  redact: true,
   sessionEvent: true,
 });

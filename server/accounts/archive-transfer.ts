@@ -20,6 +20,7 @@ export const requireArchivableAccount = Effect.fn("requireArchivableAccount")(
       AND NOT EXISTS (SELECT 1 FROM organization_memberships WHERE user_id = ${principalId})
       AND NOT EXISTS (SELECT 1 FROM workspace_memberships WHERE user_id = ${principalId} AND workspace_id <> ${workspaceId})
       AND NOT EXISTS (SELECT 1 FROM vault_items WHERE workspace_id = ${workspaceId})
+      AND NOT EXISTS (SELECT 1 FROM model_connections WHERE workspace_id = ${workspaceId} AND credentials IS NOT NULL)
       AND NOT EXISTS (SELECT 1 FROM chats WHERE workspace_id = ${workspaceId} AND channel IS NULL)
       AND NOT EXISTS (SELECT 1 FROM account_archive WHERE source_user_id IN (${sourceUserId}, ${targetUserId}) OR target_user_id = ${sourceUserId})
       FOR UPDATE OF u`;

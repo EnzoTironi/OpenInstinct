@@ -1,5 +1,6 @@
 "use client";
 
+import { ModelConnections } from "../../../_components/model-connections";
 import { useI18n } from "@web/i18n/context";
 
 import { ChevronsUpDownIcon } from "lucide-react";
@@ -26,6 +27,7 @@ type ModelCatalogItem = RouterOutputs["models"]["list"][number];
 export function ModelSelector({ modelId }: { readonly modelId: string }) {
   const { t, locale } = useI18n();
   const router = useRouter();
+  const connection = api.modelConnections.read.useQuery();
   const [open, setOpen] = useState(false);
   const catalog = api.models.list.useQuery(undefined, {
     enabled: open,
@@ -59,6 +61,8 @@ export function ModelSelector({ modelId }: { readonly modelId: string }) {
       : selectModel.error
         ? t("Unable to update the workspace. Try again.")
         : undefined;
+
+  if (connection.data?.connection?.connected) return <ModelConnections />;
 
   return (
     <ModelSelectorRoot onOpenChange={setOpen} open={open}>

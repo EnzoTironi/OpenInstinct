@@ -33,6 +33,10 @@ vi.mock("../../server/runtime", async () => {
   const { Effect: runtimeEffect } = await import("effect");
   return { serverRuntime: { runPromise: runtimeEffect.runPromise } };
 });
+vi.mock("@agent/lib/workspace-model", async () => {
+  const { Effect: Fx } = await import("effect");
+  return { workspaceModel: () => Fx.succeed(null) };
+});
 
 import agent from "@agent/agent";
 

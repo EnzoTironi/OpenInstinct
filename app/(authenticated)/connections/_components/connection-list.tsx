@@ -7,7 +7,7 @@ import { useI18n } from "@web/i18n/context";
 import { GoogleWorkspaceAction } from "../google-workspace-action";
 import { LinkedChannels } from "./linked-channels";
 import { ConnectionIcon } from "./connection-icon";
-import styles from "../connections.module.css";
+import styles from "../../_components/connections.module.css";
 
 export function ConnectionList({
   googleState,

@@ -8,6 +8,7 @@ import { Message, MessageContent } from "@web/components/ai-elements/message";
 import { cn } from "@web/components/class-names";
 import { AgentMessagePart, partKey } from "./parts";
 import type { RespondToAgentInput } from "./types";
+import { MessageFeedback } from "./feedback";
 
 export function AgentMessage({
   canRespond,
@@ -77,6 +78,9 @@ export function AgentMessage({
           )
         )}
       </MessageContent>
+      {hasAssistantText && !isStreaming && (
+        <MessageFeedback messageId={message.id} />
+      )}
       {displayedTimestamp ? (
         <time
           className={cn(
