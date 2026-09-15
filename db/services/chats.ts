@@ -32,19 +32,21 @@ function toChatSummary(row: z.infer<typeof chatRowSchema>): ChatSummary {
   };
 }
 
+const chatSummarySelect = {
+  channel: chats.channel,
+  costUsd: chats.costUsd,
+  createdAt: chats.createdAt,
+  inputTokens: chats.inputTokens,
+  outputTokens: chats.outputTokens,
+  sessionId: chats.sessionId,
+  title: chats.title,
+  updatedAt: chats.updatedAt,
+} as const;
+
 export async function listChats(scope: AccessScope) {
   const rows = chatRowSchema.array().parse(
     await db
-      .select({
-        channel: chats.channel,
-        costUsd: chats.costUsd,
-        createdAt: chats.createdAt,
-        inputTokens: chats.inputTokens,
-        outputTokens: chats.outputTokens,
-        sessionId: chats.sessionId,
-        title: chats.title,
-        updatedAt: chats.updatedAt,
-      })
+      .select(chatSummarySelect)
       .from(chats)
       .innerJoin(agentSessions, eq(agentSessions.sessionId, chats.sessionId))
       .where(
@@ -59,17 +61,22 @@ export async function listChats(scope: AccessScope) {
 }
 
 export async function readChat(scope: AccessScope, sessionId: string) {
-  const rows = await db
-    .select()
-    .from(chats)
-    .where(
-      and(
-        eq(chats.workspaceId, scope.workspaceId),
-        eq(chats.sessionId, sessionId)
+  // A session outside this user/workspace is indistinguishable from an unknown one.
+  const rows = chatRowSchema.array().parse(
+    await db
+      .select(chatSummarySelect)
+      .from(chats)
+      .innerJoin(agentSessions, eq(agentSessions.sessionId, chats.sessionId))
+      .where(
+        and(
+          eq(chats.workspaceId, scope.workspaceId),
+          eq(chats.sessionId, sessionId),
+          eq(agentSessions.createdByUserId, scope.userId)
+        )
       )
-    )
-    .limit(1);
-  const row = chatRowSchema.optional().parse(rows[0]);
+      .limit(1)
+  );
+  const row = rows[0];
   return row ? toChatSummary(row) : undefined;
 }
 

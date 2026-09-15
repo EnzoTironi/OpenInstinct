@@ -187,6 +187,22 @@ describe("database services", () => {
     ).toMatchObject({ channel: "channel:linq", title: "New chat" });
     expect(await chats.listChats(bob)).toEqual([]);
 
+    await pgliteDatabase.insert(schema.workspaceMemberships).values({
+      createdAt: new Date(),
+      role: "member",
+      userId: bob.userId,
+      workspaceId: alice.workspaceId,
+    });
+    const coworker = {
+      userId: bob.userId,
+      workspaceId: alice.workspaceId,
+    };
+    expect(await chats.readChat(coworker, "session-alice")).toBeUndefined();
+    expect(await chats.listChats(coworker)).toEqual([]);
+    expect(await sessions.isSessionOwned(coworker, "session-alice")).toBe(
+      false
+    );
+
     await chats.saveChat(bob, {
       sessionId: "session-alice",
       title: "Bob's title",
