@@ -1,6 +1,6 @@
 # Zoen — plano de implementação e qualificação
 
-Data: 14 de setembro de 2026. Status: plano apoiado em inspeção do código e documentação oficial; os testes novos abaixo ainda não foram executados.
+Data original: 14 de setembro de 2026. Atualização: 15 de setembro. Implementação em andamento; a matriz de aceite e os relatórios de validação distinguem provas realizadas de pendências de produção.
 
 ## Resultado esperado
 

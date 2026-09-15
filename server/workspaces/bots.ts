@@ -85,13 +85,31 @@ export const saveWorkspaceBot = Effect.fn("saveWorkspaceBot")(function* (
   );
 });
 
+export const delegatedBotProfile = Effect.fn("delegatedBotProfile")(function* (
+  actor: typeof WorkspaceActorSchema.Type
+) {
+  if (!actor.agentGrantId) return null;
+  const sql = yield* PgClient.PgClient;
+  return yield* sql.withTransaction(
+    Effect.gen(function* () {
+      yield* requireWorkspaceAccess(actor);
+      const rows =
+        yield* sql`SELECT b.username, b.name, b.description, b.discoverable
+      FROM workspace_bots b JOIN workspace_agent_grants g ON g.bot_id = b.id
+      WHERE g.id = ${actor.agentGrantId}`;
+      if (!rows[0]) return yield* new WorkspaceAccessDenied();
+      return yield* Schema.decodeUnknownEffect(BotProfileSchema)(rows[0]);
+    })
+  );
+});
+
 export const searchWorkspaceBots = Effect.fn("searchWorkspaceBots")(function* (
   actor: typeof WorkspaceActorSchema.Type,
   query: string
 ) {
   const access = yield* requireWorkspaceAccess(actor);
   const prefix = yield* Schema.decodeUnknownEffect(
-    Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9_]{1,29}$/))
+    Schema.String.check(Schema.isPattern(/^(?:[a-z][a-z0-9_]{1,29})?$/))
   )(query.toLowerCase());
   const sql = yield* PgClient.PgClient;
   const rows = access.organizationId

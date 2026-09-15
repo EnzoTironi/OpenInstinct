@@ -44,16 +44,23 @@ import {
 } from "../../server/workspaces/connections";
 import {
   AnswerPersonalTrustSchema,
-  ContactNetworkBotSchema,
   PersonalTrustUsernameSchema,
   answerPersonalTrust,
   blockPersonalTrust,
-  contactNetworkBot,
   endPersonalTrust,
   invitePersonalTrust,
   listPersonalNetwork,
 } from "../../server/workspaces/network";
 import { workspaceProcedure } from "./workspace-procedure";
+import {
+  MatrixConversationInput,
+  MatrixConversationSend,
+  openMatrixConversation,
+  listMatrixConversations,
+  readMatrixConversation,
+  sendMatrixConversation,
+  closeMatrixConversation,
+} from "../../server/matrix/conversations";
 
 const revisionFields = {
   expectedRevision: Schema.NullOr(GitRevisionSchema),
@@ -98,10 +105,7 @@ export const workspaceAgentsRouter = {
       .input(
         Schema.toStandardSchemaV1(
           Schema.Struct({
-            query: Schema.String.check(
-              Schema.isMinLength(2),
-              Schema.isMaxLength(30)
-            ),
+            query: Schema.String.check(Schema.isMaxLength(30)),
           })
         )
       )
@@ -128,6 +132,49 @@ export const workspaceAgentsRouter = {
       ),
   },
   network: {
+    conversations: {
+      list: workspaceProcedure.query(({ ctx, signal }) =>
+        serverRuntime.runPromise(listMatrixConversations(ctx.actor), { signal })
+      ),
+      open: workspaceProcedure
+        .input(Schema.toStandardSchemaV1(PersonalTrustUsernameSchema))
+        .mutation(({ ctx, input, signal }) =>
+          serverRuntime.runPromise(
+            openMatrixConversation(ctx.actor, input.username).pipe(
+              Effect.map((c) => ({
+                id: c.id,
+                name: c.name,
+                username: c.username,
+                network: c.networkKind,
+              }))
+            ),
+            { signal }
+          )
+        ),
+      messages: workspaceProcedure
+        .input(Schema.toStandardSchemaV1(MatrixConversationInput))
+        .query(({ ctx, input, signal }) =>
+          serverRuntime.runPromise(
+            readMatrixConversation(ctx.actor, input.id),
+            { signal }
+          )
+        ),
+      send: workspaceProcedure
+        .input(Schema.toStandardSchemaV1(MatrixConversationSend))
+        .mutation(({ ctx, input, signal }) =>
+          serverRuntime.runPromise(sendMatrixConversation(ctx.actor, input), {
+            signal,
+          })
+        ),
+      close: workspaceProcedure
+        .input(Schema.toStandardSchemaV1(MatrixConversationInput))
+        .mutation(({ ctx, input, signal }) =>
+          serverRuntime.runPromise(
+            closeMatrixConversation(ctx.actor, input.id),
+            { signal }
+          )
+        ),
+    },
     list: workspaceProcedure.query(({ ctx, signal }) =>
       serverRuntime.runPromise(
         listPersonalNetwork(ctx.actor).pipe(
@@ -181,28 +228,6 @@ export const workspaceAgentsRouter = {
           blockPersonalTrust(ctx.actor, input).pipe(
             Effect.catchTag("WorkspaceAccessDenied", () =>
               Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
-            )
-          ),
-          { signal }
-        )
-      ),
-    contact: workspaceProcedure
-      .input(Schema.toStandardSchemaV1(ContactNetworkBotSchema))
-      .mutation(({ ctx, input, signal }) =>
-        serverRuntime.runPromise(
-          contactNetworkBot(ctx.actor, input).pipe(
-            Effect.map((result) => ({
-              task: result.task,
-              dest: result.dest,
-              network: result.network,
-            })),
-            Effect.catchTag("WorkspaceAccessDenied", () =>
-              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
-            ),
-            Effect.catchTag("A2AError", (error) =>
-              Effect.fail(
-                new TRPCError({ code: "BAD_REQUEST", message: error.message })
-              )
             )
           ),
           { signal }

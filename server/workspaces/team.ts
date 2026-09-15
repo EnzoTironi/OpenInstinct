@@ -169,16 +169,20 @@ export const removeWorkspaceMember = Effect.fn("removeWorkspaceMember")(
       FROM scheduled_agent_report_outputs o JOIN scheduled_agent_runs r ON r.id = o.run_id JOIN scheduled_agent_jobs j ON j.id = r.job_id
       WHERE q.id = o.outbox_id AND j.workspace_id = ${actor.workspaceId} AND j.created_by_user_id = ${targetUserId}
         AND q.status IN ('queued', 'dispatching') RETURNING q.id`;
-        const revokedGrants =
-          yield* sql`UPDATE workspace_agent_grants g SET revoked_at = clock_timestamp() FROM workspace_bots b
-      WHERE b.id = g.bot_id AND b.workspace_id = ${actor.workspaceId} AND g.revoked_at IS NULL
-        AND (g.issued_by = ${targetUserId} OR g.requester_user_id = ${targetUserId}) RETURNING g.id`;
+        const affectedGrant = sql`(b.workspace_id = ${actor.workspaceId} AND g.issued_by = ${targetUserId})
+          OR (g.source_workspace_id = ${actor.workspaceId} AND g.requester_user_id = ${targetUserId})`;
+        // Lock grants before tasks, matching execution's authority lock order.
+        // Count and cancel before the revocation trigger retires Matrix rooms.
+        yield* sql`SELECT g.id FROM workspace_agent_grants g JOIN workspace_bots b ON b.id = g.bot_id
+          WHERE (${affectedGrant}) FOR UPDATE OF g`;
         const canceledTasks =
           yield* sql`UPDATE agent_protocol_tasks t SET state = 'TASK_STATE_CANCELED', updated_at = now()
       FROM workspace_agent_grants g JOIN workspace_bots b ON b.id = g.bot_id
-      WHERE t.grant_id = g.id AND b.workspace_id = ${actor.workspaceId}
-        AND (g.issued_by = ${targetUserId} OR g.requester_user_id = ${targetUserId})
+      WHERE t.grant_id = g.id AND (${affectedGrant})
         AND t.state IN ('TASK_STATE_SUBMITTED', 'TASK_STATE_WORKING', 'TASK_STATE_INPUT_REQUIRED') RETURNING t.id`;
+        const revokedGrants =
+          yield* sql`UPDATE workspace_agent_grants g SET revoked_at = clock_timestamp() FROM workspace_bots b
+            WHERE b.id = g.bot_id AND (${affectedGrant}) AND g.revoked_at IS NULL RETURNING g.id`;
         yield* sql`UPDATE vault_item_delegations SET revoked_at = clock_timestamp(), wrapped_secret = 'revoked'
       WHERE workspace_id = ${actor.workspaceId} AND issued_by = ${targetUserId} AND revoked_at IS NULL`;
         yield* sql`UPDATE whatsapp_bridge_shares SET revoked_at = clock_timestamp()

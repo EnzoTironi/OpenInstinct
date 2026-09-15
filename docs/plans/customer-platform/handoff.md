@@ -2,7 +2,7 @@
 
 Implemente e qualifique o Zoen seguindo o [plano](plan.md) e a [matriz de aceite](acceptance.csv) desta pasta. A decisão mais recente é usar redes de confiança para comunicação A2A: cada empresa é uma rede; pessoas também podem aceitar conexões pessoais. Confiança permite contato com bots publicados à rede e não substitui permissões de dados, ferramentas ou cofres.
 
-O repo é `https://github.com/EnzoTironi/tryzoen`. Confirme o estado atual do checkout e preserve alterações de outros agentes. A produção previamente qualificada estava em `29086d3022c57eb0cd1ccc158b28f07ecf1f7ab5`. Atualize a referência antes de começar. Leia o `AGENTS.md` e use Node 24. As implementações devem seguir Effect 4, as APIs instaladas de Eve e os donos de código mapeados no plano.
+O repo é `https://github.com/EnzoTironi/tryzoen`. Confirme o estado atual do checkout e preserve alterações de outros agentes. A última produção qualificada registrada neste plano é `29086d3022c57eb0cd1ccc158b28f07ecf1f7ab5`; as integrações mais recentes em main não comprovam uma nova publicação. Atualize ambas as referências antes de continuar. Leia o `AGENTS.md` e use Node 24. As implementações devem seguir Effect 4, as APIs instaladas de Eve e os donos de código mapeados no plano.
 
 Primeiro corrija a origem de contas duplicadas: um mensageiro desconhecido ainda pode provisionar usuário independente antes do Google. O onboarding normal deve criar uma identidade canônica via Google e vincular mensageiros por desafio confirmado. Não usar uma tela de mescla como solução normal e não zerar produção como substituto da correção.
 
@@ -10,7 +10,7 @@ Execute P01 e P02 antes de ampliar permissões. Depois entregue a criação/publ
 
 Mantenha a interface aprovada: céu integrado, assets existentes, pouco texto, PT-BR/EN/ES, navegação React sem reload e sheets em torno de 80% apenas com fechamento. Redes e conexões devem aparecer no espaço certo. Ações e dados pessoais não ficam disponíveis automaticamente à empresa.
 
-Não há implementação ou teste novo de Vaultwarden/Beeper nesta entrega de planejamento. Todas as linhas da matriz começam como `planned`. Não transforme a CI ou os 15 resultados antigos em prova desses fluxos. Colete evidência sanitizada para cada caso e separe teste determinístico, integração real e jornada real de provedor. Faça exclusão completa com prova de não ressurgimento após restauração e qualifique a capacidade dentro do envelope proposto.
+As PRs #113, #114, #121, #122 e #123 já foram integradas. Há implementação do cofre delegado local e dos contratos de ponte; isso ainda não comprova servidores Vaultwarden/mautrix reais. A matriz distingue prova isolada, modelo real e jornada de provedor. Consulte também `docs/decisions/zoen-network-validation.md` para Matrix e `adr-customer-connectors.md` para MCP/OpenAPI. Não transforme a CI ou os 15 resultados antigos em prova desses fluxos. Colete evidência sanitizada para cada caso e separe teste determinístico, integração real e jornada real de provedor. Faça exclusão completa com prova de não ressurgimento após restauração e qualifique a capacidade dentro do envelope proposto.
 
 Trabalhe em PRs por comportamento, com validação do mesmo SHA que será publicado por Alchemy. Registre impedimentos externos concretos e mantenha a funcionalidade indisponível quando sua prova estiver faltando. Não alegue suporte de todas as redes a partir de uma ponte. Não coloque segredos em ferramentas que retornam ao modelo, replays, logs, imagens, Git ou Mem0.
 

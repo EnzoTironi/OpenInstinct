@@ -31,6 +31,26 @@ export const launchTarget = Effect.fn("eval.launchTarget")(function* (
         return HttpServerResponse.empty({ status: 403 });
       if (request.method === "GET" && url.pathname === "/_eval/fixture")
         return yield* HttpServerResponse.json(fixture.metadata);
+      if (fixture.network) {
+        if (request.method === "GET" && url.pathname === "/_eval/network")
+          return yield* HttpServerResponse.json(
+            yield* fixture.network.inspect()
+          );
+        if (
+          request.method === "POST" &&
+          url.pathname === "/_eval/network-human"
+        )
+          return yield* HttpServerResponse.json(
+            yield* fixture.network.direct()
+          );
+        if (
+          request.method === "POST" &&
+          url.pathname === "/_eval/network-revoke"
+        )
+          return yield* HttpServerResponse.json(
+            yield* fixture.network.revoke()
+          );
+      }
       if (request.method === "GET" && url.pathname === "/_eval/ontology")
         return yield* HttpServerResponse.json(yield* fixture.ontology());
       if (request.method === "GET" && url.pathname === "/_eval/file")

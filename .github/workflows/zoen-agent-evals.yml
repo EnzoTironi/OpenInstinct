@@ -47,6 +47,10 @@ jobs:
       EVE_NEXT_PRODUCTION_PORT: "4352"
       WORKFLOW_POSTGRES_WORKER_CONCURRENCY: "3"
       WORKFLOW_POSTGRES_MAX_POOL_SIZE: "6"
+      ZOEN_MATRIX_URL: http://127.0.0.1:8008
+      ZOEN_MATRIX_SERVER_NAME: matrix.zoen.test
+      ZOEN_MATRIX_AS_TOKEN: synthetic-native-matrix-appservice-token-2026
+      ZOEN_MATRIX_HS_TOKEN: synthetic-native-matrix-homeserver-token-2026
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -68,6 +72,22 @@ jobs:
           bootstrap
           node scripts/migrate-hosted.ts
           bootstrap
+      - name: Start the isolated Matrix homeserver
+        run: |
+          docker exec -i -e ZOEN_MATRIX_DATABASE_PASSWORD=eval-matrix-password \
+            '${{ job.services.postgres.id }}' bash < infrastructure/postgres/bootstrap-matrix.sh
+          docker build -t zoen-matrix-eval infrastructure/matrix
+          docker run -d --name matrix-eval --network host \
+            -e ZOEN_MATRIX_SERVER_NAME -e ZOEN_MATRIX_AS_TOKEN -e ZOEN_MATRIX_HS_TOKEN \
+            -e ZOEN_MATRIX_SIGNING_SECRET=synthetic-native-matrix-signing-secret-2026 \
+            -e ZOEN_MATRIX_DATABASE_PASSWORD=eval-matrix-password \
+            -e ZOEN_DATABASE_HOST=127.0.0.1 \
+            -e ZOEN_MATRIX_CALLBACK_URL=http://127.0.0.1:4352 zoen-matrix-eval
+          for attempt in {1..60}; do
+            curl --fail --silent http://127.0.0.1:8008/health && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8008/health
       - name: Prepare only model and browser provider credentials
         env:
           EVAL_PROVIDERS: ${{ secrets.ZOEN_EVAL_PROVIDERS }}
@@ -135,7 +155,9 @@ jobs:
             exit 1
           fi
           node --env-file=.eve/eval.env --import tsx scripts/run-agent-evals.ts \
-            --url http://127.0.0.1:4351 --suite launch --repeat "$REPETITIONS" --timeout 240000 --junit .eve/launch.xml
+            --url http://127.0.0.1:4351 --suite launch --network-scope company --repeat "$REPETITIONS" --timeout 360000 --junit .eve/launch.xml
+          node --env-file=.eve/eval.env --import tsx scripts/run-agent-evals.ts \
+            --url http://127.0.0.1:4351 --suite launch/network --network-scope personal --repeat "$REPETITIONS" --timeout 360000 --junit .eve/network-personal.xml
       - name: Upload sanitized benchmark receipts
         if: always()
         uses: actions/upload-artifact@v6
@@ -144,6 +166,7 @@ jobs:
           path: |
             .eve/launch-*/run-*.json
             .eve/launch.xml*
+            .eve/network-personal.xml*
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 14

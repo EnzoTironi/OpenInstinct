@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { workspaces } from "./workspaces";
+import { workspaceMemberships, workspaces } from "./workspaces";
 
 export const workspaceConnections = pgTable(
   "workspace_connections",
@@ -79,6 +79,7 @@ export const workspaceAgentGrants = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     requesterUserId: text("requester_user_id"),
+    sourceWorkspaceId: text("source_workspace_id"),
     networkKind: text("network_kind"),
     networkId: text("network_id"),
     originBotId: uuid("origin_bot_id"),
@@ -90,6 +91,14 @@ export const workspaceAgentGrants = pgTable(
     uniqueIndex("workspace_agent_grants_token_uidx").on(table.tokenHash),
     index("workspace_agent_grants_bot_idx").on(table.botId),
     index("workspace_agent_grants_requester_idx").on(table.requesterUserId),
+    foreignKey({
+      name: "workspace_agent_grants_source_member_fkey",
+      columns: [table.sourceWorkspaceId, table.requesterUserId],
+      foreignColumns: [
+        workspaceMemberships.workspaceId,
+        workspaceMemberships.userId,
+      ],
+    }).onDelete("cascade"),
     foreignKey({
       columns: [table.originBotId],
       foreignColumns: [workspaceBots.id],
@@ -179,4 +188,15 @@ export const agentProtocolTasks = pgTable(
       sql`${table.round} BETWEEN 1 AND 8`
     ),
   ]
+);
+
+/** Independent outbox survives grant/membership deletion until Eve acknowledges cancellation. */
+export const agentProtocolCancellations = pgTable(
+  "agent_protocol_cancellations",
+  {
+    sessionId: text("session_id").primaryKey(),
+    requestedAt: timestamp("requested_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  }
 );

@@ -2,6 +2,8 @@ import { Effect, Result } from "effect";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { UsersRoundIcon } from "lucide-react";
+import { PanelLink } from "../_components/panel-link";
 import { requireRequestScope } from "@web/auth/request-scope";
 import { cn } from "@web/components/class-names";
 import { getI18n } from "@web/i18n/server";
@@ -30,6 +32,10 @@ export default async function ConnectionsPage({
     return (
       <div className={styles.page}>
         <h1 className="type-page-title">{t("Conexões da equipe")}</h1>
+        <PanelLink className={connections.row} href="/network">
+          <UsersRoundIcon />
+          {t("Rede da empresa")}
+        </PanelLink>
         <TeamConnections />
         <ModelConnections />
         <ServiceConnections />
@@ -57,6 +63,10 @@ export default async function ConnectionsPage({
       <h1 className={cn("type-page-title", connections.heading)}>
         {t("Conexões")}
       </h1>
+      <PanelLink className={connections.row} href="/network">
+        <UsersRoundIcon />
+        {t("Minha rede")}
+      </PanelLink>
       {Result.isFailure(google) || Result.isFailure(messengers) ? (
         <Alert variant="destructive">
           <AlertTitle>

@@ -11,6 +11,8 @@ import {
 } from "../../server/matrix/delivery";
 import { WorkspaceAccessDenied } from "../../server/workspaces/access";
 import { matrixConfiguration } from "../../server/matrix/client";
+import { matrixProtocolTask } from "../../server/matrix/network-delivery";
+import a2a from "./a2a";
 
 export default defineChannel({
   receive(input, context) {
@@ -42,7 +44,24 @@ export default defineChannel({
               Effect.forEach(
                 events,
                 (id) =>
-                  deliverMatrixEvent(id, context).pipe(
+                  Effect.gen(function* () {
+                    const protocol = yield* matrixProtocolTask(id);
+                    if (!protocol)
+                      return yield* deliverMatrixEvent(id, context);
+                    const config = yield* matrixConfiguration;
+                    return yield* Effect.tryPromise(() =>
+                      context
+                        .to(a2a, { taskId: protocol.taskId })
+                        .send("Resume accepted Matrix request", {
+                          auth: {
+                            principalType: "service",
+                            principalId: config.serverName,
+                            authenticator: "matrix-homeserver",
+                            attributes: { matrixEventId: id },
+                          },
+                        })
+                    );
+                  }).pipe(
                     Effect.catch(() =>
                       Effect.logWarning("Matrix event awaits native recovery", {
                         eventId: id,
