@@ -155,6 +155,11 @@ const rows: readonly QualificationRow[] = [
   coordinator("workspace.files.list", "none", files),
   coordinator("workspace.files.read", "none", files),
   coordinator("workspace.files.search", "none", files),
+  coordinator(
+    "workspace.tools.connections",
+    "none",
+    "tests/runtime/customer-connectors.integration.ts"
+  ),
   coordinator("workspace.memory.search", "mem0", learned),
   coordinator("workspace.ontology.read", "none", ontology),
   coordinator("workspace.google.mail.search", "google", google),

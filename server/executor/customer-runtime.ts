@@ -13,12 +13,15 @@ export const executeCustomerCode = Effect.fn("Executor.customerCode")(
     input: Parameters<typeof decodeCustomerValue>[1],
     invoker: SandboxToolInvoker
   ) {
+    const implementation = tool.implementation;
+    if (implementation.kind !== "code")
+      return yield* new CustomerToolError({ reason: "invalid_definition" });
     const decoded = yield* decodeCustomerValue(tool.inputSchema, input);
     const result = yield* runCustomerCode(
-      `const input = ${JSON.stringify(decoded)};\nreturn await (async () => {\n${tool.implementation.code}\n})();`,
+      `const input = ${JSON.stringify(decoded)};\nreturn await (async () => {\n${implementation.code}\n})();`,
       {
         invoke: (call) =>
-          tool.implementation.requires.includes(call.path)
+          implementation.requires.includes(call.path)
             ? invoker.invoke(call)
             : Effect.fail(
                 new CustomerToolError({ reason: "dependency_unavailable" })

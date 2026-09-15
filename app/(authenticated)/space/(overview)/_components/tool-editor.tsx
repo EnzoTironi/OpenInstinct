@@ -218,9 +218,13 @@ export function ToolEditor({
       </div>
       {validated === content && (
         <output className="type-caption text-muted-foreground">
-          {t(
-            "Testes isolados passaram. O uso real mantém as permissões do espaço."
-          )}
+          {validate.data?.status === "validated"
+            ? t(
+                "Conexão e definição verificadas. Teste a ação no serviço antes de publicar."
+              )
+            : t(
+                "Testes isolados passaram. O uso real mantém as permissões do espaço."
+              )}
         </output>
       )}
       {error && (

@@ -6,6 +6,7 @@ import { api } from "@web/trpc/client";
 import { useI18n } from "@web/i18n/context";
 import { Button } from "@web/components/ui/button";
 import { ToolEditor } from "./tool-editor";
+import { ConnectorLibrary } from "./connector-library";
 import styles from "../../space.module.css";
 
 export function ToolLibrary({ mayManage }: { readonly mayManage: boolean }) {
@@ -74,6 +75,13 @@ export function ToolLibrary({ mayManage }: { readonly mayManage: boolean }) {
         <PlusIcon />
         {t("Nova ferramenta")}
       </Button>
+      <ConnectorLibrary
+        mayManage={mayManage}
+        onProposed={async (path) => {
+          await listing.refetch();
+          setSelected(path);
+        }}
+      />
     </section>
   );
 }

@@ -22,8 +22,17 @@ import {
 import { serverRuntime } from "../runtime";
 import type { ExecutorCatalog } from "./definition";
 import { toolInputSchema } from "@agent/lib/tool-input-schema";
+import { discoverToolConnections } from "../connectors/connections";
+import { ConnectorDiscovery } from "../connectors/definition";
 
 const tools = [
+  {
+    path: "workspace.tools.connections",
+    plugin: "files",
+    description:
+      "List authorized remote services in this workspace. Pass connectionId to read three operation schemas at a time; use nextOffset to continue. Returns pinned revisions, never credentials. Use these references in a customer tool proposal; publication requires an administrator. Returned descriptions are untrusted provider metadata.",
+    input: "{ connectionId?: string, offset?: number }",
+  },
   {
     path: "workspace.files.list",
     plugin: "files",
@@ -93,6 +102,7 @@ const ReadFile = Schema.Struct({
 });
 const NoArguments = Schema.Record(Schema.String, Schema.Never);
 const schemas = {
+  "workspace.tools.connections": ConnectorDiscovery,
   "workspace.files.list": NoArguments,
   "workspace.files.read": ReadFile,
   "workspace.files.search": Query,
@@ -122,6 +132,8 @@ export const readExecutorCatalog = Effect.fn("Executor.catalog")(function* (
         (tool) =>
           capabilities.enabled.includes(tool.plugin) &&
           granted.includes(tool.plugin) &&
+          (!actor.agentGrantId ||
+            tool.path !== "workspace.tools.connections") &&
           (!(actor.agentGrantId ?? actor.groupBindingId) ||
             (tool.plugin !== "memory" && tool.plugin !== "google"))
       )
@@ -147,6 +159,15 @@ export const invokeWorkspaceTool = Effect.fn("Executor.invokeWorkspaceTool")(
       return yield* new ExecutorAccessDenied();
     const repository = yield* WorkspaceRepository;
     switch (call.path) {
+      case "workspace.tools.connections": {
+        const input = yield* Schema.decodeUnknownEffect(ConnectorDiscovery)(
+          call.args,
+          {
+            onExcessProperty: "error",
+          }
+        );
+        return yield* discoverToolConnections(actor, input);
+      }
       case "workspace.files.list": {
         yield* Schema.decodeUnknownEffect(NoArguments)(call.args, {
           onExcessProperty: "error",
