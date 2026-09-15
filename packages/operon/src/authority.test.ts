@@ -301,4 +301,183 @@ describe("scoped authority", () => {
         expect(rejected.actualRevision).toBe(first.revision);
       })
     ));
+
+  it("does keep a host correction through same-source resync", () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const authority = new InMemoryAuthority();
+        const source = yield* authority.admitSource(
+          alice,
+          "gmail:deadline",
+          "hist-1",
+          { snippet: "Friday" },
+          1
+        );
+        const friday = yield* authority.extractClaim(
+          alice,
+          source.id,
+          "commitment:brief",
+          "commitment",
+          "deadline",
+          "Friday",
+          "interpretation"
+        );
+        yield* authority.acceptClaim(alice, friday.id);
+        yield* authority.correctPredicate(
+          alice,
+          "commitment:brief",
+          "deadline",
+          "Thursday"
+        );
+        const duplicate = yield* authority.admitSource(
+          alice,
+          "gmail:deadline",
+          "hist-1",
+          { snippet: "Friday again" },
+          1
+        );
+        expect(duplicate.id).toBe(source.id);
+        const replay = yield* authority.extractClaim(
+          alice,
+          source.id,
+          "commitment:brief",
+          "commitment",
+          "deadline",
+          "Friday",
+          "interpretation"
+        );
+        yield* authority.acceptClaim(alice, replay.id);
+        const pinned = yield* authority.getObject(alice, "commitment:brief");
+        expect(pinned?.body.deadline).toBe("Thursday");
+
+        const later = yield* authority.admitSource(
+          alice,
+          "gmail:deadline-later",
+          "hist-2",
+          { snippet: "Friday confirmed by calendar" },
+          10
+        );
+        const laterClaim = yield* authority.extractClaim(
+          alice,
+          later.id,
+          "commitment:brief",
+          "commitment",
+          "deadline",
+          "Friday",
+          "interpretation"
+        );
+        yield* authority.acceptClaim(alice, laterClaim.id);
+        const updated = yield* authority.getObject(alice, "commitment:brief");
+        expect(updated?.body.deadline).toBe("Friday");
+      })
+    ));
+
+  it("does reject a late extract after forget and pause", () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const authority = new InMemoryAuthority();
+        const source = yield* authority.admitSource(
+          alice,
+          "gmail:private",
+          "hist-private",
+          { snippet: "home address Rua Exemplo" },
+          1
+        );
+        const claim = yield* authority.extractClaim(
+          alice,
+          source.id,
+          "address",
+          "commitment",
+          "note",
+          "home address Rua Exemplo",
+          "interpretation"
+        );
+        yield* authority.acceptClaim(alice, claim.id);
+        const captured = yield* authority.scopeGeneration(alice);
+        yield* authority.pauseSource(alice, source.id);
+        const pausedExtract = yield* authority
+          .extractClaim(
+            alice,
+            source.id,
+            "address",
+            "commitment",
+            "note",
+            "home address Rua Exemplo",
+            "interpretation"
+          )
+          .pipe(Effect.flip);
+        expect(pausedExtract.reason).toBe("suppressed_source");
+        const receipt = yield* authority.forgetSource(alice, source.id);
+        expect(receipt.objectIds).toEqual(["address"]);
+        expect(JSON.stringify(receipt)).not.toContain("Rua Exemplo");
+        const stale = yield* authority
+          .requireGeneration(alice, captured)
+          .pipe(Effect.flip);
+        expect(stale.reason).toBe("stale_generation");
+        const late = yield* authority
+          .extractClaim(
+            alice,
+            source.id,
+            "address",
+            "commitment",
+            "note",
+            "home address Rua Exemplo",
+            "interpretation"
+          )
+          .pipe(Effect.flip);
+        expect(late.reason).toBe("suppressed_source");
+        const reingest = yield* authority
+          .admitSource(
+            alice,
+            "gmail:private",
+            "hist-next",
+            { snippet: "home address Rua Exemplo" },
+            2
+          )
+          .pipe(Effect.flip);
+        expect(reingest.reason).toBe("suppressed_source");
+        const tombstone = yield* authority.getObject(alice, "address");
+        expect(tombstone?.eligibility).toBe("forgotten");
+        expect(tombstone?.body).toEqual({});
+        expect(
+          yield* authority.getObjectAtRevision(
+            alice,
+            "address",
+            tombstone?.revision ?? "1"
+          )
+        ).toBeUndefined();
+      })
+    ));
+
+  it("does keep a low-risk style preference scoped and correctable", () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const authority = new InMemoryAuthority();
+        const source = yield* authority.admitSource(
+          alice,
+          "gmail:sent-style",
+          "hist-style",
+          { snippet: "short sentences" },
+          1
+        );
+        const claim = yield* authority.extractClaim(
+          alice,
+          source.id,
+          "style:mail",
+          "preference",
+          "tone",
+          "short sentences",
+          "interpretation"
+        );
+        yield* authority.acceptClaim(alice, claim.id);
+        const corrected = yield* authority.correctPredicate(
+          alice,
+          "style:mail",
+          "tone",
+          "warm and direct"
+        );
+        expect(corrected.body.tone).toBe("warm and direct");
+        expect(yield* authority.getObject(bob, "style:mail")).toBeUndefined();
+      })
+    ));
 });

@@ -203,13 +203,10 @@ describe("host-scoped recall", () => {
         ).not.toContain("salary");
         expect(JSON.stringify(bobHit)).not.toContain("180000");
 
-        const staleGeneration = cache.read(
-          alice,
-          2,
-          "salary compensation 180000",
-          []
-        );
-        expect(staleGeneration).toBeUndefined();
+        const nextGeneration = yield* authority.bumpGeneration(alice);
+        expect(
+          cache.read(alice, nextGeneration, "salary compensation 180000", [])
+        ).toBeUndefined();
         const refreshed = yield* selectHostScopedContext(
           authority,
           cache,
@@ -217,7 +214,7 @@ describe("host-scoped recall", () => {
           "salary compensation 180000",
           [],
           64,
-          2,
+          nextGeneration,
           []
         );
         expect(
@@ -382,6 +379,83 @@ describe("host-scoped recall", () => {
         expect(result.modelCalls).toBe(0);
         expect(result.requiredEvidence[0]?.status).toBe("missing");
         expect(result.createdLinks).toEqual([]);
+      })
+    ));
+
+  it("does reselect pruned records and hide forgotten or withdrawn ones", () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const authority = new InMemoryAuthority();
+        const cache = new HostScopedRecallCache();
+        yield* rememberNote(
+          authority,
+          alice,
+          "courier",
+          "Pruned but still authorized note that the courier is FlashLog.",
+          1
+        );
+        const salarySource = yield* authority.admitSource(
+          alice,
+          "gmail:salary",
+          "hist-salary",
+          { snippet: "Private salary number 180000" },
+          2
+        );
+        const salaryClaim = yield* authority.extractClaim(
+          alice,
+          salarySource.id,
+          "salary",
+          "commitment",
+          "note",
+          "Private salary number 180000",
+          "interpretation"
+        );
+        yield* authority.acceptClaim(alice, salaryClaim.id);
+        yield* rememberNote(
+          authority,
+          alice,
+          "rumor",
+          "Withdrawn rumor that Ana left the company.",
+          3
+        );
+        const before = yield* selectHostScopedContext(
+          authority,
+          cache,
+          alice,
+          "FlashLog courier salary 180000 rumor",
+          [],
+          64,
+          yield* authority.scopeGeneration(alice),
+          []
+        );
+        expect(before.relevant.map((row) => row.section.objectId)).toEqual(
+          expect.arrayContaining(["courier", "salary"])
+        );
+
+        yield* authority.pruneObject(alice, "courier");
+        const forgotten = yield* authority.forgetSource(alice, salarySource.id);
+        yield* authority.withdrawObject(alice, "rumor");
+        const after = yield* selectHostScopedContext(
+          authority,
+          cache,
+          alice,
+          "FlashLog courier salary 180000 rumor",
+          [],
+          64,
+          forgotten.generation,
+          []
+        );
+        expect(after.relevant.map((row) => row.section.objectId)).toEqual([
+          "courier",
+        ]);
+        expect(JSON.stringify(after)).not.toContain("180000");
+        expect(JSON.stringify(after)).not.toContain("left the company");
+        const earlier = yield* authority.getObjectAtRevision(
+          alice,
+          "salary",
+          "2"
+        );
+        expect(earlier).toBeUndefined();
       })
     ));
 });

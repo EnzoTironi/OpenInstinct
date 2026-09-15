@@ -63,16 +63,20 @@ export function projectObjectSection(
     host
   );
   const body = sectionBody(snapshot);
+  const visible =
+    snapshot.eligibility === "eligible" || snapshot.eligibility === "pruned"
+      ? body
+      : "";
   return {
     audience: host.userId,
     authorityGeneration,
-    body,
-    eligibility: "eligible",
+    body: visible,
+    eligibility: snapshot.eligibility,
     id: scoped.sourceId,
     objectId: scoped.objectId,
     revision: scoped.revision,
     title: snapshot.typeId,
-    tokenCost: tokenCostOf(body),
+    tokenCost: tokenCostOf(visible),
   };
 }
 
