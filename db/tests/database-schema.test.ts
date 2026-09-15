@@ -24,6 +24,12 @@ import {
   organizationInvites,
   organizationMemberships,
   organizations,
+  operonClaims,
+  operonContactIdentities,
+  operonIdentityMerges,
+  operonObjectRevisions,
+  operonObjects,
+  operonSources,
   workspaceMemberships,
   workspaces,
 } from "../schema";
@@ -171,6 +177,22 @@ describe("database schema", () => {
       ).toBe(true);
     }
   });
+});
+
+it("scopes Operon authority tables to workspace membership", () => {
+  for (const table of [
+    operonSources,
+    operonClaims,
+    operonObjects,
+    operonObjectRevisions,
+    operonContactIdentities,
+    operonIdentityMerges,
+  ]) {
+    const foreignKeys = getTableConfig(table).foreignKeys;
+    expect(foreignKeys.map((foreignKey) => foreignKey.getName())).toContain(
+      `${getTableConfig(table).name}_membership_fkey`
+    );
+  }
 });
 
 it("owns C02 organization invite and append-only audit receipt tables", () => {

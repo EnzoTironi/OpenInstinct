@@ -7,6 +7,7 @@
  */
 export {
   ConcurrentModificationError,
+  InMemoryAuthority,
   InMemoryObjectStore,
   ObjectInstanceSchema,
   acceptActionInput,
@@ -25,4 +26,6 @@ export type {
   ActionHostBinding,
   Claim,
   DefinitionArtifact,
+  ObjectSnapshot,
+  SourceOccurrence,
 } from "@zoen/operon";
