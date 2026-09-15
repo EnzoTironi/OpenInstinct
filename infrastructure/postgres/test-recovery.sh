@@ -13,6 +13,7 @@ trap cleanup EXIT
 common=(-e POSTGRES_PASSWORD=test-password -e POSTGRES_DB=open_instinct_prod
   -e ZOEN_MEMORY_DATABASE_PASSWORD=test-memory-password
   -e ZOEN_MATRIX_DATABASE_PASSWORD=test-matrix-password
+  -e ZOEN_VAULTWARDEN_DATABASE_PASSWORD=test-vault-password
   -e ZOEN_APPLICATION_DATABASE_PASSWORD=test-app-password
   -e ZOEN_MIGRATION_DATABASE_PASSWORD=test-migrator-password
   -e PGBACKREST_REPO1_TYPE=posix -e PGBACKREST_REPO1_PATH=/backup
@@ -36,6 +37,8 @@ docker exec "$source_name" /usr/local/bin/bootstrap-memory.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-memory.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-matrix.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-matrix.sh
+docker exec "$source_name" /usr/local/bin/bootstrap-vaultwarden.sh
+docker exec "$source_name" /usr/local/bin/bootstrap-vaultwarden.sh
 allowed=$(docker exec "$source_name" psql -X -U postgres -d postgres -At -v ON_ERROR_STOP=1 \
   -c "SELECT has_database_privilege('zoen_memory', 'open_instinct_prod', 'CONNECT');")
 [[ $allowed == f ]] || { echo 'Memory role can enter the application database.' >&2; exit 1; }
@@ -43,6 +46,8 @@ docker exec -e PGPASSWORD=test-memory-password "$source_name" psql -X -h 127.0.0
   -c "CREATE TABLE memory_probe (id int PRIMARY KEY, value vector(3)); INSERT INTO memory_probe VALUES (1, '[1,2,3]');"
 docker exec -e PGPASSWORD=test-matrix-password "$source_name" psql -X -h 127.0.0.1 -U zoen_matrix -d zoen_matrix -v ON_ERROR_STOP=1 \
   -c "CREATE TABLE matrix_probe (id int PRIMARY KEY); INSERT INTO matrix_probe VALUES (1);"
+docker exec -e PGPASSWORD=test-vault-password "$source_name" psql -X -h 127.0.0.1 -U zoen_vaultwarden -d zoen_vaultwarden -v ON_ERROR_STOP=1 \
+  -c "CREATE TABLE vault_probe (id int PRIMARY KEY); INSERT INTO vault_probe VALUES (1);"
 docker exec -i "$source_name" psql -X -U postgres -d open_instinct_prod -v ON_ERROR_STOP=1 <<'SQL'
 CREATE EXTENSION vector;
 CREATE TABLE workspaces(id int PRIMARY KEY);
@@ -81,6 +86,9 @@ actual=$(docker exec -e PGPASSWORD=test-memory-password "$restore_name" psql -X 
 actual=$(docker exec -e PGPASSWORD=test-matrix-password "$restore_name" psql -X -h 127.0.0.1 -U zoen_matrix -d zoen_matrix -At -v ON_ERROR_STOP=1 \
   -c "SELECT count(*) = 1 FROM matrix_probe;")
 [[ $actual == t ]] || { echo 'Restored Matrix database or credentials failed.' >&2; exit 1; }
+actual=$(docker exec -e PGPASSWORD=test-vault-password "$restore_name" psql -X -h 127.0.0.1 -U zoen_vaultwarden -d zoen_vaultwarden -At -v ON_ERROR_STOP=1 \
+  -c "SELECT count(*) = 1 FROM vault_probe;")
+[[ $actual == t ]] || { echo 'Restored vault database or credentials failed.' >&2; exit 1; }
 actual=$(docker exec -e PGPASSWORD=test-app-password "$restore_name" psql -X -h 127.0.0.1 -U zoen_app -d open_instinct_prod -At -v ON_ERROR_STOP=1 \
   -c "SELECT count(*) = 1 AND NOT has_schema_privilege('zoen_app', 'public', 'CREATE') AND NOT pg_has_role('zoen_app', 'zoen_migrator', 'MEMBER') FROM workspaces;")
 [[ $actual == t ]] || { echo 'Restored runtime role isolation failed.' >&2; exit 1; }
@@ -89,4 +97,4 @@ if docker exec "$restore_name" /usr/local/bin/backup.sh full; then
   echo 'An isolated restore must not write backups.' >&2
   exit 1
 fi
-echo 'Encrypted backup, WAL replay, memory, Matrix and runtime role recovery passed.'
+echo 'Encrypted backup, WAL replay, memory, Matrix, vault and runtime role recovery passed.'
