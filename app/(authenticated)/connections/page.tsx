@@ -17,6 +17,7 @@ import connections from "../_components/connections.module.css";
 import { accessScopeForUser } from "@shared/identity/access-scope";
 import { TeamConnections } from "./_components/team-connections";
 import { ModelConnections } from "../_components/model-connections";
+import { ServiceConnections } from "./_components/service-connections";
 
 export default async function ConnectionsPage({
   searchParams,
@@ -31,6 +32,7 @@ export default async function ConnectionsPage({
         <h1 className="type-page-title">{t("Conexões da equipe")}</h1>
         <TeamConnections />
         <ModelConnections />
+        <ServiceConnections />
       </div>
     );
   const requestHeaders = await headers();
@@ -77,6 +79,7 @@ export default async function ConnectionsPage({
         </Link>
       )}
       <ModelConnections />
+      <ServiceConnections />
     </div>
   );
 }

@@ -11,12 +11,14 @@ import {
   CustomerToolError,
   customerToolId,
   decodeCustomerTool,
+  decodeCustomerValue,
   ToolProposalPath,
   PublishedToolPath,
   ToolSlug,
 } from "./tool-document";
 import { executeCustomerCode } from "../executor/customer-runtime";
 import { readExecutorCatalog } from "../executor/workspace";
+import { requireRemoteTool } from "../connectors/connections";
 
 export const CustomerToolPublication = Schema.Struct({
   slug: ToolSlug,
@@ -70,6 +72,16 @@ export const validateCustomerTool = Effect.fn("CustomerTools.validate")(
     yield* requireWorkspaceAccess(actor);
     if (actor.agentGrantId) return yield* new WorkspaceAccessDenied();
     const tool = yield* decodeCustomerTool(content);
+    if (tool.implementation.kind !== "code") {
+      yield* requireRemoteTool(actor, tool);
+      yield* Effect.forEach(tool.tests, (test) =>
+        Effect.gen(function* () {
+          yield* decodeCustomerValue(tool.inputSchema, test.input);
+          yield* decodeCustomerValue(tool.outputSchema, test.expected, true);
+        })
+      );
+      return { name: tool.name, tests: 0, status: "validated" as const };
+    }
     const available = new Set<string>(
       (yield* readExecutorCatalog(actor)).tools.map((entry) => entry.path)
     );

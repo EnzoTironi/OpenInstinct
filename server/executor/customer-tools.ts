@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Effect } from "effect";
+import { always } from "eve/tools/approval";
 import type { DynamicResolveContext } from "eve/tools";
 import {
   workspaceActorFromPrincipal,
@@ -16,6 +17,8 @@ import { executeCustomerCode } from "./customer-runtime";
 import { invokeWorkspaceTool, readExecutorCatalog } from "./workspace";
 import type { ExecutorCatalog } from "./definition";
 import { serverRuntime } from "../runtime";
+import { requireRemoteTool } from "../connectors/connections";
+import { invokeRemoteTool } from "../connectors/invocation";
 
 export const resolveCustomerTools = Effect.fn("Executor.customerTools")(
   function* (context: DynamicResolveContext) {
@@ -46,17 +49,30 @@ export const resolveCustomerTools = Effect.fn("Executor.customerTools")(
             return null;
           const definition = yield* decodeCustomerTool(file.content);
           if (
+            definition.implementation.kind === "code" &&
             definition.implementation.requires.some(
               (path) =>
                 !available.has(path) || path.startsWith("workspace.google.")
             )
           )
             return null;
+          if (definition.implementation.kind !== "code") {
+            const allowed = yield* requireRemoteTool(actor, definition).pipe(
+              Effect.as(true),
+              Effect.catchTag("ConnectorError", () => Effect.succeed(false))
+            );
+            if (!allowed) return null;
+          }
           const tool: ExecutorCatalog[string] = {
-            description: definition.description,
+            description:
+              definition.implementation.kind === "code"
+                ? definition.description
+                : `${definition.description} External service action: approval is required for these exact arguments. If the outcome is uncertain, do not retry with a new call; ask the user to verify the remote result.`,
             inputSchema: z.fromJSONSchema(definition.inputSchema),
             outputSchema: z.fromJSONSchema(definition.outputSchema),
-            codeSafe: true,
+            codeSafe: definition.implementation.kind === "code",
+            approval:
+              definition.implementation.kind === "code" ? undefined : always(),
             execute: (input, execution) =>
               serverRuntime.runPromise(
                 Effect.gen(function* () {
@@ -85,12 +101,20 @@ export const resolveCustomerTools = Effect.fn("Executor.customerTools")(
                     yield* Effect.context<
                       Effect.Services<ReturnType<typeof invokeWorkspaceTool>>
                     >();
-                  const output = yield* executeCustomerCode(definition, input, {
-                    invoke: (call) =>
-                      invokeWorkspaceTool(current, call).pipe(
-                        Effect.provide(services)
-                      ),
-                  });
+                  const output =
+                    definition.implementation.kind !== "code"
+                      ? yield* invokeRemoteTool(
+                          current,
+                          definition,
+                          input,
+                          `${execution.session.id}:${execution.callId}`
+                        )
+                      : yield* executeCustomerCode(definition, input, {
+                          invoke: (call) =>
+                            invokeWorkspaceTool(current, call).pipe(
+                              Effect.provide(services)
+                            ),
+                        });
                   // Membership and publication can change while a mediated read waits.
                   const latest = yield* (yield* WorkspaceRepository).read(
                     current,

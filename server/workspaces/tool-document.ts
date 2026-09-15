@@ -20,20 +20,26 @@ const CodeTool = Schema.Struct({
     Schema.isMaxLength(12)
   ),
 });
+const RemoteTool = Schema.Struct({
+  kind: Schema.Literals(["mcp", "openapi"]),
+  connectionId: Schema.String.check(Schema.isUUID()),
+  revision: Schema.String.check(Schema.isUUID()),
+  operation: Schema.NonEmptyString.check(Schema.isMaxLength(120)),
+});
 
 export const CustomerToolSchema = Schema.Struct({
   name: Schema.NonEmptyString.check(Schema.isMaxLength(80)),
   description: Schema.NonEmptyString.check(Schema.isMaxLength(500)),
   inputSchema: JsonObject,
   outputSchema: JsonObject,
-  implementation: CodeTool,
+  implementation: Schema.Union([CodeTool, RemoteTool]),
   tests: Schema.Array(
     Schema.Struct({
       input: JsonObject,
       expected: JsonObject,
       fixtures: Schema.Record(Schema.String, JsonObject),
     })
-  ).check(Schema.isMinLength(1), Schema.isMaxLength(5)),
+  ).check(Schema.isMaxLength(5)),
 });
 
 export class CustomerToolError extends Schema.TaggedError<CustomerToolError>()(
@@ -47,6 +53,8 @@ export class CustomerToolError extends Schema.TaggedError<CustomerToolError>()(
       "dependency_unavailable",
       "unavailable",
       "execution_failed",
+      "connection_changed",
+      "uncertain",
     ]),
   }
 ) {}
@@ -108,6 +116,8 @@ export const decodeCustomerTool = Effect.fn("CustomerTool.decode")(
     const tool = yield* Schema.decodeUnknownEffect(
       Schema.fromJsonString(CustomerToolSchema)
     )(content, { onExcessProperty: "error" });
+    if (tool.implementation.kind === "code" && tool.tests.length === 0)
+      return yield* new CustomerToolError({ reason: "invalid_definition" });
     if (
       tool.inputSchema.type !== "object" ||
       tool.outputSchema.type !== "object" ||

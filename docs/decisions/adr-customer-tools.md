@@ -1,6 +1,6 @@
 # Versioned customer tools in Executor
 
-Date: 2026-09-15. Status: bounded code tools implemented and integration-tested. Remote MCP/OpenAPI registration is the next slice; it is not available through this implementation.
+Date: 2026-09-15. Status: bounded code tools implemented and integration-tested. Remote MCP/OpenAPI registration is described in [Customer connectors](adr-customer-connectors.md).
 
 ## Publication and use
 
@@ -22,4 +22,4 @@ Input/output JSON Schema uses a bounded subset: objects, arrays, strings, number
 
 `tests/runtime/customer-tools.integration.ts` exercises personal publication, repeat-safe publication, a skill pinned to the tool ID, four simultaneous nested Code Mode calls, another personal workspace, stale descriptors after disable, rollback, member proposals, direct-write rejection, bound-group use and membership removal. Malicious code attempts environment access, filesystem access, an infinite loop and an undeclared dependency. The existing repository and skill integration suites cover Git concurrency and permission boundaries.
 
-A local browser proof uses a synthetic user in `companion_runtime_test`, not Google OAuth. Mobile UI transitions create, test, publish and disable a tool without another document request. It is not an end-to-end Eve reasoning or live-provider pass. Remote connectors, provider writes, full P03 fixture actions and native agent evals remain separate acceptance gates.
+A local browser proof uses a synthetic user in `companion_runtime_test`, not Google OAuth. Mobile UI transitions create, test, publish and disable a tool without another document request. It is not an end-to-end Eve reasoning or live-provider pass. Remote connector fixture proofs are recorded separately in [Customer connectors](adr-customer-connectors.md). A customer provider pilot and native agent evals remain separate acceptance gates.

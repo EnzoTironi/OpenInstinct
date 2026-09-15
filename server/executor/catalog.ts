@@ -49,6 +49,7 @@ const modules: readonly {
 // Code may compose reads; each write gets its own durable Eve call and operation ID.
 // This is an explicit allowlist, never a guess from an API verb or tool name.
 export const codeReadableTools = new Set([
+  "workspace.tools.connections",
   "gmail-search",
   "gmail-read-thread",
   "calendar-list-events",
