@@ -5,6 +5,7 @@ import type { ToolContext } from "eve/tools";
 import { scanSecretCanaries } from "../../server/qualification/canary";
 import { toolsMissingEvidence } from "../../server/qualification/inventory";
 import { discoverExecutor } from "../../server/executor/discovery";
+import { executorContext } from "../../server/executor/dispatch";
 import { requireVaultwarden } from "../../server/workspaces/vault";
 import { requireWhatsAppBridge } from "../../server/workspaces/whatsapp";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
@@ -65,7 +66,7 @@ test("catalog discovery after skill publication is inventoried and live provider
         const page = yield* Schema.decodeUnknownEffect(SearchPage, {
           onExcessProperty: "ignore",
         })(
-          yield* discoverExecutor(context, "search", {
+          yield* discoverExecutor(executorContext(context), "search", {
             kind: "tool",
             limit: 20,
             offset,
@@ -86,7 +87,7 @@ test("catalog discovery after skill publication is inventoried and live provider
       const skills = yield* Schema.decodeUnknownEffect(SearchPage, {
         onExcessProperty: "ignore",
       })(
-        yield* discoverExecutor(context, "search", {
+        yield* discoverExecutor(executorContext(context), "search", {
           kind: "skill",
           query: "qualify",
         })
