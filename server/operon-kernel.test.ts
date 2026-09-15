@@ -16,8 +16,11 @@ import {
   MailRejected,
   ObjectInstanceSchema,
   classifyLocator,
+  computerScopeKey,
   deliveryFulfillment,
+  embeddedRuntimeDecision,
   evaluateEvidence,
+  guestEnvironment,
   j1DefinitionArtifact,
   mailOutcome,
   replyLengthPolicy,
@@ -115,6 +118,24 @@ it("does compile the host kernel and mount Operon learned notes without Mem0", (
         { userId: "better-auth:ana" }
       );
       expect(child.finalReply).toBe(false);
+      expect(embeddedRuntimeDecision.selected).toBe("eve-just-bash");
+      expect(embeddedRuntimeDecision.agentOs).toBe("no-go");
+      expect(
+        computerScopeKey({
+          kind: "private",
+          userId: "better-auth:ana",
+          workspaceId: "personal:ana",
+        })
+      ).not.toBe(
+        computerScopeKey({
+          kind: "shared",
+          audienceId: "group:ana",
+          workspaceId: "personal:ana",
+        })
+      );
+      expect(
+        guestEnvironment({ DATABASE_URL: "postgresql://x", PATH: "/bin" })
+      ).toEqual({ PATH: "/bin" });
       expect(runtime).toContain("@zoen/operon");
       expect(runtime).toContain("LearnedMemory.layer");
       expect(runtime).not.toContain("Mem0.layer");
