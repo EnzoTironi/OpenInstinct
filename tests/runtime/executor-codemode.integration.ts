@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Effect, Layer, Result } from "effect";
 import { expect, test } from "vitest";
-import type { ToolContext } from "eve/tools";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { LearnedMemory } from "../../server/memory/learned";
 import { Mem0 } from "../../server/memory/mem0";
@@ -11,7 +10,7 @@ import {
   invokeExecutorCall,
 } from "../../server/executor/dispatch";
 import { discoverExecutor } from "../../server/executor/discovery";
-import { workspaceFixture } from "./workspace-fixture";
+import { workspaceFixture, workspaceExecutionFor } from "./workspace-fixture";
 import { runtimeDatabase } from "./database";
 import { toolContextFor } from "../helpers/tool-context";
 
@@ -20,32 +19,6 @@ const services = LearnedMemory.layer.pipe(
   Layer.provideMerge(WorkspaceRepository.layer),
   Layer.provideMerge(runtimeDatabase)
 );
-
-function executionFor(
-  actor: Effect.Success<ReturnType<typeof workspaceFixture>>["actor" | "guest"]
-) {
-  const base = toolContextFor({
-    toolName: "execute",
-    callId: randomUUID(),
-    sessionId: randomUUID(),
-  });
-  const principal = {
-    principalId: actor.userId,
-    principalType: "user",
-    authenticator: "authjs",
-    attributes: {
-      workspaceId: actor.workspaceId,
-      authSessionId: actor.authSessionId,
-    },
-  };
-  return {
-    ...base,
-    session: {
-      ...base.session,
-      auth: { current: principal, initiator: principal },
-    },
-  } satisfies ToolContext;
-}
 
 test("Code Mode discovers schemas and versioned skills without leaking personal files to a team", () =>
   Effect.runPromise(
@@ -63,7 +36,7 @@ test("Code Mode discovers schemas and versioned skills without leaking personal 
         expectedRevision: null,
         operationId: randomUUID(),
       });
-      const context = executionFor(guest);
+      const context = workspaceExecutionFor(guest);
       const searched = yield* executeCodeMode(
         'return await tools.search({query:"launch",kind:"skill"});',
         context
@@ -142,7 +115,7 @@ test("writes cannot run inside Code Mode, and a native call uses the same durabl
   Effect.runPromise(
     Effect.gen(function* () {
       const { actor, repository } = yield* workspaceFixture();
-      const context = executionFor(actor);
+      const context = workspaceExecutionFor(actor);
       const call = {
         path: "workspace-save",
         input: {
@@ -223,7 +196,7 @@ test("discovery and invocation both recheck plugin changes and member removal", 
   Effect.runPromise(
     Effect.gen(function* () {
       const { actor, guest, repository, sql } = yield* workspaceFixture();
-      const context = executionFor(guest);
+      const context = workspaceExecutionFor(guest);
       const first = yield* repository.write(actor, {
         path: "plugins/workspace.json",
         content: '{"version":1,"enabled":["files","google"]}',

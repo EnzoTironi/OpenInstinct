@@ -1041,5 +1041,22 @@
   "Revogar acesso do Zoen": "Revocar acceso de Zoen",
   "Até {date}": "Hasta {date}",
   "Não foi possível atualizar o acesso. Tente novamente.": "No se pudo actualizar el acceso. Inténtalo de nuevo.",
-  "Você escolhe quais itens o Zoen pode usar e por quanto tempo.": "Tú eliges qué elementos puede usar Zoen y por cuánto tiempo."
+  "Você escolhe quais itens o Zoen pode usar e por quanto tempo.": "Tú eliges qué elementos puede usar Zoen y por cuánto tiempo.",
+  "Peça ao Zoen uma ferramenta. Teste e publique aqui.": "Pídele una herramienta a Zoen. Pruébala y publícala aquí.",
+  "Ferramentas": "Herramientas",
+  "Ferramenta": "Herramienta",
+  "Proposta": "Propuesta",
+  "Publicada": "Publicada",
+  "Nova ferramenta": "Nueva herramienta",
+  "Minha ferramenta": "Mi herramienta",
+  "Organiza um texto.": "Organiza un texto.",
+  "Identificador da ferramenta": "Identificador de la herramienta",
+  "Definição e testes": "Definición y pruebas",
+  "Testar": "Probar",
+  "Salvar proposta": "Guardar propuesta",
+  "Publicar": "Publicar",
+  "Testes isolados passaram. O uso real mantém as permissões do espaço.": "Las pruebas aisladas pasaron. El uso real mantiene los permisos del espacio.",
+  "Não foi possível concluir. Confira a definição e atualize a revisão antes de tentar novamente.": "No se pudo completar. Revisa la definición y actualiza la revisión antes de volver a intentarlo.",
+  "Restaurar versão": "Restaurar versión",
+  "Desativar ferramenta": "Desactivar herramienta"
 }

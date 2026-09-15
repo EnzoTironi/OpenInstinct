@@ -1041,5 +1041,22 @@
   "Revogar acesso do Zoen": "Revoke Zoen access",
   "Até {date}": "Until {date}",
   "Não foi possível atualizar o acesso. Tente novamente.": "Could not update access. Try again.",
-  "Você escolhe quais itens o Zoen pode usar e por quanto tempo.": "You choose which items Zoen can use and for how long."
+  "Você escolhe quais itens o Zoen pode usar e por quanto tempo.": "You choose which items Zoen can use and for how long.",
+  "Peça ao Zoen uma ferramenta. Teste e publique aqui.": "Ask Zoen for a tool. Test and publish it here.",
+  "Ferramentas": "Tools",
+  "Ferramenta": "Tool",
+  "Proposta": "Proposal",
+  "Publicada": "Published",
+  "Nova ferramenta": "New tool",
+  "Minha ferramenta": "My tool",
+  "Organiza um texto.": "Organizes text.",
+  "Identificador da ferramenta": "Tool identifier",
+  "Definição e testes": "Definition and tests",
+  "Testar": "Test",
+  "Salvar proposta": "Save proposal",
+  "Publicar": "Publish",
+  "Testes isolados passaram. O uso real mantém as permissões do espaço.": "Isolated tests passed. Live use keeps the space permissions.",
+  "Não foi possível concluir. Confira a definição e atualize a revisão antes de tentar novamente.": "Could not finish. Check the definition and refresh the revision before trying again.",
+  "Restaurar versão": "Restore version",
+  "Desativar ferramenta": "Disable tool"
 }

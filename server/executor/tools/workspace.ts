@@ -31,10 +31,14 @@ export default defineDynamic({
       return {
         "workspace-save": defineTool({
           description:
-            "Save a document the user requested into the active workspace. First read workspace.files.list and pass its revision as expectedRevision, even when creating a NEW FILE. expectedRevision is the WORKSPACE head; null is only for an entirely empty workspace. Show the user the path and result. Team documents are shared with members. This tool cannot edit agent instructions, skills or plugin permissions. Re-read and reconcile a conflicting edit before retrying.",
+            "Save a document the user requested into the active workspace. First read workspace.files.list and pass its revision as expectedRevision, even when creating a NEW FILE. expectedRevision is the WORKSPACE head; null is only for an entirely empty workspace. Show the user the path and result. Team documents are shared with members. Use proposals/skills/<slug>.md or proposals/tools/<slug>.json to propose a skill or a customer tool. Before authoring tool JSON, call tools.describe.tool({path:'customer.tool.definition'}) in Code Mode for the definition schema. Proposals do not execute; an administrator must test and publish them in the app. This tool cannot edit published skills/tools, agent instructions or plugin permissions. Re-read and reconcile a conflicting edit before retrying.",
           inputSchema: toolInputSchema(
             Schema.Struct({
-              path: WorkspacePathSchema.check(Schema.isPattern(/^knowledge\//)),
+              path: WorkspacePathSchema.check(
+                Schema.isPattern(
+                  /^(?:knowledge|proposals\/(?:skills|tools))\//u
+                )
+              ),
               expectedRevision: Schema.NullOr(GitRevisionSchema),
               content: Schema.String.check(Schema.isMaxLength(262_144)),
             })

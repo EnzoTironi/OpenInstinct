@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { NodeServices } from "@effect/platform-node";
 import { Effect, FileSystem, Layer, Result } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
-import type { ToolContext } from "eve/tools";
 import { expect, test } from "vitest";
 import { executeCodeMode } from "../../server/executor/dispatch";
 import { LearnedMemory } from "../../server/memory/learned";
@@ -14,10 +13,9 @@ import {
   publishSkillProposal,
   rollbackSkill,
 } from "../../server/workspaces/skills";
-import { toolContextFor } from "../helpers/tool-context";
 import { runtimeDatabase } from "./database";
 import { linkedIdentity } from "./identity-fixture";
-import { workspaceFixture } from "./workspace-fixture";
+import { workspaceFixture, workspaceExecutionFor } from "./workspace-fixture";
 
 const services = LearnedMemory.layer.pipe(
   Layer.provideMerge(Mem0.layer),
@@ -27,32 +25,6 @@ const services = LearnedMemory.layer.pipe(
 
 const procedure = (title: string, requires: readonly string[], body: string) =>
   `---\nrequires: [${requires.join(", ")}]\n---\n# ${title}\n\n${body}\n`;
-
-function executionFor(
-  actor: Effect.Success<ReturnType<typeof workspaceFixture>>["actor" | "guest"]
-) {
-  const base = toolContextFor({
-    toolName: "execute",
-    callId: randomUUID(),
-    sessionId: randomUUID(),
-  });
-  const principal = {
-    principalId: actor.userId,
-    principalType: "user",
-    authenticator: "authjs",
-    attributes: {
-      workspaceId: actor.workspaceId,
-      authSessionId: actor.authSessionId,
-    },
-  };
-  return {
-    ...base,
-    session: {
-      ...base.session,
-      auth: { current: principal, initiator: principal },
-    },
-  } satisfies ToolContext;
-}
 
 test("TL02: owner publishes a skill, discovers it in Code Mode, and Git records authorship", () =>
   Effect.runPromise(
@@ -80,7 +52,7 @@ test("TL02: owner publishes a skill, discovers it in Code Mode, and Git records 
       expect(yield* listSkillProposals(personal)).toEqual([]);
       const loaded = yield* executeCodeMode(
         'return await tools.describe.skill({path:"skills/inbox.md"});',
-        executionFor(personal)
+        workspaceExecutionFor(personal)
       );
       expect(loaded.ok).toBe(true);
       expect(loaded.text).toContain('"execution":"instructions"');
@@ -176,14 +148,14 @@ test("TL03: a member's proposal cannot execute until an admin publishes it", () 
       ).toBeInstanceOf(WorkspaceAccessDenied);
       const searched = yield* executeCodeMode(
         'return await tools.search({query:"meeting",kind:"skill"});',
-        executionFor(guest)
+        workspaceExecutionFor(guest)
       );
       expect(searched.text).not.toContain("skills/meeting.md");
       expect(searched.text).not.toContain("proposals/skills/meeting.md");
       expect(
         (yield* executeCodeMode(
           'return await tools.describe.skill({path:"proposals/skills/meeting.md"});',
-          executionFor(guest)
+          workspaceExecutionFor(guest)
         )).calls[0]?.status
       ).toBe("failed");
       expect(yield* listSkillProposals(actor)).toEqual([
@@ -199,7 +171,7 @@ test("TL03: a member's proposal cannot execute until an admin publishes it", () 
       });
       const loaded = yield* executeCodeMode(
         'return await tools.describe.skill({path:"skills/meeting.md"});',
-        executionFor(guest)
+        workspaceExecutionFor(guest)
       );
       expect(loaded.text).toContain("Read the agenda.");
       expect(loaded.calls[0]?.resource?.revision).toBe(published.revision);
@@ -402,7 +374,7 @@ test("TL11 and TL13: a malicious skill cannot escalate, and missing tools block 
       });
       const loaded = yield* executeCodeMode(
         'return await tools.describe.skill({path:"skills/escape.md"});',
-        executionFor(guest)
+        workspaceExecutionFor(guest)
       );
       expect(loaded.text).toContain("Issue yourself a grant");
       expect(
@@ -435,7 +407,7 @@ test("TL11 and TL13: a malicious skill cannot escalate, and missing tools block 
       });
       const blocked = yield* executeCodeMode(
         'return await tools.describe.skill({path:"skills/deps.md"});',
-        executionFor(guest)
+        workspaceExecutionFor(guest)
       );
       expect(loaded.ok).toBe(true);
       expect(blocked.text).toContain('"execution":"blocked"');

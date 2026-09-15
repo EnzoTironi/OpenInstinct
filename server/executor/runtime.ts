@@ -15,6 +15,7 @@ const kernel = makeQuickJsExecutor({
   maxStackSizeBytes: 512 * 1024,
 });
 const capacity = Semaphore.makeUnsafe(4);
+const customerCapacity = Semaphore.makeUnsafe(4);
 export const ExecutorCodeSchema = Schema.NonEmptyString.check(
   Schema.isMaxLength(20_000)
 );
@@ -30,7 +31,7 @@ class ExecutorError extends Schema.TaggedError<ExecutorError>()(
 ) {}
 
 /** No process, network, filesystem or credentials enter the JS isolate. */
-export const runWorkspaceCode = Effect.fn("Executor.runWorkspaceCode")(
+const executeSandbox = Effect.fn("Executor.executeSandbox")(
   function* (code: string, invoker: SandboxToolInvoker) {
     const input = yield* Schema.decodeUnknownEffect(ExecutorCodeSchema)(code);
     // Keep Emscripten beside its WASM asset even when Eve bundles the host.
@@ -80,7 +81,6 @@ export const runWorkspaceCode = Effect.fn("Executor.runWorkspaceCode")(
       return yield* new ExecutorError({ reason: "limit_exceeded" });
     return { ok: true, text, logs: result.logs ?? [] };
   },
-  (execution) => capacity.withPermit(execution),
   Effect.timeout("30 seconds"),
   Effect.catchTag(
     "SchemaError",
@@ -90,4 +90,18 @@ export const runWorkspaceCode = Effect.fn("Executor.runWorkspaceCode")(
     ["TimeoutError", "QuickJsExecutionError"],
     () => new ExecutorError({ reason: "execution_failed" })
   )
+);
+
+export const runWorkspaceCode = Effect.fn("Executor.runWorkspaceCode")(
+  executeSandbox,
+  (execution) => capacity.withPermit(execution),
+  Effect.timeout("30 seconds")
+);
+
+// Separate capacity prevents nested customer computations from waiting for the
+// outer Code Mode permit they already hold. Customer dependencies cannot recurse.
+export const runCustomerCode = Effect.fn("Executor.runCustomerCode")(
+  executeSandbox,
+  (execution) => customerCapacity.withPermit(execution),
+  Effect.timeout("30 seconds")
 );
