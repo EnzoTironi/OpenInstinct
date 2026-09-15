@@ -113,6 +113,8 @@ customer conversations out of public reports. Security concerns go through
 - [Contribution guide](CONTRIBUTING.md) and [community conduct](CODE_OF_CONDUCT.md)
 - [Hosted beta terms](TERMS.md) and [privacy notice](PRIVACY.md)
 - [Architecture decisions](docs/decisions/) and [current launch evidence](docs/decisions/zoen-launch-validation.md)
+- [Customer platform implementation plan](docs/plans/customer-platform/) — trusted
+  networks, Matrix/A2A, tools, skills, Vaultwarden and hosted messaging validation
 
 ## License
 
