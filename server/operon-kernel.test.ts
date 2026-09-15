@@ -13,10 +13,13 @@ import {
   InMemoryAuthority,
   InMemoryObjectStore,
   InMemorySourceIngest,
+  MailRejected,
   ObjectInstanceSchema,
   classifyLocator,
   evaluateEvidence,
   j1DefinitionArtifact,
+  mailOutcome,
+  selectConnectedAccount,
   selectHostScopedContext,
 } from "./operon-kernel";
 
@@ -84,6 +87,14 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
         )
         .pipe(Effect.flip);
       expect(missing).toBeInstanceOf(IngestRejected);
+      expect(mailOutcome({ draftId: "draft_1", kind: "local_draft" })).toBe(
+        "draft"
+      );
+      const implicitAccount = yield* selectConnectedAccount(
+        ["Personal", "Work"],
+        ""
+      ).pipe(Effect.flip);
+      expect(implicitAccount).toBeInstanceOf(MailRejected);
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");
