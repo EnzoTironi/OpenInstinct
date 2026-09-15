@@ -7,7 +7,7 @@
     "@babel/parser": "7.29.2",
     "@base-ui/react": "^1.7.0",
     "@better-auth/oauth-provider": "1.7.2",
-    "@effect/platform-node": "4.0.0-rc.112",
+    "@effect/platform-node": "4.0.0-rc.115",
     "@effect/sql-pg": "4.0.0-rc.112",
     "@firecrawl/anydoc": "0.2.4",
     "@googleapis/calendar": "^16.0.0",
