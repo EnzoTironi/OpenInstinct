@@ -6,10 +6,18 @@ import { VaultLogins } from "./_components/logins";
 import { VaultOtherItems } from "./_components/other";
 import { readVaultItems } from "@db/services/vault";
 import { requireRequestScope } from "@web/auth/request-scope";
+import { Effect, Option } from "effect";
+import { serverRuntime } from "../../../server/runtime";
+import { requireVaultwarden } from "../../../server/workspaces/vault";
+import { Button } from "@web/components/ui/button";
+import { LockKeyholeIcon, ArrowUpRightIcon } from "lucide-react";
 
 export default async function Page() {
   const { t } = await getI18n();
   const scope = await requireRequestScope();
+  const hosted = await serverRuntime.runPromise(
+    requireVaultwarden().pipe(Effect.option)
+  );
   const items = await readVaultItems(scope);
   const itemsByKind = Object.groupBy(items, (item) => item.kind);
   const otherItems = items.filter(
@@ -25,6 +33,35 @@ export default async function Page() {
           {t("Você escolhe quais itens o Zoen pode usar e por quanto tempo.")}
         </p>
       </header>
+      {Option.isSome(hosted) ? (
+        <section className="flex items-center justify-between gap-4 rounded-3xl border bg-white/5 p-5">
+          <div className="flex items-center gap-3">
+            <LockKeyholeIcon className="size-6" />
+            <div>
+              <h2 className="type-label">{t("Seu cofre privado")}</h2>
+              <p className="type-caption text-muted-foreground">
+                {t("Protegido pela sua senha mestra.")}
+              </p>
+            </div>
+          </div>
+          <Button
+            nativeButton={false}
+            render={
+              <a
+                aria-label={t("Abrir cofre")}
+                href={hosted.value.url}
+                target="_blank"
+                rel="noreferrer"
+              />
+            }
+            variant="outline"
+          >
+            {t("Abrir cofre")}
+            <ArrowUpRightIcon />
+          </Button>
+        </section>
+      ) : null}
+      <h2 className="type-section-title">{t("Acessos deste espaço")}</h2>
       <VaultLogins items={itemsByKind.login ?? []} />
       <VaultCards items={itemsByKind.payment ?? []} />
       <VaultAddresses items={itemsByKind.address ?? []} />

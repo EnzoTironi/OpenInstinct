@@ -9,6 +9,7 @@ import { DateTime, Effect, Redacted, Schema } from "effect";
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { readVaultItem, readVaultSecret } from "@db/services/vault";
 import type { AccessScope } from "@shared/identity/access-scope";
+import { env } from "@shared/environment";
 import {
   requireWorkspaceAccess,
   WorkspaceAccessDenied,
@@ -37,14 +38,29 @@ const installationKey = Effect.fn("vaultAgentInstallationKey")(function* () {
   return Buffer.from(Redacted.value(secrets.secretEncryptionKey), "base64");
 });
 
-/**
- * Vaultwarden is a Bitwarden-compatible server. Collection membership there is a
- * server ACL around the organization key, not a per-item wrapping key. Zoen
- * does not speak to a homeserver until a live instance proves that handshake.
- */
-export const requireVaultwarden = Effect.fn("requireVaultwarden")(function* () {
-  return yield* new VaultwardenUnavailable();
-});
+export const requireVaultwarden = Effect.fn("requireVaultwarden")(
+  function* () {
+    const url = env.ZOEN_VAULTWARDEN_URL;
+    if (!url || !env.ZOEN_VAULTWARDEN_CLIENT_SECRET)
+      return yield* new VaultwardenUnavailable();
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        fetch(`${url}/alive`, {
+          method: "HEAD",
+          signal,
+          redirect: "error",
+          cache: "no-store",
+        }),
+      catch: () => new VaultwardenUnavailable(),
+    });
+    if (!response.ok) return yield* new VaultwardenUnavailable();
+    return { url };
+  },
+  Effect.timeoutOrElse({
+    duration: "3 seconds",
+    orElse: () => Effect.fail(new VaultwardenUnavailable()),
+  })
+);
 
 export const listDelegatedVaultItems = Effect.fn("listDelegatedVaultItems")(
   function* (scope: AccessScope) {

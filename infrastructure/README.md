@@ -6,16 +6,17 @@ providers. PostgreSQL is self-hosted; no managed Postgres product is provisioned
 
 ## Production layout
 
-| Resource                 | Configuration                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Web + Eve                | companion-tironi, gru, 2 shared CPUs / 2 GB                                                                         |
-| PostgreSQL 17 + pgvector | companion-pg-prod, gru, 1 shared CPU / 1 GB, encrypted 10 GB volume                                                 |
-| Private Mem0 API         | zoen-memory-tironi, gru, 1 shared CPU / 1 GB                                                                        |
-| Private Matrix           | zoen-matrix-tironi, gru, 1 shared CPU / 1 GB; Synapse 1.160.0, database zoen_matrix                                 |
-| Memory persistence       | PostgreSQL database zoen_memory, separate login; original encrypted 3 GB volume retained for legacy import/recovery |
-| Backups                  | Private Tigris bucket, pgBackRest client-side AES-256 encryption, continuous WAL archive                            |
-| Domain                   | Cloudflare A + AAAA records and Fly TLS certificate for zoen.tironi.xyz                                             |
-| Infrastructure state     | Alchemy Cloudflare remote state, encrypted with a separate key in Cloudflare Secrets Store                          |
+| Resource                 | Configuration                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Web + Eve                | companion-tironi, gru, 2 shared CPUs / 2 GB                                                                                    |
+| PostgreSQL 17 + pgvector | companion-pg-prod, gru, 1 shared CPU / 1 GB, encrypted 10 GB volume                                                            |
+| Private Mem0 API         | zoen-memory-tironi, gru, 1 shared CPU / 1 GB                                                                                   |
+| Private vault            | zoen-vault-tironi, gru, 1 shared CPU / 512 MB; Vaultwarden 1.37.3, restricted database zoen_vaultwarden, encrypted 3 GB volume |
+| Private Matrix           | zoen-matrix-tironi, gru, 1 shared CPU / 1 GB; Synapse 1.160.0, database zoen_matrix                                            |
+| Memory persistence       | PostgreSQL database zoen_memory, separate login; original encrypted 3 GB volume retained for legacy import/recovery            |
+| Backups                  | Private Tigris bucket, pgBackRest client-side AES-256 encryption, continuous WAL archive                                       |
+| Domain                   | Cloudflare A + AAAA records and Fly TLS certificate for zoen.tironi.xyz                                                        |
+| Infrastructure state     | Alchemy Cloudflare remote state, encrypted with a separate key in Cloudflare Secrets Store                                     |
 
 All machines remain running. PostgreSQL, memory and Matrix have no public service or IP.
 Fly private networking carries their traffic. The memory and Matrix database
@@ -60,7 +61,7 @@ service token and does not need an interactive login.
 
 `ZOEN_RELEASE` must be the full tested Git commit SHA. Alchemy builds and pushes
 Linux amd64 images and deploys their immutable digests. Optional
-`ZOEN_POSTGRES_IMAGE`, `ZOEN_MEMORY_IMAGE`, `ZOEN_MATRIX_IMAGE`, and `ZOEN_WEB_IMAGE` digest references
+`ZOEN_POSTGRES_IMAGE`, `ZOEN_MEMORY_IMAGE`, `ZOEN_MATRIX_IMAGE`, `ZOEN_VAULTWARDEN_IMAGE`, and `ZOEN_WEB_IMAGE` digest references
 support adoption or a deliberate rollback. Keep the database on PostgreSQL major
 17; a major upgrade requires a separate migration and recovery plan.
 Which SHA has actually been published is recorded in the
@@ -74,10 +75,10 @@ superuser, role creation, database creation, replication or RLS bypass. It canno
 assume the migrator role. Graphile's private queue tables have an explicit runtime
 policy; the application does not become their owner to bypass RLS.
 
-One Alchemy action prepares the application, memory and Matrix databases in
+One Alchemy action prepares the application, memory, Matrix and Vaultwarden databases in
 sequence. Their scripts update shared PostgreSQL catalogs and database permissions,
 so independent parallel actions can conflict. Migrations and service updates depend
-on the completed preparation, including all three credential versions.
+on the completed preparation, including all four credential versions.
 
 Before switching the web image, the stack takes an incremental backup and runs
 `scripts/migrate-hosted.ts` in a temporary machine with no public services, DNS
@@ -180,8 +181,8 @@ Every deployment ends with an isolated production recovery drill. The same drill
 runs every Sunday at 04:47 UTC, after the scheduled full backup. Temporary recovery
 resources are removed even if verification fails.
 Its protected configuration is supplied by `ZOEN_PRODUCTION_ENV` and
-`ZOEN_ALCHEMY_STATE`. The uptime workflow uses an app-scoped
-`ZOEN_FLY_OPERATIONS_TOKEN`; no application secrets are required by its probe.
+`ZOEN_ALCHEMY_STATE`. The uptime workflow uses `ZOEN_FLY_OPERATIONS_TOKEN` scoped to the database
+and Vaultwarden apps; no application secrets are required by its probe.
 Rotate Fly deploy/probe tokens before their 90-day expiry. State and backup
 credentials are never included in uploaded artifacts.
 
@@ -219,3 +220,21 @@ ensures unrelated API errors still fail the deployment. Remove the patch only wh
 upstream version supports these behaviors and the adoption/recovery
 proofs still pass. The provider remains native; provisioning is not a shell
 wrapper around flyctl.
+
+## Vaultwarden operations
+
+Alchemy declares the official image digest, database role, SSO secret, public TLS
+endpoint `vault.zoen.tironi.xyz`, encrypted volume and private Tigris backup
+repository. All three generated passwords (database, SSO client and restic) are
+retained in Alchemy state and Fly secrets; none are user master passwords.
+Back up access to the encrypted Alchemy state separately from the database.
+`vaultwarden/README.md` describes recovery, maintenance and rotation.
+
+The health probe also checks the latest remote Vaultwarden snapshot and disk
+usage. Before activating this revision, refresh the operations token with both
+app scopes; its previous database-only token cannot inspect the vault machine.
+The deploy workflow requires the vault probe; set the repository variable
+`ZOEN_VAULT_PROBE_ENABLED=true` after deployment to enable the scheduled probe.
+Until then the existing database monitor explicitly reports that the vault probe
+is inactive, avoiding false incidents before the service exists.
+Vaultwarden's own public health endpoint reports process liveness only.

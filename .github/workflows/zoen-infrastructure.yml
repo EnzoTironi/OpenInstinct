@@ -98,7 +98,7 @@ jobs:
       - name: Verify database backup and public service
         if: env.OPERATION != 'plan'
         run: |
-          pnpm --dir infrastructure check:production
+          ZOEN_VAULT_PROBE_ENABLED=true pnpm --dir infrastructure check:production
           curl --fail --show-error --max-time 30 https://zoen.tironi.xyz/eve/v1/health
       - name: Remove runner credentials
         if: always()

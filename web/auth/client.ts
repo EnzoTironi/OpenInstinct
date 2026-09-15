@@ -1,2 +1,5 @@
 import { createAuthClient } from "better-auth/react";
-export const authClient = createAuthClient();
+import { oauthProviderClient } from "@better-auth/oauth-provider/client";
+export const authClient = createAuthClient({
+  plugins: [oauthProviderClient()],
+});

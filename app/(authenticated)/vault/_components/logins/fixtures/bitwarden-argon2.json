@@ -1,0 +1,15 @@
+{
+  "source": "Bitwarden crypto KDF test_master_key_derive_argon2 known-answer key; synthetic envelope",
+  "password": "67t9b5g67$%Dh89n",
+  "export": {
+    "encrypted": true,
+    "passwordProtected": true,
+    "kdfType": 1,
+    "kdfMemory": 32,
+    "kdfIterations": 4,
+    "kdfParallelism": 2,
+    "salt": "test_key",
+    "encKeyValidation_DO_NOT_EDIT": "2.LBGF6CXN6xr1nR68Bl5PvQ==|qrRodrztXqP4DLEVNrwFXCtsWvKzGMpGEQEGrqQ4C2g=|mHyOcAowVhHGq3haL/aiWRWLKZGC8eD6yO1aJskgmrg=",
+    "data": "2.oN5JBY5IUctcDmBjJiIs9g==|PUDjDqZnNrPP+Hk0Mj8aln99WHLT9IUKohPry5A05fuDT5sAqHXTHe/Oyfy9PqZVDa8xkL/j/BTsDl/yzAMsLoFMfdrKbrncI14KpaTm6EH50unAAEgAfuniJGXyrtERq7axffs5NNuCBzrmVeGPpjFd4lsiV2lOShyURi88VNXJHgLAGgX0G/t0SYj5t0JaRR3f82mEkDKL4+BanWUJbmiVYqI+ZRGmpQU7HCxxOj4=|SuD9BFR2Qzvl+/mH46WVIW/X7WJWCUMWEWVqG7+aTac="
+  }
+}

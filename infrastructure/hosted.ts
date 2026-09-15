@@ -16,6 +16,7 @@ import { provisionMatrix, deployMatrix } from "./matrix.ts";
 import { ReconcileChannelWebhooks } from "./webhooks.ts";
 import { RetireLegacyWeb } from "./web-cutover.ts";
 import { provisionErasureJournal } from "./erasure-journal.ts";
+import { provisionVaultwarden, deployVaultwarden } from "./vaultwarden.ts";
 
 export const hosted = Effect.gen(function* () {
   const policy = yield* CompanionStagePolicy;
@@ -50,6 +51,11 @@ export const hosted = Effect.gen(function* () {
   const matrixServerName = prod
     ? "matrix.zoen.tironi.xyz"
     : `matrix-${policy.stage}.zoen.invalid`;
+  const vaultSecrets = yield* provisionVaultwarden({
+    stage: policy.stage,
+    postgresApp,
+    webApp,
+  });
 
   const password = yield* Config.redacted("COMPANION_POSTGRES_PASSWORD");
   const pgSecret = yield* Fly.Secret("PostgresPassword", {
@@ -143,6 +149,9 @@ export const hosted = Effect.gen(function* () {
         Output.map((value) => value ?? "")
       ),
       "zoen.matrix-password": matrixSecrets.databaseVersion,
+      "zoen.vault-password": vaultSecrets.databaseVersion.pipe(
+        Output.map((value) => value ?? "")
+      ),
       "zoen.upgrade-snapshot": preUpgradeSnapshot
         ? preUpgradeSnapshot.snapshotId
         : "new-installation",
@@ -156,7 +165,8 @@ export const hosted = Effect.gen(function* () {
     credentialVersion: Output.all(
       applicationCredentialVersion,
       memoryBootstrapPassword.digest,
-      matrixSecrets.databaseVersion
+      matrixSecrets.databaseVersion,
+      vaultSecrets.databaseVersion
     ).pipe(Output.map((values) => JSON.stringify(values))),
   });
   const matrix = yield* deployMatrix({
@@ -166,6 +176,13 @@ export const hosted = Effect.gen(function* () {
     webApp: webName,
     serverName: matrixServerName,
     region,
+  });
+  const vaultwarden = yield* deployVaultwarden({
+    stage: policy.stage,
+    provision: vaultSecrets,
+    postgresApp: pgName,
+    issuer: `https://${hostname}/api/auth`,
+    databaseRelease: databases.release,
   });
 
   const memoryDatabaseSecret = yield* Fly.Secret("MemoryDatabaseUrl", {
@@ -286,6 +303,7 @@ export const hosted = Effect.gen(function* () {
       ZOEN_MEM0_URL: `http://${memoryName}.internal:8000`,
       ZOEN_MATRIX_URL: `http://${matrixSecrets.name}.internal:8008`,
       ZOEN_MATRIX_SERVER_NAME: matrixServerName,
+      ZOEN_VAULTWARDEN_URL: `https://${vaultSecrets.hostname}`,
     },
     mounts: [
       {
@@ -326,6 +344,9 @@ export const hosted = Effect.gen(function* () {
       "zoen.secrets": webSecrets,
       "zoen.migrated-image": migrations.image,
       "zoen.matrix": matrixSecrets.webVersion,
+      "zoen.vault": vaultSecrets.webVersion.pipe(
+        Output.map((value) => value ?? "")
+      ),
       "zoen.erasure-journal": erasureJournal,
       "zoen.runtime-database": Output.all(
         ...databaseUrls.map((secret) => secret.digest)
@@ -382,6 +403,7 @@ export const hosted = Effect.gen(function* () {
     postgres: postgres.machineId,
     memory: memory.machineId,
     matrix: matrix.machineId,
+    vaultwarden: vaultwarden.machineId,
     web: web.machineId,
   };
 }).pipe(Effect.provide(CompanionStagePolicy.layer));

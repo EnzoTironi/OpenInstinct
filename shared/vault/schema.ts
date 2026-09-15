@@ -73,6 +73,7 @@ export const loginIdentifierSchema = z
 const loginAuthenticationSchema = z.discriminatedUnion("type", [
   z.object({
     password: z.string().min(1).max(20_000),
+    totp: z.string().min(1).max(2_048).optional(),
     type: z.literal("password"),
   }),
   z.object({ type: z.literal("email_otp") }),

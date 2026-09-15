@@ -54,6 +54,7 @@ jobs:
         working-directory: infrastructure
         env:
           FLY_API_TOKEN: ${{ secrets.ZOEN_FLY_OPERATIONS_TOKEN }}
+          ZOEN_VAULT_PROBE_ENABLED: ${{ vars.ZOEN_VAULT_PROBE_ENABLED || 'false' }}
         run: node operations.ts check
 
   incident:
