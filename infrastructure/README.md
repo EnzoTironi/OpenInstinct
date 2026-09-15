@@ -63,6 +63,10 @@ Linux amd64 images and deploys their immutable digests. Optional
 `ZOEN_POSTGRES_IMAGE`, `ZOEN_MEMORY_IMAGE`, `ZOEN_MATRIX_IMAGE`, and `ZOEN_WEB_IMAGE` digest references
 support adoption or a deliberate rollback. Keep the database on PostgreSQL major
 17; a major upgrade requires a separate migration and recovery plan.
+Which SHA has actually been published is recorded in the
+[customer-platform release map](../docs/decisions/adr-customer-platform-release.md);
+REL02 stays blocked until that SHA's images, recovery drill and health checks
+are written down. Do not use Eve's generic deploy.
 
 Alchemy creates separate `zoen_app` and `zoen_migrator` logins with independent
 vault secrets. The runtime has DML and native workflow queue permissions, no DDL,

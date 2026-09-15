@@ -4,11 +4,17 @@ Status (2026-09-14): the Google-first onboarding release is deployed. Existing
 Google and WhatsApp accounts have completed real sign-in, and a WhatsApp reply is
 visible in both the native app and web history. Telegram group isolation fixes
 are merged; their production promotion and a real group reply remain pending.
-Explicit consolidation of the separate pilot accounts is not yet qualified.
+The remaining split pilot accounts are joined only through the explicit archive
+path. Ordinary onboarding has no merge screen; an unknown messenger no longer
+creates a user. That archive path is not a live pass for later stack SHAs.
 This ledger is evidence, not launch approval.
 Deployed baseline: `94b1f1e117ea7e3d49d1ff923097bd0883d2d8aa`.
 This ledger tracks the launch work after the verified team-agents release.
 A passing component test is not a completed user journey or a live-provider proof.
+Installed versus fixture-tested, unavailable and missing live proof for the later
+P01–P08 stack is in the
+[customer-platform release map](adr-customer-platform-release.md).
+That map does not reclassify the dated live evidence below.
 
 ## Current functional qualification
 
@@ -28,7 +34,8 @@ A passing component test is not a completed user journey or a live-provider proo
 - The pilot's Google/Telegram account and legacy WhatsApp account are separate.
   A normal link challenge correctly refuses this conflict. The browser currently
   waits until expiry while the native chat reports refusal; this is not a passed
-  recovery journey. Consolidation still requires the explicit archive flow.
+  recovery journey. Joining those two existing accounts still requires the
+  explicit archive path; it is not a future merge in ordinary sign-in.
 - An old native approval interrupted the legacy WhatsApp conversation. Ordinary
   replies continued, but an explicit cancellation exposed a routing defect:
   `/internal/channel-input/respond` returned a browser sign-in redirect instead
@@ -266,8 +273,9 @@ Production rollout on 2026-09-13:
   complete account-link journey is still a separate, unpassed gate.
 - A read-only production inspection confirmed that the current Telegram and
   WhatsApp pilot identities belong to different accounts. A prompt or webhook
-  correction cannot safely unify them. Explicit account consolidation is still
-  required; the conflict check has not been bypassed and no identities were moved.
+  correction cannot safely unify them. Joining those two accounts still uses
+  the explicit archive path; the conflict check has not been bypassed and no
+  identities were moved.
 - The deployed web chat completed a real Code Mode query with two successful
   Executor searches, one for tools and one for skills, then replied normally.
   That workspace has no published skills; the synthetic benchmark provisions

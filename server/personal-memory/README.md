@@ -158,7 +158,9 @@ mutating memory tool result is present without a pending refresh. A later
 - **Full account erase/restore:** export today is not full-account backup. Account
   delete online wipe covers personal memory + browser sessions only; channel
   identities, schedules, artifacts, history, user/workspace rows and backups are
-  not erased. Restore reconciliation remains a separate P06 gate.
+  not erased. Durable Zoen-controlled deletion is
+  [account deletion](../../docs/decisions/adr-account-deletion.md); live
+  providers stay `pending_external`.
 
 ### Code
 

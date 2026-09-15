@@ -1,9 +1,12 @@
 # Companion Release-1 self-host / ops
 
-Operator recipe for running Companion (this OpenInstinct fork) on your own host.
+Operator recipe for running this repository on your own host.
 End users on the hosted product should follow [consumer first-run](consumer-first-run.md), not this page.
 This is an **implementation-in-progress** install path, not a finished release or
-admitted user pilot. For deeper evidence and limits, see
+admitted user pilot. What is installed, fixture-tested, unavailable or missing
+live proof is in the
+[customer-platform release map](decisions/adr-customer-platform-release.md).
+For deeper evidence and limits, see
 [local runtime setup](local-runtime-setup.md). Product contracts live in the
 [blueprint](companion-blueprint.md).
 
@@ -317,14 +320,15 @@ tested.
 
 Routes (browser session + canonical membership required; fail closed):
 
-| Route                 | Method | Behavior                                                 |
-| --------------------- | ------ | -------------------------------------------------------- |
-| `/api/account/export` | GET    | Partial privacy export (stored personal memory)          |
-| `/api/account/delete` | POST   | Online personal-memory wipe + browser session invalidate |
+| Route                  | Method | Behavior                                                        |
+| ---------------------- | ------ | --------------------------------------------------------------- |
+| `/api/account/export`  | GET    | Partial privacy export (stored personal memory)               |
+| `/api/account/delete`  | POST   | Online personal-memory wipe + browser session invalidate        |
+| `/api/account/erasure` | POST   | Durable Zoen-controlled personal deletion + tombstone          |
 
-**Not full account deletion.** Export and delete cover stored personal memory
-only. Account UI → **Privacy export and online wipe** links the same
-`POST /api/account/delete` flow and lists `partial_online_wipe` exclusions.
+**Account UI wipe is not full account deletion.** Export and `POST /api/account/delete`
+cover stored personal memory only. Account UI → **Privacy export and online wipe**
+links that flow and lists `partial_online_wipe` exclusions.
 See [`server/accounts/README.md`](../server/accounts/README.md) and
 `server/accounts/privacy.ts`.
 
@@ -333,8 +337,14 @@ Delete **does wipe:** personal-memory surface for the scope; Better Auth
 
 Delete **does not erase:** conversation history, artifacts, connected accounts,
 schedules, unbound memory documents, channel identities, backups, workspace row,
-or user row. Restore reconciliation and a deletion ledger remain separate P06
-gates. Do **not** claim full account deletion or backup erasure to users.
+or user row.
+
+**Durable erasure** is `POST /api/account/erasure`. It erases the personal
+workspace, identities, grants, jobs and connections under Zoen control, keeps
+company workspaces, and writes a tombstone that a restore must replay. Live
+Mem0, Matrix, Vaultwarden, mautrix and backups stay `pending_external`. See
+[account deletion](decisions/adr-account-deletion.md). Do **not** claim backup
+erasure or third-party purge to users.
 
 ## 10. Live qualification gaps (honest)
 
@@ -367,6 +377,7 @@ Index: [docs/ops/](ops/README.md). ADR:
 
 ## Related
 
+- [Customer-platform release map](decisions/adr-customer-platform-release.md)
 - [Hosted Fly cutover (H01)](ops/hosted-fly.md)
 - [Infrastructure / Alchemy README](../infrastructure/README.md)
 - [Durable ingress (named tunnel + webhooks)](../infrastructure/ingress/README.md)

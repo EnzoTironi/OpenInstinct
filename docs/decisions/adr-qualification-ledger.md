@@ -10,7 +10,8 @@ Builds on: [launch validation](zoen-launch-validation.md),
 [Executor discovery](adr-skill-proposals-and-dependencies.md),
 [Vaultwarden](adr-vaultwarden-delegation.md),
 [WhatsApp bridge](adr-whatsapp-user-bridge.md),
-[account deletion](adr-account-deletion.md).
+[account deletion](adr-account-deletion.md),
+[customer-platform release](adr-customer-platform-release.md).
 
 ## Decision
 

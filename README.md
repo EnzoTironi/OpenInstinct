@@ -12,9 +12,11 @@ the accounts, files and actions it can access.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Stage: free closed beta.** This repository is actively developed. The
-[launch ledger](docs/decisions/zoen-launch-validation.md) separates passing tests,
-live-provider evidence and remaining launch gates. It is the source of truth for
-qualification; a green badge alone does not mean every integration is available.
+[customer-platform release map](docs/decisions/adr-customer-platform-release.md)
+says what is installed, fixture-tested, unavailable or missing live proof. The
+[qualification ledger](docs/decisions/adr-qualification-ledger.md) and
+[launch ledger](docs/decisions/zoen-launch-validation.md) keep those kinds of
+evidence separate. A green badge is not a live-provider pass.
 
 ## What it does
 
@@ -32,9 +34,11 @@ qualification; a green badge alone does not mean every integration is available.
 
 Telegram group support is being qualified. Ordinary WhatsApp groups are **not
 enabled** by the current Kapso Cloud API setup. iMessage and paid checkout are
-unavailable during this beta. Vaultwarden and Beeper are evaluations, not shipped
-integrations. Reference catalogs under `docs/recipe-integrations/` are research,
-not a list of activated product capabilities.
+unavailable during this beta. Vaultwarden and the user WhatsApp bridge have
+PostgreSQL envelopes and fail closed without live servers; they are not
+activated product integrations. Beeper Desktop is not installed. Reference
+catalogs under `docs/recipe-integrations/` are research, not a list of
+activated product capabilities.
 
 ## Architecture
 
@@ -83,9 +87,11 @@ verified webhook setup. Provider subscriptions, terms and quotas still apply whe
 you bring an existing model account.
 
 Production deployment uses the **Zoen infrastructure** GitHub workflow and
-Alchemy. Promotion requires successful checks and native evaluations on the exact
-source revision, then performs an isolated recovery drill and live health checks.
-See the [operations guide](docs/ops/README.md). The Vercel CLI is not part of this
+Alchemy, not Eve's generic deploy. Publication must use the same SHA that
+passed checks, with recorded image digests, an isolated recovery drill and live
+health checks. That publication (REL02) has not been run for this stack. See the
+[release map](docs/decisions/adr-customer-platform-release.md) and
+[operations guide](docs/ops/README.md). The Vercel CLI is not part of this
 installation's deployment toolchain.
 
 ## Validate and contribute
@@ -93,14 +99,17 @@ installation's deployment toolchain.
 ```sh
 pnpm check --concurrency=1
 node --env-file=.env.local --run db:check
+pnpm eval:list
 pnpm audit
 pnpm --dir infrastructure audit
 ```
 
 `pnpm test:runtime` requires the dedicated `companion_runtime_test` database and
-an ignored `.env.runtime.local`. It must never run against production. Native
-agent evaluations additionally need isolated fixtures and authorized model/browser
-credentials; see [reproduction instructions](docs/decisions/zoen-launch-validation.md#reproducing-native-evaluations).
+an ignored `.env.runtime.local`. It must never run against production. `pnpm eval:ci`
+needs an isolated loopback app plus model/browser credentials; listing cases is
+not a live grade. See
+[release gates](docs/decisions/adr-customer-platform-release.md) and
+[reproduction instructions](docs/decisions/zoen-launch-validation.md#reproducing-native-evaluations).
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. Use issue forms
 for reproducible bugs and feature proposals, and keep credentials and real
@@ -113,6 +122,7 @@ customer conversations out of public reports. Security concerns go through
 - [Contribution guide](CONTRIBUTING.md) and [community conduct](CODE_OF_CONDUCT.md)
 - [Hosted beta terms](TERMS.md) and [privacy notice](PRIVACY.md)
 - [Architecture decisions](docs/decisions/) and [current launch evidence](docs/decisions/zoen-launch-validation.md)
+- [Customer-platform release map](docs/decisions/adr-customer-platform-release.md)
 
 ## License
 

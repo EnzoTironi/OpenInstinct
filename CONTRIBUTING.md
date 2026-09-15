@@ -1,7 +1,8 @@
 # Contributing to Zoen
 
-Start with the [README](README.md), relevant [architecture decisions](docs/decisions/)
-and [launch ledger](docs/decisions/zoen-launch-validation.md). For a substantial
+Start with the [README](README.md), relevant [architecture decisions](docs/decisions/),
+the [release map](docs/decisions/adr-customer-platform-release.md) and the
+[launch ledger](docs/decisions/zoen-launch-validation.md). For a substantial
 feature, open a proposal explaining the user problem and intended boundary.
 
 ## Development
@@ -21,8 +22,9 @@ permissions, provider verification or native approval controls.
 
 1. Make one coherent change with a clear problem and resulting behavior.
 2. Run `pnpm check --concurrency=1`,
-   `node --env-file=.env.local --run db:check` and relevant build/runtime
-   checks. Runtime tests require `companion_runtime_test`; never use production.
+   `node --env-file=.env.local --run db:check`, `pnpm eval:list` and relevant
+   build/runtime checks. Runtime tests require `companion_runtime_test`; never
+   use production. Listing evals is not a live grade.
 3. Cover changed permissions, durable state or failures with regression tests.
    Distinguish fixture results from live-provider evidence.
 4. Update docs and all three interface languages when behavior or copy changes.

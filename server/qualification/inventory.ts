@@ -9,6 +9,7 @@ const Family = Schema.Literals([
   "capacity",
   "observability",
   "fault",
+  "release",
 ]);
 const Surface = Schema.Literals(["coordinator", "browser", "all"]);
 const Provider = Schema.Literals([
@@ -343,6 +344,49 @@ const rows: readonly QualificationRow[] = [
       "docs/decisions/adr-qualification-ledger.md"
     ),
     live: blocked(live.alert),
+  },
+  {
+    id: "REL01",
+    family: "release",
+    path: "same-sha-gates",
+    surface: "all",
+    provider: "none",
+    advertised: false,
+    fixture: fixture(
+      "contract",
+      "docs/decisions/adr-customer-platform-release.md"
+    ),
+    live: blocked(
+      "eval:ci and full test:runtime were not executed in this authoring VM. Per-SHA check/build/eval:list belong on the PR, not as a standing live pass."
+    ),
+  },
+  {
+    id: "REL02",
+    family: "release",
+    path: "alchemy-publish",
+    surface: "all",
+    provider: "none",
+    advertised: false,
+    fixture: blockedFixture(
+      "live",
+      "docs/decisions/adr-customer-platform-release.md"
+    ),
+    live: blocked(
+      "Alchemy publish, image digests, recovery drill and post-deploy health were not run for this SHA."
+    ),
+  },
+  {
+    id: "REL03",
+    family: "release",
+    path: "capability-map",
+    surface: "all",
+    provider: "none",
+    advertised: false,
+    fixture: fixture(
+      "contract",
+      "docs/decisions/adr-customer-platform-release.md"
+    ),
+    live: blocked("This SHA was not published to the hosted beta."),
   },
 ];
 

@@ -66,6 +66,19 @@ describe("qualification inventory", () => {
     }
   });
 
+  it("keeps release rows on documentation and never marks publication passed", () => {
+    const rel01 = qualificationEvidence.find((entry) => entry.id === "REL01");
+    const rel02 = qualificationEvidence.find((entry) => entry.id === "REL02");
+    const rel03 = qualificationEvidence.find((entry) => entry.id === "REL03");
+    expect(rel01?.family).toBe("release");
+    expect(rel01?.fixture.result).toBe("passed");
+    expect(rel01?.live.result).toBe("blocked");
+    expect(rel02?.fixture.result).toBe("blocked");
+    expect(rel02?.live.result).toBe("blocked");
+    expect(rel03?.fixture.result).toBe("passed");
+    expect(rel03?.live.result).toBe("blocked");
+  });
+
   it("scans planted secret canaries after diagnostic redaction", () => {
     const planted = [
       "canary-password-value",

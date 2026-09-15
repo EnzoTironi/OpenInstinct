@@ -364,6 +364,8 @@ rule. Partial field updates avoid restoring concurrently forgotten fields; an
 empty recalled profile retains its stable message identity so earlier profile
 content is replaced. Browser profile controls and native tools use those services.
 These controls do not establish full account deletion or restore reconciliation.
+Durable Zoen-controlled deletion is documented in
+[account deletion](decisions/adr-account-deletion.md).
 
 The composed profile/memory/revocation suite passed ten PostgreSQL tests in three
 files. Channel revocation and exact web-session sign-out were tested against
