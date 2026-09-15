@@ -21,6 +21,7 @@ import {
   mailOutcome,
   selectConnectedAccount,
   selectHostScopedContext,
+  whatsAppSendClaim,
 } from "./operon-kernel";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -95,6 +96,7 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
         ""
       ).pipe(Effect.flip);
       expect(implicitAccount).toBeInstanceOf(MailRejected);
+      expect(whatsAppSendClaim("queued")).toBe("pending");
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");
