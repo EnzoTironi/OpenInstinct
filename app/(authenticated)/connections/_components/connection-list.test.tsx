@@ -24,7 +24,7 @@ vi.mock("@web/trpc/client", () => ({
             data: { accounts: [], chats: [] },
             error: null,
             isPending: false,
-            refetch: vi.fn(),
+            refetch: vi.fn<() => void>(),
           }),
         },
         start: {

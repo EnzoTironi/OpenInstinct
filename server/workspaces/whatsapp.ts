@@ -10,7 +10,7 @@ import {
   whoamiWhatsApp,
   WhatsAppBridgeUnavailable,
 } from "../whatsapp/client";
-import { MatrixEventSchema } from "../matrix/client";
+import type { MatrixEventSchema } from "../matrix/client";
 import {
   requireWorkspaceAccess,
   WorkspaceAccessDenied,
@@ -735,11 +735,11 @@ const startBridgeLogin = Effect.fn("startWhatsAppBridgeLogin")(function* (
   accountId: string,
   matrixUserId: string | null
 ) {
-  if (!matrixUserId) return { loginId: null as string | null, qr: null };
+  if (!matrixUserId) return { loginId: null, qr: null };
   const started = yield* startWhatsAppLogin(matrixUserId).pipe(
     Effect.catch(() => Effect.succeed(null))
   );
-  if (!started) return { loginId: null as string | null, qr: null };
+  if (!started) return { loginId: null, qr: null };
   const sql = yield* PgClient.PgClient;
   yield* sql`UPDATE whatsapp_bridge_accounts SET login_id = ${started.loginId}
     WHERE id = ${accountId}`;

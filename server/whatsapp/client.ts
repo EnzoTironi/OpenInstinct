@@ -35,7 +35,7 @@ const whoamiSchema = Schema.Struct({
 });
 const eventSchema = Schema.Struct({ event_id: Schema.String });
 
-export const whatsappBridgeConfiguration = Effect.gen(function* () {
+const whatsappBridgeConfiguration = Effect.gen(function* () {
   if (!env.ZOEN_WHATSAPP_BRIDGE_URL || !env.ZOEN_WHATSAPP_PROVISIONING_SECRET)
     return yield* new WhatsAppBridgeUnavailable({ reason: "unconfigured" });
   return {
@@ -165,7 +165,7 @@ export const logoutWhatsApp = Effect.fn("whatsapp.logout")(function* (
   yield* assertWhatsAppBridgeReady();
   yield* provisionRequest(
     "POST",
-    `/_matrix/provision/v3/logout/${encodeURIComponent(loginId || "all")}`,
+    `/_matrix/provision/v3/logout/${encodeURIComponent(loginId ?? "all")}`,
     matrixUserId
   );
   return { loggedOut: true as const };
@@ -181,11 +181,13 @@ export const sendWhatsAppPortalMessage = Effect.fn(
   puppetUserId: string;
 }) {
   const config = yield* whatsappBridgeConfiguration;
-  if (!config.asToken || !config.matrixUrl)
+  const asToken = config.asToken;
+  const matrixUrl = config.matrixUrl;
+  if (!asToken || !matrixUrl)
     return yield* new WhatsAppBridgeUnavailable({ reason: "unconfigured" });
   const url = new URL(
     `/_matrix/client/v3/rooms/${encodeURIComponent(input.roomId)}/send/m.room.message/${encodeURIComponent(input.txnId)}`,
-    config.matrixUrl
+    matrixUrl
   );
   url.searchParams.set("user_id", input.puppetUserId);
   return yield* Effect.tryPromise({
@@ -195,7 +197,7 @@ export const sendWhatsAppPortalMessage = Effect.fn(
         signal,
         redirect: "error",
         headers: {
-          authorization: `Bearer ${Redacted.value(config.asToken!)}`,
+          authorization: `Bearer ${Redacted.value(asToken)}`,
           "content-type": "application/json",
         },
         body: JSON.stringify({ msgtype: "m.text", body: input.body }),

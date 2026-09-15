@@ -160,9 +160,7 @@ export const hosted = Effect.gen(function* () {
         Output.map((value) => value ?? "")
       ),
       "zoen.matrix-password": matrixSecrets.databaseVersion,
-      "zoen.whatsapp-password": whatsappSecrets.databaseVersion.pipe(
-        Output.map((value) => value ?? "")
-      ),
+      "zoen.whatsapp-password": whatsappSecrets.databaseVersion,
       "zoen.vault-password": vaultSecrets.databaseVersion.pipe(
         Output.map((value) => value ?? "")
       ),
@@ -369,9 +367,7 @@ export const hosted = Effect.gen(function* () {
       "zoen.secrets": webSecrets,
       "zoen.migrated-image": migrations.image,
       "zoen.matrix": matrixSecrets.webVersion,
-      "zoen.whatsapp": whatsappSecrets.webVersion.pipe(
-        Output.map((value) => value ?? "")
-      ),
+      "zoen.whatsapp": whatsappSecrets.webVersion,
       "zoen.vault": vaultSecrets.webVersion.pipe(
         Output.map((value) => value ?? "")
       ),

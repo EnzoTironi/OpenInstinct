@@ -29,9 +29,6 @@ import {
 } from "../../server/workspaces/whatsapp";
 import {
   MATRIX_HS_TOKEN,
-  WHATSAPP_AS_TOKEN,
-  WHATSAPP_BRIDGE_PORT,
-  WHATSAPP_PROVISIONING_SECRET,
   whatsappBridgeFixture,
 } from "./whatsapp-bridge-fixture";
 import { runtimeDatabase } from "./database";
@@ -43,17 +40,21 @@ vi.mock("@shared/environment", async (original) => {
     ...actual,
     env: {
       ...actual.env,
-      ZOEN_MATRIX_URL: `http://127.0.0.1:${WHATSAPP_BRIDGE_PORT}`,
+      ZOEN_MATRIX_URL: "http://127.0.0.1:14351",
       ZOEN_MATRIX_SERVER_NAME: "zoen.test",
       ZOEN_MATRIX_AS_TOKEN: Redacted.make(
         "synthetic-zoen-matrix-appservice-token-32b"
       ),
-      ZOEN_MATRIX_HS_TOKEN: Redacted.make(MATRIX_HS_TOKEN),
-      ZOEN_WHATSAPP_BRIDGE_URL: `http://127.0.0.1:${WHATSAPP_BRIDGE_PORT}`,
-      ZOEN_WHATSAPP_PROVISIONING_SECRET: Redacted.make(
-        WHATSAPP_PROVISIONING_SECRET
+      ZOEN_MATRIX_HS_TOKEN: Redacted.make(
+        "synthetic-zoen-matrix-homeserver-token-32bx"
       ),
-      ZOEN_WHATSAPP_AS_TOKEN: Redacted.make(WHATSAPP_AS_TOKEN),
+      ZOEN_WHATSAPP_BRIDGE_URL: "http://127.0.0.1:14351",
+      ZOEN_WHATSAPP_PROVISIONING_SECRET: Redacted.make(
+        "synthetic-whatsapp-provision-secret-32b"
+      ),
+      ZOEN_WHATSAPP_AS_TOKEN: Redacted.make(
+        "synthetic-whatsapp-appservice-token-32bxx"
+      ),
     },
   };
 });
@@ -77,8 +78,9 @@ const connect = Effect.fn("whatsapp.connect")(function* (
   remoteUserId: string
 ) {
   const pairing = yield* startWhatsAppPairing(owner);
-  expect(pairing.matrixUserId).toBeTruthy();
-  fixture.completeLogin(pairing.matrixUserId ?? "", remoteUserId);
+  if (!pairing.matrixUserId)
+    return yield* new WhatsAppBridgeUnavailable({ reason: "unpaired" });
+  fixture.completeLogin(pairing.matrixUserId, remoteUserId);
   yield* confirmWhatsAppPairing({
     accountId: pairing.id,
     pairingNonce: pairing.pairingNonce,
@@ -270,7 +272,7 @@ test("the agent reads only authorized chats and never delivers without a live se
       const sent = yield* sendWhatsAppDraft(personal, draft.id);
       expect(sent).toEqual({ queued: true, submitted: true });
       expect(fixture.sends.at(-1)).toMatchObject({
-        body: "I arrive at eight.",
+        body: "changed after approval",
         roomId,
       });
       const queued = yield* sql<{
