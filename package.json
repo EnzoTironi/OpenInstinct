@@ -38,7 +38,7 @@
     "@vercel/oidc": "3.8.5",
     "@workflow/world-postgres": "5.0.0-beta.39",
     "ai": "^7.0.79",
-    "better-auth": "1.7.2",
+    "better-auth": "1.7.4",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
