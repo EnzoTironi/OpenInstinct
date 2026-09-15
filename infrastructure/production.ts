@@ -26,5 +26,6 @@ export const production = {
     sizeGb: 3,
   },
   matrix: { app: "zoen-matrix-tironi" },
+  whatsapp: { app: "zoen-whatsapp-tironi" },
   vaultwarden: { app: "zoen-vault-tironi", hostname: "vault.zoen.tironi.xyz" },
 } as const;

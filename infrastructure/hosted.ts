@@ -13,6 +13,10 @@ import { backupSecrets } from "./backups.ts";
 import { PrepareServiceDatabases } from "./database.ts";
 import { MigrateApplication } from "./migrations.ts";
 import { provisionMatrix, deployMatrix } from "./matrix.ts";
+import {
+  provisionWhatsAppBridge,
+  deployWhatsAppBridge,
+} from "./whatsapp-bridge.ts";
 import { ReconcileChannelWebhooks } from "./webhooks.ts";
 import { RetireLegacyWeb } from "./web-cutover.ts";
 import { provisionErasureJournal } from "./erasure-journal.ts";
@@ -55,6 +59,13 @@ export const hosted = Effect.gen(function* () {
     stage: policy.stage,
     postgresApp,
     webApp,
+  });
+  const whatsappSecrets = yield* provisionWhatsAppBridge({
+    stage: policy.stage,
+    organization: production.organization,
+    postgresApp,
+    webApp,
+    matrixApp: matrixSecrets.app,
   });
 
   const password = yield* Config.redacted("COMPANION_POSTGRES_PASSWORD");
@@ -149,6 +160,7 @@ export const hosted = Effect.gen(function* () {
         Output.map((value) => value ?? "")
       ),
       "zoen.matrix-password": matrixSecrets.databaseVersion,
+      "zoen.whatsapp-password": whatsappSecrets.databaseVersion,
       "zoen.vault-password": vaultSecrets.databaseVersion.pipe(
         Output.map((value) => value ?? "")
       ),
@@ -166,6 +178,7 @@ export const hosted = Effect.gen(function* () {
       applicationCredentialVersion,
       memoryBootstrapPassword.digest,
       matrixSecrets.databaseVersion,
+      whatsappSecrets.databaseVersion,
       vaultSecrets.databaseVersion
     ).pipe(Output.map((values) => JSON.stringify(values))),
   });
@@ -174,6 +187,15 @@ export const hosted = Effect.gen(function* () {
     postgresApp: pgName,
     databaseRelease: databases.release,
     webApp: webName,
+    serverName: matrixServerName,
+    region,
+    whatsappCallback: `http://${whatsappSecrets.name}.internal:29318`,
+  });
+  const whatsapp = yield* deployWhatsAppBridge({
+    provision: whatsappSecrets,
+    postgresApp: pgName,
+    databaseRelease: databases.release,
+    matrixApp: matrixSecrets.name,
     serverName: matrixServerName,
     region,
   });
@@ -303,6 +325,7 @@ export const hosted = Effect.gen(function* () {
       ZOEN_MEM0_URL: `http://${memoryName}.internal:8000`,
       ZOEN_MATRIX_URL: `http://${matrixSecrets.name}.internal:8008`,
       ZOEN_MATRIX_SERVER_NAME: matrixServerName,
+      ZOEN_WHATSAPP_BRIDGE_URL: `http://${whatsappSecrets.name}.internal:29318`,
       ZOEN_VAULTWARDEN_URL: `https://${vaultSecrets.hostname}`,
     },
     mounts: [
@@ -344,6 +367,7 @@ export const hosted = Effect.gen(function* () {
       "zoen.secrets": webSecrets,
       "zoen.migrated-image": migrations.image,
       "zoen.matrix": matrixSecrets.webVersion,
+      "zoen.whatsapp": whatsappSecrets.webVersion,
       "zoen.vault": vaultSecrets.webVersion.pipe(
         Output.map((value) => value ?? "")
       ),
@@ -403,6 +427,7 @@ export const hosted = Effect.gen(function* () {
     postgres: postgres.machineId,
     memory: memory.machineId,
     matrix: matrix.machineId,
+    whatsapp: whatsapp.machineId,
     vaultwarden: vaultwarden.machineId,
     web: web.machineId,
   };

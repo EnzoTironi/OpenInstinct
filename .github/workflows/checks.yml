@@ -136,6 +136,8 @@ jobs:
           bootstrap
           docker exec -i -e ZOEN_VAULTWARDEN_DATABASE_PASSWORD=ci-vault-password \
             '${{ job.services.postgres.id }}' bash < infrastructure/postgres/bootstrap-vaultwarden.sh
+          docker exec -i -e ZOEN_WHATSAPP_DATABASE_PASSWORD=ci-whatsapp-password \
+            '${{ job.services.postgres.id }}' bash < infrastructure/postgres/bootstrap-whatsapp.sh
       - name: Start private Matrix homeserver
         run: |
           docker exec -i -e ZOEN_MATRIX_DATABASE_PASSWORD=ci-matrix-password \

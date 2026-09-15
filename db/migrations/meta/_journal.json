@@ -379,6 +379,13 @@
       "when": 1789451028719,
       "tag": "0053_vault-oidc",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1789471491447,
+      "tag": "0054_open_black_knight",
+      "breakpoints": true
     }
   ]
 }

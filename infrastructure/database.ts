@@ -34,6 +34,7 @@ export const prepareServiceDatabases = Effect.fn("prepareServiceDatabases")(
       "application",
       "memory",
       "matrix",
+      "whatsapp",
       "vaultwarden",
     ] as const) {
       const result = yield* Machines.execMachine({

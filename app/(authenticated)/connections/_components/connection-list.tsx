@@ -6,6 +6,7 @@ import { ChannelAuthForm } from "@web/auth/channel/form";
 import { useI18n } from "@web/i18n/context";
 import { GoogleWorkspaceAction } from "../google-workspace-action";
 import { LinkedChannels } from "./linked-channels";
+import { PersonalWhatsApp } from "./personal-whatsapp";
 import { ConnectionIcon } from "./connection-icon";
 import styles from "../../_components/connections.module.css";
 
@@ -84,6 +85,7 @@ export function ConnectionList({
           </p>
         )}
       </section>
+      <PersonalWhatsApp />
       {((!connectedGoogle && !pausedGoogle) ||
         availableChannels.length > 0) && (
         <section className={styles.group} aria-label={t("Adicionar conexão")}>

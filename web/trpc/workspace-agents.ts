@@ -310,6 +310,7 @@ export const workspaceAgentsRouter = {
     start: workspaceProcedure.mutation(({ ctx, signal }) =>
       serverRuntime.runPromise(
         startWhatsAppPairing(ctx.actor).pipe(
+          Effect.map(({ id, available, qr }) => ({ id, available, qr })),
           Effect.catchTag("WorkspaceAccessDenied", () =>
             Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
           )
@@ -332,6 +333,9 @@ export const workspaceAgentsRouter = {
         resumeWhatsAppBridge(ctx.actor).pipe(
           Effect.catchTag("WorkspaceAccessDenied", () =>
             Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+          ),
+          Effect.catchTag("WhatsAppBridgeUnavailable", () =>
+            Effect.fail(new TRPCError({ code: "PRECONDITION_FAILED" }))
           )
         ),
         { signal }

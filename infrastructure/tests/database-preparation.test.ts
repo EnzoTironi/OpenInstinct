@@ -76,11 +76,18 @@ void test("waits for each bootstrap before starting the next shared-catalog muta
     "/usr/local/bin/bootstrap-application.sh",
     "/usr/local/bin/bootstrap-memory.sh",
     "/usr/local/bin/bootstrap-matrix.sh",
+    "/usr/local/bin/bootstrap-whatsapp.sh",
     "/usr/local/bin/bootstrap-vaultwarden.sh",
   ]);
 });
 
-for (const database of ["application", "memory", "matrix", "vaultwarden"]) {
+for (const database of [
+  "application",
+  "memory",
+  "matrix",
+  "whatsapp",
+  "vaultwarden",
+]) {
   void test(`stops after ${database} fails and keeps command output private`, async () => {
     const failure = `/usr/local/bin/bootstrap-${database}.sh`;
     const api = databaseApi(async (command) =>

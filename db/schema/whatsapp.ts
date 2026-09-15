@@ -21,6 +21,8 @@ export const whatsappBridgeAccounts = pgTable(
     userId: text("user_id").notNull(),
     pairingNonceHash: text("pairing_nonce_hash").notNull(),
     remoteUserId: text("remote_user_id"),
+    matrixUserId: text("matrix_user_id"),
+    loginId: text("login_id"),
     status: text("status").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     connectedAt: timestamp("connected_at", { withTimezone: true }),
@@ -34,7 +36,7 @@ export const whatsappBridgeAccounts = pgTable(
     check(
       "whatsapp_bridge_accounts_status_check",
       sql`(${table.status} = 'pairing' AND ${table.remoteUserId} IS NULL AND ${table.revokedAt} IS NULL)
-        OR (${table.status} IN ('connected', 'paused') AND ${table.remoteUserId} IS NOT NULL AND ${table.revokedAt} IS NULL)
+        OR (${table.status} IN ('connected', 'paused') AND ${table.remoteUserId} IS NOT NULL AND ${table.matrixUserId} IS NOT NULL AND ${table.revokedAt} IS NULL)
         OR (${table.status} = 'revoked' AND ${table.revokedAt} IS NOT NULL)`
     ),
     uniqueIndex("whatsapp_bridge_accounts_workspace_uidx")
@@ -56,6 +58,7 @@ export const whatsappBridgeChats = pgTable(
       .notNull()
       .references(() => whatsappBridgeAccounts.id, { onDelete: "cascade" }),
     remoteChatId: text("remote_chat_id").notNull(),
+    matrixRoomId: text("matrix_room_id"),
     kind: text("kind").notNull(),
     lastBackfillAt: timestamp("last_backfill_at", { withTimezone: true }),
     lastLiveAt: timestamp("last_live_at", { withTimezone: true }),
@@ -72,6 +75,11 @@ export const whatsappBridgeChats = pgTable(
     uniqueIndex("whatsapp_bridge_chats_live_uidx")
       .on(table.accountId, table.remoteChatId)
       .where(sql`${table.revokedAt} IS NULL`),
+    uniqueIndex("whatsapp_bridge_chats_room_uidx")
+      .on(table.matrixRoomId)
+      .where(
+        sql`${table.matrixRoomId} IS NOT NULL AND ${table.revokedAt} IS NULL`
+      ),
     index("whatsapp_bridge_chats_account_idx").on(table.accountId),
   ]
 );
@@ -111,6 +119,7 @@ export const whatsappBridgeEvents = pgTable(
       .notNull()
       .references(() => whatsappBridgeChats.id, { onDelete: "cascade" }),
     providerEventId: text("provider_event_id").notNull(),
+    matrixEventId: text("matrix_event_id"),
     kind: text("kind").notNull(),
     authorRemoteId: text("author_remote_id").notNull(),
     body: text("body").notNull(),

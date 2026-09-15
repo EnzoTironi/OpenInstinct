@@ -2,6 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { Effect, Redacted, Schema } from "effect";
 import { matrixConfiguration, MatrixError, MatrixEventSchema } from "./client";
+import { ingestWhatsAppMatrixEvent } from "../workspaces/whatsapp";
 import { acceptMatrixNetworkEvent } from "./network-delivery";
 
 const transactionSchema = Schema.Struct({
@@ -84,6 +85,10 @@ export const acceptMatrixTransaction = Effect.fn("matrix.acceptTransaction")(
         WHERE channel = 'matrix' AND installation_id = ${config.serverName} AND conversation_id = ${event.room_id} AND revoked_at IS NULL FOR UPDATE`;
           const binding = bindings[0];
           if (!binding) {
+            if (yield* ingestWhatsAppMatrixEvent(event)) {
+              accepted.push(event.event_id);
+              continue;
+            }
             if (yield* acceptMatrixNetworkEvent(event))
               accepted.push(event.event_id);
             continue;
