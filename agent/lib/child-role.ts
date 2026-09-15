@@ -9,6 +9,7 @@ export interface ChildRoleContract {
   readonly audience: "coordinator";
   readonly mayApprove: false;
   readonly isSentinel: false;
+  readonly hostBash: false;
   readonly writeEffects: boolean;
 }
 
@@ -38,6 +39,7 @@ export function childRoleContract(role: ChildRole): ChildRoleContract {
         audience: "coordinator",
         mayApprove: false,
         isSentinel: false,
+        hostBash: false,
         writeEffects: false,
       };
     case "advisor":
@@ -46,6 +48,7 @@ export function childRoleContract(role: ChildRole): ChildRoleContract {
         audience: "coordinator",
         mayApprove: false,
         isSentinel: false,
+        hostBash: false,
         writeEffects: false,
       };
     case "builder":
@@ -54,6 +57,7 @@ export function childRoleContract(role: ChildRole): ChildRoleContract {
         audience: "coordinator",
         mayApprove: false,
         isSentinel: false,
+        hostBash: false,
         writeEffects: true,
       };
     case "browser-agent":
@@ -62,6 +66,7 @@ export function childRoleContract(role: ChildRole): ChildRoleContract {
         audience: "coordinator",
         mayApprove: false,
         isSentinel: false,
+        hostBash: false,
         writeEffects: true,
       };
     default: {

@@ -20,6 +20,7 @@ describe("Eve child role contracts", () => {
       audience: "coordinator",
       mayApprove: false,
       isSentinel: false,
+      hostBash: false,
       writeEffects: false,
     });
   });
@@ -50,6 +51,7 @@ describe("Eve child role contracts", () => {
       audience: "coordinator",
       mayApprove: false,
       isSentinel: false,
+      hostBash: false,
       writeEffects: false,
     });
     const instructions = advisorConsultInstructions();
@@ -68,10 +70,12 @@ describe("Eve child role contracts", () => {
       isSentinel: false,
       writeEffects: true,
     });
+    expect(childRoleContract("builder").hostBash).toBe(false);
     expect(childRoleContract("browser-agent")).toMatchObject({
       audience: "coordinator",
       mayApprove: false,
       isSentinel: false,
+      hostBash: false,
       writeEffects: true,
     });
   });
