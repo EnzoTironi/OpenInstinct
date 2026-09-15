@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { PgClient } from "@effect/sql-pg";
 import { serverRuntime } from "../../server/runtime";
 import { recordTelemetry } from "../../server/observability/events";
-import { workspaceActorFromPrincipal } from "../../server/workspaces/access";
+import { telemetryScope } from "../../server/observability/principal";
 import { parseDiagnostic } from "../../shared/observability/redaction";
 import { isSharedPrincipal } from "../../shared/identity/principal-scope";
 import { requireChannelPrincipal } from "../../server/channels/principal";
@@ -34,7 +34,7 @@ export default defineHook({
           }
           const scope = unboundGroup
             ? undefined
-            : yield* workspaceActorFromPrincipal(principal);
+            : yield* telemetryScope(principal, context.session.id);
           const sql = yield* PgClient.PgClient;
           const data = "data" in event ? event.data : {};
           const turnId = "turnId" in data ? data.turnId : undefined;
@@ -95,6 +95,7 @@ export default defineHook({
           });
         }).pipe(
           Effect.timeout("3 seconds"),
+          Effect.catchTag("WorkspaceAccessDenied", () => Effect.void),
           Effect.catchCause(() => Effect.logError("telemetry.write_failed"))
         )
       );

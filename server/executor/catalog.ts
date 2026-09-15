@@ -7,6 +7,7 @@ import { readWorkspaceCapabilities } from "../workspaces/capabilities";
 import artifacts from "./tools/artifacts";
 import calendar from "./tools/calendar";
 import contacts from "./tools/contacts";
+import network from "./tools/network";
 import device from "./tools/device-auth";
 import gmail from "./tools/gmail";
 import ontology from "./tools/ontology";
@@ -36,6 +37,7 @@ const modules: readonly {
   artifacts,
   calendar,
   contacts,
+  network,
   device,
   gmail,
   ontology,
@@ -49,6 +51,8 @@ const modules: readonly {
 // Code may compose reads; each write gets its own durable Eve call and operation ID.
 // This is an explicit allowlist, never a guess from an API verb or tool name.
 export const codeReadableTools = new Set([
+  "network-bots",
+  "network-result",
   "workspace.tools.connections",
   "gmail-search",
   "gmail-read-thread",

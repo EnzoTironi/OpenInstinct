@@ -36,6 +36,7 @@ const NetworkKind = Schema.Literals(["company", "personal"]);
 const requireConversationNetwork = Effect.fn("requireConversationNetwork")(
   function* (input: {
     requesterUserId: string;
+    sourceWorkspaceId: string | null;
     networkKind: string | null;
     networkId: string | null;
     destWorkspaceId: string;
@@ -45,6 +46,22 @@ const requireConversationNetwork = Effect.fn("requireConversationNetwork")(
     ).pipe(Effect.mapError(() => new WorkspaceAccessDenied()));
     if (!input.networkId) return yield* new WorkspaceAccessDenied();
     const sql = yield* PgClient.PgClient;
+    const source = yield* sql<{
+      organization_id: string | null;
+      role: string;
+    }>`SELECT w.organization_id, m.role FROM workspaces w
+      JOIN workspace_memberships m ON m.workspace_id = w.id AND m.user_id = ${input.requesterUserId}
+      WHERE w.id = ${input.sourceWorkspaceId} FOR SHARE OF w, m`;
+    if (
+      !source[0] ||
+      (kind === "company"
+        ? source[0].organization_id !== input.networkId
+        : source[0].organization_id !== null ||
+          source[0].role !== "owner" ||
+          input.sourceWorkspaceId !==
+            accessScopeForUser(input.requesterUserId).workspaceId)
+    )
+      return yield* new WorkspaceAccessDenied();
     switch (kind) {
       case "company": {
         const rows = yield* sql`SELECT w.id FROM workspaces w
@@ -128,9 +145,10 @@ export const requireWorkspaceAccess = Effect.fn("requireWorkspaceAccess")(
       const grants = yield* sql<{
         id: string;
         requester_user_id: string | null;
+        source_workspace_id: string | null;
         network_kind: string | null;
         network_id: string | null;
-      }>`SELECT g.id, g.requester_user_id, g.network_kind, g.network_id FROM workspace_agent_grants g
+      }>`SELECT g.id, g.requester_user_id, g.source_workspace_id, g.network_kind, g.network_id FROM workspace_agent_grants g
       JOIN workspace_bots b ON b.id = g.bot_id
       WHERE g.id = ${actor.agentGrantId} AND g.issued_by = ${actor.userId}
         AND b.workspace_id = ${actor.workspaceId} AND g.revoked_at IS NULL
@@ -142,6 +160,7 @@ export const requireWorkspaceAccess = Effect.fn("requireWorkspaceAccess")(
       if (grant.requester_user_id)
         yield* requireConversationNetwork({
           requesterUserId: grant.requester_user_id,
+          sourceWorkspaceId: grant.source_workspace_id,
           networkKind: grant.network_kind,
           networkId: grant.network_id,
           destWorkspaceId: actor.workspaceId,

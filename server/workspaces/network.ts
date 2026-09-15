@@ -46,6 +46,7 @@ const inviteSchema = Schema.Struct({
 const connectionSchema = Schema.Struct({
   username: Schema.String,
   name: Schema.String,
+  botUsername: Schema.NullOr(Schema.String),
 });
 const conversationCapabilities = JSON.stringify(["conversation"]);
 
@@ -231,9 +232,12 @@ export const listPersonalNetwork = Effect.fn("listPersonalNetwork")(function* (
       AND (i.from_user_id = ${actor.userId} OR i.to_user_id = ${actor.userId})
     ORDER BY i.created_at`;
   const connections =
-    yield* sql`SELECT d.username, u.name FROM personal_trust_edges e
+    yield* sql`SELECT d.username, u.name, bot.username AS "botUsername" FROM personal_trust_edges e
     JOIN public.user u ON ('better-auth:' || u.id) = e.peer_user_id
     JOIN user_directory d ON d.user_id = u.id
+    LEFT JOIN LATERAL (SELECT b.username FROM workspace_bots b JOIN workspaces w ON w.id = b.workspace_id
+      JOIN workspace_memberships m ON m.workspace_id = w.id AND m.user_id = e.peer_user_id AND m.role = 'owner'
+      WHERE w.organization_id IS NULL AND b.discoverable LIMIT 1) bot ON true
     WHERE e.user_id = ${actor.userId} ORDER BY d.username`;
   return {
     invites: yield* Schema.decodeUnknownEffect(Schema.Array(inviteSchema))(
@@ -313,7 +317,7 @@ const conversationGrant = Effect.fn("conversationNetworkGrant")(function* (
   const existing = yield* sql<{
     id: string;
   }>`SELECT id FROM workspace_agent_grants
-    WHERE bot_id = ${bot.id} AND requester_user_id = ${actor.userId}
+    WHERE bot_id = ${bot.id} AND requester_user_id = ${actor.userId} AND source_workspace_id = ${actor.workspaceId}
       AND network_kind = ${bot.networkKind} AND network_id = ${bot.networkId}
       AND origin_bot_id IS NOT DISTINCT FROM ${originBotId}
       AND revoked_at IS NULL AND expires_at > now()
@@ -333,9 +337,49 @@ const conversationGrant = Effect.fn("conversationNetworkGrant")(function* (
   const expiresAt = DateTime.toDateUtc(
     DateTime.add(yield* DateTime.now, { days: 7 })
   );
-  yield* sql`INSERT INTO workspace_agent_grants(id, bot_id, issued_by, label, token_hash, capabilities, expires_at, requester_user_id, network_kind, network_id, origin_bot_id)
-    VALUES (${id}, ${bot.id}, ${bot.issued_by}, 'Network conversation', ${createHash("sha256").update(token).digest("hex")}, ${conversationCapabilities}::jsonb, ${expiresAt}, ${actor.userId}, ${bot.networkKind}, ${bot.networkId}, ${originBotId})`;
+  yield* sql`INSERT INTO workspace_agent_grants(id, bot_id, issued_by, label, token_hash, capabilities, expires_at, requester_user_id, source_workspace_id, network_kind, network_id, origin_bot_id)
+    VALUES (${id}, ${bot.id}, ${bot.issued_by}, 'Network conversation', ${createHash("sha256").update(token).digest("hex")}, ${conversationCapabilities}::jsonb, ${expiresAt}, ${actor.userId}, ${actor.workspaceId}, ${bot.networkKind}, ${bot.networkId}, ${originBotId})`;
   return { id, issuedBy: bot.issued_by, workspaceId: bot.workspace_id };
+});
+
+/** Called by authenticated UI or Executor code; agent identity is never supplied by the model. */
+export const openNetworkBot = Effect.fn("openNetworkBot")(function* (
+  actor: typeof WorkspaceActorSchema.Type,
+  username: string,
+  asAgent = false
+) {
+  const sql = yield* PgClient.PgClient;
+  return yield* sql.withTransaction(
+    Effect.gen(function* () {
+      if (!actor.authSessionId) return yield* new WorkspaceAccessDenied();
+      yield* requireWorkspaceAccess(actor);
+      const dest = yield* resolvePublishedBot(actor, username);
+      const source = asAgent
+        ? (yield* sql<{
+            id: string;
+            name: string;
+          }>`SELECT id, name FROM workspace_bots WHERE workspace_id = ${actor.workspaceId}`)[0]
+        : undefined;
+      if (asAgent && (!source || source.id === dest.id))
+        return yield* new WorkspaceAccessDenied();
+      const grant = yield* conversationGrant(actor, dest, source?.id ?? null);
+      return {
+        dest: {
+          id: dest.id,
+          username: dest.username,
+          name: dest.name,
+          description: dest.description,
+        },
+        source,
+        network: { kind: dest.networkKind, id: dest.networkId },
+        destActor: {
+          userId: grant.issuedBy,
+          workspaceId: grant.workspaceId,
+          agentGrantId: grant.id,
+        },
+      };
+    })
+  );
 });
 
 export const contactNetworkBot = Effect.fn("contactNetworkBot")(function* (

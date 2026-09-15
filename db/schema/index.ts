@@ -24,4 +24,5 @@ export * from "./personal-trust";
 export * from "./matrix";
 export * from "./model-connections";
 export * from "./tool-connections";
+export * from "./matrix-conversations";
 export * from "./telemetry";

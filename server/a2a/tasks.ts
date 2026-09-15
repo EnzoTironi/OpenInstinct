@@ -152,8 +152,11 @@ export const bindProtocolSession = Effect.fn("bindProtocolSession")(function* (
 ) {
   yield* readProtocolTask(actor, id);
   const sql = yield* PgClient.PgClient;
-  yield* sql`UPDATE agent_protocol_tasks SET session_id = ${sessionId}, state = CASE WHEN state = 'TASK_STATE_SUBMITTED' THEN 'TASK_STATE_WORKING' ELSE state END, updated_at = now()
-    WHERE id = ${id} AND grant_id = ${actor.agentGrantId} AND (session_id IS NULL OR session_id = ${sessionId})`;
+  const bound =
+    yield* sql`UPDATE agent_protocol_tasks SET session_id = ${sessionId}, state = CASE WHEN state = 'TASK_STATE_SUBMITTED' THEN 'TASK_STATE_WORKING' ELSE state END, updated_at = now()
+    WHERE id = ${id} AND grant_id = ${actor.agentGrantId} AND (session_id IS NULL OR session_id = ${sessionId}) RETURNING id`;
+  if (!bound.length) return yield* new WorkspaceAccessDenied();
+  return undefined;
 });
 
 export const cancelProtocolTask = Effect.fn("cancelProtocolTask")(function* (

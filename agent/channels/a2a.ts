@@ -1,6 +1,12 @@
 import { defineChannel, GET, POST } from "eve/channels";
+import { deliverProtocolCancellation } from "../../server/a2a/cancellation";
 import { Effect, Schema } from "effect";
 import { serverRuntime } from "../../server/runtime";
+import { matrixConfiguration } from "../../server/matrix/client";
+import {
+  matrixProtocolTask,
+  publishMatrixProtocolAnswer,
+} from "../../server/matrix/network-delivery";
 import { authenticateAgentGrant } from "../../server/workspaces/bots";
 import {
   workspaceActorFromPrincipal,
@@ -36,13 +42,43 @@ export default defineChannel({
     return serverRuntime.runPromise(
       Effect.gen(function* () {
         if (
+          Schema.is(Schema.Struct({ cancelSessionId: Schema.NonEmptyString }))(
+            input.target
+          )
+        ) {
+          if (
+            input.auth?.principalType !== "runtime" ||
+            input.auth.authenticator !== "app"
+          )
+            return yield* new WorkspaceAccessDenied();
+          yield* deliverProtocolCancellation(
+            input.target.cancelSessionId,
+            context
+          );
+          return context.attachSession(input.target.cancelSessionId);
+        }
+        const target = yield* Schema.decodeUnknownEffect(
+          Schema.Struct({ taskId: Schema.String.check(Schema.isUUID()) })
+        )(input.target);
+        if (
+          input.auth?.principalType === "service" &&
+          input.auth.authenticator === "matrix-homeserver"
+        ) {
+          const config = yield* matrixConfiguration;
+          const eventId = input.auth.attributes.matrixEventId;
+          if (
+            input.auth.principalId !== config.serverName ||
+            !Schema.is(Schema.String)(eventId)
+          )
+            return yield* new WorkspaceAccessDenied();
+          const mapped = yield* matrixProtocolTask(eventId);
+          if (mapped?.taskId !== target.taskId)
+            return yield* new WorkspaceAccessDenied();
+        } else if (
           input.auth?.principalType !== "runtime" ||
           input.auth.authenticator !== "app"
         )
           return yield* new WorkspaceAccessDenied();
-        const target = yield* Schema.decodeUnknownEffect(
-          Schema.Struct({ taskId: Schema.String.check(Schema.isUUID()) })
-        )(input.target);
         const actor = yield* recoverableProtocolActor(target.taskId);
         return yield* deliverProtocolTask(actor, target.taskId, context);
       })
@@ -239,6 +275,7 @@ export default defineChannel({
             "TASK_STATE_COMPLETED",
             text
           );
+          yield* publishMatrixProtocolAnswer(taskId);
         }).pipe(Effect.catchTag("WorkspaceAccessDenied", () => Effect.void))
       );
     },
@@ -255,6 +292,7 @@ export default defineChannel({
             "TASK_STATE_FAILED",
             "The task could not be completed. Start a new task to retry."
           );
+          yield* publishMatrixProtocolAnswer(taskId);
         }).pipe(Effect.catchTag("WorkspaceAccessDenied", () => Effect.void))
       );
     },

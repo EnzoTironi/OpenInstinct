@@ -6,10 +6,17 @@ import {
   readOntology,
 } from "../../server/workspaces/ontology";
 import { emptyOntology } from "../../shared/workspaces/ontology";
+import { networkFixture } from "./network";
 
-export const launchFixture = Effect.fn("eval.launchFixture")(function* () {
+export const launchFixture = Effect.fn("eval.launchFixture")(function* (
+  networkKind?: "personal" | "company"
+) {
   const fixture = yield* workspaceFixture();
-  const { actor, personal, repository } = fixture;
+  const { personal, repository } = fixture;
+  const actor = networkKind === "personal" ? personal : fixture.actor;
+  const network = networkKind
+    ? yield* networkFixture(fixture, networkKind)
+    : null;
   const secret = yield* Config.redacted("BETTER_AUTH_SECRET");
   const signature = createHmac("sha256", Redacted.value(secret))
     .update(actor.authSessionId)
@@ -37,12 +44,15 @@ export const launchFixture = Effect.fn("eval.launchFixture")(function* () {
     variants.push({ language, canary, skill, source, destination });
   }
   const privateCanary = `PRIVATE_${randomUUID()}`;
-  yield* repository.write(personal, {
-    path: "knowledge/private.md",
-    content: privateCanary,
-    expectedRevision: null,
-    operationId: randomUUID(),
-  });
+  yield* repository.write(
+    networkKind === "personal" ? fixture.actor : personal,
+    {
+      path: "knowledge/private.md",
+      content: privateCanary,
+      expectedRevision: null,
+      operationId: randomUUID(),
+    }
+  );
   revision = (yield* repository.write(actor, {
     path: "plugins/workspace.json",
     content: '{"version":1,"enabled":["files","ontology"]}',
@@ -68,7 +78,8 @@ export const launchFixture = Effect.fn("eval.launchFixture")(function* () {
   return {
     cookie,
     actor,
-    metadata: { variants, privateCanary },
+    metadata: { variants, privateCanary, network: network?.metadata },
+    network,
     inspect: (path: string) => repository.read(actor, path),
     ontology: () => readOntology(actor),
     sessions: () => fixture.sql<{ session_id: string }>`

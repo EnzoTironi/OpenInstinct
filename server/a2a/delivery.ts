@@ -58,8 +58,19 @@ export const deliverProtocolTask = Effect.fn("deliverProtocolTask")(function* (
         message: "Task was accepted; retry with the same message ID",
       }),
   });
-  yield* bindProtocolSession(actor, task.id, session.id);
-  const current = yield* readProtocolTask(actor, task.id);
+  const current = yield* Effect.gen(function* () {
+    yield* bindProtocolSession(actor, task.id, session.id);
+    return yield* readProtocolTask(actor, task.id);
+  }).pipe(
+    Effect.onError(() =>
+      Effect.gen(function* () {
+        const sql = yield* PgClient.PgClient;
+        // The source may disappear after native acceptance but before binding. Keep
+        // cancellation durable even though no protocol task survives to hold it.
+        yield* sql`INSERT INTO agent_protocol_cancellations(session_id) VALUES (${session.id}) ON CONFLICT DO NOTHING`;
+      }).pipe(Effect.orDie)
+    )
+  );
   if (current.state === "TASK_STATE_CANCELED")
     yield* Effect.tryPromise(() => session.cancel());
   return session;

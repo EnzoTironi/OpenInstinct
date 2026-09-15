@@ -40,6 +40,13 @@ activated product integrations. Beeper Desktop is not installed. Reference
 catalogs under `docs/recipe-integrations/` are research, not a list of
 activated product capabilities.
 
+Trusted networks now have a customer interface: invite and accept a person, find
+a published bot, and converse through private Matrix rooms and native Eve/A2A.
+Company discovery uses current membership. Personal files and tools are excluded
+from conversation grants. Real Synapse and two-account browser proofs are recorded
+in the [network validation](docs/decisions/zoen-network-validation.md). Hosted
+activation, E2EE and federation are separate qualification gates.
+
 ## Architecture
 
 | Layer                      | Responsibility                                              |

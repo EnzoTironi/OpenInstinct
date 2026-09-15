@@ -21,25 +21,25 @@ is recorded. Fixture and CI evidence do not become live passes. This
 checkout is not “prod-ready”. REL03 columns below are installed,
 fixture-tested, live, and missing proof.
 
-| Surface                  | Installed         | Fixture / CI              | Live                                                                      | Missing proof                       |
-| ------------------------ | ----------------- | ------------------------- | ------------------------------------------------------------------------- | ----------------------------------- |
-| Google sign-in           | Yes               | PostgreSQL + Better Auth  | Existing-account round trip is on the deployed launch SHA, not this stack | New invitee, Gmail/Calendar consent |
-| Google Workspace tools   | Yes               | Team connection tests     | Blocked                                                                   | Interactive OAuth on this SHA       |
-| Telegram bot             | Yes               | Webhook fixtures          | Group isolation fixture, not actual delivery                              | Real group reply on this install    |
-| WhatsApp Kapso bot       | Yes               | Auth fixtures             | Historical DM on launch SHA                                               | Ordinary groups; templates          |
-| WhatsApp user bridge     | Envelope only     | Pairing tests             | Blocked                                                                   | mautrix pair, real group, send      |
-| Vaultwarden              | Envelope only     | Delegation tests          | Blocked                                                                   | Live vault, TOTP site               |
-| Matrix / A2A             | Yes               | CI has Synapse            | Blocked here                                                              | Two people, two bots                |
-| Mem0                     | Yes               | Learned-memory tests      | CI service, not a user journey                                            | Live forget/recall journey          |
-| Executor skills          | Yes               | Publication + discovery   | Blocked                                                                   | Use and revoke in three live scopes |
-| Customer tool code       | Yes               | QuickJS + Git + local UI  | Not a provider pass                                                       | Remote connectors and native evals  |
-| Account UI wipe          | Yes               | Honesty tests             | Partial by design                                                         | Must not be sold as full deletion   |
-| Account erasure          | Yes               | PostgreSQL deletion tests | Pending Mem0/Matrix/Vaultwarden/mautrix/backups                           | Live provider purge                 |
-| Browser / Kernel         | Yes               | Launch eval listed        | Blocked                                                                   | `eval:ci` / Kernel on this SHA      |
-| Closed-beta load         | Envelope declared | Unmeasured                | Blocked                                                                   | OP01–OP03                           |
-| Alchemy deploy           | Workflow exists   | Not run here              | Blocked                                                                   | REL02 images/digests/health         |
-| Beeper Desktop           | No                | —                         | Unavailable                                                               | Not installed                       |
-| iMessage / paid checkout | No                | —                         | Unavailable                                                               | Out of this stack                   |
+| Surface                  | Installed         | Fixture / CI                              | Live                                                                      | Missing proof                                   |
+| ------------------------ | ----------------- | ----------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------- |
+| Google sign-in           | Yes               | PostgreSQL + Better Auth                  | Existing-account round trip is on the deployed launch SHA, not this stack | New invitee, Gmail/Calendar consent             |
+| Google Workspace tools   | Yes               | Team connection tests                     | Blocked                                                                   | Interactive OAuth on this SHA                   |
+| Telegram bot             | Yes               | Webhook fixtures                          | Group isolation fixture, not actual delivery                              | Real group reply on this install                |
+| WhatsApp Kapso bot       | Yes               | Auth fixtures                             | Historical DM on launch SHA                                               | Ordinary groups; templates                      |
+| WhatsApp user bridge     | Envelope only     | Pairing tests                             | Blocked                                                                   | mautrix pair, real group, send                  |
+| Vaultwarden              | Envelope only     | Delegation tests                          | Blocked                                                                   | Live vault, TOTP site                           |
+| Matrix / A2A             | Yes               | Real Synapse; permission and replay tests | Two synthetic people/bots and browser proof                               | Hosted qualification; E2EE; company native eval |
+| Mem0                     | Yes               | Learned-memory tests                      | CI service, not a user journey                                            | Live forget/recall journey                      |
+| Executor skills          | Yes               | Publication + discovery                   | Blocked                                                                   | Use and revoke in three live scopes             |
+| Customer tool code       | Yes               | QuickJS + Git + local UI                  | Not a provider pass                                                       | Remote connectors and native evals              |
+| Account UI wipe          | Yes               | Honesty tests                             | Partial by design                                                         | Must not be sold as full deletion               |
+| Account erasure          | Yes               | PostgreSQL deletion tests                 | Pending Mem0/Matrix/Vaultwarden/mautrix/backups                           | Live provider purge                             |
+| Browser / Kernel         | Yes               | Launch eval listed                        | Blocked                                                                   | `eval:ci` / Kernel on this SHA                  |
+| Closed-beta load         | Envelope declared | Unmeasured                                | Blocked                                                                   | OP01–OP03                                       |
+| Alchemy deploy           | Workflow exists   | Not run here                              | Blocked                                                                   | REL02 images/digests/health                     |
+| Beeper Desktop           | No                | —                                         | Unavailable                                                               | Not installed                                   |
+| iMessage / paid checkout | No                | —                                         | Unavailable                                                               | Out of this stack                               |
 
 ## Identity
 
@@ -93,8 +93,9 @@ pnpm eval:list
 ```
 
 `pnpm test:runtime` needs `companion_runtime_test` and must never use
-production. This authoring VM has no Synapse, so
-`matrix-rooms.integration.ts` stays unavailable here; CI provides it.
+production. The local qualification environment now runs real Synapse and PostgreSQL.
+Matrix integration tests and native-model evidence are detailed in
+[network validation](zoen-network-validation.md).
 `pnpm eval:list` is `eve eval --list`. `pnpm eval:ci` runs
 `scripts/run-agent-evals.ts`, which defaults to `--suite launch`.
 `.github/workflows/zoen-agent-evals.yml` runs that suite on `main` with

@@ -147,6 +147,18 @@ const observations = "tests/runtime/observability.integration.ts";
 const reporter = "tests/launch-reporter.test.ts";
 
 const rows: readonly QualificationRow[] = [
+  {
+    id: "eval:launch/network",
+    family: "eval",
+    path: "evals/launch/network.eval.ts",
+    surface: "coordinator",
+    provider: "matrix",
+    advertised: true,
+    fixture: fixture("contract", "tests/runtime/matrix-network.integration.ts"),
+    live: blocked(
+      "Execute the native network eval with a configured real Synapse and model; catalog inclusion is not a live receipt."
+    ),
+  },
   coordinator("search", "none", files),
   coordinator("describe.tool", "none", files),
   coordinator("describe.skill", "none", skills),
@@ -174,6 +186,21 @@ const rows: readonly QualificationRow[] = [
   coordinator("calendar-create-event", "google", google),
   coordinator("calendar-list-events", "google", google),
   coordinator("contacts-search", "google", google),
+  coordinator(
+    "network-bots",
+    "matrix",
+    "tests/runtime/matrix-network.integration.ts"
+  ),
+  coordinator(
+    "network-contact",
+    "matrix",
+    "tests/runtime/matrix-network.integration.ts"
+  ),
+  coordinator(
+    "network-result",
+    "matrix",
+    "tests/runtime/matrix-network.integration.ts"
+  ),
   coordinator("request_vault_import", "vaultwarden", vault),
   coordinator("request_vault_setup", "vaultwarden", vault),
   coordinator("whatsapp-list-chats", "whatsapp", whatsapp),

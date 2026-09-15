@@ -56,6 +56,9 @@ const command = Command.make(
     url: Flag.string("url").pipe(Flag.optional),
     suite: Flag.string("suite").pipe(Flag.withDefault("launch")),
     tag: Flag.string("tag").pipe(Flag.optional),
+    networkScope: Flag.choice("network-scope", ["personal", "company"]).pipe(
+      Flag.withDefault("personal")
+    ),
     list: Flag.boolean("list").pipe(Flag.withDefault(false)),
     json: Flag.boolean("json").pipe(Flag.withDefault(false)),
     repeat: Flag.integer("repeat").pipe(
@@ -143,7 +146,13 @@ const command = Command.make(
     const failedReports: string[] = [];
     for (let index = 0; index < options.repeat; index++) {
       yield* Effect.gen(function* () {
-        const fixture = yield* launchFixture();
+        const fixture = yield* launchFixture(
+          options.suite === "launch" ||
+            options.suite === "launch/network" ||
+            (Option.isSome(options.tag) && options.tag.value === "network")
+            ? options.networkScope
+            : undefined
+        );
         const target = yield* launchTarget(origin.origin, fixture);
         yield* Effect.tryPromise({
           try: () =>
@@ -194,6 +203,11 @@ const command = Command.make(
           })
         );
         const code = yield* child.exitCode;
+        if (fixture.network)
+          yield* fs.writeFileString(
+            `${output}/run-${String(index + 1)}-matrix.json`,
+            JSON.stringify(yield* fixture.network.evidence(), null, 2)
+          );
         if (!(yield* fs.exists(report)))
           return yield* new EvalFailed({
             message: `Eve exited with ${String(code)} before producing a report. Inspect its preceding configuration or transport error.`,

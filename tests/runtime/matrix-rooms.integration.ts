@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { createServer, type Server } from "node:http";
-import { Effect, Layer, Result, Schema } from "effect";
+import { matrixReceiver } from "./matrix-fixture";
+import { Effect, Layer, Result } from "effect";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { requireWorkspaceAccess } from "../../server/workspaces/access";
@@ -20,54 +20,12 @@ import { workspaceFixture } from "./workspace-fixture";
 const services = WorkspaceRepository.layer.pipe(
   Layer.provideMerge(runtimeDatabase)
 );
-let server: Server;
-const receipts: { id: string; body: string; authorization: string }[] = [];
+let receiver: Awaited<ReturnType<typeof matrixReceiver>>;
 beforeAll(async () => {
-  server = createServer((incoming, outgoing) => {
-    const receive = async () => {
-      if (!incoming.url?.startsWith("/_matrix/app/v1/transactions/")) {
-        outgoing.writeHead(200);
-        outgoing.end("{}");
-        return;
-      }
-      try {
-        const chunks: Uint8Array[] = [];
-        for await (const chunk of incoming)
-          chunks.push(Schema.decodeUnknownSync(Schema.Uint8Array)(chunk));
-        const body = Buffer.concat(chunks).toString("utf8");
-        const authorization = incoming.headers.authorization ?? "";
-        const id = incoming.url.split("/").at(-1) ?? "";
-        await Effect.runPromise(
-          acceptMatrixTransaction(
-            new Request("http://localhost/transactions", {
-              method: "PUT",
-              headers: { authorization },
-              body,
-            }),
-            id
-          ).pipe(Effect.provide(services))
-        );
-        receipts.push({ id, body, authorization });
-        outgoing.writeHead(200);
-        outgoing.end("{}");
-      } catch {
-        outgoing.writeHead(503);
-        outgoing.end("{}");
-      }
-    };
-    void receive();
-  });
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(4350, "0.0.0.0", resolve);
-  });
+  receiver = await matrixReceiver();
 });
 afterAll(async () => {
-  await new Promise<void>((resolve) =>
-    server.close(() => {
-      resolve();
-    })
-  );
+  await receiver.close();
 });
 
 test(
@@ -130,7 +88,7 @@ test(
         const first = deliveries[0];
         if (!first) throw new Error("Missing Matrix receipt");
         const eventId = first.eventId;
-        const source = receipts.find((r) => r.body.includes(eventId));
+        const source = receiver.receipts.find((r) => r.body.includes(eventId));
         expect(source).toBeDefined();
         if (!source) throw new Error("Missing homeserver transaction");
         yield* acceptMatrixTransaction(
