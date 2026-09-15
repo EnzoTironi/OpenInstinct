@@ -125,7 +125,8 @@ export const requireWorkspaceAccess = Effect.fn("requireWorkspaceAccess")(
         const bindings = yield* sql`SELECT b.id FROM workspace_group_bindings b
         JOIN channel_identity i ON i.id = ${actor.channelIdentityId}
         WHERE b.id = ${actor.groupBindingId} AND b.workspace_id = ${actor.workspaceId}
-          AND b.channel = i.channel AND b.installation_id = i.installation_id FOR SHARE OF b`;
+          AND b.channel = i.channel AND b.installation_id = i.installation_id
+          AND b.revoked_at IS NULL FOR SHARE OF b`;
         if (bindings.length !== 1) return yield* new WorkspaceAccessDenied();
       }
     } else return yield* new WorkspaceAccessDenied();

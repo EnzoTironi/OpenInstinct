@@ -38,6 +38,20 @@
    remains the personal provisioning path (`role: "owner"`).
 6. **Migration** `0029_org-workspace-rbac` adds tables/column and widens the
    role CHECK with `NOT VALID` + `VALIDATE` (Effect-safe adoption).
+7. **Removal ends issued authority** (`server/workspaces/team.ts`
+   `removeWorkspaceMember`). `agent_sessions`, `scheduled_agent_jobs`, their
+   runs and rendered report outputs cascade from the membership row. Before
+   deleting it, removal cancels the queued `channel_outbox` rows of those
+   reports, revokes the `workspace_agent_grants` the member issued for the
+   workspace's bots, cancels open `agent_protocol_tasks` on those grants, and
+   records `removedSessions`, `removedJobs`, `cancelledOutbox`,
+   `revokedGrants` and `canceledTasks` in the `member_removed` receipt.
+   Use-time gates (`requireWorkspaceAccess`, `ensureScope`,
+   `getWorkspaceGoogleToken`) deny the removed member on the next request,
+   message or scheduled run. A shared Google connection stays in workspace
+   custody and never follows a person into a personal space. A group binding
+   grants access only while it is unrevoked and points at a workspace the
+   sender belongs to.
 
 ## Alternatives considered
 
@@ -61,4 +75,11 @@
 
 - Existing personal installs keep working: `ensureScope` + `owner` unchanged.
 - Company features must call org RBAC gates before mutating memberships.
+- `tests/runtime/workspace-boundaries.integration.ts` proves against real
+  PostgreSQL that a copied workspace id grants nothing without a membership,
+  that a guest reaches only the granted workspace, that removal ends sessions,
+  jobs, grants, tasks and the shared Google connection for the removed member,
+  that a group principal cannot reach a personal space, and that an accepted
+  invitation cannot be answered again. `workspace-team.integration.ts` covers
+  revoked, expired and wrong-recipient invitations.
 - Schema tests / drizzle snapshot include org tables; no secrets in tree.

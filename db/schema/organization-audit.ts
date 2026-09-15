@@ -17,6 +17,11 @@ export interface OrganizationAuditMetadata {
   retentionHold?: boolean;
   reason?: string;
   notErased?: readonly string[];
+  removedSessions?: number;
+  removedJobs?: number;
+  cancelledOutbox?: number;
+  revokedGrants?: number;
+  canceledTasks?: number;
 }
 
 /**
