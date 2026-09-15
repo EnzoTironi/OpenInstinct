@@ -320,11 +320,11 @@ tested.
 
 Routes (browser session + canonical membership required; fail closed):
 
-| Route                  | Method | Behavior                                                        |
-| ---------------------- | ------ | --------------------------------------------------------------- |
-| `/api/account/export`  | GET    | Partial privacy export (stored personal memory)               |
-| `/api/account/delete`  | POST   | Online personal-memory wipe + browser session invalidate        |
-| `/api/account/erasure` | POST   | Durable Zoen-controlled personal deletion + tombstone          |
+| Route                  | Method | Behavior                                                 |
+| ---------------------- | ------ | -------------------------------------------------------- |
+| `/api/account/export`  | GET    | Partial privacy export (stored personal memory)          |
+| `/api/account/delete`  | POST   | Online personal-memory wipe + browser session invalidate |
+| `/api/account/erasure` | POST   | Durable Zoen-controlled personal deletion + tombstone    |
 
 **Account UI wipe is not full account deletion.** Export and `POST /api/account/delete`
 cover stored personal memory only. Account UI → **Privacy export and online wipe**
