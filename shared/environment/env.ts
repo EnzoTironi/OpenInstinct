@@ -157,6 +157,28 @@ export const env = createEnv({
         })
       )
     ),
+    ZOEN_WHATSAPP_BRIDGE_URL: z.url().optional(),
+    ZOEN_WHATSAPP_PROVISIONING_SECRET: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {
+          disallowEncode: true,
+        })
+      )
+    ),
+    ZOEN_WHATSAPP_AS_TOKEN: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {
+          disallowEncode: true,
+        })
+      )
+    ),
+    ZOEN_WHATSAPP_HS_TOKEN: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {
+          disallowEncode: true,
+        })
+      )
+    ),
     ZOEN_MEM0_API_KEY: Schema.toStandardSchemaV1(
       Schema.optional(
         Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {

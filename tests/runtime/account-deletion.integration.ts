@@ -8,10 +8,7 @@ import {
   requestAccountDeletion,
   transferOrganizationAdmin,
 } from "../../server/accounts/deletion";
-import {
-  confirmWhatsAppPairing,
-  startWhatsAppPairing,
-} from "../../server/workspaces/whatsapp";
+import { startWhatsAppPairing } from "../../server/workspaces/whatsapp";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { runtimeDatabase } from "./database";
 import { workspaceFixture } from "./workspace-fixture";
@@ -58,12 +55,7 @@ test("a company member's deletion keeps company git and never delivers to live p
         VALUES (${randomUUID()}, ${guest.userId}, 'turn', '{}')`;
       yield* sql`INSERT INTO matrix_identities(user_id, matrix_id)
         VALUES (${guest.userId}, ${`@guest-${randomUUID()}:zoen.test`})`;
-      const pairing = yield* startWhatsAppPairing(guestPersonal);
-      yield* confirmWhatsAppPairing({
-        accountId: pairing.id,
-        pairingNonce: pairing.pairingNonce,
-        remoteUserId: `wa:${randomUUID()}`,
-      });
+      yield* startWhatsAppPairing(guestPersonal);
       denied(
         yield* requestAccountDeletion({
           ...guest,

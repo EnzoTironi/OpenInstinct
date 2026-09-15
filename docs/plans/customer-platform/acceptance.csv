@@ -69,15 +69,15 @@ BR03,P06,group,live_whatsapp_bridge,Responder em grupo existente de participante
 BR04,P06,group,live_whatsapp_bridge,Enviar imagem audio e resposta citada,Mídia e correlacao preservadas sem vazamento entre chats,planned,
 BR05,P06,all,live_whatsapp_bridge,Interromper rede apos envio e repetir evento,Reconcilia status sem duplicar efeito nem gerar loop,planned,
 BR06,P06,all,live_whatsapp_bridge,Revogar pareamento e tentar tarefa na fila,Leitura envio e retomada bloqueados,planned,
-BR07,P06,all,integration_real_bridge,Cliente ou grupo usa roomId de outra conta,Acesso negado e resultado nao aparece na observabilidade errada,planned,
-BR08,P06,all,integration_real_bridge_crypto,Verificar chaves e mensagem em sala criptografada,Contrato de criptografia documentado sem promessa nao testada,planned,
+BR07,P06,all,integration_real_bridge,Cliente ou grupo usa roomId de outra conta,Acesso negado e resultado nao aparece na observabilidade errada,passed_integration,tests/runtime/whatsapp-bridge.integration.ts fixture: company cannot read a personal DM; 2026-09-15
+BR08,P06,all,integration_real_bridge_crypto,Verificar chaves e mensagem em sala criptografada,Contrato de criptografia documentado sem promessa nao testada,in_progress,"Hosted mautrix config sets encryption.allow=false; WhatsApp plaintext still crosses the bridge. Live E2EE proof pending. adr-whatsapp-user-bridge.md"
 BR09,P06,personal,live_beeper_desktop,Desktop fecha ou rede conectada perde sessao,Estado recuperavel sem prometer funcionamento continuo offline,planned,
 BR10,P06,group,live_whatsapp_bridge,Sincronizar historico parcial e pedir catch-up,Resumo indica periodo cobertura e mensagens de origem sem fingir historico completo,planned,
-BR11,P06,all,integration_real_bridge,Backfill e evento novo chegam repetidos fora de ordem,Cursor distingue historico de novidade e nao envia alerta ou resposta duplicados,planned,
+BR11,P06,all,integration_real_bridge,Backfill e evento novo chegam repetidos fora de ordem,Cursor distingue historico de novidade e nao envia alerta ou resposta duplicados,passed_integration,tests/runtime/whatsapp-bridge.integration.ts duplicate (account_id, provider_event_id); 2026-09-15
 BR12,P06,group,live_whatsapp_bridge,Editar rascunho ou trocar destinatario depois da autorizacao,Conteudo e destino novos exigem autorizacao correspondente,planned,
 BR13,P06,all,live_whatsapp_bridge,Agendar follow-up e receber resposta antes do prazo,Consulta estado recente e cancela cobranca desnecessaria,planned,
-BR14,P06,all,integration_real_bridge,Importar contatos e tentar A2A sem convite aceito,Contato sincronizado nao recebe confianca ou concessao automaticamente,planned,
-BR15,P06,professional,integration_real_bridge,Resumir chat pessoal em grupo de empresa sem compartilhamento,Nenhum conteudo ou resumo privado atravessa o escopo,planned,
+BR14,P06,all,integration_real_bridge,Importar contatos e tentar A2A sem convite aceito,Contato sincronizado nao recebe confianca ou concessao automaticamente,passed_integration,tests/runtime/whatsapp-bridge.integration.ts contacts vs user_directory/personal_trust_edges; 2026-09-15
+BR15,P06,professional,integration_real_bridge,Resumir chat pessoal em grupo de empresa sem compartilhamento,Nenhum conteudo ou resumo privado atravessa o escopo,passed_integration,tests/runtime/whatsapp-bridge.integration.ts company summarize of unshared DM denied; 2026-09-15
 BR16,P06,all,live_whatsapp_bridge,Pausar acompanhamento durante sincronizacao e retomar,Nenhum trabalho novo e enviado durante pausa e estado retoma sem duplicacao,planned,
 DL01,P07,personal,integration_full_stack,Excluir conta com memoria conversas anexos e fontes,Dados ativos pessoais apagados e sessao imediatamente revogada,planned,
 DL02,P07,personal,integration_full_stack,Excluir enquanto existem jobs grants e conexoes,Tarefas cessam e provedores delegados perdem novas autorizacoes,planned,

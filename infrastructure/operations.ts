@@ -127,10 +127,37 @@ const main = Effect.gen(function* () {
   const vaultEnabled = yield* Config.boolean("ZOEN_VAULT_PROBE_ENABLED").pipe(
     Config.withDefault(false)
   );
-  if (vaultEnabled) return yield* vaultCheck;
-  return yield* Effect.log(
-    "Vault probe inactive until the hosted vault is deployed."
-  );
+  if (vaultEnabled) yield* vaultCheck;
+  else
+    yield* Effect.log(
+      "Vault probe inactive until the hosted vault is deployed."
+    );
+  const whatsappEnabled = yield* Config.boolean(
+    "ZOEN_WHATSAPP_PROBE_ENABLED"
+  ).pipe(Config.withDefault(false));
+  if (!whatsappEnabled)
+    return yield* Effect.log(
+      "WhatsApp bridge probe inactive until a live paired session exists."
+    );
+  const whatsapp = yield* Machines.execMachine({
+    app_name: production.database.app,
+    machine_id: production.database.machine,
+    command: [
+      "wget",
+      "-q",
+      "-T",
+      "15",
+      "-O",
+      "-",
+      `http://${production.whatsapp.app}.internal:29318/_matrix/mau/live`,
+    ],
+    timeout: 20,
+  });
+  if (whatsapp.exit_code !== 0)
+    return yield* Effect.fail(
+      new Error("Private WhatsApp bridge health check failed")
+    );
+  return yield* Effect.log(whatsapp.stdout ?? "WhatsApp bridge check passed");
 }).pipe(
   Effect.provide(CredentialsFromEnv),
   Effect.provide(FetchHttpClient.layer)

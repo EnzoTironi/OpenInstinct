@@ -17,6 +17,42 @@ vi.mock("@web/trpc/client", () => ({
         useMutation: () => ({ isPending: false, mutate: vi.fn<() => void>() }),
       },
     },
+    workspaces: {
+      whatsapp: {
+        list: {
+          useQuery: () => ({
+            data: { accounts: [], chats: [] },
+            error: null,
+            isPending: false,
+            refetch: vi.fn(),
+          }),
+        },
+        start: {
+          useMutation: () => ({
+            isPending: false,
+            mutate: vi.fn<() => void>(),
+          }),
+        },
+        pause: {
+          useMutation: () => ({
+            isPending: false,
+            mutate: vi.fn<() => void>(),
+          }),
+        },
+        resume: {
+          useMutation: () => ({
+            isPending: false,
+            mutate: vi.fn<() => void>(),
+          }),
+        },
+        revoke: {
+          useMutation: () => ({
+            isPending: false,
+            mutate: vi.fn<() => void>(),
+          }),
+        },
+      },
+    },
   },
 }));
 
@@ -35,6 +71,7 @@ describe("connection directory", () => {
     );
     expect(markup.match(/>Telegram</g)).toHaveLength(1);
     expect(markup.match(/>WhatsApp</g)).toHaveLength(1);
+    expect(markup).toContain("My WhatsApp");
     expect(markup).toContain("Gmail, Calendar &amp; Contacts");
     expect(markup).not.toContain("Disconnect and sign out");
   });

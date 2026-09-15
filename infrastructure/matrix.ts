@@ -78,6 +78,7 @@ export const deployMatrix = Effect.fn("deployMatrix")(function* (input: {
   webApp: string;
   serverName: string;
   region: string;
+  whatsappCallback: string;
 }) {
   const image = yield* releaseImage("Matrix", input.provision.name, "./matrix");
   return yield* Fly.Machine("Matrix", {
@@ -91,6 +92,7 @@ export const deployMatrix = Effect.fn("deployMatrix")(function* (input: {
       ZOEN_MATRIX_SERVER_NAME: input.serverName,
       ZOEN_DATABASE_HOST: `${input.postgresApp}.internal`,
       ZOEN_MATRIX_CALLBACK_URL: `http://${input.webApp}.internal:3000`,
+      ZOEN_WHATSAPP_CALLBACK_URL: input.whatsappCallback,
     },
     services: [],
     restart: { policy: "always" },

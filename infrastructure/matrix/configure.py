@@ -26,6 +26,25 @@ registration = {
 registration_path = config_dir / "application-service.yaml"
 registration_path.write_text(json.dumps(registration))
 registration_path.chmod(0o600)
+app_service_files = [str(registration_path)]
+whatsapp_as = os.environ.get("ZOEN_WHATSAPP_AS_TOKEN")
+whatsapp_hs = os.environ.get("ZOEN_WHATSAPP_HS_TOKEN")
+whatsapp_url = os.environ.get("ZOEN_WHATSAPP_CALLBACK_URL")
+if whatsapp_as and whatsapp_hs and whatsapp_url:
+    whatsapp_registration = {
+        "id": "whatsapp", "url": whatsapp_url,
+        "as_token": whatsapp_as, "hs_token": whatsapp_hs,
+        "sender_localpart": "whatsappbot", "rate_limited": False,
+        "namespaces": {
+            "users": [{"exclusive": True, "regex": "^@whatsapp_.*:" + re.escape(name) + "$"}],
+            "aliases": [{"exclusive": True, "regex": "^#whatsapp_.*:" + re.escape(name) + "$"}],
+            "rooms": [],
+        },
+    }
+    whatsapp_path = config_dir / "whatsapp-application-service.yaml"
+    whatsapp_path.write_text(json.dumps(whatsapp_registration))
+    whatsapp_path.chmod(0o600)
+    app_service_files.append(str(whatsapp_path))
 config = {
     "server_name": name, "pid_file": str(config_dir / "homeserver.pid"),
     "signing_key_path": str(key), "report_stats": False,
@@ -40,7 +59,7 @@ config = {
     "allow_guest_access": False, "enable_media_repo": False,
     "url_preview_enabled": False, "trusted_key_servers": [],
     "federation_domain_whitelist": [], "suppress_key_server_warning": True,
-    "app_service_config_files": [str(registration_path)],
+    "app_service_config_files": app_service_files,
     "caches": {"global_factor": 0.25}, "presence": {"enabled": False},
     "rc_message": {"per_second": 1, "burst_count": 10},
     "rc_invites": {"per_room": {"per_second": 5, "burst_count": 50}, "per_user": {"per_second": 5, "burst_count": 50}},

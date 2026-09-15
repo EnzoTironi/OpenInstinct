@@ -14,6 +14,7 @@ common=(-e POSTGRES_PASSWORD=test-password -e POSTGRES_DB=open_instinct_prod
   -e ZOEN_MEMORY_DATABASE_PASSWORD=test-memory-password
   -e ZOEN_MATRIX_DATABASE_PASSWORD=test-matrix-password
   -e ZOEN_VAULTWARDEN_DATABASE_PASSWORD=test-vault-password
+  -e ZOEN_WHATSAPP_DATABASE_PASSWORD=test-whatsapp-password
   -e ZOEN_APPLICATION_DATABASE_PASSWORD=test-app-password
   -e ZOEN_MIGRATION_DATABASE_PASSWORD=test-migrator-password
   -e PGBACKREST_REPO1_TYPE=posix -e PGBACKREST_REPO1_PATH=/backup
@@ -39,6 +40,8 @@ docker exec "$source_name" /usr/local/bin/bootstrap-matrix.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-matrix.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-vaultwarden.sh
 docker exec "$source_name" /usr/local/bin/bootstrap-vaultwarden.sh
+docker exec "$source_name" /usr/local/bin/bootstrap-whatsapp.sh
+docker exec "$source_name" /usr/local/bin/bootstrap-whatsapp.sh
 allowed=$(docker exec "$source_name" psql -X -U postgres -d postgres -At -v ON_ERROR_STOP=1 \
   -c "SELECT has_database_privilege('zoen_memory', 'open_instinct_prod', 'CONNECT');")
 [[ $allowed == f ]] || { echo 'Memory role can enter the application database.' >&2; exit 1; }
@@ -48,6 +51,8 @@ docker exec -e PGPASSWORD=test-matrix-password "$source_name" psql -X -h 127.0.0
   -c "CREATE TABLE matrix_probe (id int PRIMARY KEY); INSERT INTO matrix_probe VALUES (1);"
 docker exec -e PGPASSWORD=test-vault-password "$source_name" psql -X -h 127.0.0.1 -U zoen_vaultwarden -d zoen_vaultwarden -v ON_ERROR_STOP=1 \
   -c "CREATE TABLE vault_probe (id int PRIMARY KEY); INSERT INTO vault_probe VALUES (1);"
+docker exec -e PGPASSWORD=test-whatsapp-password "$source_name" psql -X -h 127.0.0.1 -U zoen_whatsapp -d zoen_whatsapp -v ON_ERROR_STOP=1 \
+  -c "CREATE TABLE whatsapp_probe (id int PRIMARY KEY); INSERT INTO whatsapp_probe VALUES (1);"
 docker exec -i "$source_name" psql -X -U postgres -d open_instinct_prod -v ON_ERROR_STOP=1 <<'SQL'
 CREATE EXTENSION vector;
 CREATE TABLE workspaces(id int PRIMARY KEY);
@@ -89,6 +94,9 @@ actual=$(docker exec -e PGPASSWORD=test-matrix-password "$restore_name" psql -X 
 actual=$(docker exec -e PGPASSWORD=test-vault-password "$restore_name" psql -X -h 127.0.0.1 -U zoen_vaultwarden -d zoen_vaultwarden -At -v ON_ERROR_STOP=1 \
   -c "SELECT count(*) = 1 FROM vault_probe;")
 [[ $actual == t ]] || { echo 'Restored vault database or credentials failed.' >&2; exit 1; }
+actual=$(docker exec -e PGPASSWORD=test-whatsapp-password "$restore_name" psql -X -h 127.0.0.1 -U zoen_whatsapp -d zoen_whatsapp -At -v ON_ERROR_STOP=1 \
+  -c "SELECT count(*) = 1 FROM whatsapp_probe;")
+[[ $actual == t ]] || { echo 'Restored WhatsApp database or credentials failed.' >&2; exit 1; }
 actual=$(docker exec -e PGPASSWORD=test-app-password "$restore_name" psql -X -h 127.0.0.1 -U zoen_app -d open_instinct_prod -At -v ON_ERROR_STOP=1 \
   -c "SELECT count(*) = 1 AND NOT has_schema_privilege('zoen_app', 'public', 'CREATE') AND NOT pg_has_role('zoen_app', 'zoen_migrator', 'MEMBER') FROM workspaces;")
 [[ $actual == t ]] || { echo 'Restored runtime role isolation failed.' >&2; exit 1; }
@@ -97,4 +105,4 @@ if docker exec "$restore_name" /usr/local/bin/backup.sh full; then
   echo 'An isolated restore must not write backups.' >&2
   exit 1
 fi
-echo 'Encrypted backup, WAL replay, memory, Matrix, vault and runtime role recovery passed.'
+echo 'Encrypted backup, WAL replay, memory, Matrix, WhatsApp, vault and runtime role recovery passed.'
