@@ -1,5 +1,10 @@
 # Pally: recipes, conversational operation and public architecture
 
+For the 2026-09-14 Zoen implementation direction, see
+[hosted messaging with Beeper/mautrix](../plans/customer-platform/beeper-pally.md).
+That document separates Pally's publicly described behavior from the unverified
+claim about its underlying Beeper implementation.
+
 Research snapshot: 2026-09-08. This is competitor evidence and design analysis,
 not a claim that Companion implements these capabilities or permission to adopt
 a provider. No account was connected and no task was executed through Pally.
