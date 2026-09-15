@@ -130,7 +130,7 @@ export const executeCodeMode = Effect.fn("Executor.executeCodeMode")(function* (
           });
           const resolved = yield* resolveExecutorCall(context, input, surface);
           if (
-            !codeReadableTools.has(call.path) ||
+            (!codeReadableTools.has(call.path) && !resolved.tool.codeSafe) ||
             resolved.tool.approval !== undefined
           )
             return {

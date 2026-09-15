@@ -12,6 +12,7 @@ import { ExecutorCatalogError } from "./errors";
 import { readExecutorSkills, loadExecutorSkill } from "./skills";
 import { rankCatalog } from "./search";
 import { toolInputSchema } from "@agent/lib/tool-input-schema";
+import { CustomerToolSchema } from "../workspaces/tool-document";
 
 const Search = Schema.Struct({
   query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(200))),
@@ -55,13 +56,29 @@ export const discoverExecutor = Effect.fn("Executor.discover")(function* (
     kind: "tool" as const,
     path: name,
     description: tool.description,
-    execution: codeReadableTools.has(name) ? "code" : "call",
+    execution:
+      (codeReadableTools.has(name) || tool.codeSafe) &&
+      tool.approval === undefined
+        ? "code"
+        : "call",
     approval: tool.approval !== undefined,
   }));
   if (path === "describe.tool") {
     const input = yield* Schema.decodeUnknownEffect(Describe)(args, {
       onExcessProperty: "error",
     });
+    if (
+      input.path === "customer.tool.definition" &&
+      actor &&
+      !actor.agentGrantId
+    )
+      return {
+        kind: "definition" as const,
+        path: input.path,
+        instructions:
+          "Author JSON at proposals/tools/<slug>.json using workspace-save. The owner tests and publishes in Space → Tools. Input and output schemas are JSON Schema objects with additionalProperties:false; supported types are object, array, string, number, integer and boolean. No references, regexes or executable schema extensions. Customer code receives input and may only invoke explicitly listed workspace read dependencies, excluding Google and customer tools. Tests use fixtures keyed by dependency path. Return an object. Published IDs contain the content version; use the discovered ID in skill requires. This definition grants no permissions.",
+        schema: describeToolSchema(toolInputSchema(CustomerToolSchema)),
+      };
     if (["search", "describe.tool", "describe.skill"].includes(input.path))
       return {
         kind: "tool" as const,

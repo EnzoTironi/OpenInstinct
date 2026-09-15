@@ -19,6 +19,7 @@ import workspace from "./tools/workspace";
 import { resolveBrowserTools } from "./browser/catalog";
 import { ExecutorCatalogError } from "./errors";
 import { resolveWorkspaceTools } from "./workspace";
+import { resolveCustomerTools } from "./customer-tools";
 
 export type ExecutorSurface = "coordinator" | "browser";
 
@@ -100,7 +101,10 @@ export const resolveExecutorTools = Effect.fn("Executor.resolveTools")(
       try: async () => webFetch.events["turn.started"]?.(undefined, context),
       catch: () => new ExecutorCatalogError({ reason: "unavailable" }),
     });
-    const tools: ExecutorCatalog = Object.fromEntries([
+    const tools: ExecutorCatalog = Object.fromEntries<ExecutorCatalog[string]>([
+      ...Object.entries<ExecutorCatalog[string]>(
+        reporting ? {} : yield* resolveCustomerTools(context)
+      ),
       ...Object.entries(reporting ? {} : yield* resolveWorkspaceTools(context)),
       ...groups.flatMap((group) =>
         Object.entries(group ?? {}).flatMap(([name, tool]) =>

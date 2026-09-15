@@ -1,3 +1,8 @@
+import {
+  decodeCustomerTool,
+  PublishedToolPath,
+  ToolProposalPath,
+} from "./tool-document";
 import { readAgentGrantCapabilities } from "./bots";
 import {
   ontologyPath,
@@ -74,6 +79,7 @@ const visibleInSharedExecution = (path: string) =>
   path.startsWith("knowledge/") ||
   path.startsWith("ontology/") ||
   path.startsWith("skills/") ||
+  path.startsWith("tools/") ||
   [
     capabilitiesPath,
     "agent/SOUL.md",
@@ -271,8 +277,15 @@ const makeRepository = Effect.gen(function* () {
               readonly filename: string;
               readonly bytes: Uint8Array;
             }
-          | { readonly kind: "publication"; readonly proposal: string }
-          | { readonly kind: "rollback"; readonly revision: string } = {
+          | {
+              readonly kind: "publication" | "tool-publication";
+              readonly proposal: string;
+            }
+          | {
+              readonly kind: "rollback" | "tool-rollback";
+              readonly revision: string;
+            }
+          | { readonly kind: "tool-disable" } = {
           kind: "editor",
         }
       ) {
@@ -288,6 +301,42 @@ const makeRepository = Effect.gen(function* () {
             () => new WorkspaceRepositoryError({ reason: "invalid_input" })
           )
         );
+        if (
+          Schema.is(PublishedToolPath)(input.path) &&
+          !["tool-publication", "tool-rollback", "tool-disable"].includes(
+            source.kind
+          )
+        )
+          return yield* new WorkspaceAccessDenied();
+        if (
+          (Schema.is(PublishedToolPath)(input.path) ||
+            Schema.is(ToolProposalPath)(input.path)) &&
+          input.content !== null
+        )
+          yield* decodeCustomerTool(input.content);
+        if (
+          source.kind === "tool-publication" &&
+          (!Schema.is(ToolProposalPath)(source.proposal) ||
+            source.proposal.replace(/^proposals\//u, "") !== input.path)
+        )
+          return yield* new WorkspaceRepositoryError({
+            reason: "invalid_input",
+          });
+        if (
+          source.kind === "tool-rollback" &&
+          (!Schema.is(PublishedToolPath)(input.path) ||
+            !Schema.is(GitRevisionSchema)(source.revision))
+        )
+          return yield* new WorkspaceRepositoryError({
+            reason: "invalid_input",
+          });
+        if (
+          source.kind === "tool-disable" &&
+          (!Schema.is(PublishedToolPath)(input.path) || input.content !== null)
+        )
+          return yield* new WorkspaceRepositoryError({
+            reason: "invalid_input",
+          });
         if (input.path === capabilitiesPath && input.content !== null)
           yield* Schema.decodeUnknownEffect(
             Schema.fromJsonString(WorkspaceCapabilitiesSchema)
@@ -343,9 +392,15 @@ const makeRepository = Effect.gen(function* () {
                 filename: original?.filename,
                 action: source.kind === "ontology" ? source.action : undefined,
                 proposal:
-                  source.kind === "publication" ? source.proposal : undefined,
+                  ["publication", "tool-publication"].includes(source.kind) &&
+                  "proposal" in source
+                    ? source.proposal
+                    : undefined,
                 revision:
-                  source.kind === "rollback" ? source.revision : undefined,
+                  ["rollback", "tool-rollback"].includes(source.kind) &&
+                  "revision" in source
+                    ? source.revision
+                    : undefined,
               },
             })
           )
@@ -355,7 +410,8 @@ const makeRepository = Effect.gen(function* () {
             yield* requireWorkspaceAccess(
               actor,
               !input.path.startsWith("knowledge/") &&
-                !input.path.startsWith("proposals/skills/")
+                !input.path.startsWith("proposals/skills/") &&
+                !input.path.startsWith("proposals/tools/")
             );
             const prior = yield* replay(
               actor.workspaceId,
@@ -375,14 +431,15 @@ const makeRepository = Effect.gen(function* () {
                 operation: input.operationId,
                 action: source.action,
               }
-            : source.kind === "publication"
+            : source.kind === "publication" ||
+                source.kind === "tool-publication"
               ? {
                   actor: actor.userId,
                   operation: input.operationId,
                   source: "publication",
                   proposal: source.proposal,
                 }
-              : source.kind === "rollback"
+              : source.kind === "rollback" || source.kind === "tool-rollback"
                 ? {
                     actor: actor.userId,
                     operation: input.operationId,
@@ -398,7 +455,7 @@ const makeRepository = Effect.gen(function* () {
           message: `${input.content === null ? "Remove" : "Update"} ${input.path}\n\nZoen-Metadata: ${JSON.stringify(metadata)}`,
         };
         const candidate = yield* publishWorkspaceGit(
-          source.kind === "publication"
+          source.kind === "publication" || source.kind === "tool-publication"
             ? { ...gitInput, remove: source.proposal }
             : gitInput
         );
@@ -407,7 +464,8 @@ const makeRepository = Effect.gen(function* () {
             yield* requireWorkspaceAccess(
               actor,
               !input.path.startsWith("knowledge/") &&
-                !input.path.startsWith("proposals/skills/")
+                !input.path.startsWith("proposals/skills/") &&
+                !input.path.startsWith("proposals/tools/")
             );
             const prior = yield* replay(
               actor.workspaceId,

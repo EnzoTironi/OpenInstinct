@@ -22,6 +22,7 @@ import {
 } from "../../server/workspaces/git";
 import { workspaceProcedure } from "./workspace-procedure";
 import { workspaceRoomsRouter } from "./workspace-rooms";
+import { workspaceToolsRouter } from "./workspace-tools";
 import { workspaceAgentsRouter } from "./workspace-agents";
 import { readWorkspaceCapabilities } from "../../server/workspaces/capabilities";
 import {
@@ -49,6 +50,7 @@ import {
 } from "../../server/memory/learned";
 
 export const workspacesRouter = {
+  tools: workspaceToolsRouter,
   rooms: workspaceRoomsRouter,
   ...workspaceAgentsRouter,
   schedules: {

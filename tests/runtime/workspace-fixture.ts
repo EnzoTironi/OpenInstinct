@@ -1,3 +1,4 @@
+import { toolContextFor } from "../helpers/tool-context";
 import { randomUUID } from "node:crypto";
 import { PgClient } from "@effect/sql-pg";
 import { Effect } from "effect";
@@ -49,3 +50,29 @@ export const workspaceFixture = Effect.fn("workspace.fixture")(function* () {
     repository: yield* WorkspaceRepository,
   };
 });
+
+export function workspaceExecutionFor(
+  actor: Effect.Success<ReturnType<typeof workspaceFixture>>["actor" | "guest"]
+) {
+  const base = toolContextFor({
+    toolName: "execute",
+    callId: randomUUID(),
+    sessionId: randomUUID(),
+  });
+  const principal = {
+    principalId: actor.userId,
+    principalType: "user",
+    authenticator: "authjs",
+    attributes: {
+      workspaceId: actor.workspaceId,
+      authSessionId: actor.authSessionId,
+    },
+  };
+  return {
+    ...base,
+    session: {
+      ...base.session,
+      auth: { current: principal, initiator: principal },
+    },
+  };
+}

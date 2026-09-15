@@ -14,6 +14,7 @@ import {
   PuzzleIcon,
   UsersIcon,
   AtSignIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { api } from "@web/trpc/client";
 import { useI18n } from "@web/i18n/context";
@@ -23,6 +24,7 @@ import { agentFiles } from "@shared/workspaces/agent-files";
 import { workspaceHref } from "@web/workspaces/navigation";
 import { PanelIntro } from "../../../_components/panel-intro";
 import { PanelLink } from "../../../_components/panel-link";
+import { ToolLibrary } from "./tool-library";
 import { FileEditor } from "./file-editor";
 import { PluginSettings } from "./plugin-settings";
 import panel from "../../../_components/panel.module.css";
@@ -33,7 +35,7 @@ export function SpaceOverview() {
   const router = useRouter();
   const search = useSearchParams();
   const [category, setCategory] = useState<
-    "knowledge" | "agent" | "skills" | "plugins"
+    "knowledge" | "agent" | "skills" | "plugins" | "tools"
   >(search.get("tab") === "plugins" ? "plugins" : "knowledge");
   const [path, setPath] = useState<string>();
   const [newFile, setNewFile] = useState(false);
@@ -150,6 +152,7 @@ export function SpaceOverview() {
             ["knowledge", "Arquivos", FolderOpenIcon],
             ["agent", "Seu agente", SparklesIcon],
             ["skills", "Skills", FileTextIcon],
+            ["tools", "Ferramentas", WrenchIcon],
             ["plugins", "Plugins", PuzzleIcon],
           ] as const
         ).map(([id, label, Icon]) => (
@@ -167,13 +170,14 @@ export function SpaceOverview() {
           </button>
         ))}
       </div>
+      {category === "tools" && <ToolLibrary mayManage={mayManage} />}
       {category === "plugins" && <PluginSettings mayManage={mayManage} />}
       {listing.error && (
         <p className={styles.error} role="alert">
           {t("Não foi possível abrir seu espaço.")}
         </p>
       )}
-      {category !== "plugins" && (
+      {category !== "plugins" && category !== "tools" && (
         <div className={styles.list}>
           {category === "agent"
             ? agentFiles.map((item) => (
@@ -220,6 +224,7 @@ export function SpaceOverview() {
       )}
       {category !== "agent" &&
         category !== "plugins" &&
+        category !== "tools" &&
         files.length === 0 &&
         !listing.isPending && (
           <p className={styles.empty}>
@@ -233,6 +238,7 @@ export function SpaceOverview() {
       {listing.isPending && <output>{t("Carregando…")}</output>}
       {category !== "agent" &&
         category !== "plugins" &&
+        category !== "tools" &&
         (category !== "skills" || mayManage) && (
           <div className={styles.actions}>
             <Button

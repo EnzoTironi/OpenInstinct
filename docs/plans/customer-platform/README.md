@@ -10,6 +10,8 @@ Start with [the handoff](handoff.md), then use:
   deletion, evals and release gates.
 - [Beeper and the Pally experience](beeper-pally.md): the hosted messaging
   approach, user journeys, data boundaries and primary-source findings.
+- [Implemented customer code slice](../../decisions/adr-customer-tools.md):
+  current behavior, isolation evidence and remaining remote-connector work.
 - [Acceptance matrix](acceptance.csv): scenarios with required evidence levels;
   populate results only after running them.
 - [Existing launch evidence](../../decisions/zoen-launch-validation.md): previous

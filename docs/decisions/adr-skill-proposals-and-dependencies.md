@@ -1,7 +1,7 @@
-# Skill proposals, publication, rollback and unavailable tool code
+# Skill proposals, publication, rollback and dependencies
 
-Status: implemented for the skill lifecycle; customer tool code and
-connectors remain unavailable.
+Status: implemented for the skill lifecycle and bounded customer code.
+Remote connectors remain unavailable.
 
 Date: 2026-09-14.
 
@@ -29,17 +29,14 @@ required catalog path is present in this turn, or `execution: "blocked"`
 with `missing` or `problem`. Discovery re-reads the catalog on every call.
 A skill never changes grants, plugins or membership.
 
-## Tool code and connectors stay unavailable
+## Customer code and remote connectors
 
-The plan requires customer-authored tool code and MCP/OpenAPI connectors to
-run only after the sandbox enforces CPU, memory, network, filesystem,
-concurrency and cancellation limits, with no host fallback. The current
-QuickJS isolate bounds memory, stack, idle interrupt, host calls, code size
-and output. Concurrency is unbounded, and the outer 30 second timeout fails
-the Effect fiber without stopping a running evaluation. Until that isolation
-exists, Zoen does not store tool code, does not load client tools as
-`agent/tools/*.ts`, and does not register MCP or OpenAPI connectors. A
-manifest that calls itself read-only would not change that policy.
+The bounded code implementation and its evidence now live in
+[versioned customer tools](adr-customer-tools.md). Customer tools use the same
+Executor catalog, content-versioned IDs and validated publication. Remote
+MCP/OpenAPI connectors remain unavailable pending the dedicated transport,
+authorization and live-provider proof. An integration calling itself read-only
+does not change the authorization of its operations.
 
 ## Alternatives rejected
 

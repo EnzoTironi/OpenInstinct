@@ -7,6 +7,8 @@ export type ExecutorTool = Pick<
   "description" | "approval" | "toModelOutput"
 > &
   Pick<ToolDefinition, "inputSchema" | "outputSchema"> & {
+    /** Only host-validated, isolated computations may opt into Code Mode. */
+    codeSafe?: boolean;
     // oxlint-disable-next-line anti-slop/no-unknown-returns -- Owner-specific outputs remain heterogeneous until the paired projection decodes them.
     execute: (...args: Parameters<ToolDefinition<never>["execute"]>) => unknown;
   };

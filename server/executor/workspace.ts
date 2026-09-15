@@ -134,7 +134,7 @@ export const readExecutorCatalog = Effect.fn("Executor.catalog")(function* (
   };
 });
 
-const invokeWorkspaceTool = Effect.fn("Executor.invokeWorkspaceTool")(
+export const invokeWorkspaceTool = Effect.fn("Executor.invokeWorkspaceTool")(
   function* (
     actor: typeof WorkspaceActorSchema.Type,
     call: Parameters<SandboxToolInvoker["invoke"]>[0],

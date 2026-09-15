@@ -32,7 +32,7 @@ fixture-tested, live, and missing proof.
 | Matrix / A2A             | Yes               | CI has Synapse            | Blocked here                                                              | Two people, two bots                |
 | Mem0                     | Yes               | Learned-memory tests      | CI service, not a user journey                                            | Live forget/recall journey          |
 | Executor skills          | Yes               | Publication + discovery   | Blocked                                                                   | Use and revoke in three live scopes |
-| Customer tool code       | No                | Isolation incomplete      | Unavailable                                                               | Sandbox limits before any store     |
+| Customer tool code       | Yes               | QuickJS + Git + local UI  | Not a provider pass                                                       | Remote connectors and native evals  |
 | Account UI wipe          | Yes               | Honesty tests             | Partial by design                                                         | Must not be sold as full deletion   |
 | Account erasure          | Yes               | PostgreSQL deletion tests | Pending Mem0/Matrix/Vaultwarden/mautrix/backups                           | Live provider purge                 |
 | Browser / Kernel         | Yes               | Launch eval listed        | Blocked                                                                   | `eval:ci` / Kernel on this SHA      |
@@ -60,11 +60,11 @@ Skills are Markdown in the workspace Git bundle. A member can draft
 `proposals/skills/<slug>.md`; an admin publishes `skills/<slug>.md` in
 the same commit. Rollback is a later revision. `requires:` lists catalog
 paths; discovery re-reads the catalog. Publishing a skill does not grant
-new permissions. Customer-authored tool code, MCP and OpenAPI
-connectors stay unavailable until the sandbox enforces CPU, memory,
-network, filesystem, concurrency and cancellation. Code Mode discovers
-Executor catalog names; mutations still need current grants and exact
-approvals.
+new permissions. Bounded customer tool code now uses content-versioned IDs and the same
+Executor catalog, with validated publication and current authorization.
+See [customer tools](adr-customer-tools.md). Remote MCP/OpenAPI registration
+remains unavailable. Mutations still require their native Eve action and
+approval boundary.
 
 ## Data policy
 
