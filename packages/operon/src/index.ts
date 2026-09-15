@@ -17,3 +17,4 @@ export * from "./recall/evaluate";
 export * from "./recall/span-query";
 export * from "./recall/section-needle";
 export * from "./recall/host";
+export * from "./ingest";

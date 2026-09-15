@@ -8,10 +8,13 @@ import { expect, it } from "vitest";
 import { objectTypeIdSchema } from "@zoen/operon";
 import {
   HostScopedRecallCache,
+  IngestRejected,
   InMemoryActionLifecycle,
   InMemoryAuthority,
   InMemoryObjectStore,
+  InMemorySourceIngest,
   ObjectInstanceSchema,
+  classifyLocator,
   evaluateEvidence,
   j1DefinitionArtifact,
   selectHostScopedContext,
@@ -58,6 +61,29 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
       );
       expect(recalled.profile).toBe("lean");
       expect(recalled.requiredEvidence[0]?.status).toBe("missing");
+      expect(classifyLocator("http://127.0.0.1/secret")).toEqual({
+        kind: "unsafe_locator",
+      });
+      const ingest = new InMemorySourceIngest();
+      const blob = yield* ingest.putBlob(
+        { userId: "better-auth:ana", workspaceId: "personal:ana" },
+        new TextEncoder().encode("blob first"),
+        "text/plain"
+      );
+      const source = yield* ingest.commitReference(
+        { userId: "better-auth:ana", workspaceId: "personal:ana" },
+        blob.id,
+        "raw"
+      );
+      expect(source.instructionAuthority).toBe("none");
+      const missing = yield* ingest
+        .commitReference(
+          { userId: "better-auth:ana", workspaceId: "personal:ana" },
+          "blob_absent",
+          "raw"
+        )
+        .pipe(Effect.flip);
+      expect(missing).toBeInstanceOf(IngestRejected);
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");
