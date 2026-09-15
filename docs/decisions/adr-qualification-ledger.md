@@ -29,9 +29,9 @@ The closed-beta envelope (25 active users, five concurrent agent tasks,
 burst of ten, 30-minute load, 24-hour soak, API p95 1 s, queue p95 10 s)
 is declared and unmeasured. Insufficient quota is not a pass.
 
-Live Mem0, Matrix, Vaultwarden and mautrix stay fail-closed. Observability
-keeps enterprise dashboards in-workspace, redacts credentials including
-TOTP seeds, and scans exports for planted canaries. No onboarding
+Observability keeps enterprise dashboards in-workspace, redacts credentials
+including TOTP seeds, correlates request/workspace/channel/room/tool/grant/
+outbox identifiers, and scans exports for planted canaries. No onboarding
 collection step is added. A controlled production alert was not fired.
 
 Spark versus Luna was not compared: this environment has no authorized

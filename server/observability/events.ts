@@ -26,9 +26,31 @@ const TelemetryEventSchema = Schema.Struct({
   inputTokens: Schema.optional(Schema.Number),
   outputTokens: Schema.optional(Schema.Number),
   costUsd: Schema.optional(Schema.Number),
+  roomId: Schema.optional(Schema.String),
+  toolPath: Schema.optional(Schema.String),
+  grantId: Schema.optional(Schema.String),
+  outboxId: Schema.optional(Schema.String),
   metadata: Schema.optional(Schema.Json),
   payload: Schema.optional(Schema.Unknown),
 });
+
+const JsonRecord = Schema.Record(Schema.String, Schema.Json);
+
+function correlationMetadata(event: typeof TelemetryEventSchema.Type) {
+  return parseDiagnostic(
+    JSON.stringify(
+      Object.assign(
+        Schema.is(JsonRecord)(event.metadata) ? event.metadata : {},
+        {
+          grantId: event.grantId ?? null,
+          outboxId: event.outboxId ?? null,
+          roomId: event.roomId ?? null,
+          toolPath: event.toolPath ?? null,
+        }
+      )
+    )
+  );
+}
 
 export const readTelemetryPolicy = Effect.fn("telemetry.policy")(function* (
   workspaceId: string
@@ -75,7 +97,7 @@ export const recordTelemetry = Effect.fn("telemetry.record")(function* (
     duration_ms, input_tokens, output_tokens, cost_usd, metadata, payload)
     VALUES (${event.id}, ${event.workspaceId ?? null}, ${event.userId ?? null}, ${event.sessionId ?? null}, ${event.turnId ?? null}, ${event.kind},
       ${event.channel ?? null}, ${event.model ?? null}, ${event.name ?? null}, ${event.status ?? null}, ${event.durationMs ?? null},
-      ${event.inputTokens ?? null}, ${event.outputTokens ?? null}, ${event.costUsd ?? null}, ${sql.json(parseDiagnostic(JSON.stringify(event.metadata ?? {})))}, ${payload})
+      ${event.inputTokens ?? null}, ${event.outputTokens ?? null}, ${event.costUsd ?? null}, ${sql.json(correlationMetadata(event))}, ${payload})
     ON CONFLICT (id) DO NOTHING`;
 });
 
