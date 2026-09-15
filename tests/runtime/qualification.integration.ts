@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Effect, Layer, Result, Schema } from "effect";
 import { expect, test } from "vitest";
-import type { ToolContext } from "eve/tools";
 import { scanSecretCanaries } from "../../server/qualification/canary";
 import { toolsMissingEvidence } from "../../server/qualification/inventory";
 import { discoverExecutor } from "../../server/executor/discovery";
@@ -14,8 +13,7 @@ import { Mem0 } from "../../server/memory/mem0";
 import { recordTelemetry } from "../../server/observability/events";
 import { readDiagnosticSession } from "../../server/observability/insights";
 import { runtimeDatabase } from "./database";
-import { workspaceFixture } from "./workspace-fixture";
-import { toolContextFor } from "../helpers/tool-context";
+import { workspaceFixture, workspaceExecutionFor } from "./workspace-fixture";
 
 const services = LearnedMemory.layer.pipe(
   Layer.provideMerge(Mem0.layer),
@@ -28,38 +26,12 @@ const SearchPage = Schema.Struct({
   nextOffset: Schema.NullOr(Schema.Number),
 });
 
-function executionFor(
-  actor: Effect.Success<ReturnType<typeof workspaceFixture>>["actor"]
-) {
-  const base = toolContextFor({
-    toolName: "execute",
-    callId: randomUUID(),
-    sessionId: randomUUID(),
-  });
-  const principal = {
-    principalId: actor.userId,
-    principalType: "user",
-    authenticator: "authjs",
-    attributes: {
-      workspaceId: actor.workspaceId,
-      authSessionId: actor.authSessionId,
-    },
-  };
-  return {
-    ...base,
-    session: {
-      ...base.session,
-      auth: { current: principal, initiator: principal },
-    },
-  } satisfies ToolContext;
-}
-
 test("catalog discovery after skill publication is inventoried and live providers stay pending", () =>
   Effect.runPromise(
     Effect.gen(function* () {
       const { actor, guest, guestPersonal, repository } =
         yield* workspaceFixture();
-      const context = executionFor(actor);
+      const context = workspaceExecutionFor(actor);
       const discovered: string[] = [];
       let offset = 0;
       for (;;) {
