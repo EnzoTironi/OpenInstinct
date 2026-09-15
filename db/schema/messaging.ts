@@ -173,7 +173,7 @@ export const channelOutbox = pgTable(
     ),
     check(
       "channel_outbox_effect_kind_check",
-      sql`${table.effectKind} IN ('channel_send', 'mail', 'whatsapp')`
+      sql`${table.effectKind} IN ('browser_submit', 'channel_send', 'mail', 'whatsapp')`
     ),
     check(
       "channel_outbox_operation_check",

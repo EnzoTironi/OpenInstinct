@@ -407,6 +407,13 @@
       "when": 1789513119146,
       "tag": "0057_famous_kate_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1789516702622,
+      "tag": "0058_big_gorgon",
+      "breakpoints": true
     }
   ]
 }

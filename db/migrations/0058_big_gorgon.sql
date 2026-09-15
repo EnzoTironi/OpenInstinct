@@ -1,0 +1,2 @@
+ALTER TABLE "channel_outbox" DROP CONSTRAINT "channel_outbox_effect_kind_check";--> statement-breakpoint
+ALTER TABLE "channel_outbox" ADD CONSTRAINT "channel_outbox_effect_kind_check" CHECK ("channel_outbox"."effect_kind" IN ('browser_submit', 'channel_send', 'mail', 'whatsapp'));

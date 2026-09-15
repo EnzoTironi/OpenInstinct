@@ -75,7 +75,12 @@ export const AcceptInputSchema = Schema.Struct({
   payload: MessagePayloadSchema,
 });
 export type AcceptInput = typeof AcceptInputSchema.Type;
-const EffectKindSchema = Schema.Literals(["channel_send", "mail", "whatsapp"]);
+const EffectKindSchema = Schema.Literals([
+  "browser_submit",
+  "channel_send",
+  "mail",
+  "whatsapp",
+]);
 export type EffectKind = typeof EffectKindSchema.Type;
 
 export const EnqueueInputSchema = Schema.Struct({

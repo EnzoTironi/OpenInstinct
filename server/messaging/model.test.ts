@@ -37,8 +37,13 @@ describe("EnqueueInputSchema", () => {
       payload: { text: "ok" },
     };
     await expect(
-      Effect.runPromise(Schema.decodeUnknownEffect(EnqueueInputSchema)(valid))
-    ).resolves.toEqual(valid);
+      Effect.runPromise(
+        Schema.decodeUnknownEffect(EnqueueInputSchema)({
+          ...valid,
+          effectKind: "browser_submit",
+        })
+      )
+    ).resolves.toMatchObject({ effectKind: "browser_submit" });
     await expect(
       Effect.runPromise(
         Schema.decodeUnknownEffect(EnqueueInputSchema, {
