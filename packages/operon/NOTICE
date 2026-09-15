@@ -1,0 +1,29 @@
+Embedded Operon domain extract for Zoen.
+
+Source: github.com/enzotironi/operon @ ec7f26386171d2eec24cf49eb425e22fa9b82fcf
+License: MIT, Copyright (c) 2026 Enzo Tironi (see LICENSE).
+
+This package carries Object/Link/Value Type definitions, claims/evidence
+schemas, definition artifacts, an in-memory ObjectStore with optimistic
+concurrency, and a compile-time section recall helper. It is a library
+inside the Zoen workspace, not a cell, MCP server, or second product.
+
+Recall helpers in `src/recall/span-query.ts` and `src/recall/section-needle.ts`
+are adapted from vellum-ai/vellum-assistant commit
+`4f7c8744acb4d7f4f7c6e8f1eacdf90538dfac2f` (MIT, Copyright (c) 2025 Vellum AI).
+The upstream license is at `third-party/vellum-LICENSE.txt`. No Vellum daemon,
+scheduler, gateway, Qdrant collection, credential service, or canonical
+Markdown memory is imported.
+
+It does not include, import, or start:
+
+- Operon cell / Alchemy PostgreSQL cell
+- MCP stdio server
+- cell-auth
+- CLI `--workspace` snapshot JSON
+- Generated UI
+- mission scheduler or provider dispatch
+- package migrators / DDL-on-connect (`applySchema`)
+
+Do not provide this package to `server/runtime.ts` until Mem0 is removed in
+the same change (P10). Persistence on Zoen Postgres is a later package.

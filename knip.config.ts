@@ -43,6 +43,8 @@ export default {
         "scripts/groups-live-e2e.ts",
         // Launched in a separate process before web/worker traffic is admitted.
         "scripts/reconcile-account-erasures.ts",
+        // Host compile surface for @zoen/operon; not mounted until P10.
+        "server/operon-kernel.ts",
         // In-memory Operon MCP used by email-flow tests.
       ],
       ignoreDependencies: [
@@ -59,7 +61,15 @@ export default {
         "eslint-plugin-turbo",
         "oxlint-tailwindcss",
       ],
-      project: ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "!infrastructure/**"],
+      project: [
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!infrastructure/**",
+        "!packages/operon/**",
+      ],
+    },
+    "packages/operon": {
+      entry: ["src/index.ts", "src/**/*.test.ts"],
+      project: ["src/**/*.ts"],
     },
     infrastructure: {
       entry: [

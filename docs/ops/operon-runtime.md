@@ -1,8 +1,16 @@
 # Zoen and Operon runtime
 
+G0 (2026-09-15): domain types live in the workspace package `@zoen/operon`.
+That package is not mounted in `server/runtime.ts` and does not start MCP,
+cell-auth, or a workspace snapshot store. See
+[G0 baseline](../decisions/g0-baseline.md).
+
+The remainder of this page describes the **legacy** private stdio adapter.
+`operon.lock` still pins that checkout for the Docker image and CI until P10
+removes the bridge with Mem0.
+
 Zoen keeps Eve as the owner of conversations, approvals, and durable tool state.
-Operon runs over private stdio for each authenticated operation. `operon.lock`
-pins the public Operon commit used by both the Docker image and CI.
+Operon (legacy path) runs over private stdio for each authenticated operation.
 
 ## Running locally
 

@@ -54,13 +54,17 @@ activation, E2EE and federation are separate qualification gates.
 | Next.js + React            | App, onboarding and authenticated browser interface         |
 | Better Auth + PostgreSQL   | Identity, sessions, memberships and access boundaries       |
 | Eve + owned Executor       | Durable agent execution, discovery, approval and tool calls |
-| Git + Mem0                 | Versioned durable content and scoped memory                 |
+| Git + Mem0                 | Versioned durable content and scoped memory (Mem0 until P10) |
+| `@zoen/operon`             | Embedded domain types and OCC store; not mounted on startup |
 | Matrix + A2A adapters      | Collaboration and agent interoperability boundaries         |
 | Alchemy + Fly + Cloudflare | Declared deployment, private services, TLS and operations   |
 
 Git branches are not authorization boundaries. Personal credentials and memories
 do not become team or group data just because the same person uses both spaces.
-Secrets stay outside Git. Operon is not required for the current architecture.
+Secrets stay outside Git. `@zoen/operon` is a compile-time workspace package and
+is not provided to the Effect runtime until Mem0 is removed. The G0 live door is
+authenticated `/chat` on the same application PostgreSQL. See
+[G0 baseline](docs/decisions/g0-baseline.md).
 
 ## Run locally
 

@@ -30,6 +30,7 @@
       "@evals/*": ["./evals/*"],
       "@shared/environment": ["./shared/environment/env.ts"],
       "@shared/*": ["./shared/*"],
+      "@zoen/operon": ["./packages/operon/src/index.ts"],
       "@tests/*": ["./tests/*"],
       "@tools/*": ["./tools/*"],
       "@web/*": ["./web/*"]

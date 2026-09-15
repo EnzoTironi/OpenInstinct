@@ -124,6 +124,9 @@ importers:
       '@workflow/world-postgres':
         specifier: 5.0.0-beta.39
         version: 5.0.0-beta.39(patch_hash=5b4d2fdce9240706380a85625fbbaf9bdee2524f897503e94267167654f2e4e4)(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(sql.js@1.14.2)(supports-color@7.2.0)(typescript@7.0.2)
+      '@zoen/operon':
+        specifier: workspace:*
+        version: link:packages/operon
       ai:
         specifier: ^7.0.79
         version: 7.0.83(zod@4.5.4)
@@ -281,6 +284,12 @@ importers:
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
+
+  packages/operon:
+    dependencies:
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
 
 packages:
 

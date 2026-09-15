@@ -24,4 +24,23 @@ describe("turn failures", () => {
 
     expect(getLatestTurnFailure(events)).toBe("Child failed.");
   });
+
+  it("does surface a model outage without fabricating an answer", () => {
+    const events = [
+      {
+        data: {
+          code: "MODEL_CALL_FAILED",
+          message: "upstream timeout",
+          sequence: 1,
+          turnId: "turn-1",
+        },
+        meta: { at: "2026-09-15T17:00:00.000Z", id: "failed" },
+        type: "turn.failed",
+      },
+    ] satisfies MessageStreamEvent[];
+
+    expect(getLatestTurnFailure(events)).toBe(
+      "The model is temporarily unavailable. Please try again."
+    );
+  });
 });
