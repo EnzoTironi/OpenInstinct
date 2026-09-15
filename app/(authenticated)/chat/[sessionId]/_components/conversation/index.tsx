@@ -10,7 +10,11 @@ import {
   sentMessages,
 } from "../../_lib/message-events";
 import { messagesForTraceView, type TraceView } from "../../_lib/trace-view";
-import { getLatestTurnFailure } from "../../_lib/turn-failure";
+import {
+  chatFailureCopy,
+  getLatestTurnFailure,
+  userFacingFailureCopy,
+} from "../../_lib/turn-failure";
 import {
   Conversation,
   ConversationContent,
@@ -61,8 +65,14 @@ export function ChatConversation({
       pendingAssistantMessageId !== undefined);
   const turnFailure =
     isBusy || isRestoring ? undefined : getLatestTurnFailure(agent.events);
-  const errorMessage =
+  const rawFailure =
     (agent.error ? toErrorMessage(agent.error) : undefined) ?? turnFailure;
+  const errorMessage =
+    rawFailure === undefined
+      ? undefined
+      : traceView === "trace"
+        ? rawFailure
+        : userFacingFailureCopy(rawFailure);
   const messages = useMemo(
     () => messagesForTraceView(agent.data.messages, agent.events, traceView),
     [agent.data.messages, agent.events, traceView]
@@ -186,11 +196,11 @@ function completedReply(message: EveMessage): EveMessage["parts"] {
 }
 
 function toErrorMessage(cause: unknown): string {
-  if (!(cause instanceof Error)) return "Unable to complete the request.";
+  if (!(cause instanceof Error)) return chatFailureCopy.generic;
   if (/<!doctype html|<html[\s>]/i.test(cause.message)) {
-    return "The agent runtime is unavailable. Try again in a moment.";
+    return chatFailureCopy.runtimeUnavailable;
   }
-  return cause.message;
+  return userFacingFailureCopy(cause.message);
 }
 
 function ErrorMessage({ message }: { readonly message: string }) {
