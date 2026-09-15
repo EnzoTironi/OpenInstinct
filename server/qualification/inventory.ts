@@ -144,6 +144,7 @@ const launchExecutor = "evals/launch/executor.eval.ts";
 const launchApproval = "evals/launch/approval.eval.ts";
 const launchBrowser = "evals/launch/browser.eval.ts";
 const observations = "tests/runtime/observability.integration.ts";
+const deletion = "tests/runtime/account-deletion-providers.integration.ts";
 const reporter = "tests/launch-reporter.test.ts";
 
 const rows: readonly QualificationRow[] = [
@@ -329,9 +330,9 @@ const rows: readonly QualificationRow[] = [
     surface: "all",
     provider: "none",
     advertised: false,
-    fixture: fixture("integration", `${whatsapp}, ${vault}`),
+    fixture: fixture("integration", `${whatsapp}, ${vault}, ${deletion}`),
     live: blocked(
-      "Fail-closed requireVaultwarden and requireWhatsAppBridge are proved. Live PostgreSQL/Mem0/worker kill was not injected in this run."
+      "Fail-closed requireVaultwarden, requireWhatsAppBridge and pending_external deletion wipes are proved. Live PostgreSQL/Mem0/worker kill was not injected in this run."
     ),
   },
   {
@@ -352,7 +353,9 @@ const rows: readonly QualificationRow[] = [
     provider: "none",
     advertised: false,
     fixture: fixture("integration", observations),
-    live: blocked("No live Executor/A2A/model delivery trace was captured."),
+    live: blocked(
+      "No live Executor/A2A/model delivery trace was captured. Fixture correlation covers request, workspace, channel, room, tool, grant and outbox without secrets."
+    ),
   },
   {
     id: "OP07",
@@ -378,6 +381,18 @@ const rows: readonly QualificationRow[] = [
     live: blocked(live.alert),
   },
   {
+    id: "deletion:external-wipes",
+    family: "fault",
+    path: "account-erasure",
+    surface: "all",
+    provider: "none",
+    advertised: false,
+    fixture: fixture("integration", deletion),
+    live: blocked(
+      "Live Vaultwarden admin, paired WhatsApp, Synapse deactivate, Mem0 and backup media were not purged."
+    ),
+  },
+  {
     id: "REL01",
     family: "release",
     path: "same-sha-gates",
@@ -386,10 +401,10 @@ const rows: readonly QualificationRow[] = [
     advertised: false,
     fixture: fixture(
       "contract",
-      "docs/decisions/adr-customer-platform-release.md"
+      "docs/decisions/adr-customer-platform-release.md#gates-on-one-sha-rel01"
     ),
     live: blocked(
-      "eval:ci and full test:runtime were not executed in this authoring VM. Per-SHA check/build/eval:list belong on the PR, not as a standing live pass."
+      "eval:ci and Alchemy publish were not executed. Per-SHA check/build/db:check/eval:list belong on the stacked PR, not as a standing live pass."
     ),
   },
   {

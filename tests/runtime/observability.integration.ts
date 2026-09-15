@@ -59,23 +59,39 @@ test("diagnostics isolate members, redact secrets, encrypt content and deduplica
           userId: actor.userId,
           sessionId,
           kind: "step.completed",
+          channel: "matrix",
+          name: "network-contact",
           inputTokens: 12,
           outputTokens: 4,
           durationMs: 50,
+          roomId: "!synthetic:zoen.test",
+          toolPath: "network-contact",
+          grantId: randomUUID(),
+          outboxId: randomUUID(),
           payload: {
             message: "synthetic useful context",
             accessToken: "must-not-persist",
+            totp: "planted-totp-seed",
           },
         };
         yield* recordTelemetry(event);
         yield* recordTelemetry(event);
         const raw =
-          yield* sql`SELECT payload FROM telemetry_events WHERE id = ${event.id}`;
+          yield* sql`SELECT payload, metadata FROM telemetry_events WHERE id = ${event.id}`;
         expect(raw).toHaveLength(1);
         expect(JSON.stringify(raw)).not.toContain("synthetic useful context");
+        expect(JSON.stringify(raw)).not.toContain("planted-totp-seed");
+        expect(JSON.stringify(raw[0]?.metadata)).toContain(
+          "!synthetic:zoen.test"
+        );
+        expect(JSON.stringify(raw[0]?.metadata)).toContain("network-contact");
+        expect(JSON.stringify(raw[0]?.metadata)).toContain(event.grantId);
+        expect(JSON.stringify(raw[0]?.metadata)).toContain(event.outboxId);
         const rows = yield* readDiagnosticSession(actor, sessionId);
         expect(rows.events[0]?.payload).toContain("synthetic useful context");
         expect(rows.events[0]?.payload).not.toContain("must-not-persist");
+        expect(rows.events[0]?.payload).not.toContain("planted-totp-seed");
+        expect(rows.events[0]?.metadata).toContain("!synthetic:zoen.test");
         expect(
           Result.isFailure(
             yield* readDiagnosticSession(guest, sessionId).pipe(Effect.result)
