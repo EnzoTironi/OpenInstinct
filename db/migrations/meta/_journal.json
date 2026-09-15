@@ -337,6 +337,13 @@
       "when": 1789431016075,
       "tag": "0047_whatsapp-bridge",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1789432736920,
+      "tag": "0048_account-deletion",
+      "breakpoints": true
     }
   ]
 }

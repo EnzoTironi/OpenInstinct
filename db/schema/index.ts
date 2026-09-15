@@ -1,5 +1,6 @@
 export * from "./auth";
 export * from "./account-archives";
+export * from "./account-deletion";
 export * from "./artifacts";
 export * from "./billing";
 export * from "./browser";
