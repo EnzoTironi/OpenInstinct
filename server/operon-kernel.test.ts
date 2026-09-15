@@ -6,7 +6,11 @@ import { Effect, Schema } from "effect";
 import { expect, it } from "vitest";
 
 import { objectTypeIdSchema } from "@zoen/operon";
-import { InMemoryObjectStore, ObjectInstanceSchema } from "./operon-kernel";
+import {
+  InMemoryObjectStore,
+  ObjectInstanceSchema,
+  j1DefinitionArtifact,
+} from "./operon-kernel";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -28,6 +32,7 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
         join(repositoryRoot, "server/runtime.ts"),
         "utf8"
       );
+      expect(j1DefinitionArtifact.definitionVersion).toBe("j1.0.0");
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");

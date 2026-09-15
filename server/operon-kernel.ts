@@ -9,11 +9,20 @@ export {
   ConcurrentModificationError,
   InMemoryObjectStore,
   ObjectInstanceSchema,
+  acceptActionInput,
   actionDefSchema,
   claimSchema,
   definitionArtifactSchema,
   defineObjectType,
   defineProperty,
+  j1DefinitionArtifact,
   objectTypeIdSchema,
+  projectActionSurfaces,
+  projectScopedSection,
 } from "@zoen/operon";
-export type { ActionDef, Claim, DefinitionArtifact } from "@zoen/operon";
+export type {
+  ActionDef,
+  ActionHostBinding,
+  Claim,
+  DefinitionArtifact,
+} from "@zoen/operon";

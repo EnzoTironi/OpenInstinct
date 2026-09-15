@@ -9,6 +9,7 @@ export * from "./evidence";
 export * from "./definition";
 export * from "./errors";
 export * from "./object-store";
+export * from "./catalog";
 export * from "./recall/select";
 export * from "./recall/evaluate";
 export * from "./recall/span-query";

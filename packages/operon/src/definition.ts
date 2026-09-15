@@ -62,6 +62,7 @@ export const actionDefSchema = Schema.Struct({
 export type ActionDef = typeof actionDefSchema.Type;
 
 export const definitionArtifactSchema = Schema.Struct({
+  definitionVersion: Schema.String,
   types: Schema.Array(typeDefSchema),
   links: Schema.Array(linkDefSchema),
   queries: Schema.Array(queryDefSchema),
