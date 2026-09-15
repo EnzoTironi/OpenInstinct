@@ -22,6 +22,7 @@ import {
   mailOutcome,
   replyLengthPolicy,
   pollInbox,
+  projectChildDelivery,
   selectConnectedAccount,
   selectHostScopedContext,
   whatsAppSendClaim,
@@ -105,6 +106,11 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
       ).toBe("incomplete");
       expect(replyLengthPolicy("analysis")).toBe("full");
       expect(pollInbox("", [], 0).modelJudgment).toBe(false);
+      const child = yield* projectChildDelivery(
+        { userId: "better-auth:ana", workspaceId: "personal:ana" },
+        { userId: "better-auth:ana" }
+      );
+      expect(child.finalReply).toBe(false);
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");
