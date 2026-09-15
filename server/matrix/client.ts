@@ -72,6 +72,43 @@ export const matrixRequest = Effect.fn("matrix.request")(function* (
   }).pipe(Effect.timeout("20 seconds"));
 });
 
+/** Synapse admin erase. A missing user is already gone. Live admin stays optional. */
+export const deactivateMatrixUser = Effect.fn("matrix.deactivateUser")(
+  function* (matrixId: string) {
+    const config = yield* matrixConfiguration;
+    const url = new URL(
+      `/_synapse/admin/v1/deactivate/${encodeURIComponent(matrixId)}`,
+      config.url
+    );
+    yield* Effect.tryPromise({
+      try: async (signal) => {
+        const response = await fetch(url, {
+          method: "POST",
+          signal,
+          redirect: "error",
+          headers: {
+            authorization: `Bearer ${Redacted.value(config.token)}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ erase: true }),
+        });
+        if (response.ok || response.status === 404) return;
+        throw new MatrixError({ reason: "unavailable" });
+      },
+      catch: (error) =>
+        error instanceof MatrixError
+          ? error
+          : new MatrixError({ reason: "unavailable" }),
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: "20 seconds",
+        orElse: () => Effect.fail(new MatrixError({ reason: "unavailable" })),
+      })
+    );
+    return { deactivated: true as const };
+  }
+);
+
 export const MatrixEventSchema = Schema.Struct({
   event_id: Schema.String,
   room_id: Schema.optional(Schema.String),

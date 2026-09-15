@@ -55,6 +55,10 @@ test("a company member's deletion keeps company git and never delivers to live p
         VALUES (${randomUUID()}, ${guest.userId}, 'turn', '{}')`;
       yield* sql`INSERT INTO matrix_identities(user_id, matrix_id)
         VALUES (${guest.userId}, ${`@guest-${randomUUID()}:zoen.test`})`;
+      yield* sql`INSERT INTO vault_items (id, workspace_id, kind, label, account)
+        VALUES (${`vault-${randomUUID()}`}, ${guestPersonal.workspaceId}, 'login', ${personalCanary}, 'personal@example.invalid')`;
+      yield* sql`INSERT INTO encrypted_secrets (workspace_id, namespace, id, encrypted_value)
+        VALUES (${guestPersonal.workspaceId}, 'vault', ${personalCanary}, 'ciphertext')`;
       yield* startWhatsAppPairing(guestPersonal);
       denied(
         yield* requestAccountDeletion({
@@ -104,6 +108,12 @@ test("a company member's deletion keeps company git and never delivers to live p
       expect(
         yield* sql`SELECT 1 FROM matrix_identities WHERE user_id = ${guest.userId}`
       ).toHaveLength(0);
+      expect(
+        yield* sql`SELECT 1 FROM vault_items WHERE workspace_id = ${guestPersonal.workspaceId}`
+      ).toHaveLength(0);
+      expect(
+        yield* sql`SELECT 1 FROM encrypted_secrets WHERE workspace_id = ${guestPersonal.workspaceId}`
+      ).toHaveLength(0);
       expect((yield* repository.read(actor, "knowledge/team.md")).content).toBe(
         companyCanary
       );
@@ -124,9 +134,33 @@ test("a company member's deletion keeps company git and never delivers to live p
         (${guestPersonal.workspaceId}, ${guest.userId}, 'owner')`;
       yield* sql`INSERT INTO chats(session_id, workspace_id, title) VALUES
         (${randomUUID()}, ${guestPersonal.workspaceId}, ${personalCanary})`;
+      yield* sql`INSERT INTO vault_items (id, workspace_id, kind, label, account)
+        VALUES (${`vault-restore-${randomUUID()}`}, ${guestPersonal.workspaceId}, 'login', ${personalCanary}, 'restored@example.invalid')`;
+      yield* sql`INSERT INTO encrypted_secrets (workspace_id, namespace, id, encrypted_value)
+        VALUES (${guestPersonal.workspaceId}, 'vault', ${`restore-${personalCanary}`}, 'restored-ciphertext')`;
+      yield* sql`INSERT INTO whatsapp_bridge_accounts (
+          workspace_id, user_id, pairing_nonce_hash, remote_user_id, matrix_user_id, login_id, status, expires_at, connected_at
+        ) VALUES (
+          ${guestPersonal.workspaceId}, ${guest.userId}, 'restored', ${`wa-${randomUUID()}`},
+          ${`@restored-wa-${randomUUID()}:zoen.test`}, ${randomUUID()}, 'connected', now() + interval '1 day', clock_timestamp()
+        )`;
+      yield* sql`INSERT INTO matrix_identities(user_id, matrix_id)
+        VALUES (${guest.userId}, ${`@restored-${randomUUID()}:zoen.test`})`;
       yield* applyAccountDeletionTombstones();
       expect(
         yield* sql`SELECT 1 FROM chats WHERE title = ${personalCanary}`
+      ).toHaveLength(0);
+      expect(
+        yield* sql`SELECT 1 FROM vault_items WHERE workspace_id = ${guestPersonal.workspaceId}`
+      ).toHaveLength(0);
+      expect(
+        yield* sql`SELECT 1 FROM encrypted_secrets WHERE workspace_id = ${guestPersonal.workspaceId}`
+      ).toHaveLength(0);
+      expect(
+        yield* sql`SELECT 1 FROM whatsapp_bridge_accounts WHERE workspace_id = ${guestPersonal.workspaceId}`
+      ).toHaveLength(0);
+      expect(
+        yield* sql`SELECT 1 FROM matrix_identities WHERE user_id = ${guest.userId}`
       ).toHaveLength(0);
       expect(
         yield* sql`SELECT 1 FROM public."user" WHERE id = ${guest.userId.slice("better-auth:".length)}`
