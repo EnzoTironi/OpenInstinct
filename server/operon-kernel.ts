@@ -8,6 +8,7 @@
 export {
   ActionLifecycleRejected,
   ConcurrentModificationError,
+  HostScopedRecallCache,
   InMemoryActionLifecycle,
   InMemoryAuthority,
   InMemoryObjectStore,
@@ -16,15 +17,20 @@ export {
   actionDefSchema,
   bindChatYes,
   claimSchema,
+  corroboratingProviderIds,
   definitionArtifactSchema,
   defineObjectType,
   defineProperty,
   evaluateEvidence,
+  evidenceObservationsFromRecall,
   j1DefinitionArtifact,
   objectTypeIdSchema,
   projectActionSurfaces,
+  projectObjectSection,
   projectScopedSection,
   refuseIncomingRequestAutoAccept,
+  selectHostScopedContext,
+  selectRelevantContext,
 } from "@zoen/operon";
 export type {
   ActionDef,

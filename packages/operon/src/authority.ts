@@ -380,6 +380,23 @@ const countSourcesImpl = Effect.fn("InMemoryAuthority.countSources")(function* (
   return count;
 });
 
+const listObjectsImpl = Effect.fn("InMemoryAuthority.listObjects")(function* (
+  state: AuthorityState,
+  scope: ActionHostBinding
+) {
+  const host = yield* decodeScope(scope).pipe(
+    Effect.mapError(() => reject("invalid_scope"))
+  );
+  return [...state.objects.values()]
+    .filter(
+      (snapshot) =>
+        snapshot.userId === host.userId &&
+        snapshot.workspaceId === host.workspaceId
+    )
+    .map(clone)
+    .toSorted((left, right) => left.id.localeCompare(right.id));
+});
+
 const rememberIdentityImpl = Effect.fn("InMemoryAuthority.rememberIdentity")(
   function* (
     state: AuthorityState,
@@ -616,6 +633,10 @@ export class InMemoryAuthority {
 
   countSources(scope: ActionHostBinding) {
     return countSourcesImpl(this.#state, scope);
+  }
+
+  listObjects(scope: ActionHostBinding) {
+    return listObjectsImpl(this.#state, scope);
   }
 
   rememberIdentity(scope: ActionHostBinding, handle: string, personId: string) {

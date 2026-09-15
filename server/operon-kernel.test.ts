@@ -7,11 +7,14 @@ import { expect, it } from "vitest";
 
 import { objectTypeIdSchema } from "@zoen/operon";
 import {
+  HostScopedRecallCache,
   InMemoryActionLifecycle,
+  InMemoryAuthority,
   InMemoryObjectStore,
   ObjectInstanceSchema,
   evaluateEvidence,
   j1DefinitionArtifact,
+  selectHostScopedContext,
 } from "./operon-kernel";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -43,6 +46,18 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
         new InMemoryActionLifecycle().rememberRetrievedPlaybook("proposal text")
           .admission
       ).toBe("proposal");
+      const recalled = yield* selectHostScopedContext(
+        new InMemoryAuthority(),
+        new HostScopedRecallCache(),
+        { userId: "better-auth:ana", workspaceId: "personal:ana" },
+        "anything at all about Ana",
+        [{ id: "rd-ana", objectId: "missing-object" }],
+        64,
+        1,
+        []
+      );
+      expect(recalled.profile).toBe("lean");
+      expect(recalled.requiredEvidence[0]?.status).toBe("missing");
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");
