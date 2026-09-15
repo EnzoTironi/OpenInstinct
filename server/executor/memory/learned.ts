@@ -68,10 +68,8 @@ const recall = (
         context.memory.scope.value
       );
       const memory = yield* LearnedMemory;
-      const query =
-        context.turn === null ? "" : JSON.stringify(context.turn.input);
       const stored = yield* memory
-        .recall(actor, context.memory.scope.key, context.operationId, query)
+        .recall(actor, context.memory.scope.key, context.operationId, "")
         .pipe(
           Effect.catchTag("LearnedMemoryError", (error) =>
             error.reason === "invalid_input"

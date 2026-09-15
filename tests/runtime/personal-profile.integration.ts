@@ -12,7 +12,7 @@ import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
-import { personalMemoryProvider } from "../../server/executor/memory/personal-memory-provider";
+import learnedMemory from "../../server/executor/memory/learned";
 import { getAuth } from "../../db/services/auth";
 import { channelChallengeSchema } from "../../shared/identity/channel-auth";
 import { applicationOrigin } from "../../shared/environment/origin";
@@ -248,68 +248,120 @@ test("concurrent unrelated patch cannot restore a forgotten field", async () => 
   }
 });
 
-test("native note correction and last-note removal replace recalled content across turns and compaction", async () => {
+const learnedItemListSchema = Schema.Array(
+  Schema.Struct({
+    id: Schema.String.check(Schema.isUUID()),
+    memory: Schema.String,
+  })
+);
+
+function learnedRecallItems(content: string) {
+  const line = content.trim().split("\n").at(-1);
+  if (line?.[0] !== "[") return [];
+  return Schema.decodeUnknownSync(learnedItemListSchema)(JSON.parse(line));
+}
+
+function nextLearnedTurn(
+  context: MemoryTurnStartedContext
+): MemoryTurnStartedContext {
+  const operationId = randomUUID();
+  const sequence = context.turn.sequence + 1;
+  return {
+    ...context,
+    operationId,
+    session: {
+      ...context.session,
+      turn: { id: operationId, sequence },
+    },
+    turn: { id: operationId, sequence, input: context.turn.input },
+  };
+}
+
+test("learned note correction and last-note removal replace recalled content across turns and compaction", async () => {
   const owner = await fixture();
-  const context = {
+  const principal = owner.context.session.auth.current;
+  assert.ok(principal);
+  let context: MemoryTurnStartedContext = {
     ...owner.context,
-    memory: { ...owner.context.memory, slot: "profile" },
+    memory: {
+      scope: {
+        key: `learned-proof:${randomUUID()}`,
+        namespace: "zoen-learned-v1",
+        value: [owner.scope.workspaceId, principal.principalId],
+      },
+      slot: "learned",
+    },
   };
   try {
-    const tools = await personalMemoryProvider.tools?.({
+    const tools = await learnedMemory.provider.tools({
       ...context,
       channel: { kind: "telegram" },
     });
-    assert.ok(tools?.save_memory && tools.remove_memory);
     const save = tools.save_memory;
     const remove = tools.remove_memory;
     await save.execute(
       // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
-      { text: "My favorite color is orange." },
-      owner.execution
+      { text: "Minha cor favorita é laranja." },
+      { ...owner.execution, callId: randomUUID() }
     );
-    const first = await personalMemoryProvider.recall["turn.started"](context);
-    const firstMessage = first?.messages[0];
-    const recallId = firstMessage?.id;
-    assert.ok(recallId, "Native recall must identify the content it replaces.");
-    const oldIndex = /(?:^|\n)(\d+):.*orange/mu.exec(firstMessage.content)?.[1];
-    assert.ok(oldIndex, firstMessage.content);
+    context = nextLearnedTurn(context);
+    const first = await learnedMemory.provider.recall["turn.started"](context);
+    const firstMessage = first.messages[0];
+    const recallId = firstMessage.id;
+    assert.ok(
+      recallId,
+      "Learned recall must identify the content it replaces."
+    );
+    const oldNote = learnedRecallItems(firstMessage.content).find((item) =>
+      item.memory.includes("laranja")
+    );
+    assert.ok(oldNote, firstMessage.content);
     await save.execute(
       // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
-      { text: "My favorite color is green." },
-      owner.execution
+      { text: "Minha cor favorita é verde." },
+      { ...owner.execution, callId: randomUUID() }
     );
-    // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
-    await remove.execute({ index: Number(oldIndex) }, owner.execution);
+    await remove.execute(
+      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
+      { id: oldNote.id },
+      { ...owner.execution, callId: randomUUID() }
+    );
+    context = nextLearnedTurn(context);
     const corrected =
-      await personalMemoryProvider.recall["turn.started"](context);
-    const content = corrected?.messages[0]?.content ?? "";
-    assert.match(content, /green/);
-    assert.doesNotMatch(content, /orange/);
-    const newIndex = /(?:^|\n)(\d+):.*green/mu.exec(content)?.[1];
-    assert.ok(newIndex, content);
-    // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
-    await remove.execute({ index: Number(newIndex) }, owner.execution);
-    // Exercise both native lifecycle callbacks in their actual sequence.
+      await learnedMemory.provider.recall["turn.started"](context);
+    const content = corrected.messages[0].content;
+    assert.match(content, /verde/);
+    assert.doesNotMatch(content, /laranja/);
+    const kept = learnedRecallItems(content).find((item) =>
+      item.memory.includes("verde")
+    );
+    assert.ok(kept, content);
+    await remove.execute(
+      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
+      { id: kept.id },
+      { ...owner.execution, callId: randomUUID() }
+    );
+    context = nextLearnedTurn(context);
     /* oxlint-disable eslint/no-await-in-loop */
     for (const event of ["turn.started", "compaction.completed"] as const) {
-      const recalled = await personalMemoryProvider.recall[event]({
+      const recalled = await learnedMemory.provider.recall[event]({
         ...context,
-        compaction: { modelId: "profile-storage-proof" },
+        compaction: { modelId: "learned-storage-proof" },
       });
-      assert.equal(recalled?.messages[0]?.id, recallId);
-      assert.match(recalled.messages[0].content, /No memories are saved/);
-      assert.doesNotMatch(recalled.messages[0].content, /orange|green/);
+      assert.equal(recalled.messages[0].id, recallId);
+      assert.deepEqual(learnedRecallItems(recalled.messages[0].content), []);
+      assert.doesNotMatch(recalled.messages[0].content, /laranja|verde/);
     }
     /* oxlint-enable eslint/no-await-in-loop */
     await owner.revoke();
     await assert.rejects(async () =>
       // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
-      save.execute({ text: "My favorite color is orange." }, owner.execution)
+      save.execute(
+        { text: "Minha cor favorita é laranja." },
+        { ...owner.execution, callId: randomUUID() }
+      )
     );
   } finally {
-    await owner.sql.query("DELETE FROM memory_document WHERE key = $1", [
-      context.memory.scope.key,
-    ]);
     await owner.close();
   }
 });

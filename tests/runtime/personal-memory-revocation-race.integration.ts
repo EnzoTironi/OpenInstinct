@@ -13,7 +13,8 @@ import { channelChallengeSchema } from "../../shared/identity/channel-auth";
 import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
 import { channelPrincipal } from "../../server/channels/principal";
-import { personalMemoryProvider } from "../../server/executor/memory/personal-memory-provider";
+import learnedMemory from "../../server/executor/memory/learned";
+import { disposableDatabaseNames } from "../../server/database/reset-target";
 
 const cookieHeader = (response: Response) =>
   response.headers
@@ -22,7 +23,7 @@ const cookieHeader = (response: Response) =>
     .join("; ");
 
 for (const authority of ["channel", "web"] as const) {
-  test(`${authority} revocation linearizes with native memory writes waiting on a real row lock`, async () => {
+  test(`${authority} revocation linearizes with learned memory writes waiting on a real row lock`, async () => {
     const url = await Effect.runPromise(Config.string("DATABASE_URL"));
     const database = new Client({ connectionString: url });
     const blocker = new Client({ connectionString: url });
@@ -34,13 +35,14 @@ for (const authority of ["channel", "web"] as const) {
     let write: Promise<{ ok: boolean }> | undefined;
     let revoke: Promise<void> | undefined;
     try {
-      assert.equal(
-        (
-          await database.query<{ name: string }>(
-            "SELECT current_database() AS name"
-          )
-        ).rows[0]?.name,
-        "companion_runtime_test"
+      assert.ok(
+        new Set<string>(disposableDatabaseNames).has(
+          (
+            await database.query<{ name: string }>(
+              "SELECT current_database() AS name"
+            )
+          ).rows[0]?.name ?? ""
+        )
       );
       const auth = await getAuth();
       const accounts = await serverRuntime.runPromise(ChannelAccounts);
@@ -118,10 +120,10 @@ for (const authority of ["channel", "web"] as const) {
         memory: {
           scope: {
             key,
-            namespace: "memory-revocation-race",
-            value: workspaceId,
+            namespace: "zoen-learned-v1",
+            value: [workspaceId, principal.principalId],
           },
-          slot: "profile",
+          slot: "learned",
         },
         messages: [],
         operationId: randomUUID(),
@@ -141,7 +143,7 @@ for (const authority of ["channel", "web"] as const) {
       const execution: ToolContext = {
         ...context,
         callId: randomUUID(),
-        toolName: "profile__save_memory",
+        toolName: "learned__save_memory",
         getToken() {
           throw new Error("No connection belongs in this memory proof");
         },
@@ -151,34 +153,39 @@ for (const authority of ["channel", "web"] as const) {
           );
         },
       };
-      const tools = await personalMemoryProvider.tools?.({
+      const tools = await learnedMemory.provider.tools({
         ...context,
         channel: { kind: "http" },
       });
-      const save = tools?.save_memory;
+      const save = tools.save_memory;
       assert.ok(save);
       const invoke = async (text: string) => {
         // @ts-expect-error The heterogeneous public map erases the native tool input type.
-        await save.execute({ text }, execution);
+        await save.execute({ text }, { ...execution, callId: randomUUID() });
       };
-      await invoke("Before revocation");
-      const before = (
-        await database.query<{ content: string; version: string }>(
-          "SELECT content,version FROM memory_document WHERE key=$1",
-          [key]
-        )
-      ).rows[0];
-      assert.ok(before);
+      await invoke("Antes da revogação");
+      const listLearned = async () =>
+        (
+          await database.query<{ id: string; memory: string }>(
+            `SELECT i.id, i.memory FROM workspace_learned_item i
+             JOIN workspace_memory_namespace n ON n.namespace_id = i.namespace_id
+             WHERE n.workspace_id = $1 AND n.user_id = $2
+             ORDER BY i.id`,
+            [workspaceId, principal.principalId]
+          )
+        ).rows;
+      const before = await listLearned();
+      assert.ok(before.length >= 1);
       await blocker.query("BEGIN");
       await blocker.query(
-        "SELECT key FROM memory_document WHERE key=$1 FOR UPDATE",
-        [key]
+        "SELECT namespace_id FROM workspace_memory_namespace WHERE workspace_id=$1 AND user_id=$2 FOR UPDATE",
+        [workspaceId, principal.principalId]
       );
       const blockerPid = (
         await blocker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")
       ).rows[0]?.pid;
       assert.ok(blockerPid);
-      write = invoke("Racing write").then(
+      write = invoke("Escrita concorrente").then(
         () => ({ ok: true }),
         () => ({ ok: false })
       );
@@ -187,7 +194,7 @@ for (const authority of ["channel", "web"] as const) {
         .poll(
           async () => {
             const rows = await database.query<{ pid: number }>(
-              "SELECT pid FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)) AND query ILIKE '%UPDATE%memory_document%'",
+              "SELECT pid FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)) AND query LIKE '%workspace_memory_namespace%'",
               [blockerPid]
             );
             writerPid = rows.rows[0]?.pid;
@@ -235,35 +242,24 @@ for (const authority of ["channel", "web"] as const) {
       await blocker.query("COMMIT");
       const outcome = await write;
       await revoke;
-      const after = (
-        await database.query<{ content: string; version: string }>(
-          "SELECT content,version FROM memory_document WHERE key=$1",
-          [key]
-        )
-      ).rows[0];
-      assert.ok(after);
+      const after = await listLearned();
+      assert.ok(after.length >= 1);
       if (revocationWon) {
         assert.deepEqual(
           after,
           before,
-          "Revocation completed before releasing the document lock, but the native tool still committed a write"
+          "Revocation completed before releasing the namespace lock, but the learned tool still committed a write"
         );
         assert.equal(outcome.ok, false);
       } else {
         // The writer held an authority lock: revocation could finish only after its transaction ended.
-        assert.match(after.content, /Racing write/);
+        assert.ok(
+          after.some((row) => row.memory.includes("Escrita concorrente"))
+        );
       }
       const frozen = after;
-      await assert.rejects(invoke("Must not persist after revocation"));
-      assert.deepEqual(
-        (
-          await database.query<{ content: string; version: string }>(
-            "SELECT content,version FROM memory_document WHERE key=$1",
-            [key]
-          )
-        ).rows[0],
-        frozen
-      );
+      await assert.rejects(invoke("Não deve persistir após revogação"));
+      assert.deepEqual(await listLearned(), frozen);
       assert.equal(
         (
           await database.query<{ n: number }>(

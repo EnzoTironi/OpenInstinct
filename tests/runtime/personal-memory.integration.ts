@@ -19,6 +19,7 @@ import { inspectPersonalMemory } from "../../server/personal-memory/export";
 import { serverRuntime } from "../../server/runtime";
 import { createMemoryDocumentBackend } from "../../agent/lib/memory-document-backend";
 import { personalMemoryProvider } from "../../server/executor/memory/personal-memory-provider";
+import learnedMemory from "../../server/executor/memory/learned";
 import { channelPrincipal } from "../../server/channels/principal";
 import { inspectStoredPersonalMemory } from "../../server/executor/tools/personal-memory";
 import { GET } from "../../app/api/account/personal-memory/export/route";
@@ -102,6 +103,40 @@ function memoryContext(
     },
     getSkill() {
       throw new Error("Personal memory must not request a skill.");
+    },
+  };
+}
+
+function learnedContext(
+  identity: Identity
+): MemoryTurnStartedContext & Pick<MemoryToolsContext, "channel"> {
+  const principal = channelPrincipal(identity);
+  const scope = accessScopeForUser(principal.principalId);
+  const id = randomUUID();
+  return {
+    abortSignal: new AbortController().signal,
+    channel: { kind: identity.channel },
+    memory: {
+      scope: {
+        key: `learned-memory-test:${randomUUID()}`,
+        namespace: "zoen-learned-v1",
+        value: [scope.workspaceId, principal.principalId],
+      },
+      slot: "learned",
+    },
+    messages: [],
+    operationId: randomUUID(),
+    session: {
+      id,
+      auth: { current: principal, initiator: principal },
+      turn: { id, sequence: 1 },
+    },
+    turn: { id, input: [], sequence: 1 },
+    getSandbox() {
+      throw new Error("Learned memory must not request a sandbox.");
+    },
+    getSkill() {
+      throw new Error("Learned memory must not request a skill.");
     },
   };
 }
@@ -302,17 +337,19 @@ test("actual account auth, profile store, Eve provider, private tool and export 
         .status,
       401
     );
-    const createNativeTools = personalMemoryProvider.tools;
-    assert.ok(createNativeTools);
-    const nativeTools = await createNativeTools(ownerContext);
-    const save = nativeTools?.save_memory;
-    const remove = nativeTools?.remove_memory;
-    assert.ok(save && remove);
+    const learnedOwnerContext = learnedContext(owner.identity);
+    const learnedOtherContext = learnedContext(other.identity);
+    const learnedTools =
+      await learnedMemory.provider.tools(learnedOwnerContext);
+    const save = learnedTools.save_memory;
+    const remove = learnedTools.remove_memory;
+    const nativeTools = await personalMemoryProvider.tools?.(ownerContext);
+    assert.equal(nativeTools?.save_memory, undefined);
     await assert.rejects(async () =>
       save.execute(
         // @ts-expect-error The native heterogeneous tool map erases its input type.
-        { text: "Another account cannot use this bound tool" },
-        toolContext(otherContext)
+        { text: "Outra conta não pode usar esta ferramenta capturada" },
+        toolContext(learnedOtherContext)
       )
     );
     const browserSession = await auth.api.getSession({ headers: ownerHeaders });
@@ -358,8 +395,14 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     await assert.rejects(
       personalMemoryProvider.recall["turn.started"](missingWebSession)
     );
-    const webTools = await createNativeTools(webContext);
-    assert.ok(webTools?.save_memory);
+    const learnedWebContext = {
+      ...learnedOwnerContext,
+      session: {
+        ...learnedOwnerContext.session,
+        auth: { current: webPrincipal, initiator: webPrincipal },
+      },
+    };
+    const webTools = await learnedMemory.provider.tools(learnedWebContext);
     const secondLogin = await login(owner.identity.senderId);
     const secondSession = await auth.api.getSession({
       headers: new Headers({ cookie: secondLogin.cookie }),
@@ -390,10 +433,10 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       personalMemoryProvider.recall["turn.started"](webContext)
     );
     await assert.rejects(async () =>
-      webTools.save_memory?.execute(
-        // @ts-expect-error Synthetic input exercises the real native save_memory tool.
-        { text: "Must not use another active browser session" },
-        toolContext(webContext)
+      webTools.save_memory.execute(
+        // @ts-expect-error Synthetic input exercises the real learned save_memory tool.
+        { text: "Não deve usar outra sessão ativa do navegador" },
+        toolContext(learnedWebContext)
       )
     );
     const browserSecret = randomBytes(32).toString("base64url");
@@ -429,6 +472,23 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       key: ownerContext.memory.scope.key,
       signal: ownerContext.abortSignal,
     });
+    await save.execute(
+      // @ts-expect-error Synthetic input exercises the real learned save_memory tool.
+      { text: "Nota aprendida do titular" },
+      toolContext(learnedOwnerContext)
+    );
+    const beforeLearned = await serverRuntime.runPromise(
+      Effect.gen(function* () {
+        const sql = yield* PgClient.PgClient;
+        return yield* sql<{ id: string; memory: string }>`
+          SELECT i.id, i.memory FROM workspace_learned_item i
+          JOIN workspace_memory_namespace n ON n.namespace_id = i.namespace_id
+          WHERE n.workspace_id = ${ownerScope.workspaceId}
+            AND n.user_id = ${ownerScope.userId}
+          ORDER BY i.id`;
+      })
+    );
+    assert.ok(beforeLearned.some((row) => row.memory.includes("titular")));
     await serverRuntime.runPromise(
       accounts.revokeIdentity({
         identityId: owner.identity.id,
@@ -444,20 +504,20 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     await assert.rejects(
       personalMemoryProvider.recall["turn.started"](ownerContext)
     );
-    await assert.rejects(createNativeTools(ownerContext));
+    await assert.rejects(learnedMemory.provider.tools(learnedOwnerContext));
     await assert.rejects(async () =>
       save.execute(
         // The public heterogeneous memory-tool map erases each tool's input type.
-        // @ts-expect-error Synthetic input exercises the real native save_memory tool.
-        { text: "Must never be saved through a revoked channel" },
-        toolContext(ownerContext)
+        // @ts-expect-error Synthetic input exercises the real learned save_memory tool.
+        { text: "Nunca deve ser gravado por um canal revogado" },
+        toolContext(learnedOwnerContext)
       )
     );
     await assert.rejects(async () =>
       remove.execute(
-        // @ts-expect-error Synthetic input exercises the real native remove_memory tool.
-        { index: 0 },
-        toolContext(ownerContext)
+        // @ts-expect-error Synthetic input exercises the real learned remove_memory tool.
+        { id: randomUUID() },
+        toolContext(learnedOwnerContext)
       )
     );
     assert.deepEqual(
@@ -466,6 +526,20 @@ test("actual account auth, profile store, Eve provider, private tool and export 
         signal: ownerContext.abortSignal,
       }),
       beforeRevocation
+    );
+    assert.deepEqual(
+      await serverRuntime.runPromise(
+        Effect.gen(function* () {
+          const sql = yield* PgClient.PgClient;
+          return yield* sql<{ id: string; memory: string }>`
+            SELECT i.id, i.memory FROM workspace_learned_item i
+            JOIN workspace_memory_namespace n ON n.namespace_id = i.namespace_id
+            WHERE n.workspace_id = ${ownerScope.workspaceId}
+              AND n.user_id = ${ownerScope.userId}
+            ORDER BY i.id`;
+        })
+      ),
+      beforeLearned
     );
     await serverRuntime.runPromise(
       Effect.gen(function* () {
