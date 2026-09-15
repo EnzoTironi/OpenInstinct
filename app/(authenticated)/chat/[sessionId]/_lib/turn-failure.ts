@@ -16,7 +16,7 @@ export type ChatFailureCopy =
 
 const chatFailureCopyValues: readonly string[] = Object.values(chatFailureCopy);
 
-export function isChatFailureCopy(message: string): message is ChatFailureCopy {
+function isChatFailureCopy(message: string): message is ChatFailureCopy {
   return chatFailureCopyValues.includes(message);
 }
 
@@ -47,7 +47,7 @@ export function getLatestTurnFailure(
   return undefined;
 }
 
-export function modelAccessFailureMessage(detail: string) {
+function modelAccessFailureMessage(detail: string) {
   if (
     /usage limit|quota|insufficient.*(?:credit|balance)|\b402\b/iu.test(detail)
   ) {
