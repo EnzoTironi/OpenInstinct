@@ -164,7 +164,7 @@ jobs:
             --url http://127.0.0.1:4351 --suite launch/network --network-scope personal --repeat "$REPETITIONS" --timeout 360000 --junit .eve/network-personal.xml
       - name: Upload sanitized benchmark receipts
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: zoen-native-evals-${{ github.sha }}
           path: |
