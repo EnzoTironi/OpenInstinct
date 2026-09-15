@@ -6,12 +6,14 @@
  * until Mem0 is removed in the same change.
  */
 export {
-  ActionDef,
-  Claim,
   ConcurrentModificationError,
-  DefinitionArtifact,
   InMemoryObjectStore,
   ObjectInstanceSchema,
+  actionDefSchema,
+  claimSchema,
+  definitionArtifactSchema,
   defineObjectType,
   defineProperty,
+  objectTypeIdSchema,
 } from "@zoen/operon";
+export type { ActionDef, Claim, DefinitionArtifact } from "@zoen/operon";

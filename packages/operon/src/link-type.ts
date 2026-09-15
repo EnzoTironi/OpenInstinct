@@ -1,25 +1,25 @@
 import { Schema } from "effect";
 
-import { LinkTypeId, ObjectTypeId } from "./types";
+import { linkTypeIdSchema, objectTypeIdSchema } from "./types";
 
-export const LinkCardinality = Schema.Literals([
+export const linkCardinalitySchema = Schema.Literals([
   "one-to-one",
   "one-to-many",
   "many-to-many",
 ]);
-export type LinkCardinality = typeof LinkCardinality.Type;
+export type LinkCardinality = typeof linkCardinalitySchema.Type;
 
-export const LinkType = Schema.Struct({
-  id: LinkTypeId,
+export const linkTypeSchema = Schema.Struct({
+  id: linkTypeIdSchema,
   description: Schema.String,
-  sourceTypeId: ObjectTypeId,
-  targetTypeId: ObjectTypeId,
+  sourceTypeId: objectTypeIdSchema,
+  targetTypeId: objectTypeIdSchema,
   sourceToTargetName: Schema.String,
   targetToSourceName: Schema.String,
-  cardinality: LinkCardinality,
+  cardinality: linkCardinalitySchema,
   cascadeDelete: Schema.optionalKey(Schema.Boolean),
 });
-export type LinkType = typeof LinkType.Type;
+export type LinkType = typeof linkTypeSchema.Type;
 
 export interface LinkTypeConfig {
   readonly id: string;
@@ -35,17 +35,17 @@ export interface LinkTypeConfig {
 export function defineLinkType(config: LinkTypeConfig): LinkType {
   return {
     ...config,
-    id: LinkTypeId.make(config.id),
-    sourceTypeId: ObjectTypeId.make(config.sourceTypeId),
-    targetTypeId: ObjectTypeId.make(config.targetTypeId),
+    id: linkTypeIdSchema.make(config.id),
+    sourceTypeId: objectTypeIdSchema.make(config.sourceTypeId),
+    targetTypeId: objectTypeIdSchema.make(config.targetTypeId),
   };
 }
 
-export const LinkInstance = Schema.Struct({
-  linkTypeId: LinkTypeId,
+export const linkInstanceSchema = Schema.Struct({
+  linkTypeId: linkTypeIdSchema,
   sourceId: Schema.String,
   targetId: Schema.String,
   createdAt: Schema.Number,
   metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
 });
-export type LinkInstance = typeof LinkInstance.Type;
+export type LinkInstance = typeof linkInstanceSchema.Type;

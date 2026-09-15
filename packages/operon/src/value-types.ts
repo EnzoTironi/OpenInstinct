@@ -4,12 +4,12 @@ export interface ValueType<T> {
   readonly id: string;
   readonly unit?: string;
   readonly description: string;
-  readonly schema: Schema.Codec<T, unknown, never>;
+  readonly schema: Schema.Codec<T, unknown>;
 }
 
 export interface ValueTypeConfig<T> {
   readonly id: string;
-  readonly schema: Schema.Codec<T, unknown, never>;
+  readonly schema: Schema.Codec<T, unknown>;
   readonly unit?: string;
   readonly description: string;
 }

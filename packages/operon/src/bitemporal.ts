@@ -1,19 +1,19 @@
 import { Schema } from "effect";
 
-export const ValidTime = Schema.Struct({
+export const validTimeSchema = Schema.Struct({
   validFrom: Schema.Number,
   validTo: Schema.optionalKey(Schema.Number),
 });
-export type ValidTime = typeof ValidTime.Type;
+export type ValidTime = typeof validTimeSchema.Type;
 
-export const TransactionTime = Schema.Struct({
+export const transactionTimeSchema = Schema.Struct({
   recordedAt: Schema.Number,
   supersededAt: Schema.optionalKey(Schema.Number),
 });
-export type TransactionTime = typeof TransactionTime.Type;
+export type TransactionTime = typeof transactionTimeSchema.Type;
 
-export const BitemporalCoordinates = Schema.Struct({
-  validTime: ValidTime,
-  transactionTime: TransactionTime,
+export const bitemporalCoordinatesSchema = Schema.Struct({
+  validTime: validTimeSchema,
+  transactionTime: transactionTimeSchema,
 });
-export type BitemporalCoordinates = typeof BitemporalCoordinates.Type;
+export type BitemporalCoordinates = typeof bitemporalCoordinatesSchema.Type;

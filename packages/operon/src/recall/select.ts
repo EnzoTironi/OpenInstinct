@@ -76,10 +76,10 @@ export const LEAN_SECTION_THRESHOLD = 32;
 const REFERENCE_ONLY =
   /^(?:use |usa |use a |usa a )?(?:the )?(?:first|second|third|primeiro|primeira|segundo|segunda|terceiro|terceira)(?: one)?\.?$/iu;
 
-const ORDINAL_INDEX: ReadonlyArray<{
+const ORDINAL_INDEX: readonly {
   readonly pattern: RegExp;
   readonly index: number;
-}> = [
+}[] = [
   {
     pattern: /\b(?:first|primeiro|primeira)\b/iu,
     index: 0,
@@ -160,11 +160,11 @@ function toNeedleDocument(
 }
 
 function mergeScores(
-  hits: ReadonlyArray<{
+  hits: readonly {
     readonly id: string;
     readonly score: number;
     readonly lane: RecallLane;
-  }>
+  }[]
 ): Map<string, { score: number; lane: RecallLane }> {
   const merged = new Map<string, { score: number; lane: RecallLane }>();
   for (const hit of hits) {
@@ -237,11 +237,11 @@ export function selectRelevantContext(input: SelectContextInput): RecallResult {
     });
 
   let lexicalQueries = 0;
-  const scoredHits: Array<{
+  const scoredHits: {
     readonly id: string;
     readonly score: number;
     readonly lane: RecallLane;
-  }> = [];
+  }[] = [];
 
   if (isReferenceOnlyQuery(input.query) && input.orderedReferents) {
     const index = ordinalIndex(input.query);
@@ -287,7 +287,7 @@ export function selectRelevantContext(input: SelectContextInput): RecallResult {
       return { lane: value.lane, score: value.score, section };
     })
     .filter((row): row is NonNullable<typeof row> => row !== undefined)
-    .sort(
+    .toSorted(
       (left, right) =>
         right.score - left.score ||
         left.section.id.localeCompare(right.section.id)

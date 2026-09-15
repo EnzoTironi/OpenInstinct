@@ -213,9 +213,9 @@ describe("selectRelevantContext", () => {
   it("does keep required evidence that misses the ranking cutoff", () => {
     const distractors = Array.from({ length: 12 }, (_, index) =>
       section({
-        body: `common brief language filler ${index} about the Q3 brief wording`,
-        id: `noise-${index}`,
-        objectId: `noise-${index}`,
+        body: `common brief language filler ${String(index)} about the Q3 brief wording`,
+        id: `noise-${String(index)}`,
+        objectId: `noise-${String(index)}`,
         title: "Brief wording",
         tokenCost: 10,
       })

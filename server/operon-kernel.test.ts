@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Effect, Schema } from "effect";
 import { expect, it } from "vitest";
 
-import { ObjectTypeId } from "@zoen/operon";
+import { objectTypeIdSchema } from "@zoen/operon";
 import { InMemoryObjectStore, ObjectInstanceSchema } from "./operon-kernel";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -18,7 +18,7 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
         id: "ana",
         lastModifiedAt: 0,
         properties: { displayName: "Ana" },
-        typeId: ObjectTypeId.make("Person"),
+        typeId: objectTypeIdSchema.make("Person"),
         version: 1,
       });
       const stored = yield* store.putObject(instance);

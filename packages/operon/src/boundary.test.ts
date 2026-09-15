@@ -22,7 +22,7 @@ const forbiddenStartup = [
 function walkTypeScript(directory: string): readonly string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) return [...walkTypeScript(path)];
+    if (entry.isDirectory()) return walkTypeScript(path);
     return entry.name.endsWith(".ts") ? [path] : [];
   });
 }

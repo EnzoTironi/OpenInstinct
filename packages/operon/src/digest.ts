@@ -1,15 +1,19 @@
 import { createHash } from "node:crypto";
 
-import { Predicate, Schema } from "effect";
+import { Predicate, type Schema } from "effect";
+
+function isJsonArray(value: Schema.Json): value is Schema.Json[] {
+  return Array.isArray(value);
+}
 
 function isJsonObject(
   value: Schema.Json
-): value is { readonly [key: string]: Schema.Json | undefined } {
-  return Predicate.isObject(value);
+): value is Record<string, Schema.Json> {
+  return Predicate.isObject(value) && !Array.isArray(value);
 }
 
 export function canonicalJson(value: Schema.Json): string {
-  if (Array.isArray(value)) {
+  if (isJsonArray(value)) {
     return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
   }
   if (isJsonObject(value)) {
@@ -17,11 +21,7 @@ export function canonicalJson(value: Schema.Json): string {
     const pairs: string[] = [];
     for (const key of keys) {
       const item = value[key];
-      if (
-        item === undefined ||
-        Predicate.isFunction(item) ||
-        Predicate.isSymbol(item)
-      ) {
+      if (item === undefined) {
         continue;
       }
       pairs.push(`${JSON.stringify(key)}:${canonicalJson(item)}`);

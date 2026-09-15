@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import { ConcurrentModificationError } from "./errors";
 import type { ObjectInstance } from "./object-type";
 import { InMemoryObjectStore } from "./object-store";
-import { LinkTypeId, ObjectTypeId } from "./types";
+import { linkTypeIdSchema, objectTypeIdSchema } from "./types";
 
-const personType = ObjectTypeId.make("Person");
-const knows = LinkTypeId.make("knows");
+const personType = objectTypeIdSchema.make("Person");
+const knows = linkTypeIdSchema.make("knows");
 
 function person(
   id: string,

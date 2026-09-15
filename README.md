@@ -49,15 +49,15 @@ activation, E2EE and federation are separate qualification gates.
 
 ## Architecture
 
-| Layer                      | Responsibility                                              |
-| -------------------------- | ----------------------------------------------------------- |
-| Next.js + React            | App, onboarding and authenticated browser interface         |
-| Better Auth + PostgreSQL   | Identity, sessions, memberships and access boundaries       |
-| Eve + owned Executor       | Durable agent execution, discovery, approval and tool calls |
+| Layer                      | Responsibility                                               |
+| -------------------------- | ------------------------------------------------------------ |
+| Next.js + React            | App, onboarding and authenticated browser interface          |
+| Better Auth + PostgreSQL   | Identity, sessions, memberships and access boundaries        |
+| Eve + owned Executor       | Durable agent execution, discovery, approval and tool calls  |
 | Git + Mem0                 | Versioned durable content and scoped memory (Mem0 until P10) |
-| `@zoen/operon`             | Embedded domain types and OCC store; not mounted on startup |
-| Matrix + A2A adapters      | Collaboration and agent interoperability boundaries         |
-| Alchemy + Fly + Cloudflare | Declared deployment, private services, TLS and operations   |
+| `@zoen/operon`             | Embedded domain types and OCC store; not mounted on startup  |
+| Matrix + A2A adapters      | Collaboration and agent interoperability boundaries          |
+| Alchemy + Fly + Cloudflare | Declared deployment, private services, TLS and operations    |
 
 Git branches are not authorization boundaries. Personal credentials and memories
 do not become team or group data just because the same person uses both spaces.

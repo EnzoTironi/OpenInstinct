@@ -59,12 +59,16 @@ interface Posting {
   weightedTf: number;
 }
 
-export function buildSectionNeedle(documents: readonly NeedleDocument[]): {
-  queryScored: (text: string, k: number) => NeedleHit[];
-} {
+export interface SectionNeedle {
+  readonly queryScored: (text: string, k: number) => NeedleHit[];
+}
+
+export function buildSectionNeedle(
+  documents: readonly NeedleDocument[]
+): SectionNeedle {
   const docCount = documents.length;
   const postings = new Map<string, Posting[]>();
-  const docLengths: number[] = new Array(docCount).fill(0);
+  const docLengths: number[] = [];
   let totalLength = 0;
 
   for (const [doc, document] of documents.entries()) {
@@ -72,7 +76,7 @@ export function buildSectionNeedle(documents: readonly NeedleDocument[]): {
     const bodyTerms = tokenize(document.body);
     const length =
       HEAD_WEIGHT * headTerms.length + BODY_WEIGHT * bodyTerms.length;
-    docLengths[doc] = length;
+    docLengths.push(length);
     totalLength += length;
 
     const weightedTf = new Map<string, number>();
@@ -157,7 +161,7 @@ export function buildSectionNeedle(documents: readonly NeedleDocument[]): {
       return [];
     }
     return [...scores.keys()]
-      .sort((left, right) => rankSection(left, right, scores))
+      .toSorted((left, right) => rankSection(left, right, scores))
       .slice(0, k)
       .flatMap((doc) => {
         const document = documents[doc];

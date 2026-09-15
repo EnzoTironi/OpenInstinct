@@ -1,11 +1,11 @@
 import { Schema } from "effect";
 
-import { BitemporalCoordinates } from "./bitemporal";
+import { bitemporalCoordinatesSchema } from "./bitemporal";
 import { computeCanonicalDigest } from "./digest";
-import { Subject } from "./security";
-import { DataClassification, ObjectTypeId } from "./types";
+import { subjectSchema } from "./security";
+import { dataClassificationSchema, objectTypeIdSchema } from "./types";
 
-export const ClaimState = Schema.Literals([
+export const claimStateSchema = Schema.Literals([
   "proposed",
   "supported",
   "accepted",
@@ -14,10 +14,10 @@ export const ClaimState = Schema.Literals([
   "retracted",
   "unknown",
 ]);
-export type ClaimState = typeof ClaimState.Type;
+export type ClaimState = typeof claimStateSchema.Type;
 
-export const Claim = Schema.Struct({
-  attribution: Subject,
+export const claimSchema = Schema.Struct({
+  attribution: subjectSchema,
   claimId: Schema.String,
   confidence: Schema.Number,
   conflictReason: Schema.optional(Schema.String),
@@ -27,49 +27,50 @@ export const Claim = Schema.Struct({
   propertyValue: Schema.Json,
   recordedAt: Schema.Number,
   sourceSystem: Schema.String,
-  state: ClaimState,
+  state: claimStateSchema,
   subjectId: Schema.String,
-  targetTypeId: ObjectTypeId,
+  targetTypeId: objectTypeIdSchema,
 });
-export type Claim = typeof Claim.Type;
+export type Claim = typeof claimSchema.Type;
 
-export const EvidenceClosure = Schema.Struct({
+export const evidenceClosureSchema = Schema.Struct({
   dependencyPredicate: Schema.optional(Schema.String),
   maxStalenessMs: Schema.Number,
   requiredInputs: Schema.Array(Schema.String),
   sourceRevision: Schema.String,
 });
-export type EvidenceClosure = typeof EvidenceClosure.Type;
+export type EvidenceClosure = typeof evidenceClosureSchema.Type;
 
-export const CanonicalEvidenceEnvelope = Schema.Struct({
-  author: Subject,
-  classification: DataClassification,
+export const canonicalEvidenceEnvelopeSchema = Schema.Struct({
+  author: subjectSchema,
+  classification: dataClassificationSchema,
   contentDigest: Schema.String,
   effectiveTime: Schema.Number,
   envelopeId: Schema.String,
-  evidenceClosure: Schema.optional(EvidenceClosure),
+  evidenceClosure: Schema.optional(evidenceClosureSchema),
   externalId: Schema.String,
   rawPayload: Schema.Json,
   receivedAt: Schema.Number,
   sourceSystem: Schema.String,
-  targetTypeId: ObjectTypeId,
+  targetTypeId: objectTypeIdSchema,
 });
-export type CanonicalEvidenceEnvelope = typeof CanonicalEvidenceEnvelope.Type;
+export type CanonicalEvidenceEnvelope =
+  typeof canonicalEvidenceEnvelopeSchema.Type;
 
-export const AdmissionReceipt = Schema.Struct({
+export const admissionReceiptSchema = Schema.Struct({
   admissionId: Schema.String,
   admittedAt: Schema.Number,
-  admittedBy: Subject,
-  bitemporal: BitemporalCoordinates,
-  claims: Schema.Array(Claim),
-  conflictingClaims: Schema.Array(Claim),
+  admittedBy: subjectSchema,
+  bitemporal: bitemporalCoordinatesSchema,
+  claims: Schema.Array(claimSchema),
+  conflictingClaims: Schema.Array(claimSchema),
   envelopeId: Schema.String,
   receiptDigest: Schema.String,
   status: Schema.Literals(["admitted", "contested", "quarantined"]),
   subjectId: Schema.String,
-  targetTypeId: ObjectTypeId,
+  targetTypeId: objectTypeIdSchema,
 });
-export type AdmissionReceipt = typeof AdmissionReceipt.Type;
+export type AdmissionReceipt = typeof admissionReceiptSchema.Type;
 
 export interface AdmissionReceiptDigestInput {
   readonly envelopeId: string;

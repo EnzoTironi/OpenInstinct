@@ -2,18 +2,19 @@ import { Schema } from "effect";
 
 import type { ValueType } from "./value-types";
 import {
-  ObjectTypeId,
-  Provenance,
+  objectTypeIdSchema,
+  provenanceSchema,
   type DataClassification,
   type EntityTypology,
   type FreshnessBudget,
+  type ObjectTypeId,
 } from "./types";
 
-export const ObjectProperties = Schema.Record(Schema.String, Schema.Json);
-export type ObjectProperties = typeof ObjectProperties.Type;
+export const objectPropertiesSchema = Schema.Record(Schema.String, Schema.Json);
+export type ObjectProperties = typeof objectPropertiesSchema.Type;
 
-export interface PropertyDefinition<T = Schema.Json> {
-  readonly schema: Schema.Codec<T, unknown, never>;
+export interface PropertyDefinition<T> {
+  readonly schema: Schema.Codec<T, unknown>;
   readonly description: string;
   readonly valueType?: ValueType<T>;
   readonly required?: boolean;
@@ -25,9 +26,9 @@ export interface PropertyDefinition<T = Schema.Json> {
 }
 
 export interface ObjectType<
-  Props extends Record<string, PropertyDefinition> = Record<
+  Props extends Record<string, PropertyDefinition<Schema.Json>> = Record<
     string,
-    PropertyDefinition
+    PropertyDefinition<Schema.Json>
   >,
 > {
   readonly id: ObjectTypeId;
@@ -41,7 +42,7 @@ export interface ObjectType<
 }
 
 export interface ObjectTypeConfig<
-  Props extends Record<string, PropertyDefinition>,
+  Props extends Record<string, PropertyDefinition<Schema.Json>>,
   PK extends keyof Props & string,
 > {
   readonly id: string;
@@ -55,12 +56,12 @@ export interface ObjectTypeConfig<
 }
 
 export function defineObjectType<
-  Props extends Record<string, PropertyDefinition>,
+  Props extends Record<string, PropertyDefinition<Schema.Json>>,
   PK extends keyof Props & string,
 >(config: ObjectTypeConfig<Props, PK>): ObjectType<Props> {
   return {
     ...config,
-    id: ObjectTypeId.make(config.id),
+    id: objectTypeIdSchema.make(config.id),
   };
 }
 
@@ -72,9 +73,9 @@ export function defineProperty<T>(
 
 export const ObjectInstanceSchema = Schema.Struct({
   id: Schema.String,
-  typeId: ObjectTypeId,
-  properties: ObjectProperties,
-  provenance: Schema.optionalKey(Provenance),
+  typeId: objectTypeIdSchema,
+  properties: objectPropertiesSchema,
+  provenance: Schema.optionalKey(provenanceSchema),
   lastModifiedAt: Schema.Number,
   validFrom: Schema.optionalKey(Schema.Number),
   validTo: Schema.optionalKey(Schema.Number),

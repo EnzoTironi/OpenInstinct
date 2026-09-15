@@ -133,11 +133,10 @@ const commitAtomicTransactionImpl = Effect.fn(
       }
     }
   }
-  if (batch.links) {
-    for (const link of batch.links) {
-      yield* addLink(link);
-    }
+  for (const link of batch.links ?? []) {
+    yield* addLink(link);
   }
+  return undefined;
 });
 
 /**

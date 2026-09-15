@@ -55,7 +55,7 @@ describe("spanChunksOf", () => {
   it("does merge over-cap messages into contiguous covering chunks", () => {
     const sentences = Array.from(
       { length: 30 },
-      (_, i) => `sentence number ${i} padded for length.`
+      (_, index) => `sentence number ${String(index)} padded for length.`
     );
     const chunks = spanChunksOf(sentences.join(" "));
     expect(chunks.length).toBe(MAX_SPAN_CHUNKS);
