@@ -1,6 +1,7 @@
 import { browserWorkspaceHeaders } from "@web/workspaces/navigation";
 import { Client, type MessageStreamEvent } from "eve/client";
 import { z } from "zod";
+import { chatFailureCopy } from "./turn-failure";
 
 const eventsPerRead = 128;
 const messagesPerPage = 4;
@@ -160,9 +161,10 @@ async function readNdjsonEvents(response: Response) {
 }
 
 async function streamResponseError(response: Response) {
-  const body = await response.text();
+  await response.text();
   return new Error(
-    body.trim() ||
-      `Unable to read the session stream (${String(response.status)}).`
+    response.status === 401 || response.status === 403
+      ? chatFailureCopy.generic
+      : chatFailureCopy.runtimeUnavailable
   );
 }

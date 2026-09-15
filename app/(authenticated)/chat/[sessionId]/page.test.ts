@@ -53,11 +53,9 @@ describe("chat session page", () => {
       usage: { costUsd: null, inputTokens: 1, outputTokens: 0 },
     });
 
-    await expect(
-      ChatSessionPage({
-        params: Promise.resolve({ sessionId: "session-alice" }),
-      })
-    ).rejects.toThrow("not-found");
+    await expect(ChatSessionPage(pageProps("session-alice"))).rejects.toThrow(
+      "not-found"
+    );
 
     expect(mocks.notFound).toHaveBeenCalledOnce();
     expect(mocks.isSessionOwned).toHaveBeenCalledWith(scope, "session-alice");
@@ -67,12 +65,17 @@ describe("chat session page", () => {
   it("opens an owned session before the chat row exists", async () => {
     mocks.isSessionOwned.mockResolvedValue(true);
 
-    const page = await ChatSessionPage({
-      params: Promise.resolve({ sessionId: "session-new" }),
-    });
+    const page = await ChatSessionPage(pageProps("session-new"));
 
     expect(mocks.notFound).not.toHaveBeenCalled();
     expect(mocks.readChat).toHaveBeenCalledWith(scope, "session-new");
     expect(page).toBeTruthy();
   });
 });
+
+function pageProps(sessionId: string): PageProps<"/chat/[sessionId]"> {
+  return {
+    params: Promise.resolve({ sessionId }),
+    searchParams: Promise.resolve({}),
+  };
+}

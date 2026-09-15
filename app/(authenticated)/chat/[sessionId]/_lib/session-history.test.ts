@@ -43,6 +43,32 @@ describe("session history", () => {
       "valid tail index"
     );
   });
+
+  it.each([
+    [403, "Session not found.", "Unable to complete the request."],
+    [
+      500,
+      "Internal runtime failure",
+      "The agent runtime is unavailable. Try again in a moment.",
+    ],
+  ] as const)(
+    "hides HTTP %s stream bodies from the history failure",
+    async (status, body, copy) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<() => Promise<Response>>(() =>
+          Promise.resolve(new Response(body, { status }))
+        )
+      );
+
+      await expect(readLatestSessionHistory("session/one")).rejects.toThrow(
+        copy
+      );
+      await expect(readLatestSessionHistory("session/one")).rejects.not.toThrow(
+        body
+      );
+    }
+  );
 });
 
 function receivedMessage(index: number): MessageStreamEvent {
