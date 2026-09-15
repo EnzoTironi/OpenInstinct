@@ -17,7 +17,7 @@ COPY --from=build /usr/local/lib/postgresql/vector.so /usr/local/lib/postgresql/
 COPY --from=build /usr/local/share/postgresql/extension/vector* /usr/local/share/postgresql/extension/
 COPY --from=backup-tools /usr/bin/pgbackrest /usr/local/bin/pgbackrest
 COPY pgbackrest.conf /etc/pgbackrest/pgbackrest.conf
-COPY entrypoint.sh verify-restore.sh backup.sh backup-health.sh bootstrap-memory.sh bootstrap-application.sh bootstrap-matrix.sh /usr/local/bin/
+COPY entrypoint.sh verify-restore.sh backup.sh backup-health.sh bootstrap-memory.sh bootstrap-application.sh bootstrap-matrix.sh bootstrap-vaultwarden.sh /usr/local/bin/
 COPY crontab /etc/crontabs/root
 RUN chmod 755 /usr/local/bin/*.sh \
     && chmod 600 /etc/crontabs/root \

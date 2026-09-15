@@ -26,6 +26,8 @@ import { Label } from "@web/components/ui/label";
 import type { VaultItem } from "@shared/vault/schema";
 import { api } from "@web/trpc/client";
 import { VaultDelegation } from "./delegation";
+import { cn } from "@web/components/class-names";
+import panel from "../../_components/panel.module.css";
 
 const VAULT_DIALOG_PAGE_SIZE = 50;
 
@@ -98,11 +100,12 @@ export function VaultSectionContent({
   return (
     <DialogContent
       animated={false}
-      className={
+      className={cn(
+        panel.dialogPanel,
         view === "list"
           ? "grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden"
           : "no-scrollbar overflow-y-auto"
-      }
+      )}
       variant="responsive"
     >
       {children}

@@ -30,7 +30,12 @@ export const prepareServiceDatabases = Effect.fn("prepareServiceDatabases")(
 
     // Separate Alchemy actions can run concurrently. These scripts touch shared
     // PostgreSQL catalogs and database ACLs, so they belong to one ordered action.
-    for (const database of ["application", "memory", "matrix"] as const) {
+    for (const database of [
+      "application",
+      "memory",
+      "matrix",
+      "vaultwarden",
+    ] as const) {
       const result = yield* Machines.execMachine({
         app_name: input.app,
         machine_id: input.machine,

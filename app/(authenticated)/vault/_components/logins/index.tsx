@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@web/components/ui/dialog";
 import { LoginForm } from "./form";
-import { ChromeImportPanel } from "./import";
+import { VaultImportPanel } from "./import";
 import {
   useVaultSection,
   VaultItemBrowser,
@@ -92,7 +92,7 @@ export function VaultLogins({
               title={t("Logins")}
             />
             {section.view === "import" ? (
-              <ChromeImportPanel
+              <VaultImportPanel
                 onDone={() => {
                   section.setView("list");
                 }}

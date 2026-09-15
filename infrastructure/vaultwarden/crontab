@@ -1,0 +1,2 @@
+# UTC: 03:15 in Sao Paulo. The supervisor briefly closes the vault for a consistent backup.
+15 6 * * * kill -USR1 "$(cat /run/zoen-vault-supervisor.pid)"

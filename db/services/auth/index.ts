@@ -7,6 +7,11 @@ import { env } from "@shared/environment";
 import { getInstallationSecrets } from "@db/services/installation-secrets";
 import { channelAuthPlugin } from "../../../server/channel-auth";
 import { serverRuntime } from "../../../server/runtime";
+import * as oauthSchema from "@db/schema/oauth";
+import {
+  provisionVaultwardenClient,
+  vaultwardenAuthPlugins,
+} from "./vaultwarden";
 
 export class AuthUnavailable extends Schema.TaggedError<AuthUnavailable>()(
   "AuthUnavailable",
@@ -14,6 +19,9 @@ export class AuthUnavailable extends Schema.TaggedError<AuthUnavailable>()(
 ) {}
 
 const initializeAuth = Effect.fn("initializeAuth")(function* () {
+  yield* provisionVaultwardenClient().pipe(
+    Effect.mapError(() => new AuthUnavailable())
+  );
   const { betterAuthSecret } = yield* Effect.tryPromise({
     try: () => getInstallationSecrets(),
     catch: () => new AuthUnavailable(),
@@ -26,7 +34,7 @@ const initializeAuth = Effect.fn("initializeAuth")(function* () {
         advanced: { disableOriginCheck: false, disableCSRFCheck: false },
         database: drizzleAdapter(db, {
           provider: "pg",
-          schema: { account, session, user, verification },
+          schema: { account, session, user, verification, ...oauthSchema },
         }),
         socialProviders:
           env.GOOGLE_CLIENT_ID !== undefined &&
@@ -65,6 +73,7 @@ const initializeAuth = Effect.fn("initializeAuth")(function* () {
           },
         },
         disabledPaths: [
+          "/token",
           "/account-info",
           "/change-email",
           "/get-access-token",
@@ -79,7 +88,10 @@ const initializeAuth = Effect.fn("initializeAuth")(function* () {
           "/sign-up/email",
           "/verify-email",
         ],
-        plugins: [channelAuthPlugin(serverRuntime.runPromise)],
+        plugins: [
+          channelAuthPlugin(serverRuntime.runPromise),
+          ...vaultwardenAuthPlugins(),
+        ],
         secret: betterAuthSecret,
       }),
     catch: () => new AuthUnavailable(),

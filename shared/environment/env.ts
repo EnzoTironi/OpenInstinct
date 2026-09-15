@@ -125,6 +125,20 @@ export const env = createEnv({
       )
     ),
     ZOEN_MATRIX_URL: z.url().optional(),
+    ZOEN_VAULTWARDEN_URL: z
+      .url()
+      .refine((value) => {
+        const url = new URL(value);
+        return url.protocol === "https:" && url.origin === value;
+      }, "Vaultwarden requires an HTTPS origin.")
+      .optional(),
+    ZOEN_VAULTWARDEN_CLIENT_SECRET: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {
+          disallowEncode: true,
+        })
+      )
+    ),
     ZOEN_MATRIX_SERVER_NAME: z
       .string()
       .regex(/^[a-z0-9.-]+$/)

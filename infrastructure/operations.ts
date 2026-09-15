@@ -1,7 +1,7 @@
 import * as Machines from "@distilled.cloud/fly-io/machines";
 import { CredentialsFromEnv } from "@distilled.cloud/fly-io";
 import { NodeRuntime } from "@effect/platform-node";
-import { Effect, Schema } from "effect";
+import { Config, Effect, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { production } from "./production.ts";
 
@@ -96,11 +96,41 @@ const databaseCheck = Effect.gen(function* () {
   return yield* Effect.log(health);
 });
 
+const vaultCheck = Effect.gen(function* () {
+  const vaults = yield* Machines.listMachines({
+    app_name: production.vaultwarden.app,
+  });
+  const vault = vaults.find(
+    (candidate) =>
+      candidate.name === "vaultwarden" && candidate.state === "started"
+  );
+  if (!vault?.id)
+    return yield* Effect.fail(new Error("Hosted vault is not running"));
+  const vaultBackup = yield* Machines.execMachine({
+    app_name: production.vaultwarden.app,
+    machine_id: vault.id,
+    command: ["/usr/local/bin/backup-health.sh"],
+    timeout: 60,
+  });
+  if (vaultBackup.exit_code !== 0)
+    return yield* Effect.fail(
+      new Error("Vault encrypted backup or volume health check failed")
+    );
+  return yield* Effect.log(vaultBackup.stdout ?? "Vault backup check passed");
+});
+
 const main = Effect.gen(function* () {
   const command = process.argv[2];
   if (command !== "check")
     return yield* Effect.fail(new Error("Usage: node operations.ts check"));
-  return yield* databaseCheck;
+  yield* databaseCheck;
+  const vaultEnabled = yield* Config.boolean("ZOEN_VAULT_PROBE_ENABLED").pipe(
+    Config.withDefault(false)
+  );
+  if (vaultEnabled) return yield* vaultCheck;
+  return yield* Effect.log(
+    "Vault probe inactive until the hosted vault is deployed."
+  );
 }).pipe(
   Effect.provide(CredentialsFromEnv),
   Effect.provide(FetchHttpClient.layer)

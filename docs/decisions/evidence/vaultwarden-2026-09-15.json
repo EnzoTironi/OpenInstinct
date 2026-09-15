@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "date": "2026-09-15",
+  "proofType": "isolated-real-server-and-official-client",
+  "syntheticOnly": true,
+  "crypto": {
+    "version": "2026.8.0",
+    "server": "1.37.3",
+    "gates": [
+      "owner: official client unlocked separate account",
+      "agent: official client unlocked separate account",
+      "only the selected item was re-encrypted in the independent agent account",
+      "agent cannot retrieve the private owner item",
+      "official client rejects the owner ciphertext with the agent key"
+    ],
+    "at": "2026-09-15T05:37:19.221Z"
+  },
+  "recovery": {
+    "at": "2026-09-15T06:28:10.508Z",
+    "sourceSnapshot": "710f5eaab2adceb66b5e437473234f8bad13b33aa457d37a4a9b5f82134828ec",
+    "server": "Vaultwarden 1.37.3",
+    "client": "Bitwarden CLI 2026.8.0",
+    "restic": "0.18.1",
+    "database": "zoen_vaultwarden_restore",
+    "isolated": true,
+    "resticReadDataAndRestoreVerify": true,
+    "gates": [
+      "owner: official client decrypts restored items with the original client key",
+      "agent: official client decrypts restored items with the original client key",
+      "Official client decrypts the restored SSO account attachment",
+      "sso: official client decrypts restored items with the original client key"
+    ]
+  },
+  "account2fa": {
+    "ssologin": true,
+    "missingCodeDenied": true,
+    "wrongCodeDenied": true,
+    "validLeadingZeroCodeAccepted": true,
+    "masterPasswordStillRequired": true
+  },
+  "productionDeployment": false,
+  "p05Complete": false,
+  "backupFault": {
+    "type": "repository connection refused via container-local DNS mapping",
+    "deadlineSeconds": 180,
+    "vaultReopened": true,
+    "failureRecorded": true,
+    "remoteHealthRejectedUntilNewBackup": true,
+    "subsequentBackupRestoredHealth": true
+  },
+  "selectiveImportBrowser": {
+    "at": "2026-09-15T06:53:13.148Z",
+    "errors": [],
+    "postCount": 1,
+    "importRequests": 1,
+    "exportPasswordSent": false,
+    "selectedImportCount": [1],
+    "privateUnselectedCanarySent": false,
+    "selectedCanaryOnlyInImport": true
+  }
+}
