@@ -9,7 +9,7 @@ export function getLatestTurnFailure(
 
     if (isTurnFailureEvent(event) && event.type === "turn.failed") {
       return event.data.code === "MODEL_CALL_FAILED"
-        ? "The model is temporarily unavailable. Please try again."
+        ? modelAccessFailureMessage(event.data.message)
         : event.data.message;
     }
     if (
@@ -21,4 +21,20 @@ export function getLatestTurnFailure(
     }
   }
   return undefined;
+}
+
+export function modelAccessFailureMessage(detail: string) {
+  if (
+    /usage limit|quota|insufficient.*(?:credit|balance)|\b402\b/iu.test(detail)
+  ) {
+    return "The model provider has no remaining credits. Check billing and try again.";
+  }
+  if (
+    /unauthori[sz]ed|authentication|invalid.*(?:key|token)|\b40[13]\b/iu.test(
+      detail
+    )
+  ) {
+    return "The model provider rejected this request. Check the configured model connection.";
+  }
+  return "The model is temporarily unavailable. Please try again.";
 }

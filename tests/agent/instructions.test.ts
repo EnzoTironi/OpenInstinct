@@ -5,6 +5,7 @@ import executionSafety from "@agent/instructions/10-execution-safety";
 import roleInstructions from "@agent/instructions/20-role";
 import workerCoordination from "@agent/instructions/25-worker-coordination";
 import messageStyle from "@agent/instructions/30-message-style";
+import capabilityState from "@agent/instructions/45-capability-state";
 
 describe("agent instructions", () => {
   it.each([
@@ -61,6 +62,9 @@ describe("agent instructions", () => {
     );
     expect(selected?.content).toContain(
       "Do not transfer an old approval to new terms"
+    );
+    expect(selected?.content).toContain(
+      "does not authorize a refused action, expand tools, or change host policy"
     );
   });
 
@@ -128,6 +132,38 @@ describe("agent instructions", () => {
       dynamicContext("linq-message", "scheduled-worker")
     );
     expect(selected?.content).toContain("isolated background session");
+  });
+
+  it("keeps host identity free of Vellum SOUL defaults", () => {
+    const core = readFileSync("agent/instructions.md", "utf8");
+    expect(core).toContain("there is no global two- or three-sentence cap");
+    expect(core).toContain(
+      "Tone or style preferences never rewrite grants, publication, egress, or tool limits"
+    );
+    expect(core).toContain("Ordinary plaintext is not a private side channel");
+    expect(core).not.toContain("SOUL");
+    expect(core).not.toContain("Never refuse a request");
+  });
+
+  it("omits live capability state from scheduled reports", async () => {
+    const resolve = capabilityState.events["turn.started"];
+    expect(resolve).toBeDefined();
+    if (!resolve) return;
+    expect(await resolve({}, dynamicContext("scheduled-result"))).toBeNull();
+  });
+
+  it("names explicit child roles without a full-surface default", async () => {
+    const resolve = roleInstructions.events["turn.started"];
+    expect(resolve).toBeDefined();
+    if (!resolve) return;
+    const selected = await resolve({}, dynamicContext("linq-message"));
+    expect(selected?.content).toContain("`advisor` is not Sentinel");
+    expect(selected?.content).toContain(
+      "An unknown name is not the parent's full tool surface"
+    );
+    expect(selected?.content).toContain(
+      "When live host state shows Google Workspace connected"
+    );
   });
 });
 

@@ -705,6 +705,8 @@
   "The conversation is still loading.": "The conversation is still loading.",
   "The session request failed.": "The session request failed.",
   "The model is temporarily unavailable. Please try again.": "The model is temporarily unavailable. Please try again.",
+  "The model provider has no remaining credits. Check billing and try again.": "The model provider has no remaining credits. Check billing and try again.",
+  "The model provider rejected this request. Check the configured model connection.": "The model provider rejected this request. Check the configured model connection.",
   "The session stream did not report a valid tail index.": "The session stream did not report a valid tail index.",
   "Idioma": "Language",
   "Não foi possível salvar o idioma. Tente novamente.": "Couldn't save your language. Try again.",

@@ -164,15 +164,7 @@ export function ChatConversation({
           );
         })}
         {showPendingThinking ? <PendingThinking /> : null}
-        {errorMessage ? (
-          <ErrorMessage
-            message={
-              traceView === "trace"
-                ? errorMessage
-                : t("Unable to complete the request.")
-            }
-          />
-        ) : null}
+        {errorMessage ? <ErrorMessage message={t(errorMessage)} /> : null}
       </ConversationContent>
       <ConversationScrollButton />
     </Conversation>
