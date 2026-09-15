@@ -300,13 +300,13 @@ test("learned note correction and last-note removal replace recalled content acr
     const save = tools.save_memory;
     const remove = tools.remove_memory;
     await save.execute(
-      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
       { text: "Minha cor favorita é laranja." },
       { ...owner.execution, callId: randomUUID() }
     );
     context = nextLearnedTurn(context);
     const first = await learnedMemory.provider.recall["turn.started"](context);
     const firstMessage = first.messages[0];
+    assert.ok(firstMessage);
     const recallId = firstMessage.id;
     assert.ok(
       recallId,
@@ -317,19 +317,18 @@ test("learned note correction and last-note removal replace recalled content acr
     );
     assert.ok(oldNote, firstMessage.content);
     await save.execute(
-      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
       { text: "Minha cor favorita é verde." },
       { ...owner.execution, callId: randomUUID() }
     );
     await remove.execute(
-      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
       { id: oldNote.id },
       { ...owner.execution, callId: randomUUID() }
     );
     context = nextLearnedTurn(context);
     const corrected =
       await learnedMemory.provider.recall["turn.started"](context);
-    const content = corrected.messages[0].content;
+    const content = corrected.messages[0]?.content;
+    assert.ok(content);
     assert.match(content, /verde/);
     assert.doesNotMatch(content, /laranja/);
     const kept = learnedRecallItems(content).find((item) =>
@@ -337,7 +336,6 @@ test("learned note correction and last-note removal replace recalled content acr
     );
     assert.ok(kept, content);
     await remove.execute(
-      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
       { id: kept.id },
       { ...owner.execution, callId: randomUUID() }
     );
@@ -348,14 +346,15 @@ test("learned note correction and last-note removal replace recalled content acr
         ...context,
         compaction: { modelId: "learned-storage-proof" },
       });
-      assert.equal(recalled.messages[0].id, recallId);
-      assert.deepEqual(learnedRecallItems(recalled.messages[0].content), []);
-      assert.doesNotMatch(recalled.messages[0].content, /laranja|verde/);
+      const message = recalled.messages[0];
+      assert.ok(message);
+      assert.equal(message.id, recallId);
+      assert.deepEqual(learnedRecallItems(message.content), []);
+      assert.doesNotMatch(message.content, /laranja|verde/);
     }
     /* oxlint-enable eslint/no-await-in-loop */
     await owner.revoke();
     await assert.rejects(async () =>
-      // @ts-expect-error Native heterogeneous tool maps erase their individual input schemas.
       save.execute(
         { text: "Minha cor favorita é laranja." },
         { ...owner.execution, callId: randomUUID() }

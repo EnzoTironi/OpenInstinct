@@ -25,6 +25,14 @@ function learnedRecallItems(content: string) {
   return Schema.decodeUnknownSync(learnedItemListSchema)(JSON.parse(line));
 }
 
+function recallMessage(recall: {
+  messages: readonly { content: string; id?: string }[];
+}) {
+  const message = recall.messages[0];
+  assert.ok(message);
+  return message;
+}
+
 function nextTurn(context: MemoryTurnStartedContext): MemoryTurnStartedContext {
   const operationId = randomUUID();
   const sequence = context.turn.sequence + 1;
@@ -138,13 +146,9 @@ async function fixture() {
       ...context,
       channel: { kind: "eve" },
     });
-    await tools.save_memory.execute(
-      // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
-      { text: forgottenText },
-      execution
-    );
+    await tools.save_memory.execute({ text: forgottenText }, execution);
     const recall = await learnedMemory.provider.recall["turn.started"](context);
-    const original = learnedRecallItems(recall.messages[0].content).find(
+    const original = learnedRecallItems(recallMessage(recall).content).find(
       (item) => item.memory.includes("laranja")
     );
     assert.ok(original);
@@ -174,7 +178,6 @@ test("forgotten learned note stays gone while a concurrent remember commits a di
   try {
     await Promise.all([
       owner.remove.execute(
-        // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
         { id: owner.originalId },
         {
           ...owner.execution,
@@ -183,7 +186,6 @@ test("forgotten learned note stays gone while a concurrent remember commits a di
         }
       ),
       owner.save.execute(
-        // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
         { text: incomingText },
         {
           ...owner.execution,
@@ -208,7 +210,7 @@ test("forgotten learned note stays gone while a concurrent remember commits a di
     const recalled = await learnedMemory.provider.recall["turn.started"](
       nextTurn(owner.context)
     );
-    const content = recalled.messages[0].content;
+    const content = recallMessage(recalled).content;
     assert.doesNotMatch(content, /laranja/);
     assert.match(content, /chá/);
   } finally {
@@ -220,7 +222,6 @@ test("remembering forgotten text after removal creates a new learned note id", a
   const owner = await fixture();
   try {
     await owner.remove.execute(
-      // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
       { id: owner.originalId },
       {
         ...owner.execution,
@@ -229,7 +230,6 @@ test("remembering forgotten text after removal creates a new learned note id", a
       }
     );
     await owner.save.execute(
-      // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
       { text: forgottenText },
       {
         ...owner.execution,
@@ -248,7 +248,7 @@ test("remembering forgotten text after removal creates a new learned note id", a
     const recalled = await learnedMemory.provider.recall["turn.started"](
       nextTurn(owner.context)
     );
-    const items = learnedRecallItems(recalled.messages[0].content);
+    const items = learnedRecallItems(recallMessage(recalled).content);
     assert.equal(
       items.some((item) => item.id === owner.originalId),
       false

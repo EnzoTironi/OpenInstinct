@@ -347,7 +347,6 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     assert.equal(nativeTools?.save_memory, undefined);
     await assert.rejects(async () =>
       save.execute(
-        // @ts-expect-error The native heterogeneous tool map erases its input type.
         { text: "Outra conta não pode usar esta ferramenta capturada" },
         toolContext(learnedOtherContext)
       )
@@ -434,7 +433,6 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     );
     await assert.rejects(async () =>
       webTools.save_memory.execute(
-        // @ts-expect-error Synthetic input exercises the real learned save_memory tool.
         { text: "Não deve usar outra sessão ativa do navegador" },
         toolContext(learnedWebContext)
       )
@@ -473,7 +471,6 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       signal: ownerContext.abortSignal,
     });
     await save.execute(
-      // @ts-expect-error Synthetic input exercises the real learned save_memory tool.
       { text: "Nota aprendida do titular" },
       toolContext(learnedOwnerContext)
     );
@@ -507,18 +504,12 @@ test("actual account auth, profile store, Eve provider, private tool and export 
     await assert.rejects(learnedMemory.provider.tools(learnedOwnerContext));
     await assert.rejects(async () =>
       save.execute(
-        // The public heterogeneous memory-tool map erases each tool's input type.
-        // @ts-expect-error Synthetic input exercises the real learned save_memory tool.
         { text: "Nunca deve ser gravado por um canal revogado" },
         toolContext(learnedOwnerContext)
       )
     );
     await assert.rejects(async () =>
-      remove.execute(
-        // @ts-expect-error Synthetic input exercises the real learned remove_memory tool.
-        { id: randomUUID() },
-        toolContext(learnedOwnerContext)
-      )
+      remove.execute({ id: randomUUID() }, toolContext(learnedOwnerContext))
     );
     assert.deepEqual(
       await memoryDocumentBackend.read({

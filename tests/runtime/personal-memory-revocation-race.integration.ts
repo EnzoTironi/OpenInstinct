@@ -160,7 +160,6 @@ for (const authority of ["channel", "web"] as const) {
       const save = tools.save_memory;
       assert.ok(save);
       const invoke = async (text: string) => {
-        // @ts-expect-error The heterogeneous public map erases the native tool input type.
         await save.execute({ text }, { ...execution, callId: randomUUID() });
       };
       await invoke("Antes da revogação");
