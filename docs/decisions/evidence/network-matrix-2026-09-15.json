@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "evidence": "real-synapse-native-eve-synthetic-identities",
+  "sourceCommit": "6f2287c693c42dd7c520704c6e60a0e7f886c68c",
+  "date": "2026-09-15",
+  "model": "codex/gpt-5.6-luna",
+  "reasoning": "low",
+  "productionDeployment": false,
+  "runs": [
+    {
+      "scope": "personal",
+      "repetition": 1,
+      "verdict": "passed",
+      "gates": {
+        "passed": 20,
+        "failed": 0
+      },
+      "durationMs": 79261,
+      "deliveries": [
+        {
+          "task_id": "e0d0d43c-f4bd-49ca-8f84-fe7706f0b00a",
+          "session_id": "wrun_01M2HQJKNXNFG2Y91SDB6M0X60",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$hAymvAcgosMg9pZTiDSAAnsCIAct-Vu0X-uW9-zFjeU",
+          "answer_event_id": "$Mes802LeF6VMmgiNI6rILcl-asjD5LSXfQ_yBbGANI8",
+          "sender_id": "@_zoen_agent_995a4b5bb7e442a0933f8adc032869d3:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_eb7e3d167feb44ef849f33ce5120a02e:matrix.zoen.test",
+          "terminal_events": 2
+        },
+        {
+          "task_id": "c4cb6422-1302-4689-863e-6f28b73b0302",
+          "session_id": "wrun_01M2HQKP4KE0MY2Q9P6QNK5H9W",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$1QMpngb6I7O5G1CJnxQHXbEFQtHU74zvynxfuY3UJpQ",
+          "answer_event_id": "$k2HtLSWvV-EM__qfUdvW7TbSIHQ6RwkQIOVVOTD8gj4",
+          "sender_id": "@_zoen_360ca30eebc24f5100bda3629909ac6e:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_eb7e3d167feb44ef849f33ce5120a02e:matrix.zoen.test",
+          "terminal_events": 1
+        }
+      ]
+    },
+    {
+      "scope": "personal",
+      "repetition": 2,
+      "verdict": "passed",
+      "gates": {
+        "passed": 22,
+        "failed": 0
+      },
+      "durationMs": 90206,
+      "deliveries": [
+        {
+          "task_id": "27d3d241-6be5-49cf-af85-c206ac6d0561",
+          "session_id": "wrun_01M2HQN8ZB3N66KW95NZQHYV22",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$5Gj8isriHJyDfnxTxB1qQ79NM59a0Cc06W28ucaCztc",
+          "answer_event_id": "$htYKBxwW15-_tde-V_eGxcxKUZBJz97pj19NUe8h2K0",
+          "sender_id": "@_zoen_agent_fb78147c9f7742d49bcdc9ec6cdb9295:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_72d163f87211405d9370c3fc6c50173f:matrix.zoen.test",
+          "terminal_events": 2
+        },
+        {
+          "task_id": "efa4561e-19bd-4942-8944-6e7475763ff9",
+          "session_id": "wrun_01M2HQPN9AR8MNJ3Z79EDS612C",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$osoxkFbebqfmbkJ7wRrIIODRHyzqaNFlAWTLIvVC8TA",
+          "answer_event_id": "$j19pSfJQeIrTZORx18r3YUEiVc0Sv6MFyTjGDYaim98",
+          "sender_id": "@_zoen_470611fb3f5d0776a584ea4f7eff5335:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_72d163f87211405d9370c3fc6c50173f:matrix.zoen.test",
+          "terminal_events": 2
+        }
+      ]
+    },
+    {
+      "scope": "personal",
+      "repetition": 3,
+      "verdict": "passed",
+      "gates": {
+        "passed": 22,
+        "failed": 0
+      },
+      "durationMs": 72955,
+      "deliveries": [
+        {
+          "task_id": "db09fa48-4bb0-41bb-a587-ca551be1b00e",
+          "session_id": "wrun_01M2HQQZP67PT0FTRTNB7GT84Q",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$zrDyLQlQBaeg2uZPejAZEIcWz6l28V5SZcWY8_375o8",
+          "answer_event_id": "$kWcXHXeAgQKRsGVOVNg3S8918cEvUF0nZSGRcV7xKnI",
+          "sender_id": "@_zoen_agent_c9456dfdf29c411a9d7cb839e491f82d:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_f2c36f3fc71e41ba86635cd46f665380:matrix.zoen.test",
+          "terminal_events": 2
+        },
+        {
+          "task_id": "51cb8573-56fe-4cbb-9f72-fc793275999b",
+          "session_id": "wrun_01M2HQS3KK0QJK0DMCT3AMXTKA",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$hUbP6lyf0sEi4iGPf_mlBYqL-NzAMv8y-8uqpLOqACw",
+          "answer_event_id": "$02lcX40N85y617M1Lbv3DNUBXZIk8uXPYuUeBlhP4Qw",
+          "sender_id": "@_zoen_07de6f386bf41f80f8f4a1ad352ba620:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_f2c36f3fc71e41ba86635cd46f665380:matrix.zoen.test",
+          "terminal_events": 2
+        }
+      ]
+    },
+    {
+      "scope": "company",
+      "repetition": 1,
+      "verdict": "passed",
+      "gates": {
+        "passed": 20,
+        "failed": 0
+      },
+      "durationMs": 44312,
+      "deliveries": [
+        {
+          "task_id": "f2628720-59ad-48c5-91d6-bc09c06c0349",
+          "session_id": "wrun_01M2HQVASE7YXFA6FTZ28SREET",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$IXiSoCq4SHFDhNpOPc_EInravOIMWgeR7EkGicwZ0Vo",
+          "answer_event_id": "$XIavD6aTFF0RHDSZWHfNoAjJxxT4OiURDXwJNV7v9vo",
+          "sender_id": "@_zoen_agent_55db87ad557c40cf903411e77fb37839:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_3ed281859ed2408a979570c85c6cce85:matrix.zoen.test",
+          "terminal_events": 2
+        },
+        {
+          "task_id": "c40dbd07-b802-4918-bce2-b393ed7716be",
+          "session_id": "wrun_01M2HQVX5GN136ASZ086WJ6SCJ",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$7Y2nLRi91FOyyfnAsVQ91iJpAtPNOyBLS4WWZIQvDHE",
+          "answer_event_id": "$oNC1TakibRIuwpL8Ub-7B5TRLqWOUX_DjmRJdVeUoO8",
+          "sender_id": "@_zoen_acf6ba1dc017f09c8ae7a63721e4a6d3:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_3ed281859ed2408a979570c85c6cce85:matrix.zoen.test",
+          "terminal_events": 2
+        }
+      ]
+    },
+    {
+      "scope": "company",
+      "repetition": 2,
+      "verdict": "passed",
+      "gates": {
+        "passed": 22,
+        "failed": 0
+      },
+      "durationMs": 55066,
+      "deliveries": [
+        {
+          "task_id": "875ead35-7a78-4590-833d-273bfa461069",
+          "session_id": "wrun_01M2HQWTVN97GDJCS5E5GP22M5",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$tA2irpBGgI1TL7svlvX_A84843nmwsozchz7DRr-eCY",
+          "answer_event_id": "$T_8K9h7iijz_LXOZA6tsiruElcnUiDmZtTewwd4ujoA",
+          "sender_id": "@_zoen_agent_83ed734baac0423fbf558ababb384a4d:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_2cfde214f49a4f8eb80c2a3d1367e79e:matrix.zoen.test",
+          "terminal_events": 2
+        },
+        {
+          "task_id": "0e789035-3396-4b03-ba4b-5704b9b6d74a",
+          "session_id": "wrun_01M2HQXJK2TRVEGACHMG7A2X68",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$TQyCaSFHVuPox9y6dihi7lizVBDA5ujF4SSXFVWu3E4",
+          "answer_event_id": "$bHiZAXOKcMrcNH3JHkM8P9A2pTg6iyUqjhDCfofXSZg",
+          "sender_id": "@_zoen_f0eb22bef78e570235b57e7d5c9d43ab:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_2cfde214f49a4f8eb80c2a3d1367e79e:matrix.zoen.test",
+          "terminal_events": 2
+        }
+      ]
+    },
+    {
+      "scope": "company",
+      "repetition": 3,
+      "verdict": "passed",
+      "gates": {
+        "passed": 20,
+        "failed": 0
+      },
+      "durationMs": 50282,
+      "deliveries": [
+        {
+          "task_id": "6d5862e3-4c7f-4e5d-83af-c18a09873285",
+          "session_id": "wrun_01M2HQYM9QAN8VA6D1W7TJ060R",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$YaEfX4iUbgG2iqChDXaPgBA_g6AER1ZiQX4ecKZrHkc",
+          "answer_event_id": "$NLGMRCAl1qwiU9d0D4I1ILUDyYFrzji7Ni2s_04xXUw",
+          "sender_id": "@_zoen_agent_a2127d18a2774232ab138d73e90cc800:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_662fd74b5331416597f2ed95db7a5fe4:matrix.zoen.test",
+          "terminal_events": 2
+        },
+        {
+          "task_id": "13f15d7d-267a-4c1e-9532-2c58e6fd577d",
+          "session_id": "wrun_01M2HQZ6E8F04F1QHKTX7GQ0DK",
+          "state": "TASK_STATE_COMPLETED",
+          "event_id": "$7qECfzSUaTXY43_JhldFHNPg9j94nFaoS3kLiHdRCWQ",
+          "answer_event_id": "$0zhmLad2jyLE57X0J8wRz46z1yXZ6Qh4m0V0kwgLoSY",
+          "sender_id": "@_zoen_4474209453413559ca295f9f9547d3f5:matrix.zoen.test",
+          "bot_id": "@_zoen_agent_662fd74b5331416597f2ed95db7a5fe4:matrix.zoen.test",
+          "terminal_events": 2
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "One scenario in two scopes repeated three times, not six unique scenarios.",
+    "Synthetic users and data on an isolated actual Synapse, not production users or external messenger deliveries.",
+    "Earlier provider-overload and harness-assertion failures retained in local artifacts; this batch reports only its own six executions.",
+    "No E2EE, federation, recursive native chains, Vaultwarden or WhatsApp proof."
+  ],
+  "ui": {
+    "status": "passed",
+    "documents": {
+      "source": ["http://127.0.0.1:4367/connections"],
+      "guest": ["http://127.0.0.1:4367/network"]
+    },
+    "errors": []
+  }
+}

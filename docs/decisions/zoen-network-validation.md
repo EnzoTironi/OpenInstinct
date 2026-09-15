@@ -31,6 +31,11 @@ outboxes survive application-row cascades and retry external cleanup.
 - Native Eve with `codex/gpt-5.6-luna`, low reasoning: an initial successful batch
   executed six target sessions across three runs. Subsequent validation added a
   stricter check that the answer actually reaches the source web conversation.
+  The final batch passed three personal and three company repetitions: 126 gates,
+  12 actual target sessions, all completed with homeserver answer receipts. The
+  [portable evidence](evidence/network-matrix-2026-09-15.json) records each run.
+  Durations were 73–90 seconds for each complete personal scenario and 44–55
+  seconds for each company scenario; these small samples are not a capacity SLA.
   Provider `service_unavailable_error` failures are retained as failures; they are
   not silently retried into the same success count.
 - Two independent authenticated browser contexts completed invite, accept, human
