@@ -23,7 +23,6 @@ import {
 } from "../../server/workspaces/tools";
 import { publishSkillProposal } from "../../server/workspaces/skills";
 import { LearnedMemory } from "../../server/memory/learned";
-import { Mem0 } from "../../server/memory/mem0";
 import {
   executeCodeMode,
   executorContext,
@@ -65,7 +64,6 @@ afterAll(async () => {
   await fixture.close();
 });
 const services = LearnedMemory.layer.pipe(
-  Layer.provideMerge(Mem0.layer),
   Layer.provideMerge(WorkspaceRepository.layer),
   Layer.provideMerge(runtimeDatabase)
 );

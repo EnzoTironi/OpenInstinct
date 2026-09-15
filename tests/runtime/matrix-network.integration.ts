@@ -9,7 +9,6 @@ import {
 } from "../../server/executor/dispatch";
 import { resolveExecutorTools } from "../../server/executor/catalog";
 import { LearnedMemory } from "../../server/memory/learned";
-import { Mem0 } from "../../server/memory/mem0";
 import { matrixReceiver } from "./matrix-fixture";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { saveDirectoryProfile } from "../../server/accounts/directory";
@@ -43,7 +42,6 @@ import { acceptMatrixTransaction } from "../../server/matrix/inbound";
 import { removeWorkspaceMember } from "../../server/workspaces/team";
 
 const services = LearnedMemory.layer.pipe(
-  Layer.provideMerge(Mem0.layer),
   Layer.provideMerge(WorkspaceRepository.layer),
   Layer.provideMerge(runtimeDatabase)
 );

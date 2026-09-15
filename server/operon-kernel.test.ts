@@ -30,7 +30,7 @@ import {
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-it("does compile the host kernel without mounting Operon on the runtime", () =>
+it("does compile the host kernel and mount Operon learned notes without Mem0", () =>
   Effect.runPromise(
     Effect.gen(function* () {
       const store = new InMemoryObjectStore();
@@ -46,6 +46,10 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
 
       const runtime = readFileSync(
         join(repositoryRoot, "server/runtime.ts"),
+        "utf8"
+      );
+      const learned = readFileSync(
+        join(repositoryRoot, "server/memory/learned.ts"),
         "utf8"
       );
       expect(j1DefinitionArtifact.definitionVersion).toBe("j1.0.0");
@@ -111,8 +115,10 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
         { userId: "better-auth:ana" }
       );
       expect(child.finalReply).toBe(false);
-      expect(runtime).not.toContain("@zoen/operon");
-      expect(runtime).not.toContain("operon-kernel");
-      expect(runtime).toContain("Mem0.layer");
+      expect(runtime).toContain("@zoen/operon");
+      expect(runtime).toContain("LearnedMemory.layer");
+      expect(runtime).not.toContain("Mem0.layer");
+      expect(learned).toContain("learnedNoteTypeId");
+      expect(learned).not.toContain("Mem0");
     })
   ));

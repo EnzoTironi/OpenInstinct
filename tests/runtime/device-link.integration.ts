@@ -20,7 +20,6 @@ import {
   readAccountArchives,
   downloadAccountArchive,
 } from "../../server/accounts/archives";
-import { Mem0 } from "../../server/memory/mem0";
 import { requireWorkspaceAccess } from "../../server/workspaces/access";
 
 vi.mock("../../db/services/auth/session", () => ({
@@ -691,9 +690,7 @@ test("native linking and archive recovery pin both proofs, preserve data and rej
       run(readAccountArchive(archiveHeaders, archiveId, "-1"))
     );
     const exported = await run(
-      downloadAccountArchive(archiveHeaders, archiveId, "memory").pipe(
-        Effect.provide(Mem0.layer)
-      )
+      downloadAccountArchive(archiveHeaders, archiveId, "memory")
     );
     assert.equal(exported.headers.get("cache-control"), "private, no-store");
     assert.deepEqual(await exported.json(), {
@@ -708,7 +705,7 @@ test("native linking and archive recovery pin both proofs, preserve data and rej
           archiveId,
           "attachment",
           randomUUID()
-        ).pipe(Effect.provide(Mem0.layer))
+        )
       )
     );
     await pool.query("DELETE FROM public.session WHERE id = $1", [

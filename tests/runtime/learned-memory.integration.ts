@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { ConfigProvider, Effect, Layer, Result, Schema } from "effect";
+import { Effect, Layer, Result } from "effect";
 import type { PgClient } from "@effect/sql-pg";
-import { afterEach, expect, test, vi } from "vitest";
+import { expect, test } from "vitest";
 import { LearnedMemory } from "../../server/memory/learned";
-import { Mem0 } from "../../server/memory/mem0";
 import { drainMemoryErasures } from "../../server/memory/erasure";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { WorkspaceAccessDenied } from "../../server/workspaces/access";
@@ -12,26 +11,10 @@ import { workspaceFixture } from "./workspace-fixture";
 import { runtimeDatabase } from "./database";
 
 const services = LearnedMemory.layer.pipe(
-  Layer.provideMerge(Mem0.layer),
   Layer.provideMerge(WorkspaceRepository.layer),
   Layer.provideMerge(runtimeDatabase)
 );
-const requestSchema = Schema.fromJsonString(
-  Schema.Struct({
-    namespace: Schema.String.check(Schema.isUUID()),
-    action: Schema.String,
-    operation_id: Schema.optionalKey(Schema.String),
-  })
-);
-const network = () =>
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
-    const input = Schema.decodeUnknownSync(requestSchema)(init?.body);
-    return Response.json(
-      input.action === "list" || input.action === "search"
-        ? { results: [] }
-        : { ids: [] }
-    );
-  });
+
 const run = (
   body: (
     value: Effect.Success<ReturnType<typeof workspaceFixture>> & {
@@ -40,7 +23,7 @@ const run = (
   ) => Effect.Effect<
     void,
     unknown,
-    PgClient.PgClient | LearnedMemory | WorkspaceRepository | Mem0
+    PgClient.PgClient | LearnedMemory | WorkspaceRepository
   >
 ) =>
   Effect.runPromise(
@@ -49,93 +32,80 @@ const run = (
         ...(yield* workspaceFixture()),
         memory: yield* LearnedMemory,
       });
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(services),
-      Effect.provideService(
-        ConfigProvider.ConfigProvider,
-        ConfigProvider.orElse(
-          ConfigProvider.fromUnknown({
-            ZOEN_MEM0_URL: "https://memory.example.invalid",
-            ZOEN_MEM0_API_KEY: "synthetic-service-key",
-          }),
-          ConfigProvider.fromEnv()
-        )
-      )
-    )
+    }).pipe(Effect.scoped, Effect.provide(services))
   );
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
-test("partitions personal/work memory and each member; forged workspace access never reaches Mem0", () => {
-  const backend = network();
-  return run(({ actor, guest, personal, memory }) =>
+test("partitions personal/work memory and each member; forged workspace access never reaches another namespace", () =>
+  run(({ actor, guest, personal, memory, sql }) =>
     Effect.gen(function* () {
-      for (const person of [actor, guest, personal])
-        yield* memory.write(
+      const ids = new Set<string>();
+      for (const person of [actor, guest, personal]) {
+        const written = yield* memory.write(
           person,
           {
             action: "remember",
-            text: "Synthetic preference",
+            text: "Preferência sintética",
             operationId: randomUUID(),
           },
           false
         );
-      const requests = backend.mock.calls.map(([, init]) =>
-        Schema.decodeUnknownSync(requestSchema)(init?.body)
-      );
-      expect(new Set(requests.map((request) => request.namespace)).size).toBe(
-        3
-      );
-      expect(
-        requests.every((request) => !request.namespace.includes(actor.userId))
-      ).toBe(true);
+        ids.add(written.ids[0] ?? "");
+      }
+      expect(ids.size).toBe(3);
+      const namespaces = yield* sql<{
+        id: string;
+        userId: string;
+      }>`SELECT namespace_id AS id, user_id AS "userId" FROM workspace_memory_namespace
+        WHERE user_id IN (${actor.userId}, ${guest.userId}, ${personal.userId})`;
+      expect(new Set(namespaces.map((row) => row.id)).size).toBe(3);
       const denied = yield* memory
         .read({ ...guest, workspaceId: personal.workspaceId })
         .pipe(Effect.result);
       expect(Result.isFailure(denied) && denied.failure).toBeInstanceOf(
         WorkspaceAccessDenied
       );
-      expect(backend).toHaveBeenCalledTimes(3);
+      const actorNotes = yield* memory.read(actor);
+      expect(actorNotes.results).toHaveLength(1);
+      expect(actorNotes.results[0]?.memory).toBe("Preferência sintética");
     })
-  );
-});
+  ));
 
-test("replay is stable, forget tombstones previous recalls, and a scope key cannot be rebound", () => {
-  const backend = network();
-  const fact = {
-    id: randomUUID(),
-    memory: "Synthetic old preference",
-    createdAt: null,
-    updatedAt: null,
-  };
-  return run(({ actor, memory }) =>
+test("replay is stable, forget tombstones previous recalls, and a scope key cannot be rebound", () =>
+  run(({ actor, memory }) =>
     Effect.gen(function* () {
-      backend.mockResolvedValueOnce(Response.json({ results: [fact] }));
+      const saved = yield* memory.write(
+        actor,
+        {
+          action: "remember",
+          text: "Preferência antiga sintética",
+          operationId: randomUUID(),
+        },
+        false
+      );
+      const factId = saved.ids[0];
+      if (!factId) throw new Error("Expected remembered id");
       const first = yield* memory.recall(
         actor,
         "opaque-scope-one",
         "recall-one",
-        "preference"
+        "preferência"
       );
-      expect(first.results).toEqual([fact]);
+      expect(first.results.map((item) => item.id)).toEqual([factId]);
       expect(
         yield* memory.recall(
           actor,
           "opaque-scope-one",
           "recall-one",
-          "changed query"
+          "consulta diferente"
         )
       ).toEqual(first);
-      expect(backend).toHaveBeenCalledTimes(1);
       yield* memory.write(actor, {
         action: "delete",
-        memoryId: fact.id,
+        memoryId: factId,
         operationId: randomUUID(),
       });
       const stale = yield* memory
-        .recall(actor, "opaque-scope-one", "recall-one", "preference")
+        .recall(actor, "opaque-scope-one", "recall-one", "preferência")
         .pipe(Effect.result);
       expect(Result.isFailure(stale) && stale.failure).toMatchObject({
         reason: "stale_recall",
@@ -145,48 +115,35 @@ test("replay is stable, forget tombstones previous recalls, and a scope key cann
           actor,
           "opaque-scope-one",
           "recall-two",
-          "preference"
+          "preferência"
         )).results
       ).toEqual([]);
       const rebound = yield* memory
-        .recall(actor, "forged-scope", "recall-three", "preference")
+        .recall(actor, "forged-scope", "recall-three", "preferência")
         .pipe(Effect.result);
       expect(Result.isFailure(rebound) && rebound.failure).toMatchObject({
         reason: "invalid_input",
       });
       yield* memory.setEnabled(actor, false);
-      const before = backend.mock.calls.length;
       expect(
         yield* memory.recall(
           actor,
           "opaque-scope-one",
           "recall-paused",
-          "preference"
+          "preferência"
         )
       ).toEqual({ enabled: false, results: [] });
-      expect(backend).toHaveBeenCalledTimes(before);
     })
-  );
-});
+  ));
 
-test("an ambiguous deletion fences recall until an explicit clear acknowledges recovery", () => {
-  const backend = network();
-  return run(({ actor, memory }) =>
+test("a leftover fence blocks writes until recover or explicit clear", () =>
+  run(({ actor, memory, sql }) =>
     Effect.gen(function* () {
-      yield* memory.recall(actor, "scope", "before", "test");
-      backend.mockResolvedValueOnce(Response.json({}, { status: 503 }));
-      const failed = yield* memory
-        .write(actor, {
-          action: "delete",
-          memoryId: randomUUID(),
-          operationId: "uncertain-delete",
-        })
-        .pipe(Effect.result);
-      expect(Result.isFailure(failed) && failed.failure).toMatchObject({
-        _tag: "Mem0Error",
-      });
+      yield* memory.recall(actor, "scope", "before", "teste");
+      yield* sql`UPDATE workspace_memory_namespace SET pending_operation = 'uncertain-write', pending_hash = 'stale'
+        WHERE workspace_id = ${actor.workspaceId} AND user_id = ${actor.userId}`;
       const fenced = yield* memory
-        .recall(actor, "scope", "after", "test")
+        .recall(actor, "scope", "after", "teste")
         .pipe(Effect.result);
       expect(Result.isFailure(fenced) && fenced.failure).toMatchObject({
         reason: "stale_recall",
@@ -194,43 +151,39 @@ test("an ambiguous deletion fences recall until an explicit clear acknowledges r
       const unrelated = yield* memory
         .write(actor, {
           action: "remember",
-          text: "New fact",
+          text: "Novo fato",
           operationId: "new-write",
         })
         .pipe(Effect.result);
       expect(Result.isFailure(unrelated) && unrelated.failure).toMatchObject({
         reason: "stale_recall",
       });
-      expect(backend).toHaveBeenCalledTimes(2);
       yield* memory.write(actor, {
         action: "clear",
         operationId: "explicit-recovery",
       });
       expect((yield* memory.read(actor)).needsAttention).toBe(false);
       expect(
-        (yield* memory.recall(actor, "scope", "recovered", "test")).results
+        (yield* memory.recall(actor, "scope", "recovered", "teste")).results
       ).toEqual([]);
     })
-  );
-});
+  ));
 
-test("recovery verifies current memory without replaying an uncertain mutation or restoring old recalls", () => {
-  const backend = network();
-  return run(({ actor, memory }) =>
+test("recovery verifies current memory without restoring old recalls", () =>
+  run(({ actor, memory, sql }) =>
     Effect.gen(function* () {
-      yield* memory.recall(actor, "scope", "before", "test");
-      backend.mockResolvedValueOnce(Response.json({}, { status: 503 }));
-      yield* memory
-        .write(actor, {
+      yield* memory.write(
+        actor,
+        {
           action: "remember",
-          text: "Uncertain fact",
-          operationId: "uncertain-write",
-        })
-        .pipe(Effect.result);
-      backend.mockResolvedValueOnce(Response.json({}, { status: 503 }));
-      expect(
-        Result.isFailure(yield* memory.recover(actor).pipe(Effect.result))
-      ).toBe(true);
+          text: "Fato estável",
+          operationId: "stable-write",
+        },
+        false
+      );
+      yield* memory.recall(actor, "scope", "before", "teste");
+      yield* sql`UPDATE workspace_memory_namespace SET pending_operation = 'uncertain-write', pending_hash = 'stale'
+        WHERE workspace_id = ${actor.workspaceId} AND user_id = ${actor.userId}`;
       expect((yield* memory.read(actor, undefined, true)).needsAttention).toBe(
         true
       );
@@ -239,23 +192,19 @@ test("recovery verifies current memory without replaying an uncertain mutation o
         false
       );
       const stale = yield* memory
-        .recall(actor, "scope", "before", "test")
+        .recall(actor, "scope", "before", "teste")
         .pipe(Effect.result);
       expect(Result.isFailure(stale) && stale.failure).toMatchObject({
         reason: "stale_recall",
       });
-      const actions = backend.mock.calls.map(
-        ([, init]) => Schema.decodeUnknownSync(requestSchema)(init?.body).action
-      );
-      expect(actions.filter((action) => action === "remember")).toHaveLength(1);
-      expect(actions).not.toContain("clear");
+      expect(
+        (yield* memory.recall(actor, "scope", "after-recover", "fato")).results
+      ).toHaveLength(1);
     })
-  );
-});
+  ));
 
-test("Executor enforces the published plugin catalog and membership on every call", () => {
-  network();
-  return run(({ actor, guest, repository, sql }) =>
+test("Executor enforces the published plugin catalog and membership on every call", () =>
+  run(({ actor, guest, repository, sql }) =>
     Effect.gen(function* () {
       const first = yield* repository.write(actor, {
         path: "knowledge/plan.md",
@@ -296,12 +245,10 @@ test("Executor enforces the published plugin catalog and membership on every cal
         WorkspaceAccessDenied
       );
     })
-  );
-});
+  ));
 
-test("deleted accounts queue durable memory erasure; a failed service call retains the receipt", () => {
-  const backend = network();
-  return run(({ actor, personal, memory, sql }) =>
+test("deleted accounts queue durable memory erasure and drain clears the receipts", () =>
+  run(({ actor, personal, memory, sql }) =>
     Effect.gen(function* () {
       yield* memory.read(actor);
       yield* memory.read(personal);
@@ -314,16 +261,6 @@ test("deleted accounts queue durable memory erasure; a failed service call retai
           yield* sql`SELECT 1 FROM workspace_memory_erasure WHERE namespace_id = ${id}`
         ).toHaveLength(1);
       }
-      backend.mockResolvedValueOnce(Response.json({}, { status: 503 }));
-      expect(
-        Result.isFailure(yield* drainMemoryErasures().pipe(Effect.result))
-      ).toBe(true);
-      for (const { id } of partitions) {
-        expect(
-          yield* sql`SELECT 1 FROM workspace_memory_erasure WHERE namespace_id = ${id}`
-        ).toHaveLength(1);
-      }
-      // The isolated test database can contain receipts from previous integration fixtures.
       for (let i = 0; i < 20; i++) {
         if ((yield* drainMemoryErasures()).cleared === 0) break;
       }
@@ -333,5 +270,4 @@ test("deleted accounts queue durable memory erasure; a failed service call retai
         ).toHaveLength(0);
       }
     })
-  );
-});
+  ));

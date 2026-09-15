@@ -9,14 +9,12 @@ import { requireVaultwarden } from "../../server/workspaces/vault";
 import { requireWhatsAppBridge } from "../../server/workspaces/whatsapp";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { LearnedMemory } from "../../server/memory/learned";
-import { Mem0 } from "../../server/memory/mem0";
 import { recordTelemetry } from "../../server/observability/events";
 import { readDiagnosticSession } from "../../server/observability/insights";
 import { runtimeDatabase } from "./database";
 import { workspaceFixture, workspaceExecutionFor } from "./workspace-fixture";
 
 const services = LearnedMemory.layer.pipe(
-  Layer.provideMerge(Mem0.layer),
   Layer.provideMerge(WorkspaceRepository.layer),
   Layer.provideMerge(runtimeDatabase)
 );

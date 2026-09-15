@@ -1,7 +1,8 @@
 import { PgClient } from "@effect/sql-pg";
 import { Effect, Schema } from "effect";
-import { Mem0 } from "../memory/mem0";
 import { requireControlSession } from "./controls";
+import { learnedNoteTypeId } from "../memory/learned-type";
+import { LearnedMemoryItemSchema } from "../memory/learned";
 
 const Id = Schema.String.check(Schema.isUUID());
 const Cursor = Schema.String.check(Schema.isPattern(/^[0-9]{1,20}$/));
@@ -154,15 +155,24 @@ export const downloadAccountArchive = Effect.fn("downloadAccountArchive")(
       id: string;
     }>`SELECT namespace_id AS id FROM workspace_memory_namespace
     WHERE workspace_id = ${archive.workspaceId} AND user_id = ${`better-auth:${archive.sourceUserId}`}`;
-    const mem0 = yield* Mem0;
     const learned = yield* Effect.forEach(namespaces, (namespace) =>
-      mem0.read(namespace.id)
+      Effect.gen(function* () {
+        const rows = yield* sql`SELECT id, memory,
+          to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt",
+          to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "updatedAt"
+          FROM workspace_learned_item
+          WHERE namespace_id = ${namespace.id} AND type_id = ${learnedNoteTypeId}
+          ORDER BY updated_at DESC, id LIMIT 200`;
+        return yield* Schema.decodeUnknownEffect(
+          Schema.Array(LearnedMemoryItemSchema)
+        )(rows);
+      })
     );
     return Response.json(
       {
         profile: profile[0] ?? null,
         documents,
-        learned: learned.flatMap((page) => page.results),
+        learned: learned.flat(),
       },
       { headers: responseHeaders }
     );

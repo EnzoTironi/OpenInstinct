@@ -9,7 +9,6 @@ import {
 } from "../../server/executor/dispatch";
 import { resolveCustomerTools } from "../../server/executor/customer-tools";
 import { LearnedMemory } from "../../server/memory/learned";
-import { Mem0 } from "../../server/memory/mem0";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { WorkspaceAccessDenied } from "../../server/workspaces/access";
 import { publishSkillProposal } from "../../server/workspaces/skills";
@@ -25,7 +24,6 @@ import { workspaceFixture, workspaceExecutionFor } from "./workspace-fixture";
 import { linkedIdentity } from "./identity-fixture";
 
 const services = LearnedMemory.layer.pipe(
-  Layer.provideMerge(Mem0.layer),
   Layer.provideMerge(WorkspaceRepository.layer),
   Layer.provideMerge(runtimeDatabase)
 );

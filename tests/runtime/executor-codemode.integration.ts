@@ -3,7 +3,6 @@ import { Effect, Layer, Result } from "effect";
 import { expect, test } from "vitest";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { LearnedMemory } from "../../server/memory/learned";
-import { Mem0 } from "../../server/memory/mem0";
 import {
   executeCodeMode,
   executorContext,
@@ -15,7 +14,6 @@ import { runtimeDatabase } from "./database";
 import { toolContextFor } from "../helpers/tool-context";
 
 const services = LearnedMemory.layer.pipe(
-  Layer.provideMerge(Mem0.layer),
   Layer.provideMerge(WorkspaceRepository.layer),
   Layer.provideMerge(runtimeDatabase)
 );

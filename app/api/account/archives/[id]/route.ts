@@ -1,7 +1,6 @@
 import { Effect, Schema } from "effect";
 import { downloadAccountArchive } from "../../../../../server/accounts/archives";
 import { serverRuntime } from "../../../../../server/runtime";
-import { Mem0 } from "../../../../../server/memory/mem0";
 
 export async function GET(
   request: Request,
@@ -21,7 +20,6 @@ export async function GET(
         query.get("attachment") ?? undefined
       );
     }).pipe(
-      Effect.provide(Mem0.layer),
       Effect.catchTag("AccountControlError", () =>
         Effect.succeed(
           new Response("Sign in to continue", {
@@ -38,7 +36,7 @@ export async function GET(
           })
         )
       ),
-      Effect.catchTag(["AuthUnavailable", "Mem0Error", "SqlError"], () =>
+      Effect.catchTag(["AuthUnavailable", "SqlError"], () =>
         Effect.succeed(
           new Response("Archive unavailable", {
             status: 503,

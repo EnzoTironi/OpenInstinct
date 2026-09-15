@@ -43,7 +43,7 @@ export default {
         "scripts/groups-live-e2e.ts",
         // Launched in a separate process before web/worker traffic is admitted.
         "scripts/reconcile-account-erasures.ts",
-        // Host compile surface for @zoen/operon; not mounted until P10.
+        // Host compile surface for @zoen/operon; runtime mounts learned notes in P10.
         "server/operon-kernel.ts",
         // In-memory Operon MCP used by email-flow tests.
       ],

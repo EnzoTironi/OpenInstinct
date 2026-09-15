@@ -8,7 +8,6 @@ import {
 import { fileMemory } from "eve/memory/file";
 import { Effect } from "effect";
 import { serverRuntime } from "../../runtime";
-import { env } from "@shared/environment/env";
 import { createMemoryDocumentBackend } from "@agent/lib/memory-document-backend";
 import { authorizePersonalMemoryContext } from "@agent/lib/personal-memory-access";
 import { preserveProfileMemoryCancellation } from "@agent/lib/profile-memory";
@@ -47,7 +46,7 @@ export const personalMemoryProvider = preserveProfileMemoryCancellation(
       if (!tools) return null;
       return Object.fromEntries(
         Object.entries(tools)
-          .filter(([name]) => !env.ZOEN_MEM0_URL || name !== "save_memory")
+          .filter(([name]) => name !== "save_memory")
           .map(([name, tool]) => [
             name,
             {

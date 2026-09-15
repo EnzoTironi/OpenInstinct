@@ -105,7 +105,6 @@ export const env = createEnv({
     // Optional
     BLOB_READ_WRITE_TOKEN: requiredValue.optional(),
     BLOB_STORE_ID: requiredValue.optional(),
-    ZOEN_MEM0_URL: z.url().optional(),
     ZOEN_ERASURE_JOURNAL_BUCKET: requiredValue.optional(),
     ZOEN_ERASURE_JOURNAL_ENDPOINT: z
       .url()
@@ -173,13 +172,6 @@ export const env = createEnv({
       )
     ),
     ZOEN_WHATSAPP_HS_TOKEN: Schema.toStandardSchemaV1(
-      Schema.optional(
-        Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {
-          disallowEncode: true,
-        })
-      )
-    ),
-    ZOEN_MEM0_API_KEY: Schema.toStandardSchemaV1(
       Schema.optional(
         Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(32)), {
           disallowEncode: true,
