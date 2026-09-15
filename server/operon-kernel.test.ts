@@ -21,6 +21,7 @@ import {
   j1DefinitionArtifact,
   mailOutcome,
   replyLengthPolicy,
+  pollInbox,
   selectConnectedAccount,
   selectHostScopedContext,
   whatsAppSendClaim,
@@ -103,6 +104,7 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
         deliveryFulfillment({ draftId: "draft_1", kind: "local_draft" })
       ).toBe("incomplete");
       expect(replyLengthPolicy("analysis")).toBe("full");
+      expect(pollInbox("", [], 0).modelJudgment).toBe(false);
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");
