@@ -29,11 +29,11 @@ export const ConfirmWhatsAppPairingSchema = Schema.Struct({
   ),
   remoteUserId: remoteId,
 });
-export const AuthorizeWhatsAppChatSchema = Schema.Struct({
+const AuthorizeWhatsAppChatSchema = Schema.Struct({
   remoteChatId: remoteId,
   kind: Schema.Literals(["dm", "group"]),
 });
-export const IngestWhatsAppEventSchema = Schema.Struct({
+const IngestWhatsAppEventSchema = Schema.Struct({
   accountId: uuid,
   remoteChatId: remoteId,
   providerEventId: remoteId,
@@ -41,7 +41,7 @@ export const IngestWhatsAppEventSchema = Schema.Struct({
   authorRemoteId: remoteId,
   body: messageBody,
 });
-export const WhatsAppChatIdSchema = Schema.Struct({ chatId: uuid });
+const WhatsAppChatIdSchema = Schema.Struct({ chatId: uuid });
 export const ShareWhatsAppChatSchema = Schema.Struct({
   chatId: uuid,
   workspaceId: Schema.String.check(
@@ -49,7 +49,7 @@ export const ShareWhatsAppChatSchema = Schema.Struct({
     Schema.isMaxLength(200)
   ),
 });
-export const ImportWhatsAppContactsSchema = Schema.Struct({
+const ImportWhatsAppContactsSchema = Schema.Struct({
   contacts: Schema.Array(
     Schema.Struct({
       remoteUserId: remoteId,
@@ -57,7 +57,7 @@ export const ImportWhatsAppContactsSchema = Schema.Struct({
     })
   ).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
 });
-export const WhatsAppDraftSchema = Schema.Struct({
+const WhatsAppDraftSchema = Schema.Struct({
   chatId: uuid,
   body: messageBody,
 });
