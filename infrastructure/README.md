@@ -63,6 +63,10 @@ Linux amd64 images and deploys their immutable digests. Optional
 `ZOEN_POSTGRES_IMAGE`, `ZOEN_MEMORY_IMAGE`, `ZOEN_MATRIX_IMAGE`, and `ZOEN_WEB_IMAGE` digest references
 support adoption or a deliberate rollback. Keep the database on PostgreSQL major
 17; a major upgrade requires a separate migration and recovery plan.
+Which SHA has actually been published is recorded in the
+[customer-platform release map](../docs/decisions/adr-customer-platform-release.md);
+REL02 stays blocked until that SHA's images, recovery drill and health checks
+are written down. Do not use Eve's generic deploy.
 
 Alchemy creates separate `zoen_app` and `zoen_migrator` logins with independent
 vault secrets. The runtime has DML and native workflow queue permissions, no DDL,
@@ -114,6 +118,15 @@ CompanionLocal stack and volumes. They do not use the hosted production database
 `alchemy.fly-postgres.run.ts` remains a compatibility alias for the unified stack.
 
 ## Backups and recovery
+
+Account erasure uses a separate private Tigris bucket, retained by Alchemy.
+The application writes deletion intent there before removing active data.
+`pnpm start` replays the journal before starting either Next or Eve; failure
+keeps the restored service closed. Never restore or delete this bucket as part
+of a PostgreSQL rollback. Its credentials are separate from pgBackRest's.
+For other installations, configure the `ZOEN_ERASURE_JOURNAL_*` variables in
+`.env.example`; without them, full-account erasure is unavailable. CI proves
+this path with real S3 and a full PostgreSQL backup taken before deletion.
 
 pgBackRest archives WAL continuously (`archive_timeout=60s`). The target recovery
 point is about one minute plus upload delay while the archive is healthy; this

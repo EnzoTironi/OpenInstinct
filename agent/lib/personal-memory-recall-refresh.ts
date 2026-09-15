@@ -20,7 +20,8 @@ import type { ToolContext } from "eve/tools";
  * model context until refresh succeeds (or a later `turn.started` recall runs).
  *
  * Limits (not claimed here): ordinary conversation/history/summaries may still
- * mention a forgotten fact; full account erase/restore is a separate P06 gate.
+ * mention a forgotten fact; full account erase/restore is the durable deletion
+ * process in docs/decisions/adr-account-deletion.md, not this refresh path.
  */
 export interface RecalledProjection {
   readonly messages: readonly MemoryRecallMessage[];

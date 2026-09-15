@@ -27,6 +27,61 @@ export class WorkspaceAccessDenied extends Schema.TaggedError<WorkspaceAccessDen
   {}
 ) {}
 
+export function personalNetworkId(left: string, right: string) {
+  return left < right ? `${left}:${right}` : `${right}:${left}`;
+}
+
+const NetworkKind = Schema.Literals(["company", "personal"]);
+
+const requireConversationNetwork = Effect.fn("requireConversationNetwork")(
+  function* (input: {
+    requesterUserId: string;
+    networkKind: string | null;
+    networkId: string | null;
+    destWorkspaceId: string;
+  }) {
+    const kind = yield* Schema.decodeUnknownEffect(NetworkKind)(
+      input.networkKind
+    ).pipe(Effect.mapError(() => new WorkspaceAccessDenied()));
+    if (!input.networkId) return yield* new WorkspaceAccessDenied();
+    const sql = yield* PgClient.PgClient;
+    switch (kind) {
+      case "company": {
+        const rows = yield* sql`SELECT w.id FROM workspaces w
+        JOIN organization_memberships o ON o.organization_id = w.organization_id AND o.user_id = ${input.requesterUserId}
+        WHERE w.id = ${input.destWorkspaceId} AND w.organization_id = ${input.networkId} FOR SHARE OF w, o`;
+        if (rows.length !== 1) return yield* new WorkspaceAccessDenied();
+        return true;
+      }
+      case "personal": {
+        const rows = yield* sql<{
+          owner: string;
+        }>`SELECT owner.user_id AS owner FROM workspaces w
+        JOIN workspace_memberships owner ON owner.workspace_id = w.id AND owner.role = 'owner'
+        JOIN personal_trust_edges e ON e.user_id = ${input.requesterUserId} AND e.peer_user_id = owner.user_id
+        WHERE w.id = ${input.destWorkspaceId} AND w.organization_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM personal_trust_blocks b
+            WHERE (b.user_id = ${input.requesterUserId} AND b.blocked_user_id = owner.user_id)
+               OR (b.user_id = owner.user_id AND b.blocked_user_id = ${input.requesterUserId})
+          ) FOR SHARE OF w, owner, e`;
+        const owner = rows[0]?.owner;
+        if (
+          !owner ||
+          personalNetworkId(input.requesterUserId, owner) !== input.networkId
+        )
+          return yield* new WorkspaceAccessDenied();
+        return true;
+      }
+      default: {
+        const impossible: never = kind;
+        void impossible;
+        return yield* new WorkspaceAccessDenied();
+      }
+    }
+  }
+);
+
 /** Call inside the transaction that reads or publishes protected data. */
 export const requireWorkspaceAccess = Effect.fn("requireWorkspaceAccess")(
   function* (input: typeof WorkspaceActorSchema.Type, manage = false) {
@@ -70,13 +125,27 @@ export const requireWorkspaceAccess = Effect.fn("requireWorkspaceAccess")(
       if (org.length !== 1) return yield* new WorkspaceAccessDenied();
     }
     if (actor.agentGrantId) {
-      const grants = yield* sql`SELECT g.id FROM workspace_agent_grants g
+      const grants = yield* sql<{
+        id: string;
+        requester_user_id: string | null;
+        network_kind: string | null;
+        network_id: string | null;
+      }>`SELECT g.id, g.requester_user_id, g.network_kind, g.network_id FROM workspace_agent_grants g
       JOIN workspace_bots b ON b.id = g.bot_id
       WHERE g.id = ${actor.agentGrantId} AND g.issued_by = ${actor.userId}
         AND b.workspace_id = ${actor.workspaceId} AND g.revoked_at IS NULL
+        AND (g.requester_user_id IS NULL OR b.discoverable)
         AND g.expires_at > clock_timestamp() FOR SHARE OF g, b`;
-      if (grants.length !== 1 || membership.role === "member")
+      const grant = grants[0];
+      if (!grant || membership.role === "member")
         return yield* new WorkspaceAccessDenied();
+      if (grant.requester_user_id)
+        yield* requireConversationNetwork({
+          requesterUserId: grant.requester_user_id,
+          networkKind: grant.network_kind,
+          networkId: grant.network_id,
+          destWorkspaceId: actor.workspaceId,
+        });
       if (actor.protocolTaskId) {
         const tasks =
           yield* sql`SELECT id FROM agent_protocol_tasks WHERE id = ${actor.protocolTaskId}

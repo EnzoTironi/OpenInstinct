@@ -41,6 +41,8 @@ export default {
         "server/accounts/controls.integration.ts",
         // Live TG group mention e2e (manual /env.local); fixture harness is CI proof.
         "scripts/groups-live-e2e.ts",
+        // Launched in a separate process before web/worker traffic is admitted.
+        "scripts/reconcile-account-erasures.ts",
         // In-memory Operon MCP used by email-flow tests.
       ],
       ignoreDependencies: [

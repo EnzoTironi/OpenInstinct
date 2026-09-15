@@ -1,4 +1,5 @@
 import { defineTool } from "eve/tools";
+import { Effect, Redacted } from "effect";
 import { z } from "zod";
 import { requireOwnedBrowserSession } from "@agent/subagents/browser-agent/lib/owned-browser";
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
@@ -9,8 +10,9 @@ import {
   fillWithKernelNativeAutofill,
   nativeAutofillTokens,
 } from "../../../agent/subagents/browser-agent/lib/autofill/native";
-import { vaultAutofillProvider } from "../../../agent/subagents/browser-agent/lib/autofill/provider";
-import { materializeAutofillClaims } from "../../../agent/subagents/browser-agent/lib/autofill/service";
+import { claimsFromVaultSecret } from "../../../agent/subagents/browser-agent/lib/autofill/provider";
+import { serverRuntime } from "../../runtime";
+import { releaseDelegatedSecret } from "../../workspaces/vault";
 
 const inputSchema = z.object({
   browserSessionId: z.string().trim().min(1).max(500),
@@ -62,6 +64,7 @@ export default defineTool({
       browserSessionId: input.browserSessionId,
       signal: context.abortSignal,
     });
+    const tokens = nativeAutofillTokens[item.kind];
     const surfaceKind =
       item.kind === "payment"
         ? "payment-card"
@@ -70,23 +73,27 @@ export default defineTool({
           : item.kind === "contact"
             ? "contact"
             : "postal-address";
-    const tokens = nativeAutofillTokens[item.kind];
-    const surface = {
-      fields: tokens.map((token) => ({ score: 100, token })),
-      id: surfaceKind,
-      kind: surfaceKind,
-    };
-
-    const claims = await materializeAutofillClaims(
-      scope,
-      input.candidateId,
-      {
-        availableTokens: new Set(tokens),
-        origin,
-        surface,
-      },
-      vaultAutofillProvider
+    const secret = await serverRuntime.runPromise(
+      releaseDelegatedSecret(scope, input.candidateId).pipe(
+        Effect.map((value) => Redacted.value(value)),
+        Effect.catchTag("WorkspaceAccessDenied", () =>
+          Effect.fail(new Error("The selected vault item was not found."))
+        )
+      ),
+      { signal: context.abortSignal }
     );
+    const claims = claimsFromVaultSecret(item, secret, {
+      availableTokens: new Set(tokens),
+      origin,
+      surface: {
+        fields: tokens.map((token) => ({ score: 100, token })),
+        id: surfaceKind,
+        kind: surfaceKind,
+      },
+    });
+    if (claims.length === 0) {
+      throw new Error("The selected vault item has no values for this form.");
+    }
     const result = await fillWithKernelNativeAutofill({
       browserSessionId: input.browserSessionId,
       claims,

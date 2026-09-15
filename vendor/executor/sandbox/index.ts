@@ -24,6 +24,7 @@ import {
 
 export type QuickJsExecutorOptions = {
   timeoutMs?: number;
+  maxWallTimeMs?: number;
   memoryLimitBytes?: number;
   maxStackSizeBytes?: number;
 };
@@ -148,16 +149,35 @@ type DeadlineTracker = {
   readonly deadlineMs: () => number | null;
   readonly dispatchStarted: () => void;
   readonly dispatchReturned: () => void;
+  readonly shouldInterrupt: () => boolean;
 };
 
-const makeDeadlineTracker = (timeoutMs: number): DeadlineTracker => {
+const makeDeadlineTracker = (
+  timeoutMs: number,
+  maxWallTimeMs: number,
+  signal: AbortSignal
+): DeadlineTracker => {
   const start = Date.now();
+  const hardDeadline = start + maxWallTimeMs;
   let inFlight = 0;
   let lastReturnedAt = start;
 
   return {
     deadlineMs: () =>
-      inFlight > 0 ? null : Math.max(start, lastReturnedAt) + timeoutMs,
+      signal.aborted
+        ? 0
+        : Math.min(
+            hardDeadline,
+            inFlight > 0
+              ? hardDeadline
+              : Math.max(start, lastReturnedAt) + timeoutMs
+          ),
+    // Outstanding I/O pauses waiting, never the CPU interrupt. Unawaited tools
+    // must not allow `tools.slow({}); while (true) {}` to block the host forever.
+    shouldInterrupt: () =>
+      signal.aborted ||
+      Date.now() >=
+        Math.min(hardDeadline, Math.max(start, lastReturnedAt) + timeoutMs),
     dispatchStarted: () => {
       inFlight += 1;
     },
@@ -171,8 +191,7 @@ const makeDeadlineTracker = (timeoutMs: number): DeadlineTracker => {
 const shouldInterruptAfterDeadline =
   (deadline: DeadlineTracker): (() => boolean) =>
   () => {
-    const deadlineMs = deadline.deadlineMs();
-    return deadlineMs !== null && Date.now() >= deadlineMs;
+    return deadline.shouldInterrupt();
   };
 
 const normalizeExecutionError = (
@@ -474,10 +493,15 @@ const evaluateInQuickJs = async (
   options: QuickJsExecutorOptions,
   code: string,
   toolInvoker: SandboxToolInvoker,
-  runPromise: RunPromise
+  runPromise: RunPromise,
+  signal: AbortSignal
 ): Promise<ExecuteResult> => {
   const timeoutMs = Math.max(100, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  const deadline = makeDeadlineTracker(timeoutMs);
+  const deadline = makeDeadlineTracker(
+    timeoutMs,
+    Math.max(timeoutMs, options.maxWallTimeMs ?? 30_000),
+    signal
+  );
   const logs: string[] = [];
   const pendingDeferreds = new Set<QuickJSDeferredPromise>();
   const QuickJS = await resolveQuickJS();
@@ -605,7 +629,21 @@ const runInQuickJs = (
     const context = yield* Effect.context<never>();
     const runPromise = Effect.runPromiseWith(context);
     return yield* Effect.tryPromise({
-      try: () => evaluateInQuickJs(options, code, toolInvoker, runPromise),
+      try: async (signal) => {
+        const lifetime = new AbortController();
+        const combined = AbortSignal.any([signal, lifetime.signal]);
+        try {
+          return await evaluateInQuickJs(
+            options,
+            code,
+            toolInvoker,
+            (effect) => runPromise(effect, { signal: combined }),
+            combined
+          );
+        } finally {
+          lifetime.abort();
+        }
+      },
       catch: (cause) => new QuickJsExecutionError({ message: String(cause) }),
     });
   }).pipe(

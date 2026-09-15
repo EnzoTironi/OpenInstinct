@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Schema, Semaphore } from "effect";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import type * as QuickJSPackage from "quickjs-emscripten";
@@ -10,9 +10,11 @@ import type { SandboxToolInvoker } from "../../vendor/executor/core";
 
 const kernel = makeQuickJsExecutor({
   timeoutMs: 250,
+  maxWallTimeMs: 25_000,
   memoryLimitBytes: 16 * 1024 * 1024,
   maxStackSizeBytes: 512 * 1024,
 });
+const capacity = Semaphore.makeUnsafe(4);
 export const ExecutorCodeSchema = Schema.NonEmptyString.check(
   Schema.isMaxLength(20_000)
 );
@@ -78,6 +80,7 @@ export const runWorkspaceCode = Effect.fn("Executor.runWorkspaceCode")(
       return yield* new ExecutorError({ reason: "limit_exceeded" });
     return { ok: true, text, logs: result.logs ?? [] };
   },
+  (execution) => capacity.withPermit(execution),
   Effect.timeout("30 seconds"),
   Effect.catchTag(
     "SchemaError",

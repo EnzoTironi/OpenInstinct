@@ -7,6 +7,8 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { vaultItemKinds } from "@shared/vault/schema";
 import { workspaces } from "./workspaces";
@@ -80,6 +82,58 @@ export const encryptedSecrets = pgTable(
       "encrypted_secrets_namespace_check",
       sql`${table.namespace} = 'vault'`
     ),
+  ]
+);
+
+export const vaultAgentIdentities = pgTable(
+  "vault_agent_identities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    wrappingKey: text("wrapping_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("vault_agent_identities_workspace_uidx")
+      .on(table.workspaceId)
+      .where(sql`${table.revokedAt} IS NULL`),
+  ]
+);
+
+export const vaultItemDelegations = pgTable(
+  "vault_item_delegations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    identityId: uuid("identity_id")
+      .notNull()
+      .references(() => vaultAgentIdentities.id, { onDelete: "cascade" }),
+    itemId: text("item_id").notNull(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    wrappedSecret: text("wrapped_secret").notNull(),
+    issuedBy: text("issued_by").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "vault_item_delegations_item_id_fkey",
+      columns: [table.itemId],
+      foreignColumns: [vaultItems.id],
+    }).onDelete("cascade"),
+    uniqueIndex("vault_item_delegations_live_uidx")
+      .on(table.identityId, table.itemId)
+      .where(sql`${table.revokedAt} IS NULL`),
+    index("vault_item_delegations_workspace_idx").on(table.workspaceId),
   ]
 );
 

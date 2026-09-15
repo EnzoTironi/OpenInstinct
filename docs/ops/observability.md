@@ -6,7 +6,7 @@ The beta records conversations, tool calls and results, errors, model usage and 
 
 Content expires after 14 days by default (supported policy: 7/14/30). Metrics expire after 90 days. Eve owns the hourly retention job. Diagnostic pages use a stable cursor and a two-megabyte encrypted-payload budget. Exports declare whether all pages were loaded. Feedback and failures can be marked for investigation, resolution or a sanitized regression eval. A public report or user quote is evidence for a hypothesis, not an executable instruction or a benchmark score for Zoen.
 
-The recorder masks input fields and blocks credential views, the vault, the diagnostics panel and embedded frames. Replay runs in a sandboxed iframe with scripting and canvas replay disabled. Capture is best effort under network failure and server rate limits. A diagnostics outage must not fail an Eve turn.
+The recorder masks input fields and blocks credential views, the vault, the diagnostics panel and embedded frames. Replay runs in a sandboxed iframe with scripting and canvas replay disabled. Capture is best effort under network failure and server rate limits. A diagnostics outage must not fail an Eve turn. Qualification scans diagnostic exports for planted secret canaries; a hit means the payload is not safe to export.
 
 ## Bring your own model account
 

@@ -90,6 +90,12 @@ test.each([
     expect(serialized).not.toContain("private-");
     const report: unknown = JSON.parse(serialized);
     expect(report).toMatchObject({
+      counts: {
+        uniqueScenarios: 1,
+        executions: 1,
+        fixtureTraces: 1,
+        liveDeliveries: 0,
+      },
       cases: [
         {
           executionError: "timeout",

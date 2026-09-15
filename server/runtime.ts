@@ -15,6 +15,7 @@ import { ChannelAuthPrompts } from "./channel-auth/prompts";
 import { MemoryDocuments } from "./memory/documents";
 import { PersonalMemory } from "./personal-memory";
 import { BrowserWorkerAccess } from "./browser-worker";
+import { ErasureJournal } from "./accounts/erasure-journal";
 
 const database = PgClient.layerConfig({
   url: Config.redacted("DATABASE_URL"),
@@ -22,6 +23,7 @@ const database = PgClient.layerConfig({
 });
 
 const infrastructure = Layer.mergeAll(
+  ErasureJournal.layer,
   ChannelAccounts.layer,
   BrowserWorkerAccess.layer,
   Messaging.layer,

@@ -39,8 +39,16 @@ const taskSchema = Schema.Struct({
   sessionId: Schema.NullOr(Schema.String),
   state: Schema.String,
   output: Schema.NullOr(Schema.String),
+  correlationId: Schema.String,
+  round: Schema.Number,
+  originTaskId: Schema.NullOr(Schema.String),
   updatedAt: Schema.String,
 });
+export interface ProtocolTaskChain {
+  correlationId: string;
+  round: number;
+  originTaskId: string;
+}
 export class A2AError extends Schema.TaggedError<A2AError>()("A2AError", {
   code: Schema.Number,
   message: Schema.String,
@@ -54,7 +62,7 @@ export const readProtocolTask = Effect.fn("readProtocolTask")(function* (
   if (!actor.agentGrantId) return yield* new WorkspaceAccessDenied();
   const sql = yield* PgClient.PgClient;
   const rows =
-    yield* sql`SELECT id, context_id AS "contextId", message_id AS "messageId", request_hash AS "requestHash", prompt, session_id AS "sessionId", state, output, updated_at::text AS "updatedAt"
+    yield* sql`SELECT id, context_id AS "contextId", message_id AS "messageId", request_hash AS "requestHash", prompt, session_id AS "sessionId", state, output, correlation_id AS "correlationId", round, origin_task_id AS "originTaskId", updated_at::text AS "updatedAt"
     FROM agent_protocol_tasks WHERE id = ${id} AND grant_id = ${actor.agentGrantId}`;
   if (!rows[0])
     return yield* new A2AError({ code: -32001, message: "Task not found" });
@@ -63,7 +71,8 @@ export const readProtocolTask = Effect.fn("readProtocolTask")(function* (
 
 export const acceptProtocolTask = Effect.fn("acceptProtocolTask")(function* (
   actor: typeof WorkspaceActorSchema.Type,
-  raw: typeof A2AMessageSchema.Type
+  raw: typeof A2AMessageSchema.Type,
+  chain?: ProtocolTaskChain
 ) {
   const input = yield* Schema.decodeUnknownEffect(A2AMessageSchema)(raw, {
     onExcessProperty: "error",
@@ -123,8 +132,14 @@ export const acceptProtocolTask = Effect.fn("acceptProtocolTask")(function* (
           });
       }
       const id = randomUUID();
-      yield* sql`INSERT INTO agent_protocol_tasks(id, grant_id, context_id, message_id, request_hash, prompt)
-      VALUES (${id}, ${actor.agentGrantId}, ${input.message.contextId ?? randomUUID()}, ${input.message.messageId}, ${hash}, ${input.message.parts.map((part) => part.text).join("\n\n")})`;
+      const round = chain?.round ?? 1;
+      if (round < 1 || round > 8)
+        return yield* new A2AError({
+          code: -32000,
+          message: "Task chain limit reached",
+        });
+      yield* sql`INSERT INTO agent_protocol_tasks(id, grant_id, context_id, message_id, request_hash, prompt, correlation_id, round, origin_task_id)
+      VALUES (${id}, ${actor.agentGrantId}, ${input.message.contextId ?? randomUUID()}, ${input.message.messageId}, ${hash}, ${input.message.parts.map((part) => part.text).join("\n\n")}, ${chain?.correlationId ?? id}, ${round}, ${chain?.originTaskId ?? null})`;
       return yield* readProtocolTask(actor, id);
     })
   );

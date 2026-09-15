@@ -11,8 +11,8 @@ import {
   parsePaymentCardSecret,
   type VaultItemKind,
 } from "@shared/vault/schema";
-import type { DetectedAutofillSurface } from "./protocol";
-import type { AutofillVaultAdapter } from "./service";
+import type { AutofillClaim, DetectedAutofillSurface } from "./protocol";
+import type { AutofillFillTarget, AutofillVaultAdapter } from "./service";
 
 interface VaultAutofillCodec {
   readonly claims: (
@@ -210,27 +210,33 @@ export const vaultAutofillProvider: AutofillVaultAdapter = {
     const item = await readVaultItem(scope, candidateId);
     if (!item) throw new Error("The selected vault item was not found.");
 
-    const codec = codecs.find(
-      (candidate) =>
-        candidate.vaultKind === item.kind &&
-        candidate.surfaceKinds.includes(target.surface.kind)
-    );
-    if (!codec) {
-      throw new Error(
-        "The selected vault item is not compatible with this form."
-      );
-    }
-
     const secret = await readVaultSecret(scope, item.id);
     if (!secret) throw new Error("The selected vault item has no secret.");
-
-    const values = codec.claims(item, secret, target.origin);
-    return [...target.availableTokens].flatMap((token) => {
-      const value = values.get(token);
-      return value ? [{ id: crypto.randomUUID(), token, value }] : [];
-    });
+    return claimsFromVaultSecret(item, secret, target);
   },
 };
+
+export function claimsFromVaultSecret(
+  item: NonNullable<Awaited<ReturnType<typeof readVaultItem>>>,
+  secret: string,
+  target: AutofillFillTarget
+): readonly AutofillClaim[] {
+  const codec = codecs.find(
+    (candidate) =>
+      candidate.vaultKind === item.kind &&
+      candidate.surfaceKinds.includes(target.surface.kind)
+  );
+  if (!codec) {
+    throw new Error(
+      "The selected vault item is not compatible with this form."
+    );
+  }
+  const values = codec.claims(item, secret, target.origin);
+  return [...target.availableTokens].flatMap((token) => {
+    const value = values.get(token);
+    return value ? [{ id: crypto.randomUUID(), token, value }] : [];
+  });
+}
 
 function codecsForSurface(surface: DetectedAutofillSurface) {
   return codecs.filter((codec) => codec.surfaceKinds.includes(surface.kind));

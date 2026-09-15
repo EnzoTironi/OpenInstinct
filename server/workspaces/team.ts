@@ -171,12 +171,18 @@ export const removeWorkspaceMember = Effect.fn("removeWorkspaceMember")(
         AND q.status IN ('queued', 'dispatching') RETURNING q.id`;
         const revokedGrants =
           yield* sql`UPDATE workspace_agent_grants g SET revoked_at = clock_timestamp() FROM workspace_bots b
-      WHERE b.id = g.bot_id AND b.workspace_id = ${actor.workspaceId} AND g.issued_by = ${targetUserId} AND g.revoked_at IS NULL RETURNING g.id`;
+      WHERE b.id = g.bot_id AND b.workspace_id = ${actor.workspaceId} AND g.revoked_at IS NULL
+        AND (g.issued_by = ${targetUserId} OR g.requester_user_id = ${targetUserId}) RETURNING g.id`;
         const canceledTasks =
           yield* sql`UPDATE agent_protocol_tasks t SET state = 'TASK_STATE_CANCELED', updated_at = now()
       FROM workspace_agent_grants g JOIN workspace_bots b ON b.id = g.bot_id
-      WHERE t.grant_id = g.id AND b.workspace_id = ${actor.workspaceId} AND g.issued_by = ${targetUserId}
+      WHERE t.grant_id = g.id AND b.workspace_id = ${actor.workspaceId}
+        AND (g.issued_by = ${targetUserId} OR g.requester_user_id = ${targetUserId})
         AND t.state IN ('TASK_STATE_SUBMITTED', 'TASK_STATE_WORKING', 'TASK_STATE_INPUT_REQUIRED') RETURNING t.id`;
+        yield* sql`UPDATE vault_item_delegations SET revoked_at = clock_timestamp(), wrapped_secret = 'revoked'
+      WHERE workspace_id = ${actor.workspaceId} AND issued_by = ${targetUserId} AND revoked_at IS NULL`;
+        yield* sql`UPDATE whatsapp_bridge_shares SET revoked_at = clock_timestamp()
+      WHERE workspace_id = ${actor.workspaceId} AND issued_by = ${targetUserId} AND revoked_at IS NULL`;
         yield* sql`DELETE FROM workspace_memberships WHERE workspace_id = ${actor.workspaceId} AND user_id = ${targetUserId} AND role = 'member'`;
         yield* sql`DELETE FROM workspace_memory_namespace WHERE workspace_id = ${actor.workspaceId} AND user_id = ${targetUserId}`;
         yield* sql`UPDATE workspace_invites SET status = 'revoked' WHERE workspace_id = ${actor.workspaceId} AND ('better-auth:' || target_user_id) = ${targetUserId} AND status = 'pending'`;

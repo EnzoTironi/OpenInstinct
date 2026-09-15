@@ -151,7 +151,31 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:8008/health
       - name: Verify real Postgres storage
-        run: pnpm test:runtime
+        env:
+          ZOEN_RESTORE_TEST_CONTAINER: ${{ job.services.postgres.id }}
+          ZOEN_ERASURE_JOURNAL_BUCKET: zoen-erasure-test
+          ZOEN_ERASURE_JOURNAL_ENDPOINT: http://127.0.0.1:9000
+          ZOEN_ERASURE_JOURNAL_ACCESS_KEY: synthetic-erasure
+          ZOEN_ERASURE_JOURNAL_SECRET_KEY: synthetic-erasure-secret
+        run: |
+          docker run -d --name erasure-proof -p 127.0.0.1:9000:9000 \
+            -e MINIO_ROOT_USER=synthetic-erasure -e MINIO_ROOT_PASSWORD=synthetic-erasure-secret \
+            quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e server /data
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:9000/minio/health/live && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:9000/minio/health/live
+          node --input-type=module <<'JS'
+          import { S3Client, CreateBucketCommand } from '@aws-sdk/client-s3';
+          const s3 = new S3Client({ endpoint: process.env.ZOEN_ERASURE_JOURNAL_ENDPOINT,
+            region: 'auto', forcePathStyle: true,
+            credentials: { accessKeyId: process.env.ZOEN_ERASURE_JOURNAL_ACCESS_KEY,
+              secretAccessKey: process.env.ZOEN_ERASURE_JOURNAL_SECRET_KEY } });
+          await s3.send(new CreateBucketCommand({ Bucket: process.env.ZOEN_ERASURE_JOURNAL_BUCKET }));
+          s3.destroy();
+          JS
+          pnpm test:runtime
       - name: Build web app and agent
         run: pnpm build --force
       - name: Start the built web app and native Eve runtime

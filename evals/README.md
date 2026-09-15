@@ -57,8 +57,13 @@ credentials. Full native traces stay in `.eve/evals/`; only summary receipts and
 JUnit are uploaded by CI. Summaries omit model replies, inputs, provider error
 messages and credentials. All requested repetitions run, and any failed or
 skipped required case fails the command. See the
-[launch ledger](../docs/decisions/zoen-launch-validation.md) for coverage and
-current results.
+[launch ledger](../docs/decisions/zoen-launch-validation.md) for historical
+coverage and the
+[qualification ledger](../docs/decisions/adr-qualification-ledger.md) for
+what this stack can prove from catalogs, fixtures and CI versus live rows that
+remain blocked. `pnpm eval:list` is discovery, not a live pass. Launch receipts
+count unique scenarios separately from executions and do not treat synthetic
+traces as live deliveries.
 
 Run the browser benchmark separately because it uses Kernel, real websites,
 and a longer completion loop:

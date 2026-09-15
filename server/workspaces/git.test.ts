@@ -59,6 +59,42 @@ test("exports real Git history and restores prior file contents from a fresh bun
   ).toEqual(["knowledge/plan.md"]);
 });
 
+test("adds a published skill and removes its proposal in one revision", async () => {
+  const drafted = await Effect.runPromise(
+    publishWorkspaceGit({
+      bundle: null,
+      parent: null,
+      path: "proposals/skills/inbox.md",
+      content: "---\nrequires: []\n---\n# Inbox\n",
+      message: "Propose inbox",
+    })
+  );
+  const published = await Effect.runPromise(
+    publishWorkspaceGit({
+      bundle: drafted.bundle,
+      parent: drafted.revision,
+      path: "skills/inbox.md",
+      content: "---\nrequires: []\n---\n# Inbox\n",
+      message: "Publish inbox",
+      remove: "proposals/skills/inbox.md",
+    })
+  );
+  expect(
+    (
+      await Effect.runPromise(
+        readWorkspaceGit(published.bundle, published.revision)
+      )
+    ).files
+  ).toEqual(["skills/inbox.md"]);
+  expect(
+    (
+      await Effect.runPromise(
+        readWorkspaceGit(drafted.bundle, drafted.revision)
+      )
+    ).files
+  ).toEqual(["proposals/skills/inbox.md"]);
+});
+
 test.each([
   "../secret.md",
   "knowledge/../../secret.md",
@@ -66,6 +102,8 @@ test.each([
   "knowledge/a\nb.md",
   "knowledge/a..b.md",
   "skills/run.ts",
+  "proposals/secret.md",
+  "proposals/skills/run.ts",
 ])("rejects unsafe or executable workspace paths: %s", async (path) => {
   const result = await Effect.runPromise(
     publishWorkspaceGit({

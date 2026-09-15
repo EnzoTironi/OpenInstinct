@@ -36,5 +36,8 @@ send unsolicited messages to demonstrate a finding.
 
 These are required boundaries, not a claim of immunity from vulnerabilities.
 [Launch evidence](docs/decisions/zoen-launch-validation.md) records verification
-and its limits. [PRIVACY.md](PRIVACY.md) describes diagnostic collection and
-current deletion limits.
+and its limits. The
+[release map](docs/decisions/adr-customer-platform-release.md) keeps installed,
+fixture-tested and missing live proof separate. [PRIVACY.md](PRIVACY.md)
+describes diagnostic collection, the partial online wipe and durable erasure
+limits.

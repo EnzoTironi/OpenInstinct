@@ -27,6 +27,50 @@ const makeTestInvoker = (
 const executor = makeQuickJsExecutor({ timeoutMs: 5_000 });
 
 describe("quickjs executor", () => {
+  it("interrupts compute while an unawaited host call is in flight and cancels that call", async () => {
+    let ended = false;
+    const result = await Effect.runPromise(
+      makeQuickJsExecutor({ timeoutMs: 100, maxWallTimeMs: 500 }).execute(
+        "tools.slow({}); while (true) {}",
+        {
+          invoke: () =>
+            Effect.never.pipe(
+              Effect.ensuring(
+                Effect.sync(() => {
+                  ended = true;
+                })
+              )
+            ),
+        }
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.error).toContain("timed out");
+    expect(ended).toBe(true);
+  });
+
+  it("bounds time waiting for a host call which never resolves", async () => {
+    let ended = false;
+    const result = await Effect.runPromise(
+      makeQuickJsExecutor({ timeoutMs: 100, maxWallTimeMs: 150 }).execute(
+        "return await tools.slow({});",
+        {
+          invoke: () =>
+            Effect.never.pipe(
+              Effect.ensuring(
+                Effect.sync(() => {
+                  ended = true;
+                })
+              )
+            ),
+        }
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.error).toContain("timed out");
+    expect(ended).toBe(true);
+  });
+
   it.effect("runs plain code", () =>
     Effect.gen(function* () {
       const result = yield* executor.execute(

@@ -25,6 +25,7 @@ import {
 import { Label } from "@web/components/ui/label";
 import type { VaultItem } from "@shared/vault/schema";
 import { api } from "@web/trpc/client";
+import { VaultDelegation } from "./delegation";
 
 const VAULT_DIALOG_PAGE_SIZE = 50;
 
@@ -237,6 +238,7 @@ function VaultItemRow({ item }: { readonly item: VaultItem }) {
             {item.account}
           </p>
         ) : null}
+        {item.hasSecret ? <VaultDelegation itemId={item.id} /> : null}
       </div>
       <Button
         aria-label={t("Remover {name}", { name: item.label })}

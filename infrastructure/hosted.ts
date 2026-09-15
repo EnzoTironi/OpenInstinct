@@ -15,6 +15,7 @@ import { MigrateApplication } from "./migrations.ts";
 import { provisionMatrix, deployMatrix } from "./matrix.ts";
 import { ReconcileChannelWebhooks } from "./webhooks.ts";
 import { RetireLegacyWeb } from "./web-cutover.ts";
+import { provisionErasureJournal } from "./erasure-journal.ts";
 
 export const hosted = Effect.gen(function* () {
   const policy = yield* CompanionStagePolicy;
@@ -227,6 +228,7 @@ export const hosted = Effect.gen(function* () {
   }).pipe(retain(true));
 
   const webSecrets = yield* appSecrets("Web", webApp, webSecretNames);
+  const erasureJournal = yield* provisionErasureJournal(webApp, policy.stage);
   const databaseUrls = yield* Effect.forEach(
     ["DATABASE_URL", "DATABASE_URL_UNPOOLED"],
     (name) =>
@@ -324,6 +326,7 @@ export const hosted = Effect.gen(function* () {
       "zoen.secrets": webSecrets,
       "zoen.migrated-image": migrations.image,
       "zoen.matrix": matrixSecrets.webVersion,
+      "zoen.erasure-journal": erasureJournal,
       "zoen.runtime-database": Output.all(
         ...databaseUrls.map((secret) => secret.digest)
       ).pipe(Output.map((digests) => JSON.stringify(digests))),

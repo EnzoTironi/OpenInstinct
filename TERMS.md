@@ -38,10 +38,13 @@ suspended to address abuse, security incidents or provider limits.
 
 ## Leaving the beta
 
-Disconnect integrations you no longer want. Current account memory export/wipe
-controls are partial, not full account deletion. Contact the administrator who
-invited you for a broader data request. Backups and third-party copies may have
-separate lifecycles; see the privacy notice.
+Disconnect integrations you no longer want. The Account UI memory export/wipe
+is `partial_online_wipe`, not full account deletion. Durable Zoen-controlled
+erasure (`POST /api/account/erasure`) still leaves live Mem0, Matrix,
+Vaultwarden, mautrix and backups as pending external work, and does not delete
+company workspaces. Contact the administrator who invited you for that request.
+Backups and third-party copies may have separate lifecycles; see the privacy
+notice.
 
 Keep copies of important documents. The beta is provided as available, subject to
 rights that applicable law does not allow these terms to exclude. The code license

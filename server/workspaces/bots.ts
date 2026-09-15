@@ -86,15 +86,31 @@ export const saveWorkspaceBot = Effect.fn("saveWorkspaceBot")(function* (
 });
 
 export const searchWorkspaceBots = Effect.fn("searchWorkspaceBots")(function* (
+  actor: typeof WorkspaceActorSchema.Type,
   query: string
 ) {
+  const access = yield* requireWorkspaceAccess(actor);
   const prefix = yield* Schema.decodeUnknownEffect(
     Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9_]{1,29}$/))
   )(query.toLowerCase());
   const sql = yield* PgClient.PgClient;
-  const rows =
-    yield* sql`SELECT username, name, description, discoverable FROM workspace_bots
-    WHERE discoverable AND starts_with(username, ${prefix}) ORDER BY username LIMIT 20`;
+  const rows = access.organizationId
+    ? yield* sql`SELECT b.username, b.name, b.description, b.discoverable FROM workspace_bots b
+      JOIN workspaces w ON w.id = b.workspace_id
+      JOIN organization_memberships org ON org.organization_id = w.organization_id AND org.user_id = ${actor.userId}
+      WHERE w.organization_id = ${access.organizationId} AND b.discoverable
+        AND starts_with(b.username, ${prefix}) ORDER BY b.username LIMIT 20`
+    : yield* sql`SELECT b.username, b.name, b.description, b.discoverable FROM workspace_bots b
+      JOIN workspaces w ON w.id = b.workspace_id AND w.organization_id IS NULL
+      JOIN workspace_memberships owner ON owner.workspace_id = b.workspace_id AND owner.role = 'owner'
+      JOIN personal_trust_edges e ON e.user_id = ${actor.userId} AND e.peer_user_id = owner.user_id
+      WHERE b.discoverable AND starts_with(b.username, ${prefix})
+        AND NOT EXISTS (
+          SELECT 1 FROM personal_trust_blocks blk
+          WHERE (blk.user_id = ${actor.userId} AND blk.blocked_user_id = owner.user_id)
+             OR (blk.user_id = owner.user_id AND blk.blocked_user_id = ${actor.userId})
+        )
+      ORDER BY b.username LIMIT 20`;
   return yield* Schema.decodeUnknownEffect(Schema.Array(BotProfileSchema))(
     rows
   );

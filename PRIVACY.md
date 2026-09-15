@@ -46,12 +46,20 @@ You can disconnect supported integrations and manage workspace access.
 Disconnection prevents future authorized use; it does not retroactively remove
 data already stored by Zoen or a provider.
 
-Current account export covers personal memory only. The online wipe removes
-personal memory/profile notes and invalidates browser sessions. It does **not**
-erase conversation history, artifacts, connected accounts, schedules, channel
-identities, all Git history, backups or account/workspace rows. Contact the
-administrator for a broader request. These limits are also shown in the account
-interface and must not be represented as full account deletion.
+Current account export covers personal memory only. The Account UI online wipe
+(`POST /api/account/delete`) removes personal memory/profile notes and
+invalidates browser sessions. It does **not** erase conversation history,
+artifacts, connected accounts, schedules, channel identities, all Git history,
+backups or account/workspace rows. That path is `partial_online_wipe`.
+
+`POST /api/account/erasure` is a separate durable process for Zoen-controlled
+personal data: it suspends the account, revokes sessions and connections, erases
+the personal workspace and writes a tombstone so a restore cannot revive that
+user. Company workspaces stay. Live copies at Mem0, Matrix, Vaultwarden, the
+user WhatsApp bridge and backups remain `pending_external` until those providers
+are purged. Contact the administrator for that request. These limits are also
+shown in the account interface and must not be represented as complete erasure of
+every third-party copy.
 
 Never include credentials or private conversations in public issues. Report
 security concerns through [private vulnerability reporting](SECURITY.md).

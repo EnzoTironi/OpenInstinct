@@ -2,7 +2,9 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -76,6 +78,10 @@ export const workspaceAgentGrants = pgTable(
     capabilities: jsonb("capabilities").$type<readonly string[]>().notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    requesterUserId: text("requester_user_id"),
+    networkKind: text("network_kind"),
+    networkId: text("network_id"),
+    originBotId: uuid("origin_bot_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -83,6 +89,18 @@ export const workspaceAgentGrants = pgTable(
   (table) => [
     uniqueIndex("workspace_agent_grants_token_uidx").on(table.tokenHash),
     index("workspace_agent_grants_bot_idx").on(table.botId),
+    index("workspace_agent_grants_requester_idx").on(table.requesterUserId),
+    foreignKey({
+      columns: [table.originBotId],
+      foreignColumns: [workspaceBots.id],
+    }).onDelete("set null"),
+    check(
+      "workspace_agent_grants_network_check",
+      sql`(${table.requesterUserId} IS NULL) = (${table.networkKind} IS NULL)
+        AND (${table.requesterUserId} IS NULL) = (${table.networkId} IS NULL)
+        AND (${table.networkKind} IS NULL OR ${table.networkKind} IN ('company', 'personal'))
+        AND (${table.originBotId} IS NULL OR ${table.requesterUserId} IS NOT NULL)`
+    ),
   ]
 );
 
@@ -131,6 +149,9 @@ export const agentProtocolTasks = pgTable(
     sessionId: text("session_id"),
     state: text("state").notNull().default("TASK_STATE_SUBMITTED"),
     output: text("output"),
+    correlationId: uuid("correlation_id").defaultRandom().notNull(),
+    round: integer("round").notNull().default(1),
+    originTaskId: uuid("origin_task_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -144,9 +165,18 @@ export const agentProtocolTasks = pgTable(
       table.messageId
     ),
     index("agent_protocol_tasks_session_idx").on(table.sessionId),
+    index("agent_protocol_tasks_correlation_idx").on(table.correlationId),
+    foreignKey({
+      columns: [table.originTaskId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
     check(
       "agent_protocol_tasks_state_check",
       sql`${table.state} IN ('TASK_STATE_SUBMITTED', 'TASK_STATE_WORKING', 'TASK_STATE_COMPLETED', 'TASK_STATE_FAILED', 'TASK_STATE_CANCELED', 'TASK_STATE_INPUT_REQUIRED')`
+    ),
+    check(
+      "agent_protocol_tasks_round_check",
+      sql`${table.round} BETWEEN 1 AND 8`
     ),
   ]
 );

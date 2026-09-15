@@ -92,6 +92,7 @@ supplies a user ID. Missing, expired or revoked credentials fail closed as
 | `/api/account/export`                       | GET    | Partial privacy export (stored personal memory envelope)          |
 | `/api/account/personal-memory/export`       | GET    | Existing personal-memory JSON download                            |
 | `/api/account/delete`                       | POST   | Online personal-memory wipe + browser session invalidation        |
+| `/api/account/erasure`                      | POST   | Durable full deletion of Zoen-controlled personal data            |
 | Account UI → Privacy export and online wipe | —      | Same `partial_online_wipe` honesty + CTA to `/api/account/delete` |
 
 ### Limits (documented, not claimed complete)
@@ -103,12 +104,20 @@ supplies a user ID. Missing, expired or revoked credentials fail closed as
   `session` rows for the user. It does **not** erase channel identities,
   schedules, artifacts, conversation history, the user/workspace rows, or
   backups. Do not claim full account deletion or backup erasure.
-- Restore reconciliation and a deletion ledger remain separate P06 gates.
+- **Full deletion** is `POST /api/account/erasure` / `requestAccountDeletion`.
+  It erases the personal workspace, sessions, jobs, grants, connections and
+  channel identities, keeps company workspaces, and writes a tombstone that
+  a restore must reapply. Live Mem0, Matrix, Vaultwarden, mautrix and
+  backups stay `pending_external`. The last company admin must transfer or
+  close company workspaces first. See
+  `docs/decisions/adr-account-deletion.md`.
 
-Org-scoped wipe/delete is **out of scope** for these personal routes. See
-`docs/decisions/adr-c02-sso-audit-erasure.md` and
+Org-scoped cascade of a company while members remain is **out of scope**.
+See `docs/decisions/adr-c02-sso-audit-erasure.md` and
 `shared/identity/org-erasure.ts` for fail-closed company erasure gates and
 append-only audit receipts.
+
+Full deletion proofs: `tests/runtime/account-deletion.integration.ts`.
 
 Delete hooks `PersonalMemory.wipe` when that service is present in the runtime
 (registered from `server/runtime.ts`). Fixture proof:

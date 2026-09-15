@@ -24,6 +24,8 @@ cutover deferred.
 
 Related:
 
+- [Customer-platform release map](../decisions/adr-customer-platform-release.md)
+  (REL01 gates, REL02 Alchemy publication blocked on later SHAs)
 - [Hosted Fly cutover (H01)](hosted-fly.md)
 - [Prod uptime + backup](prod-uptime-checklist.md) (external probe + push alert)
 - [Self-host / ops](../self-host.md)

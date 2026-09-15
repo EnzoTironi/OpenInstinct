@@ -1036,5 +1036,10 @@
   "Você pode criar ou entrar em outras equipes pelo seu perfil.": "Puedes crear o unirte a otros equipos desde tu perfil.",
   "Peça um novo link neste navegador e confirme no seu mensageiro.": "Pide un enlace nuevo en este navegador y confirma en tu app de mensajes.",
   "Finish Zoen sign-in on this browser.": "Completa el inicio de sesión de Zoen en este navegador.",
-  "Usar a versão web": "Usar la versión web"
+  "Usar a versão web": "Usar la versión web",
+  "Permitir ao Zoen por 7 dias": "Permitir a Zoen por 7 días",
+  "Revogar acesso do Zoen": "Revocar acceso de Zoen",
+  "Até {date}": "Hasta {date}",
+  "Não foi possível atualizar o acesso. Tente novamente.": "No se pudo actualizar el acceso. Inténtalo de nuevo.",
+  "Você escolhe quais itens o Zoen pode usar e por quanto tempo.": "Tú eliges qué elementos puede usar Zoen y por cuánto tiempo."
 }
