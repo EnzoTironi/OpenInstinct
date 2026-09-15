@@ -119,6 +119,15 @@ CompanionLocal stack and volumes. They do not use the hosted production database
 
 ## Backups and recovery
 
+Account erasure uses a separate private Tigris bucket, retained by Alchemy.
+The application writes deletion intent there before removing active data.
+`pnpm start` replays the journal before starting either Next or Eve; failure
+keeps the restored service closed. Never restore or delete this bucket as part
+of a PostgreSQL rollback. Its credentials are separate from pgBackRest's.
+For other installations, configure the `ZOEN_ERASURE_JOURNAL_*` variables in
+`.env.example`; without them, full-account erasure is unavailable. CI proves
+this path with real S3 and a full PostgreSQL backup taken before deletion.
+
 pgBackRest archives WAL continuously (`archive_timeout=60s`). The target recovery
 point is about one minute plus upload delay while the archive is healthy; this
 is a target, not a guarantee during a storage/network outage. Backups run in UTC:

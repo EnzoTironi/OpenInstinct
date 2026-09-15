@@ -61,7 +61,11 @@ export const publishSkillProposal = Effect.fn("WorkspaceSkills.publish")(
     const path = skillPathFromProposal(input.proposal);
     if (!Schema.is(PublishedSkillPath)(path)) return yield* invalid();
     const repository = yield* WorkspaceRepository;
-    const proposal = yield* repository.read(actor, input.proposal);
+    const proposal = yield* repository.read(
+      actor,
+      input.proposal,
+      input.expectedRevision ?? undefined
+    );
     if (proposal.content === null || !parseSkillDocument(proposal.content))
       return yield* invalid();
     return yield* repository.write(

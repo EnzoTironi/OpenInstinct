@@ -1036,5 +1036,10 @@
   "Você pode criar ou entrar em outras equipes pelo seu perfil.": "You can create or join other teams from your profile.",
   "Peça um novo link neste navegador e confirme no seu mensageiro.": "Request a new link in this browser, then confirm in your messenger.",
   "Finish Zoen sign-in on this browser.": "Finish Zoen sign-in on this browser.",
-  "Usar a versão web": "Use the web version"
+  "Usar a versão web": "Use the web version",
+  "Permitir ao Zoen por 7 dias": "Allow Zoen for 7 days",
+  "Revogar acesso do Zoen": "Revoke Zoen access",
+  "Até {date}": "Until {date}",
+  "Não foi possível atualizar o acesso. Tente novamente.": "Could not update access. Try again.",
+  "Você escolhe quais itens o Zoen pode usar e por quanto tempo.": "You choose which items Zoen can use and for how long."
 }

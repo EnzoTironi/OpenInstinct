@@ -152,3 +152,24 @@ Kernel, anti-slop, Mona Sans or other required notices.
 - Calling the Account UI wipe complete erasure.
 - Using `eve deploy` instead of Alchemy.
 - A merge screen as ordinary onboarding.
+
+## Correções da revisão de integração
+
+As primeiras entregas foram reavaliadas no conjunto. A publicação de skills agora
+reproduz o recibo original após perda da resposta; a participação na empresa
+permite contatar bots publicados sem conceder arquivos do projeto; a exclusão
+serializa mudanças de administradores por empresa; e o cofre oferece autorização
+explícita por item, prazo e revogação na interface existente.
+
+O registro de apagamentos usa um bucket privado distinto do backup PostgreSQL,
+provisionado por Alchemy. A intenção é gravada antes da exclusão. Na inicialização,
+o processo reaplica esse registro antes de iniciar web e workers. Falha na
+reconciliação impede a abertura do serviço. Sem configurar o bucket, novos pedidos
+de exclusão completa são recusados. O teste de restauração usa um backup completo
+anterior à exclusão, PostgreSQL e S3 reais; a restauração do banco não restaura o
+bucket. O journal guarda somente o identificador opaco da conta; não guarda conteúdo.
+
+O sandbox também interrompe CPU mesmo com chamadas pendentes, cancela chamadas
+que excedam o prazo e limita execuções simultâneas. Essas correções não substituem
+as provas restantes de Vaultwarden, ponte WhatsApp, dois agentes e cadastro geral
+de ferramentas descritas no plano.

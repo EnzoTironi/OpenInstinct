@@ -74,6 +74,33 @@ export const listDelegatedVaultItems = Effect.fn("listDelegatedVaultItems")(
   }
 );
 
+export const inspectVaultDelegations = Effect.fn("inspectVaultDelegations")(
+  function* (actor: typeof WorkspaceActorSchema.Type) {
+    const access = yield* requireWorkspaceAccess(actor);
+    const sql = yield* PgClient.PgClient;
+    const rows =
+      yield* sql`SELECT d.id, d.item_id AS "itemId", d.expires_at::text AS "expiresAt"
+      FROM vault_item_delegations d JOIN vault_agent_identities a ON a.id = d.identity_id
+      WHERE d.workspace_id = ${actor.workspaceId} AND a.workspace_id = d.workspace_id
+        AND d.revoked_at IS NULL AND a.revoked_at IS NULL AND d.expires_at > now()`;
+    return {
+      mayManage:
+        access.role !== "member" &&
+        !!actor.authSessionId &&
+        !actor.groupBindingId,
+      items: yield* Schema.decodeUnknownEffect(
+        Schema.Array(
+          Schema.Struct({
+            id: Schema.String,
+            itemId: Schema.String,
+            expiresAt: Schema.String,
+          })
+        )
+      )(rows),
+    };
+  }
+);
+
 export const delegateVaultItem = Effect.fn("delegateVaultItem")(function* (
   actor: typeof WorkspaceActorSchema.Type,
   raw: typeof DelegateVaultItemSchema.Type
@@ -82,7 +109,15 @@ export const delegateVaultItem = Effect.fn("delegateVaultItem")(function* (
   const sql = yield* PgClient.PgClient;
   return yield* sql.withTransaction(
     Effect.gen(function* () {
+      yield* sql`SELECT pg_advisory_xact_lock(hashtextextended(${`vault-delegation:${actor.workspaceId}`}, 0))`;
       yield* requireWorkspaceAccess(actor, true);
+      const previous = yield* sql<{
+        id: string;
+      }>`SELECT d.id FROM vault_item_delegations d
+        JOIN vault_agent_identities a ON a.id = d.identity_id
+        WHERE d.workspace_id = ${actor.workspaceId} AND d.item_id = ${input.itemId}
+          AND a.revoked_at IS NULL AND d.revoked_at IS NULL AND d.expires_at > now()`;
+      if (previous[0]) return { id: previous[0].id };
       const scope = {
         userId: actor.userId,
         workspaceId: actor.workspaceId,
@@ -128,7 +163,7 @@ export const revokeVaultDelegation = Effect.fn("revokeVaultDelegation")(
         yield* requireWorkspaceAccess(actor, true);
         const rows =
           yield* sql`UPDATE vault_item_delegations SET revoked_at = clock_timestamp(), wrapped_secret = 'revoked'
-          WHERE id = ${grantId} AND workspace_id = ${actor.workspaceId} AND revoked_at IS NULL RETURNING id`;
+          WHERE id = ${grantId} AND workspace_id = ${actor.workspaceId} RETURNING id`;
         if (!rows.length) return yield* new WorkspaceAccessDenied();
         return { revoked: true };
       })

@@ -23,6 +23,7 @@ import {
 import {
   DelegateVaultItemSchema,
   delegateVaultItem,
+  inspectVaultDelegations,
   listDelegatedVaultItems,
   revokeVaultDelegation,
 } from "../../server/workspaces/vault";
@@ -220,6 +221,9 @@ export const workspaceAgentsRouter = {
     ),
   },
   vault: {
+    delegations: workspaceProcedure.query(({ ctx, signal }) =>
+      serverRuntime.runPromise(inspectVaultDelegations(ctx.actor), { signal })
+    ),
     list: workspaceProcedure.query(({ ctx, signal }) =>
       serverRuntime.runPromise(
         listDelegatedVaultItems({

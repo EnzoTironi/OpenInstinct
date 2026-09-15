@@ -97,7 +97,6 @@ export const searchWorkspaceBots = Effect.fn("searchWorkspaceBots")(function* (
   const rows = access.organizationId
     ? yield* sql`SELECT b.username, b.name, b.description, b.discoverable FROM workspace_bots b
       JOIN workspaces w ON w.id = b.workspace_id
-      JOIN workspace_memberships viewer ON viewer.workspace_id = b.workspace_id AND viewer.user_id = ${actor.userId}
       JOIN organization_memberships org ON org.organization_id = w.organization_id AND org.user_id = ${actor.userId}
       WHERE w.organization_id = ${access.organizationId} AND b.discoverable
         AND starts_with(b.username, ${prefix}) ORDER BY b.username LIMIT 20`

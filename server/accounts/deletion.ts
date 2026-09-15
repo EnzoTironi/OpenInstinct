@@ -3,6 +3,7 @@ import { PgClient } from "@effect/sql-pg";
 import { DateTime, Effect, Schema } from "effect";
 import { readAuthSession } from "@db/services/auth/session";
 import { accessScopeForUser } from "@shared/identity/access-scope";
+import { ErasureJournal } from "./erasure-journal";
 import {
   requireWorkspaceAccess,
   type WorkspaceActorSchema,
@@ -51,26 +52,33 @@ const resultSchema = Schema.Struct({
 /**
  * Durable personal-account deletion. Zoen-controlled rows are erased or kept
  * as company property. Live Mem0, Matrix, Vaultwarden and mautrix stay
- * pending. Tombstones sit outside restored user rows so a backup replay
- * cannot resurrect the account.
+ * pending. The external erasure journal survives database restoration.
  */
 export const requestAccountDeletion = Effect.fn("requestAccountDeletion")(
   function* (actor: typeof WorkspaceActorSchema.Type) {
-    yield* requireLiveSession(actor);
-    if (yield* isSoleOrganizationOwner(actor.userId)) {
-      yield* persistBlockedRequest(actor.userId);
-      return yield* new AccountDeletionError({ reason: "blocked_sole_owner" });
-    }
     const personal = accessScopeForUser(actor.userId);
     const sql = yield* PgClient.PgClient;
-    return yield* sql.withTransaction(
+    const result = yield* sql.withTransaction(
       Effect.gen(function* () {
+        yield* lockAccountOrganizations(actor.userId);
+        yield* requireLiveSession(actor);
+        if (yield* isSoleOrganizationOwner(actor.userId)) return null;
+        yield* (yield* ErasureJournal)
+          .append(actor.userId)
+          .pipe(
+            Effect.mapError(
+              () => new AccountDeletionError({ reason: "unavailable" })
+            )
+          );
         yield* eraseZoenControlledData(actor.userId, personal.workspaceId);
         return yield* persistCompletedRequest(actor.userId, [
           ...externalPending,
         ]);
       })
     );
+    if (result) return result;
+    yield* persistBlockedRequest(actor.userId);
+    return yield* new AccountDeletionError({ reason: "blocked_sole_owner" });
   },
   Effect.catchTag(
     "SqlError",
@@ -106,9 +114,11 @@ export const transferOrganizationAdmin = Effect.fn("transferOrganizationAdmin")(
     const sql = yield* PgClient.PgClient;
     return yield* sql.withTransaction(
       Effect.gen(function* () {
+        yield* lockAccountOrganizations(actor.userId);
         const access = yield* requireWorkspaceAccess(actor, true);
         if (access.organizationId !== input.organizationId)
           return yield* new AccountDeletionError({ reason: "unavailable" });
+        yield* requireOrganizationAdmin(actor.userId, input.organizationId);
         const target =
           yield* sql`UPDATE organization_memberships SET role = 'admin'
           WHERE organization_id = ${input.organizationId} AND user_id = ${input.targetUserId}
@@ -145,9 +155,11 @@ export const closeOrganizationForDeletion = Effect.fn(
     const sql = yield* PgClient.PgClient;
     return yield* sql.withTransaction(
       Effect.gen(function* () {
+        yield* lockAccountOrganizations(actor.userId);
         const access = yield* requireWorkspaceAccess(actor, true);
         if (access.organizationId !== input.organizationId)
           return yield* new AccountDeletionError({ reason: "unavailable" });
+        yield* requireOrganizationAdmin(actor.userId, input.organizationId);
         const others = yield* sql`SELECT user_id FROM organization_memberships
           WHERE organization_id = ${input.organizationId} AND user_id <> ${actor.userId}`;
         if (others.length)
@@ -168,19 +180,23 @@ export const applyAccountDeletionTombstones = Effect.fn(
 )(
   function* () {
     const sql = yield* PgClient.PgClient;
-    const tombs = yield* sql<{
-      user_id: string;
-    }>`SELECT user_id FROM account_deletion_tombstones`;
+    const tombs = yield* (yield* ErasureJournal)
+      .read()
+      .pipe(
+        Effect.mapError(
+          () => new AccountDeletionError({ reason: "unavailable" })
+        )
+      );
     for (const tomb of tombs) {
-      const personal = accessScopeForUser(tomb.user_id);
-      const raw = rawUserId(tomb.user_id);
+      const personal = accessScopeForUser(tomb.userId);
+      const raw = rawUserId(tomb.userId);
       const present = yield* sql`SELECT 1 FROM public."user" WHERE id = ${raw}
         UNION ALL SELECT 1 FROM workspaces WHERE id = ${personal.workspaceId}`;
       if (!present.length) continue;
       yield* sql.withTransaction(
         Effect.gen(function* () {
-          yield* eraseZoenControlledData(tomb.user_id, personal.workspaceId);
-          yield* persistCompletedRequest(tomb.user_id, [...externalPending]);
+          yield* eraseZoenControlledData(tomb.userId, personal.workspaceId);
+          yield* persistCompletedRequest(tomb.userId, [...externalPending]);
         })
       );
     }
@@ -227,6 +243,26 @@ const isSoleOrganizationOwner = Effect.fn("isSoleOrganizationOwner")(function* (
   }
   return false;
 });
+
+const lockAccountOrganizations = Effect.fn("lockAccountOrganizations")(
+  function* (userId: string) {
+    const sql = yield* PgClient.PgClient;
+    yield* sql`SELECT id FROM organizations
+      WHERE id IN (SELECT organization_id FROM organization_memberships WHERE user_id = ${userId})
+      ORDER BY id FOR UPDATE`;
+  }
+);
+
+const requireOrganizationAdmin = Effect.fn("requireDeletionOrganizationAdmin")(
+  function* (userId: string, organizationId: string) {
+    const sql = yield* PgClient.PgClient;
+    const rows = yield* sql`SELECT 1 FROM organization_memberships
+      WHERE organization_id = ${organizationId} AND user_id = ${userId} AND role = 'admin'`;
+    if (!rows.length)
+      return yield* new AccountDeletionError({ reason: "unavailable" });
+    return undefined;
+  }
+);
 
 const eraseZoenControlledData = Effect.fn("eraseZoenControlledData")(function* (
   userId: string,

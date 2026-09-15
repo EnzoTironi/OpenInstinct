@@ -435,3 +435,55 @@ test("bot-to-bot chains stop at eight rounds and a pending company invite cannot
       expect(Result.isFailure(ninth) && ninth.failure).toBeInstanceOf(A2AError);
     }).pipe(Effect.scoped, Effect.provide(services))
   ));
+
+test("review #116: organization membership allows contact without granting project files", () =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const { actor, guest, sql, repository } = yield* workspaceFixture();
+      const secondWorkspaceId = `review-project-${randomUUID()}`;
+      const org = yield* sql<{
+        organization_id: string;
+      }>`SELECT organization_id FROM workspaces WHERE id = ${actor.workspaceId}`;
+      const organizationId = org[0]?.organization_id;
+      if (!organizationId) throw new Error("Company fixture missing");
+      yield* Effect.addFinalizer(() =>
+        sql`DELETE FROM workspaces WHERE id = ${secondWorkspaceId}`.pipe(
+          Effect.orDie
+        )
+      );
+      yield* sql`INSERT INTO workspaces(id, organization_id) VALUES (${secondWorkspaceId}, ${organizationId})`;
+      yield* sql`INSERT INTO workspace_memberships(workspace_id, user_id, role) VALUES (${secondWorkspaceId}, ${actor.userId}, 'admin')`;
+      const destination = { ...actor, workspaceId: secondWorkspaceId };
+      const bot = yield* saveWorkspaceBot(destination, {
+        username: `review${randomUUID().replaceAll("-", "").slice(0, 14)}`,
+        name: "Published company bot",
+        description: "Synthetic review",
+        discoverable: true,
+      });
+      yield* repository.write(destination, {
+        operationId: randomUUID(),
+        expectedRevision: null,
+        path: "knowledge/private.md",
+        content: "project-private-canary",
+      });
+      const listed = yield* searchWorkspaceBots(guest, bot.username);
+      const contact = yield* contactNetworkBot(guest, {
+        destUsername: bot.username,
+        message: {
+          messageId: randomUUID(),
+          role: "ROLE_USER",
+          parts: [{ text: "Hello colleague" }],
+        },
+      }).pipe(Effect.result);
+      expect({
+        discoverable: listed.length,
+        contactAllowed: Result.isSuccess(contact),
+      }).toEqual({ discoverable: 1, contactAllowed: true });
+      if (Result.isSuccess(contact)) {
+        const file = yield* repository
+          .read(contact.success.destActor, "knowledge/private.md")
+          .pipe(Effect.result);
+        expect(Result.isFailure(file)).toBe(true);
+      }
+    }).pipe(Effect.scoped, Effect.provide(services))
+  ));

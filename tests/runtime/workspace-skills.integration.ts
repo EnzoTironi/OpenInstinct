@@ -459,3 +459,30 @@ test("TL11 and TL13: a malicious skill cannot escalate, and missing tools block 
       Effect.provide(NodeServices.layer)
     )
   ));
+
+test("review #115: retrying a successful publication returns the original receipt", () =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const { personal, repository } = yield* workspaceFixture();
+      const drafted = yield* repository.write(personal, {
+        operationId: randomUUID(),
+        expectedRevision: null,
+        path: "proposals/skills/retry.md",
+        content: "# Retry publication\nA synthetic procedure.",
+      });
+      const input = {
+        operationId: randomUUID(),
+        expectedRevision: drafted.revision,
+        proposal: "proposals/skills/retry.md",
+      };
+      const published = yield* publishSkillProposal(personal, input);
+      const replay = yield* publishSkillProposal(personal, input).pipe(
+        Effect.result
+      );
+      expect(
+        Result.isSuccess(replay),
+        "A lost successful response must be replayable with the same operationId"
+      ).toBe(true);
+      if (Result.isSuccess(replay)) expect(replay.success).toEqual(published);
+    }).pipe(Effect.scoped, Effect.provide(services))
+  ));

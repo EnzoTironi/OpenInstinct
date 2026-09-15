@@ -8,6 +8,7 @@ import { WorkspaceAccessDenied } from "../../server/workspaces/access";
 import { removeWorkspaceMember } from "../../server/workspaces/team";
 import {
   delegateVaultItem,
+  inspectVaultDelegations,
   listDelegatedVaultItems,
   releaseDelegatedSecret,
   requireVaultwarden,
@@ -85,6 +86,15 @@ test("the agent unwraps only the delegated item and does not read the user ciphe
         itemId: delegated.id,
         days: 7,
       });
+      expect(
+        yield* delegateVaultItem(actor, { itemId: delegated.id, days: 7 })
+      ).toEqual(grant);
+      const controls = yield* inspectVaultDelegations(actor);
+      expect(controls.mayManage).toBe(true);
+      expect(controls.items).toEqual([
+        expect.objectContaining({ id: grant.id, itemId: delegated.id }),
+      ]);
+      expect((yield* inspectVaultDelegations(guest)).mayManage).toBe(false);
       const listed = yield* listDelegatedVaultItems(scope);
       expect(listed.map((item) => item.handle)).toEqual([delegated.id]);
       expect(JSON.stringify(listed)).not.toContain(delegatedPassword);
@@ -105,6 +115,7 @@ test("the agent unwraps only the delegated item and does not read the user ciphe
         delegated.id
       );
       expect(Redacted.value(guestFill)).toContain(delegatedPassword);
+      yield* revokeVaultDelegation(actor, grant.id);
       yield* revokeVaultDelegation(actor, grant.id);
       denied(
         yield* releaseDelegatedSecret(scope, delegated.id).pipe(Effect.result)

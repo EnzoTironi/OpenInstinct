@@ -62,12 +62,13 @@ export const invokeExecutorCall = Effect.fn("Executor.invokeCall")(function* (
     surface
   );
   const output: unknown = yield* Effect.tryPromise({
-    try: async () => {
+    try: async (signal) => {
       // SAFETY: resolveExecutorCall decoded input through this exact tool's owning schema.
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The catalog is heterogeneous; its callable parameter is intentionally never before decoding.
       const result: unknown = await tool.execute(input as never, {
         ...context,
         toolName: call.path,
+        abortSignal: AbortSignal.any([signal, context.abortSignal]),
       });
       return result;
     },

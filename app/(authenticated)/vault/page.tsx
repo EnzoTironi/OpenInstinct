@@ -22,9 +22,7 @@ export default async function Page() {
       <header className="space-y-3">
         <h1 className="type-page-title">{t("Seu cofre.")}</h1>
         <p className="type-supporting-body text-muted-foreground">
-          {t(
-            "As informações que o Zoen usa quando você precisa preencher algo."
-          )}
+          {t("Você escolhe quais itens o Zoen pode usar e por quanto tempo.")}
         </p>
       </header>
       <VaultLogins items={itemsByKind.login ?? []} />

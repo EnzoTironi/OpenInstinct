@@ -106,6 +106,24 @@ export const env = createEnv({
     BLOB_READ_WRITE_TOKEN: requiredValue.optional(),
     BLOB_STORE_ID: requiredValue.optional(),
     ZOEN_MEM0_URL: z.url().optional(),
+    ZOEN_ERASURE_JOURNAL_BUCKET: requiredValue.optional(),
+    ZOEN_ERASURE_JOURNAL_ENDPOINT: z
+      .url()
+      .default("https://fly.storage.tigris.dev"),
+    ZOEN_ERASURE_JOURNAL_ACCESS_KEY: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.NonEmptyString, {
+          disallowEncode: true,
+        })
+      )
+    ),
+    ZOEN_ERASURE_JOURNAL_SECRET_KEY: Schema.toStandardSchemaV1(
+      Schema.optional(
+        Schema.RedactedFromValue(Schema.NonEmptyString, {
+          disallowEncode: true,
+        })
+      )
+    ),
     ZOEN_MATRIX_URL: z.url().optional(),
     ZOEN_MATRIX_SERVER_NAME: z
       .string()

@@ -274,8 +274,8 @@ const resolvePublishedBot = Effect.fn("resolvePublishedNetworkBot")(function* (
   if (access.organizationId) {
     if (bot.organization_id !== access.organizationId)
       return yield* new WorkspaceAccessDenied();
-    const member = yield* sql`SELECT 1 FROM workspace_memberships
-        WHERE workspace_id = ${bot.workspace_id} AND user_id = ${actor.userId}`;
+    const member = yield* sql`SELECT 1 FROM organization_memberships
+        WHERE organization_id = ${access.organizationId} AND user_id = ${actor.userId}`;
     if (!member.length) return yield* new WorkspaceAccessDenied();
     return {
       ...bot,

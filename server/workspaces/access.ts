@@ -48,9 +48,8 @@ const requireConversationNetwork = Effect.fn("requireConversationNetwork")(
     switch (kind) {
       case "company": {
         const rows = yield* sql`SELECT w.id FROM workspaces w
-        JOIN workspace_memberships m ON m.workspace_id = w.id AND m.user_id = ${input.requesterUserId}
         JOIN organization_memberships o ON o.organization_id = w.organization_id AND o.user_id = ${input.requesterUserId}
-        WHERE w.id = ${input.destWorkspaceId} AND w.organization_id = ${input.networkId} FOR SHARE OF w, m, o`;
+        WHERE w.id = ${input.destWorkspaceId} AND w.organization_id = ${input.networkId} FOR SHARE OF w, o`;
         if (rows.length !== 1) return yield* new WorkspaceAccessDenied();
         return true;
       }
@@ -135,6 +134,7 @@ export const requireWorkspaceAccess = Effect.fn("requireWorkspaceAccess")(
       JOIN workspace_bots b ON b.id = g.bot_id
       WHERE g.id = ${actor.agentGrantId} AND g.issued_by = ${actor.userId}
         AND b.workspace_id = ${actor.workspaceId} AND g.revoked_at IS NULL
+        AND (g.requester_user_id IS NULL OR b.discoverable)
         AND g.expires_at > clock_timestamp() FOR SHARE OF g, b`;
       const grant = grants[0];
       if (!grant || membership.role === "member")

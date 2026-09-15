@@ -15,9 +15,11 @@ import {
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import { runtimeDatabase } from "./database";
 import { workspaceFixture } from "./workspace-fixture";
+import { erasureJournalFixture } from "./erasure-journal-fixture";
 
 const services = WorkspaceRepository.layer.pipe(
-  Layer.provideMerge(runtimeDatabase)
+  Layer.provideMerge(runtimeDatabase),
+  Layer.provideMerge(erasureJournalFixture)
 );
 const denied = <A, E>(result: Result.Result<A, E>) => {
   expect(Result.isFailure(result)).toBe(true);
@@ -206,5 +208,32 @@ test("closing the last company workspace unblocks the remaining owner", () =>
         yield* sql`SELECT 1 FROM public."user" WHERE id = ${actor.userId.slice("better-auth:".length)}`
       ).toHaveLength(0);
       return true;
+    }).pipe(Effect.scoped, Effect.provide(services))
+  ));
+
+test("review #119: concurrent deletion cannot leave a company without any administrator", () =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const { actor, guest, sql } = yield* workspaceFixture();
+      const org = yield* sql<{
+        organization_id: string;
+      }>`SELECT organization_id FROM workspaces WHERE id = ${actor.workspaceId}`;
+      const organizationId = org[0]?.organization_id;
+      if (!organizationId) throw new Error("Company fixture missing");
+      yield* sql`UPDATE organization_memberships SET role = 'admin' WHERE user_id = ${guest.userId}`;
+      yield* sql`UPDATE workspace_memberships SET role = 'admin' WHERE user_id = ${guest.userId} AND workspace_id = ${actor.workspaceId}`;
+      const results = yield* Effect.all(
+        [
+          requestAccountDeletion(actor).pipe(Effect.result),
+          requestAccountDeletion(guest).pipe(Effect.result),
+        ],
+        { concurrency: 2 }
+      );
+      const admins =
+        yield* sql`SELECT user_id FROM organization_memberships WHERE organization_id = ${organizationId} AND role = 'admin'`;
+      expect({
+        completed: results.filter(Result.isSuccess).length,
+        remainingAdmins: admins.length,
+      }).toEqual({ completed: 1, remainingAdmins: 1 });
     }).pipe(Effect.scoped, Effect.provide(services))
   ));

@@ -74,6 +74,27 @@ const start = Command.make(
       });
     }
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const journal = yield* Config.string("ZOEN_ERASURE_JOURNAL_BUCKET").pipe(
+      Config.withDefault("")
+    );
+    if (journal) {
+      const reconciliation = yield* spawner.exitCode(
+        ChildProcess.make(
+          process.execPath,
+          ["--import", "tsx", "scripts/reconcile-account-erasures.ts"],
+          {
+            extendEnv: true,
+            stdout: "inherit",
+            stderr: "inherit",
+          }
+        )
+      );
+      if (reconciliation !== 0)
+        return yield* new ServerStopped({
+          message:
+            "Account erasure reconciliation failed; refusing to serve restored data.",
+        });
+    }
     yield* requireServerPort("127.0.0.1", evePort);
     yield* requireServerPort(hostname, port);
     const capacity = Schema.Int.check(Schema.isGreaterThan(0));
