@@ -16,6 +16,7 @@ import {
   MailRejected,
   ObjectInstanceSchema,
   classifyLocator,
+  deliveryFulfillment,
   evaluateEvidence,
   j1DefinitionArtifact,
   mailOutcome,
@@ -97,6 +98,9 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
       ).pipe(Effect.flip);
       expect(implicitAccount).toBeInstanceOf(MailRejected);
       expect(whatsAppSendClaim("queued")).toBe("pending");
+      expect(
+        deliveryFulfillment({ draftId: "draft_1", kind: "local_draft" })
+      ).toBe("incomplete");
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");
