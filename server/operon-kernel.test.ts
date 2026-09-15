@@ -20,6 +20,7 @@ import {
   evaluateEvidence,
   j1DefinitionArtifact,
   mailOutcome,
+  replyLengthPolicy,
   selectConnectedAccount,
   selectHostScopedContext,
   whatsAppSendClaim,
@@ -101,6 +102,7 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
       expect(
         deliveryFulfillment({ draftId: "draft_1", kind: "local_draft" })
       ).toBe("incomplete");
+      expect(replyLengthPolicy("analysis")).toBe("full");
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");
