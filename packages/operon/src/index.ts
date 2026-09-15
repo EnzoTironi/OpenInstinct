@@ -10,5 +10,6 @@ export * from "./definition";
 export * from "./errors";
 export * from "./object-store";
 export * from "./recall/select";
+export * from "./recall/evaluate";
 export * from "./recall/span-query";
 export * from "./recall/section-needle";

@@ -74,7 +74,7 @@ export interface RecallResult {
 export const LEAN_SECTION_THRESHOLD = 32;
 
 const REFERENCE_ONLY =
-  /^(?:use |usa |use a |usa a )?(?:the )?(?:first|second|third|primeiro|primeira|segundo|segunda|terceiro|terceira)(?: one)?\.?$/iu;
+  /^(?:use |usa |use [ao] |usa [ao] )?(?:the )?(?:first|second|third|primeiro|primeira|segundo|segunda|terceiro|terceira)(?: one)?\.?$/iu;
 
 const ORDINAL_INDEX: readonly {
   readonly pattern: RegExp;

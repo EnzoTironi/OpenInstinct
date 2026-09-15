@@ -116,9 +116,11 @@ pnpm --dir infrastructure audit
 ```
 
 `pnpm test:runtime` requires the dedicated `companion_runtime_test` database and
-an ignored `.env.runtime.local`. It must never run against production. `pnpm eval:ci`
-needs an isolated loopback app plus model/browser credentials; listing cases is
-not a live grade. See
+an ignored `.env.runtime.local`. It must never run against production.
+`pnpm db:reset -- --confirm <database-name>` only targets the disposable
+allowlist on a local host and refuses `open_instinct_prod` and hosted
+databases before connecting. `pnpm eval:ci` needs an isolated loopback app
+plus model/browser credentials; listing cases is not a live grade. See
 [release gates](docs/decisions/adr-customer-platform-release.md) and
 [reproduction instructions](docs/decisions/zoen-launch-validation.md#reproducing-native-evaluations).
 

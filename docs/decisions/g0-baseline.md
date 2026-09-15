@@ -72,7 +72,8 @@ fall back to reset.
 
 `companion_runtime_test` (runtime/CI), local Compose `open_instinct`, Alchemy
 stages `open_instinct_local` and `open_instinct_dev`. Staging/prod Alchemy
-names are not implied deletion targets.
+names are not implied deletion targets. The executable allowlist is
+`server/database/reset-target.ts`.
 
 ## Provider / license / processor register (G0)
 

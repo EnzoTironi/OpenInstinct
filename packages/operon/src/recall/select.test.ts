@@ -172,6 +172,28 @@ describe("selectRelevantContext", () => {
     expect(latencyMs).toBeLessThan(50);
   });
 
+  it("does resolve a Portuguese reference-only reply to the second referent", () => {
+    const referents = [
+      section({
+        body: "first option is the green draft",
+        id: "opt-1",
+        objectId: "opt-1",
+        title: "Green",
+      }),
+      section({
+        body: "second option is the red draft",
+        id: "opt-2",
+        objectId: "opt-2",
+        title: "Red",
+      }),
+    ];
+    const result = select(referents, "Use o segundo", {
+      orderedReferents: ["opt-1", "opt-2"],
+    });
+    expect(isReferenceOnlyQuery("Use o segundo")).toBe(true);
+    expect(result.relevant.map((row) => row.section.id)).toEqual(["opt-2"]);
+  });
+
   it("does keep a late multi-topic fact that whole-document ranking can bury", () => {
     const noisy = [
       section({
