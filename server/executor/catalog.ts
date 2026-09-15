@@ -13,6 +13,7 @@ import ontology from "./tools/ontology";
 import personalMemory from "./tools/personal-memory";
 import schedules from "./tools/schedules";
 import vault from "./tools/vault";
+import whatsapp from "./tools/whatsapp";
 import webFetch from "./tools/web_fetch";
 import workspace from "./tools/workspace";
 import { resolveBrowserTools } from "./browser/catalog";
@@ -40,6 +41,7 @@ const modules: readonly {
   personalMemory,
   schedules,
   vault,
+  whatsapp,
   workspace,
 ];
 
@@ -65,6 +67,8 @@ export const codeReadableTools = new Set([
   "workspace.google.mail.search",
   "workspace.google.calendar.list",
   "workspace.google.contacts.search",
+  "whatsapp-list-chats",
+  "whatsapp-read-messages",
 ]);
 
 export const resolveExecutorTools = Effect.fn("Executor.resolveTools")(

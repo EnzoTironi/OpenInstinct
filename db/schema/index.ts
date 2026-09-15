@@ -13,6 +13,7 @@ export * from "./organization-audit";
 export * from "./schedules";
 export * from "./sessions";
 export * from "./vault";
+export * from "./whatsapp";
 export * from "./workspaces";
 export * from "./workspace-repository";
 export * from "./user-directory";

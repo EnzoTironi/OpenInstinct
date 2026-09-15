@@ -186,6 +186,14 @@ describe("root and worker capability boundaries", () => {
     expect(existsSync(`${executorBrowser}/get_totp.ts`)).toBe(false);
     expect(existsSync(`${workerTools}/get_password.ts`)).toBe(false);
     expect(existsSync(`${workerTools}/get_totp.ts`)).toBe(false);
+    const whatsapp = readFileSync("server/executor/tools/whatsapp.ts", "utf8");
+    expect(whatsapp).toContain("listWhatsAppChats");
+    expect(whatsapp).not.toContain("kapso");
+    expect(whatsapp).not.toContain("KAPSO_");
+    expect(whatsapp).not.toContain("telegram");
+    expect(existsSync(`${executorBrowser}/whatsapp.ts`)).toBe(false);
+    expect(existsSync(`${workerTools}/whatsapp.ts`)).toBe(false);
+    expect(existsSync(`${rootTools}/whatsapp.ts`)).toBe(false);
   });
 
   it("requires structured completion for initial and resumed worker calls", () => {

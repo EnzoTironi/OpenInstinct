@@ -27,6 +27,16 @@ import {
   revokeVaultDelegation,
 } from "../../server/workspaces/vault";
 import {
+  ShareWhatsAppChatSchema,
+  listWhatsAppAccounts,
+  listWhatsAppChats,
+  pauseWhatsAppBridge,
+  resumeWhatsAppBridge,
+  revokeWhatsAppBridge,
+  shareWhatsAppChat,
+  startWhatsAppPairing,
+} from "../../server/workspaces/whatsapp";
+import {
   disconnectWorkspaceGoogle,
   readWorkspaceConnections,
   shareGoogleConnection,
@@ -244,6 +254,75 @@ export const workspaceAgentsRouter = {
       .mutation(({ ctx, input, signal }) =>
         serverRuntime.runPromise(
           revokeVaultDelegation(ctx.actor, input.id).pipe(
+            Effect.catchTag("WorkspaceAccessDenied", () =>
+              Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+            )
+          ),
+          { signal }
+        )
+      ),
+  },
+  whatsapp: {
+    list: workspaceProcedure.query(({ ctx, signal }) =>
+      serverRuntime.runPromise(
+        Effect.gen(function* () {
+          return {
+            accounts: yield* listWhatsAppAccounts(ctx.actor),
+            chats: yield* listWhatsAppChats(ctx.actor),
+          };
+        }).pipe(
+          Effect.catchTag("WorkspaceAccessDenied", () =>
+            Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+          )
+        ),
+        { signal }
+      )
+    ),
+    start: workspaceProcedure.mutation(({ ctx, signal }) =>
+      serverRuntime.runPromise(
+        startWhatsAppPairing(ctx.actor).pipe(
+          Effect.catchTag("WorkspaceAccessDenied", () =>
+            Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+          )
+        ),
+        { signal }
+      )
+    ),
+    pause: workspaceProcedure.mutation(({ ctx, signal }) =>
+      serverRuntime.runPromise(
+        pauseWhatsAppBridge(ctx.actor).pipe(
+          Effect.catchTag("WorkspaceAccessDenied", () =>
+            Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+          )
+        ),
+        { signal }
+      )
+    ),
+    resume: workspaceProcedure.mutation(({ ctx, signal }) =>
+      serverRuntime.runPromise(
+        resumeWhatsAppBridge(ctx.actor).pipe(
+          Effect.catchTag("WorkspaceAccessDenied", () =>
+            Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+          )
+        ),
+        { signal }
+      )
+    ),
+    revoke: workspaceProcedure.mutation(({ ctx, signal }) =>
+      serverRuntime.runPromise(
+        revokeWhatsAppBridge(ctx.actor).pipe(
+          Effect.catchTag("WorkspaceAccessDenied", () =>
+            Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
+          )
+        ),
+        { signal }
+      )
+    ),
+    share: workspaceProcedure
+      .input(Schema.toStandardSchemaV1(ShareWhatsAppChatSchema))
+      .mutation(({ ctx, input, signal }) =>
+        serverRuntime.runPromise(
+          shareWhatsAppChat(ctx.actor, input).pipe(
             Effect.catchTag("WorkspaceAccessDenied", () =>
               Effect.fail(new TRPCError({ code: "FORBIDDEN" }))
             )
