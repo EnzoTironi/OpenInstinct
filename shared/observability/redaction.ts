@@ -1,12 +1,12 @@
 import { Schema } from "effect";
 
 const protectedKey =
-  /authorization|cookie|password|secret|credential|api.?key|(?:access|refresh|id|session|continuation)[_-]?token|device.?code|user.?code/i;
+  /authorization|cookie|password|secret|credential|api.?key|totp|otp_secret|(?:access|refresh|id|session|continuation)[_-]?token|device.?code|user.?code/i;
 
 function redactDiagnosticText(text: string) {
   return text
     .replace(
-      /("(?:authorization|cookie|password|secret|credential|api.?key|(?:access|refresh|id|session|continuation)[_-]?token|device.?code|user.?code)"\s*:\s*")[^"]*/gi,
+      /("(?:authorization|cookie|password|secret|credential|api.?key|totp|otp_secret|(?:access|refresh|id|session|continuation)[_-]?token|device.?code|user.?code)"\s*:\s*")[^"]*/gi,
       "$1[redacted]"
     )
     .replace(/Bearer\s+[^\s"'<>]+/gi, "Bearer [redacted]")

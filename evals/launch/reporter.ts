@@ -157,6 +157,10 @@ export const launchReporter: EvalReporter = {
             scored: summary.scored,
             skipped: summary.skipped,
             errored: summary.errored,
+            uniqueScenarios: new Set(cases.map((entry) => entry.id)).size,
+            executions: cases.length,
+            fixtureTraces: cases.length,
+            liveDeliveries: 0,
           },
           latencyMs: {
             method:

@@ -24,6 +24,19 @@ describe("beta diagnostics", () => {
       image: "[binary attachment]",
     });
   });
+  it("redacts TOTP seeds the same way as other credentials", () => {
+    expect(
+      JSON.stringify(
+        parseDiagnostic(
+          JSON.stringify({
+            totp: "canary-totp-seed",
+            otp_secret: "canary-otp-secret",
+            message: "setup continued",
+          })
+        )
+      )
+    ).not.toContain("canary");
+  });
   it("removes recognizable tokens embedded in arbitrary text", () => {
     expect(
       JSON.stringify(
