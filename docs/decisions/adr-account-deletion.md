@@ -1,9 +1,9 @@
 # Account deletion ledger
 
 Status: implemented for Zoen-controlled personal data, company
-retention, sole-admin transfer/close, tombstone replay and pending
-external providers. Live Mem0, Matrix, Vaultwarden, mautrix and backup
-media remain pending.
+retention, sole-admin transfer/close, tombstone replay, and attempted
+Vaultwarden/mautrix/Synapse wipes. Unreachable providers, live Mem0 and
+backup media remain pending_external.
 
 Date: 2026-09-15.
 
@@ -26,8 +26,12 @@ organization row and append-only audit receipts stay. Imported contacts,
 personal trust and Matrix identity rows for that person are removed.
 Company git and company memberships of others are not.
 
-Live providers are recorded as `pending_external`. This checkout does not
-speak to Mem0, Synapse, Vaultwarden or mautrix during deletion.
+Live providers are attempted after the PostgreSQL transaction commits.
+Vaultwarden `DELETE /admin/users/{id}`, mautrix logout, and Synapse
+`/_synapse/admin/v1/deactivate/{mxid}` mark their ledger rows `erased`
+only when the fixture or provider succeeds (HTTP 404 counts as already
+gone). Unconfigured or unreachable providers stay `pending_external`.
+Mem0 and backups are never claimed erased here.
 `requireVaultwarden` and `requireWhatsAppBridge` still fail closed.
 Backups are not purged; the receipt stores an expiry instant so active
 deletion is distinct from later backup expiry.
@@ -47,5 +51,8 @@ deletion is distinct from later backup expiry.
 
 `tests/runtime/account-deletion.integration.ts` proves member deletion
 with company git retained, rejected unauthenticated calls, pending
-external providers, backup replay, sole-admin block, transfer, and
-close-then-delete.
+external providers, backup replay of vault/WhatsApp/Matrix rows, sole-admin
+block, transfer, and close-then-delete.
+`tests/runtime/account-deletion-providers.integration.ts` proves fixture
+wipes, fail-closed pending when the provider is down, vault retry after
+recovery, and restore replay that does not resurrect deleted rows.
