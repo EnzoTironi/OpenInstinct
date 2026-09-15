@@ -8,6 +8,9 @@ import {
   dispatchAuthFeedback,
   dispatchAuthPrompt,
   dispatchItem,
+  dispatchUnlinkedSenderPrompt,
+  signInUrl,
+  unlinkedSenderCopy,
 } from "../../server/channels/dispatch";
 import { bindGroupChannelIdentity } from "../../server/channels/group-policy";
 import type { InboundEvent } from "../../server/channels/inbound";
@@ -19,24 +22,26 @@ import { drainChannelInbox, handoffChannelMessage } from "./channel-session";
 import { privateChannelEvents } from "./private-channel-events";
 import type { ProviderInputError } from "../../server/channels/provider-errors";
 
+type Acceptance =
+  | { readonly status: "accepted"; readonly identity: Identity }
+  | { readonly status: "unlinked"; readonly prompt: boolean };
+
 const acceptChannelMessage = Effect.fn("acceptChannelMessage")(function* (
-  event: Exclude<InboundEvent, { kind: "command" }>
+  event: Extract<InboundEvent, { kind: "message" }>
 ) {
-  const identity = yield* (yield* ChannelAccounts)
-    .resolveVerifiedSender({
-      channel: event.channel,
-      installationId: event.installationId,
-      senderId: event.senderId,
-    })
-    .pipe(
-      Effect.catchTag("ChannelAccountError", (error) =>
-        error.reason === "registration_closed"
-          ? Effect.succeed(null)
-          : Effect.fail(error)
-      )
-    );
-  // Refusing one beta signup must not discard other events in a buffered delivery.
-  if (!identity) return null;
+  const accounts = yield* ChannelAccounts;
+  const resolution = yield* accounts.resolveVerifiedSender({
+    channel: event.channel,
+    installationId: event.installationId,
+    senderId: event.senderId,
+  });
+  if (resolution.status === "unlinked") {
+    if (event.chatKind === "group")
+      return { status: "unlinked", prompt: false } satisfies Acceptance;
+    const contact = yield* accounts.recordUnlinkedContact(resolution.sender);
+    return { status: "unlinked", prompt: contact.prompt } satisfies Acceptance;
+  }
+  const { identity } = resolution;
   const group =
     event.chatKind === "group"
       ? yield* bindGroupChannelIdentity({
@@ -65,7 +70,7 @@ const acceptChannelMessage = Effect.fn("acceptChannelMessage")(function* (
         }
       : payload,
   });
-  return identity;
+  return { status: "accepted", identity } satisfies Acceptance;
 });
 
 function channelInputResponse(
@@ -160,22 +165,40 @@ export function privateChannel(channel: Identity["channel"]) {
                     serverRuntime.runPromise(
                       dispatchItem(
                         event.eventId,
-                        dispatchAuthFeedback(
-                          event,
-                          result.status === "confirmed",
-                          result.status === "refused" &&
+                        Effect.gen(function* () {
+                          const refusal =
+                            result.status === "refused" &&
                             "reason" in result &&
-                            result.reason === "registration_closed"
-                            ? "Zoen is in a private beta. This account needs an invitation."
-                            : undefined
-                        )
+                            result.reason === "sender_unlinked"
+                              ? unlinkedSenderCopy(
+                                  event.channel,
+                                  yield* signInUrl(event.channel)
+                                )
+                              : undefined;
+                          yield* dispatchAuthFeedback(
+                            event,
+                            result.status === "confirmed",
+                            refusal
+                          );
+                        })
                       )
                     )
                   );
                 }
               } else {
-                const identity = yield* acceptChannelMessage(event);
-                if (identity) identities.set(identity.id, identity);
+                const acceptance = yield* acceptChannelMessage(event);
+                if (acceptance.status === "accepted") {
+                  identities.set(acceptance.identity.id, acceptance.identity);
+                } else if (acceptance.prompt) {
+                  context.waitUntil(
+                    serverRuntime.runPromise(
+                      dispatchItem(
+                        event.eventId,
+                        dispatchUnlinkedSenderPrompt(event)
+                      )
+                    )
+                  );
+                }
               }
             }
             // Both ordinary inputs and login prompts are durable before ACK.
@@ -218,13 +241,11 @@ export function privateChannel(channel: Identity["channel"]) {
                 ),
               ProviderInputError: (error) =>
                 channelInputResponse(channel, error),
-              ChannelAccountError: (error) =>
+              ChannelAccountError: () =>
                 Effect.succeed(
-                  error.reason === "registration_closed"
-                    ? new Response("ignored")
-                    : new Response("invalid challenge or identity", {
-                        status: 400,
-                      })
+                  new Response("invalid challenge or identity", {
+                    status: 400,
+                  })
                 ),
               PayloadConflict: () =>
                 Effect.succeed(

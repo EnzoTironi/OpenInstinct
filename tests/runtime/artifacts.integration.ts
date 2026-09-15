@@ -12,6 +12,7 @@ import { ArtifactId, artifactLimits } from "../../server/artifacts/model";
 import { Messaging } from "../../server/messaging";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const dependencies = Layer.mergeAll(
   ChannelAccounts.layer,
@@ -29,7 +30,6 @@ const fixture = Effect.fn("artifacts.fixture")(function* (
   }) => Effect.Effect<void, unknown>
 ) {
   const sql = yield* PgClient.PgClient;
-  const accounts = yield* ChannelAccounts;
   const identities: Identity[] = [];
   yield* Effect.addFinalizer(() =>
     Effect.forEach(identities, (identity) => {
@@ -41,7 +41,7 @@ const fixture = Effect.fn("artifacts.fixture")(function* (
     })
   );
   for (let index = 0; index < 2; index++) {
-    const identity = yield* accounts.resolveVerifiedSender({
+    const identity = yield* linkedIdentity({
       channel: "telegram",
       installationId: "artifact-proof",
       senderId: randomUUID(),

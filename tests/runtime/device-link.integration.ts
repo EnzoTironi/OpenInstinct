@@ -36,6 +36,7 @@ import {
   deviceBoundSchema,
 } from "../../shared/identity/channel-auth";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const cookieHeader = (response: Response) =>
   response.headers
@@ -111,9 +112,8 @@ test("native linking and archive recovery pin both proofs, preserve data and rej
   const createIdentity = () =>
     run(
       Effect.gen(function* () {
-        const accounts = yield* ChannelAccounts;
         const sql = yield* PgClient.PgClient;
-        const identity = yield* accounts.resolveVerifiedSender({
+        const identity = yield* linkedIdentity({
           channel: "kapso",
           installationId,
           senderId: randomUUID(),

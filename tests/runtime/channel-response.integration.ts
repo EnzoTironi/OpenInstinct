@@ -10,6 +10,7 @@ import { Kapso } from "../../server/channels/kapso";
 import { Messaging } from "../../server/messaging";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const infrastructure = Layer.mergeAll(
   ChannelAccounts.layer,
@@ -20,9 +21,8 @@ const infrastructure = Layer.mergeAll(
 const live = ChannelTransport.layer.pipe(Layer.provideMerge(infrastructure));
 
 const fixture = Effect.gen(function* () {
-  const accounts = yield* ChannelAccounts;
   const sql = yield* PgClient.PgClient;
-  const identity = yield* accounts.resolveVerifiedSender({
+  const identity = yield* linkedIdentity({
     channel: "telegram",
     installationId: randomUUID(),
     senderId: randomUUID(),

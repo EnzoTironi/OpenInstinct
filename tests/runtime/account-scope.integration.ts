@@ -7,8 +7,9 @@ import { ensureScope } from "../../db/services/scope";
 import { ChannelAccounts } from "../../server/accounts";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
-test("verified account creation provisions scope once and never restores revoked membership", async () => {
+test("a linked account owns its scope once and sender resolution never restores revoked membership", async () => {
   await Effect.runPromise(
     Effect.gen(function* () {
       const accounts = yield* ChannelAccounts;
@@ -18,7 +19,7 @@ test("verified account creation provisions scope once and never restores revoked
         installationId: `scope-${randomUUID()}`,
         senderId: "scope-owner",
       };
-      const identity = yield* accounts.resolveVerifiedSender(sender);
+      const identity = yield* linkedIdentity(sender);
       const scope = accessScopeForUser(`better-auth:${identity.userId}`);
       yield* Effect.gen(function* () {
         const members = yield* sql`SELECT user_id FROM workspace_memberships
@@ -26,7 +27,7 @@ test("verified account creation provisions scope once and never restores revoked
         assert.equal(
           members.length,
           1,
-          "new verified account must already own its workspace"
+          "a linked account must already own its workspace"
         );
         yield* Effect.promise(() => ensureScope(scope));
         const other = { ...scope, userId: `better-auth:${randomUUID()}` };
@@ -37,8 +38,10 @@ test("verified account creation provisions scope once and never restores revoked
         yield* Effect.promise(() =>
           assert.rejects(ensureScope(scope), { _tag: "ScopeAccessDenied" })
         );
-        const current = yield* accounts.resolveVerifiedSender(sender);
-        assert.equal(current.id, identity.id);
+        assert.deepEqual(yield* accounts.resolveVerifiedSender(sender), {
+          status: "linked",
+          identity,
+        });
         const remaining =
           yield* sql`SELECT user_id FROM workspace_memberships WHERE workspace_id = ${scope.workspaceId}`;
         assert.equal(

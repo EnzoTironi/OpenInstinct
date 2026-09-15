@@ -25,6 +25,7 @@ import { ChannelAccounts } from "../../server/accounts/index.ts";
 import { channelAuthPlugin } from "../../server/channel-auth/index.ts";
 
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const cookieHeader = (response: Response) =>
   response.headers
@@ -184,6 +185,7 @@ test("real BetterAuth router, signed browser challenge and database session", as
     };
     await runtime.runPromise(
       Effect.gen(function* () {
+        yield* linkedIdentity(sender);
         const accounts = yield* ChannelAccounts;
         yield* accounts.confirmChallenge({ token, sender });
       })

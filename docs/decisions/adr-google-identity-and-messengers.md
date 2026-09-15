@@ -54,11 +54,15 @@ prompt. Used, expired and revoked challenges cannot create another session.
 
 The uniqueness constraint applies to a verified provider identity within its
 installation. An active WhatsApp number cannot belong to two Zoen users in that
-installation. Legacy channel-first accounts can exist separately until explicitly
-linked or consolidated. Consolidation requires proof of both sides and the
-existing archive eligibility checks; it is never an email/phone guess or database
-wipe. Existing chat-first entry remains compatible; the generic website entry now
-starts at Google sign-in before directing the person to Connections.
+installation. A first message from an unlinked messenger no longer creates an
+account. The webhook records the address in `channel_pending_sender` and answers,
+at most once per 24 hours, with the instruction to sign in with Google and link
+the messenger. Group messages from unlinked senders are ignored without a write.
+Accounts that a channel-first contact created before this rule can be joined to a
+Google account only through the explicit archive path, which requires proof of
+both sides and the existing eligibility checks; it is never an email or phone
+guess or a database wipe. The generic website entry starts at Google sign-in
+before directing the person to Connections.
 
 ## Evidence
 
@@ -72,6 +76,14 @@ starts at Google sign-in before directing the person to Connections.
   consumption. Only outbound provider HTTP is replaced. Agent entrypoints fail
   the test if invoked. It rejects forged signatures, history imports, forwarded
   confirmations and a different browser, and proves single-use consumption.
+- `tests/runtime/unlinked-sender.integration.ts` proves against real PostgreSQL
+  that an unknown private sender yields a pending row and no user, that a `login`
+  challenge from an unknown sender is refused, that a browser link challenge binds
+  the address to the authenticated user and deletes the pending row, that a
+  repeated confirmation is an idempotent receipt, and that a second person cannot
+  take over a linked address. `tests/runtime/channel-webhook.integration.ts`
+  proves the webhook behavior for group and private messages from unlinked
+  senders.
 - The existing Telegram webhook, browser-cookie, prompt lease and account-lifecycle
   suites remain part of the runtime validation.
 

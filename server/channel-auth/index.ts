@@ -83,9 +83,10 @@ const readLinkSession = Effect.fn("ChannelAuth.readLinkSession")(function* (
   return link;
 });
 const publicError = (error: ChannelAuthError | ChannelAccountError) => {
-  if (error.reason === "registration_closed")
+  if (error.reason === "sender_unlinked")
     return new APIError("FORBIDDEN", {
-      message: "Zoen is in a private beta. This account needs an invitation.",
+      message:
+        "This messenger is not linked to a Zoen account yet. Sign in with Google, then link it from your account.",
     });
   if (error.reason === "unavailable")
     return new APIError("SERVICE_UNAVAILABLE", {

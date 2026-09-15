@@ -14,6 +14,7 @@ import { ChannelAccounts } from "../../server/accounts";
 import { channelAuthPlugin } from "../../server/channel-auth";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const cookies = (response: Response) =>
   response.headers
@@ -74,24 +75,10 @@ test("native browser binding requires same-session approval before BetterAuth ca
   };
   const installationId = randomUUID();
   const identity = await run(
-    Effect.gen(function* () {
-      const accounts = yield* ChannelAccounts;
-      return yield* accounts.resolveVerifiedSender({
-        channel: "kapso",
-        installationId,
-        senderId: randomUUID(),
-      });
-    })
+    linkedIdentity({ channel: "kapso", installationId, senderId: randomUUID() })
   );
   const otherIdentity = await run(
-    Effect.gen(function* () {
-      const accounts = yield* ChannelAccounts;
-      return yield* accounts.resolveVerifiedSender({
-        channel: "kapso",
-        installationId,
-        senderId: randomUUID(),
-      });
-    })
+    linkedIdentity({ channel: "kapso", installationId, senderId: randomUUID() })
   );
   const otherScope = accessScopeForUser(`better-auth:${otherIdentity.userId}`);
   const foreignSession = randomUUID();

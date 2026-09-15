@@ -8,8 +8,8 @@ import type { ChannelEvents } from "eve/channels";
 import { test } from "vitest";
 import { privateChannelEvents } from "../../agent/lib/private-channel-events";
 import { channelPrincipal } from "../../server/channels/principal";
-import { ChannelAccounts } from "../../server/accounts";
 import { serverRuntime } from "../../server/runtime";
+import { linkedIdentity } from "./identity-fixture";
 
 test("terminal channel events persist once per turn and enforce current authority", async () => {
   const url = await Effect.runPromise(Config.string("DATABASE_URL"));
@@ -24,13 +24,10 @@ test("terminal channel events persist once per turn and enforce current authorit
     })
   );
   const identity = await serverRuntime.runPromise(
-    Effect.gen(function* () {
-      const accounts = yield* ChannelAccounts;
-      return yield* accounts.resolveVerifiedSender({
-        channel: "telegram",
-        installationId: randomUUID(),
-        senderId: "928374",
-      });
+    linkedIdentity({
+      channel: "telegram",
+      installationId: randomUUID(),
+      senderId: "928374",
     })
   );
   try {
@@ -160,13 +157,10 @@ test("authorization challenges persist exact public fields once and reject stale
   const url = await Effect.runPromise(Config.string("DATABASE_URL"));
   assert.equal(new URL(url).pathname, "/companion_runtime_test");
   const identity = await serverRuntime.runPromise(
-    Effect.gen(function* () {
-      const accounts = yield* ChannelAccounts;
-      return yield* accounts.resolveVerifiedSender({
-        channel: "telegram",
-        installationId: randomUUID(),
-        senderId: "928375",
-      });
+    linkedIdentity({
+      channel: "telegram",
+      installationId: randomUUID(),
+      senderId: "928375",
     })
   );
   try {

@@ -10,7 +10,7 @@ export class ChannelAccountError extends Schema.TaggedError<ChannelAccountError>
       "account_conflict",
       "session_invalid",
       "last_access",
-      "registration_closed",
+      "sender_unlinked",
       "archive_requires_review",
       "account_busy",
     ]),

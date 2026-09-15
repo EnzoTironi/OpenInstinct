@@ -1,4 +1,5 @@
 import { Config, Effect } from "effect";
+import { applicationOrigin } from "@shared/environment/origin";
 import { ChannelAuthPrompts } from "../channel-auth/prompts";
 import { Telegram } from "./telegram";
 import { Kapso } from "./kapso";
@@ -60,6 +61,35 @@ export const dispatchAuthFeedback = Effect.fn("dispatchAuthFeedback")(
     }
   }
 );
+
+export const unlinkedSenderCopy = (
+  channel: InboundEvent["channel"],
+  signInUrl: string
+) =>
+  channel === "kapso"
+    ? `Este número ainda não está vinculado a uma conta Zoen. Entre com Google em ${signInUrl} e vincule o WhatsApp em Conta para continuar.`
+    : `This Telegram account is not linked to Zoen yet. Sign in with Google at ${signInUrl}, then link Telegram from your account to continue.`;
+
+export const signInUrl = (channel: InboundEvent["channel"]) =>
+  Effect.try({
+    try: () => `${applicationOrigin()}/sign-in`,
+    catch: () =>
+      new ProviderInputError({ provider: channel, reason: "configuration" }),
+  });
+
+export const dispatchUnlinkedSenderPrompt = Effect.fn(
+  "dispatchUnlinkedSenderPrompt"
+)(function* (event: Extract<InboundEvent, { kind: "message" }>) {
+  const copy = unlinkedSenderCopy(
+    event.channel,
+    yield* signInUrl(event.channel)
+  );
+  if (event.channel === "kapso") {
+    yield* (yield* Kapso).sendText(event.senderId, copy);
+    return;
+  }
+  yield* (yield* Telegram).sendText(event.chatId, copy);
+});
 
 export const dispatchAuthPrompt = Effect.fn("dispatchAuthPrompt")(function* (
   challengeId: string

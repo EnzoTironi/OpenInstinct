@@ -23,6 +23,7 @@ import { channelPrincipal } from "../../server/channels/principal";
 import { inspectStoredPersonalMemory } from "../../server/executor/tools/personal-memory";
 import { GET } from "../../app/api/account/personal-memory/export/route";
 import { runtimeDatabase } from "./database";
+import { linkedIdentity } from "./identity-fixture";
 
 const memoryDocumentBackend = createMemoryDocumentBackend(Effect.void);
 
@@ -160,7 +161,11 @@ test("actual account auth, profile store, Eve provider, private tool and export 
       senderId,
     };
     await serverRuntime.runPromise(
-      accounts.confirmChallenge({ token, sender })
+      Effect.gen(function* () {
+        const resolution = yield* accounts.resolveVerifiedSender(sender);
+        if (resolution.status === "unlinked") yield* linkedIdentity(sender);
+        yield* accounts.confirmChallenge({ token, sender });
+      })
     );
     const complete = await request(
       "complete",
