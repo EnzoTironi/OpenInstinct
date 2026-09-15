@@ -113,4 +113,16 @@ describe("inspectResetTarget", () => {
     expect(migrations).not.toContain("resetDisposable");
     expect(migrations).not.toContain("DROP DATABASE");
   });
+
+  it("does keep the prelaunch replacement cut and refuse implied protected reset", () => {
+    const baseline = readFileSync(
+      join(repositoryRoot, "docs/decisions/g0-baseline.md"),
+      "utf8"
+    );
+    const readme = readFileSync(join(repositoryRoot, "README.md"), "utf8");
+    expect(baseline).toContain("P04–P10 replacement cut");
+    expect(baseline).toContain("open_instinct_prod");
+    expect(baseline).toContain("companion-pg-prod");
+    expect(readme).toContain("open_instinct_prod");
+  });
 });

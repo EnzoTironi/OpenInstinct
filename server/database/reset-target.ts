@@ -5,7 +5,7 @@ export class ResetRefused extends Schema.TaggedError<ResetRefused>()(
   { message: Schema.String }
 ) {}
 
-const disposableDatabaseNames = [
+export const disposableDatabaseNames = [
   "companion_runtime_test",
   "open_instinct",
   "open_instinct_local",

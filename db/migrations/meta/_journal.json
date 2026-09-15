@@ -393,6 +393,13 @@
       "when": 1789502741181,
       "tag": "0055_messy_ego",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1789512225548,
+      "tag": "0056_right_proteus",
+      "breakpoints": true
     }
   ]
 }

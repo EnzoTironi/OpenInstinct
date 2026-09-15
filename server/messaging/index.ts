@@ -19,6 +19,7 @@ import {
   LeaseSchema,
   type Lease,
   type MessagingError,
+  messageReferenceSchema,
   ResolveOutboxUncertainSchema,
   type ResolveOutboxUncertainInput,
 } from "./model";
@@ -92,8 +93,11 @@ const makeMessaging = Effect.gen(function* () {
     enqueue: Effect.fn("Messaging.enqueue")(function* (input: EnqueueInput) {
       const value = yield* decodeInput(EnqueueInputSchema)(input);
       return yield* outbox.insert({
-        ...value,
+        effectKind: value.effectKind,
+        identityId: value.identityId,
         key: value.deliveryKey,
+        operationId: value.operationId,
+        payload: value.payload,
         sourceMessageId: null,
       });
     }, protect),
@@ -124,10 +128,13 @@ const makeMessaging = Effect.gen(function* () {
         // The first preparation commits its bounded, single-chunk transcript intents.
         // Identical replays do not recreate delivered or retained-away outbox entries.
         if (current.nativeInput?.content === null) {
+          const operationId = `transcript:${value.lease.id}`;
           for (const [index, transcript] of value.transcripts.entries()) {
             yield* outbox.insert({
+              effectKind: "channel_send",
               identityId: value.lease.identityId,
               key: `transcript:${value.lease.id}:${String(index)}:0`,
+              operationId,
               sourceMessageId: null,
               payload: {
                 text: `I heard: ${transcript}\nIf this is incorrect, send a correction.`,
@@ -228,6 +235,14 @@ const makeMessaging = Effect.gen(function* () {
       identityId: string
     ) {
       return yield* outbox.inspect(yield* decodeInput(IdentityId)(identityId));
+    }, protect),
+    aggregateOperation: Effect.fn("Messaging.aggregateOperation")(function* (
+      identityId: string,
+      operationId: string
+    ) {
+      const host = yield* decodeInput(IdentityId)(identityId);
+      const operation = yield* decodeInput(messageReferenceSchema)(operationId);
+      return yield* outbox.aggregateOperation(host, operation);
     }, protect),
   };
 });

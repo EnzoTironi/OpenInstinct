@@ -133,7 +133,9 @@ export const channelOutbox = pgTable(
       .notNull()
       .references(() => channelIdentities.id, { onDelete: "cascade" }),
     deliveryKey: text("delivery_key").notNull(),
+    effectKind: text("effect_kind").notNull(),
     intentHash: text("intent_hash").notNull(),
+    operationId: text("operation_id").notNull(),
     payload: jsonb("payload").notNull(),
     sequence: bigserial("sequence", { mode: "bigint" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -152,6 +154,10 @@ export const channelOutbox = pgTable(
       table.identityId,
       table.deliveryKey
     ),
+    index("channel_outbox_operation_idx").on(
+      table.identityId,
+      table.operationId
+    ),
     index("channel_outbox_dispatch_idx").on(
       table.identityId,
       table.status,
@@ -164,6 +170,14 @@ export const channelOutbox = pgTable(
     check(
       "channel_outbox_payload_check",
       sql`jsonb_typeof(${table.payload}) = 'object' AND length(trim(${table.deliveryKey})) > 0 AND ${table.intentHash} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      "channel_outbox_effect_kind_check",
+      sql`${table.effectKind} IN ('channel_send', 'mail', 'whatsapp')`
+    ),
+    check(
+      "channel_outbox_operation_check",
+      sql`length(trim(${table.operationId})) > 0 AND length(${table.operationId}) <= 256`
     ),
     check("channel_outbox_attempts_check", sql`${table.attempts} >= 0`),
     check(
