@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
+  AuthorityConflict,
   AuthorityInputRejected,
   InMemoryAuthority,
   isOperationalPredicate,
@@ -275,6 +276,29 @@ describe("scoped authority", () => {
           .pipe(Effect.flip);
         expect(stolen).toBeInstanceOf(AuthorityInputRejected);
         expect(stolen.reason).toBe("invalid_parameter");
+      })
+    ));
+
+  it("does reject a stale operational revision", () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const authority = new InMemoryAuthority();
+        const first = yield* authority.applyOperationalTransition(
+          alice,
+          "commitment:ana",
+          "accepted",
+          "1"
+        );
+        expect(first.operationalStatus).toBe("accepted");
+        const rejected = yield* authority
+          .applyOperationalTransition(alice, "commitment:ana", "accepted", "1")
+          .pipe(Effect.flip);
+        expect(rejected).toBeInstanceOf(AuthorityConflict);
+        if (!(rejected instanceof AuthorityConflict)) {
+          throw rejected;
+        }
+        expect(rejected.expectedRevision).toBe("1");
+        expect(rejected.actualRevision).toBe(first.revision);
       })
     ));
 });

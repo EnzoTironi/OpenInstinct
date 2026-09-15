@@ -7,8 +7,10 @@ import { expect, it } from "vitest";
 
 import { objectTypeIdSchema } from "@zoen/operon";
 import {
+  InMemoryActionLifecycle,
   InMemoryObjectStore,
   ObjectInstanceSchema,
+  evaluateEvidence,
   j1DefinitionArtifact,
 } from "./operon-kernel";
 
@@ -33,6 +35,14 @@ it("does compile the host kernel without mounting Operon on the runtime", () =>
         "utf8"
       );
       expect(j1DefinitionArtifact.definitionVersion).toBe("j1.0.0");
+      expect(
+        evaluateEvidence({ kind: "present", name: "artifactRevision" })
+          .disposition
+      ).toBe("available");
+      expect(
+        new InMemoryActionLifecycle().rememberRetrievedPlaybook("proposal text")
+          .admission
+      ).toBe("proposal");
       expect(runtime).not.toContain("@zoen/operon");
       expect(runtime).not.toContain("operon-kernel");
       expect(runtime).toContain("Mem0.layer");

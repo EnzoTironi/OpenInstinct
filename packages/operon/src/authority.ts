@@ -118,6 +118,15 @@ export class AuthorityInputRejected extends Schema.TaggedError<AuthorityInputRej
   }
 ) {}
 
+export class AuthorityConflict extends Schema.TaggedError<AuthorityConflict>()(
+  "AuthorityConflict",
+  {
+    actualRevision: Schema.String,
+    expectedRevision: Schema.String,
+    objectId: Schema.String,
+  }
+) {}
+
 interface AuthorityState {
   readonly claims: Map<string, PersistedClaim>;
   readonly identities: Map<string, ContactIdentity>;
@@ -483,6 +492,39 @@ const separateMergeImpl = Effect.fn("InMemoryAuthority.separateMerge")(
   }
 );
 
+const applyOperationalTransitionImpl = Effect.fn(
+  "InMemoryAuthority.applyOperationalTransition"
+)(function* (
+  state: AuthorityState,
+  scope: ActionHostBinding,
+  objectId: string,
+  status: string,
+  expectedRevision: string
+) {
+  const host = yield* decodeScope(scope).pipe(
+    Effect.mapError(() => reject("invalid_scope"))
+  );
+  const recordedAt = yield* Clock.currentTimeMillis;
+  const current = ensureObject(state, host, objectId, "commitment", recordedAt);
+  if (current.revision !== expectedRevision) {
+    return yield* new AuthorityConflict({
+      actualRevision: current.revision,
+      expectedRevision,
+      objectId,
+    });
+  }
+  const next: ObjectSnapshot = {
+    ...current,
+    operationalStatus: status,
+    recordedAt,
+    revision: String(Number(current.revision) + 1),
+  };
+  const key = recordKey(host, objectId);
+  state.objects.set(key, next);
+  state.revisions.set(`${key}\0${next.revision}`, clone(next));
+  return clone(next);
+});
+
 const listIdentitiesImpl = Effect.fn("InMemoryAuthority.listIdentities")(
   function* (
     state: AuthorityState,
@@ -605,5 +647,20 @@ export class InMemoryAuthority {
 
   listIdentities(scope: ActionHostBinding, personId: string) {
     return listIdentitiesImpl(this.#state, scope, personId);
+  }
+
+  applyOperationalTransition(
+    scope: ActionHostBinding,
+    objectId: string,
+    status: string,
+    expectedRevision: string
+  ) {
+    return applyOperationalTransitionImpl(
+      this.#state,
+      scope,
+      objectId,
+      status,
+      expectedRevision
+    );
   }
 }
