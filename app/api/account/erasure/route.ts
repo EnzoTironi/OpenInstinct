@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import {
-  AccountDeletionError,
+  type AccountDeletionError,
   requestAccountDeletionFromHeaders,
 } from "../../../../server/accounts/deletion";
 import { serverRuntime } from "../../../../server/runtime";

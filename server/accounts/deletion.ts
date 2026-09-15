@@ -202,6 +202,7 @@ const requireLiveSession = Effect.fn("requireAccountDeletionSession")(
         AND "expiresAt" > now()`;
     if (!rows.length)
       return yield* new AccountDeletionError({ reason: "unauthenticated" });
+    return undefined;
   }
 );
 
@@ -327,7 +328,7 @@ const persistCompletedRequest = Effect.fn("persistCompletedDeletionRequest")(
     yield* sql`INSERT INTO account_deletion_tombstones(user_id, request_id)
       VALUES (${userId}, ${requestId})
       ON CONFLICT (user_id) DO UPDATE SET request_id = EXCLUDED.request_id, deleted_at = clock_timestamp()`;
-    const ledger: ReadonlyArray<readonly [string, string]> = [
+    const ledger: readonly (readonly [string, string])[] = [
       ["sessions", "erased"],
       ["jobs", "erased"],
       ["grants", "erased"],
