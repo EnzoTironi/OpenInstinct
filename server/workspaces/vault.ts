@@ -62,6 +62,42 @@ export const requireVaultwarden = Effect.fn("requireVaultwarden")(
   })
 );
 
+/** Admin delete uses the existing OIDC client secret. 404 means already gone. */
+export const eraseVaultwardenUser = Effect.fn("vault.eraseUser")(function* (
+  rawUserId: string
+) {
+  const { url } = yield* requireVaultwarden();
+  const secret = env.ZOEN_VAULTWARDEN_CLIENT_SECRET;
+  if (!secret) return yield* new VaultwardenUnavailable();
+  yield* Effect.tryPromise({
+    try: async (signal) => {
+      const response = await fetch(
+        `${url}/admin/users/${encodeURIComponent(rawUserId)}`,
+        {
+          method: "DELETE",
+          signal,
+          redirect: "error",
+          headers: {
+            authorization: `Bearer ${Redacted.value(secret)}`,
+          },
+        }
+      );
+      if (response.ok || response.status === 404) return;
+      throw new VaultwardenUnavailable();
+    },
+    catch: (error) =>
+      error instanceof VaultwardenUnavailable
+        ? error
+        : new VaultwardenUnavailable(),
+  }).pipe(
+    Effect.timeoutOrElse({
+      duration: "8 seconds",
+      orElse: () => Effect.fail(new VaultwardenUnavailable()),
+    })
+  );
+  return { erased: true as const };
+});
+
 export const listDelegatedVaultItems = Effect.fn("listDelegatedVaultItems")(
   function* (scope: AccessScope) {
     yield* requireWorkspaceMember(scope);

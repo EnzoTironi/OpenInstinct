@@ -3,11 +3,14 @@ import { PgClient } from "@effect/sql-pg";
 import { DateTime, Effect, Schema } from "effect";
 import { readAuthSession } from "@db/services/auth/session";
 import { accessScopeForUser } from "@shared/identity/access-scope";
-import { ErasureJournal } from "./erasure-journal";
+import { deactivateMatrixUser } from "../matrix/client";
+import { logoutWhatsApp } from "../whatsapp/client";
 import {
   requireWorkspaceAccess,
   type WorkspaceActorSchema,
 } from "../workspaces/access";
+import { eraseVaultwardenUser } from "../workspaces/vault";
+import { ErasureJournal } from "./erasure-journal";
 
 export class AccountDeletionError extends Schema.TaggedError<AccountDeletionError>()(
   "AccountDeletionError",
@@ -51,14 +54,15 @@ const resultSchema = Schema.Struct({
 
 /**
  * Durable personal-account deletion. Zoen-controlled rows are erased or kept
- * as company property. Live Mem0, Matrix, Vaultwarden and mautrix stay
- * pending. The external erasure journal survives database restoration.
+ * as company property. Live Mem0 and backups stay pending. Vaultwarden,
+ * mautrix and Synapse are attempted after commit and stay pending_external
+ * when the provider is down. The erasure journal survives restoration.
  */
 export const requestAccountDeletion = Effect.fn("requestAccountDeletion")(
   function* (actor: typeof WorkspaceActorSchema.Type) {
     const personal = accessScopeForUser(actor.userId);
     const sql = yield* PgClient.PgClient;
-    const result = yield* sql.withTransaction(
+    const prepared = yield* sql.withTransaction(
       Effect.gen(function* () {
         yield* lockAccountOrganizations(actor.userId);
         yield* requireLiveSession(actor);
@@ -70,15 +74,28 @@ export const requestAccountDeletion = Effect.fn("requestAccountDeletion")(
               () => new AccountDeletionError({ reason: "unavailable" })
             )
           );
+        const handles = yield* collectExternalWipeHandles(
+          actor.userId,
+          personal.workspaceId
+        );
         yield* eraseZoenControlledData(actor.userId, personal.workspaceId);
-        return yield* persistCompletedRequest(actor.userId, [
-          ...externalPending,
-        ]);
+        return {
+          handles,
+          result: yield* persistCompletedRequest(actor.userId, [
+            ...externalPending,
+          ]),
+        };
       })
     );
-    if (result) return result;
-    yield* persistBlockedRequest(actor.userId);
-    return yield* new AccountDeletionError({ reason: "blocked_sole_owner" });
+    if (!prepared) {
+      yield* persistBlockedRequest(actor.userId);
+      return yield* new AccountDeletionError({ reason: "blocked_sole_owner" });
+    }
+    return yield* finishExternalWipes(
+      actor.userId,
+      prepared.handles,
+      prepared.result
+    );
   },
   Effect.catchTag(
     "SqlError",
@@ -192,13 +209,18 @@ export const applyAccountDeletionTombstones = Effect.fn(
       const raw = rawUserId(tomb.userId);
       const present = yield* sql`SELECT 1 FROM public."user" WHERE id = ${raw}
         UNION ALL SELECT 1 FROM workspaces WHERE id = ${personal.workspaceId}`;
-      if (!present.length) continue;
-      yield* sql.withTransaction(
-        Effect.gen(function* () {
-          yield* eraseZoenControlledData(tomb.userId, personal.workspaceId);
-          yield* persistCompletedRequest(tomb.userId, [...externalPending]);
-        })
+      const handles = yield* collectExternalWipeHandles(
+        tomb.userId,
+        personal.workspaceId
       );
+      if (present.length)
+        yield* sql.withTransaction(
+          Effect.gen(function* () {
+            yield* eraseZoenControlledData(tomb.userId, personal.workspaceId);
+            yield* persistCompletedRequest(tomb.userId, [...externalPending]);
+          })
+        );
+      yield* attemptExternalWipes(tomb.userId, handles);
     }
     return { applied: tombs.length };
   },
@@ -391,6 +413,101 @@ const persistCompletedRequest = Effect.fn("persistCompletedDeletionRequest")(
     });
   }
 );
+
+interface ExternalWipeHandles {
+  readonly matrixIds: readonly string[];
+  readonly rawUserId: string;
+  readonly whatsapp: readonly {
+    readonly loginId: string | null;
+    readonly matrixUserId: string;
+  }[];
+}
+
+const collectExternalWipeHandles = Effect.fn("collectExternalWipeHandles")(
+  function* (userId: string, personalWorkspaceId: string) {
+    const sql = yield* PgClient.PgClient;
+    const accounts = yield* sql<{
+      login_id: string | null;
+      matrix_user_id: string | null;
+    }>`SELECT matrix_user_id, login_id FROM whatsapp_bridge_accounts
+      WHERE matrix_user_id IS NOT NULL
+        AND (user_id = ${userId} OR workspace_id = ${personalWorkspaceId})`;
+    const identities = yield* sql<{
+      matrix_id: string;
+    }>`SELECT matrix_id FROM matrix_identities WHERE user_id = ${userId}`;
+    return {
+      matrixIds: identities.map((row) => row.matrix_id),
+      rawUserId: rawUserId(userId),
+      whatsapp: accounts.flatMap((row) =>
+        row.matrix_user_id
+          ? [{ loginId: row.login_id, matrixUserId: row.matrix_user_id }]
+          : []
+      ),
+    };
+  }
+);
+
+const markLedgerErased = Effect.fn("markDeletionLedgerErased")(function* (
+  userId: string,
+  surfaces: readonly string[]
+) {
+  if (!surfaces.length) return;
+  const sql = yield* PgClient.PgClient;
+  for (const surface of surfaces) {
+    yield* sql`UPDATE account_deletion_ledger l SET status = 'erased'
+      FROM account_deletion_requests r
+      WHERE l.request_id = r.id AND r.user_id = ${userId}
+        AND l.surface = ${surface} AND l.status = 'pending_external'`;
+  }
+});
+
+const attemptExternalWipes = Effect.fn("attemptExternalWipes")(function* (
+  userId: string,
+  handles: ExternalWipeHandles
+) {
+  const erased: string[] = [];
+  const vaultOk = yield* eraseVaultwardenUser(handles.rawUserId).pipe(
+    Effect.as(true),
+    Effect.catchTag("VaultwardenUnavailable", () => Effect.succeed(false))
+  );
+  if (vaultOk) erased.push("vaultwarden");
+  const whatsappOk = yield* Effect.all(
+    handles.whatsapp.map((row) =>
+      logoutWhatsApp(row.matrixUserId, row.loginId).pipe(
+        Effect.as(true),
+        Effect.catchTag("WhatsAppBridgeUnavailable", () =>
+          Effect.succeed(false)
+        )
+      )
+    )
+  );
+  if (handles.whatsapp.length > 0 && whatsappOk.every((ok) => ok))
+    erased.push("whatsapp");
+  const matrixOk = yield* Effect.all(
+    handles.matrixIds.map((matrixId) =>
+      deactivateMatrixUser(matrixId).pipe(
+        Effect.as(true),
+        Effect.catchTag("MatrixError", () => Effect.succeed(false))
+      )
+    )
+  );
+  if (handles.matrixIds.length > 0 && matrixOk.every((ok) => ok))
+    erased.push("matrix");
+  yield* markLedgerErased(userId, erased);
+  return erased;
+});
+
+const finishExternalWipes = Effect.fn("finishExternalWipes")(function* (
+  userId: string,
+  handles: ExternalWipeHandles,
+  result: typeof resultSchema.Type
+) {
+  const erased = yield* attemptExternalWipes(userId, handles);
+  return yield* Schema.decodeUnknownEffect(resultSchema)({
+    ...result,
+    pending: result.pending.filter((surface) => !erased.includes(surface)),
+  });
+});
 
 function rawUserId(userId: string) {
   return userId.startsWith("better-auth:")
