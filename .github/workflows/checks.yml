@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
@@ -83,7 +83,7 @@ jobs:
       ZOEN_MATRIX_HS_TOKEN: synthetic-matrix-homeserver-token-2026
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
       - name: Set up Node.js
@@ -216,7 +216,7 @@ jobs:
       ZOEN_MEMORY_DATABASE_URL: postgresql://zoen_memory:ci-memory-password@127.0.0.1:5432/zoen_memory
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
