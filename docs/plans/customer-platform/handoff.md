@@ -1,0 +1,19 @@
+# Instrução para o agente de implementação
+
+Implemente e qualifique o Zoen seguindo o [plano](plan.md) e a [matriz de aceite](acceptance.csv) desta pasta. A decisão mais recente é usar redes de confiança para comunicação A2A: cada empresa é uma rede; pessoas também podem aceitar conexões pessoais. Confiança permite contato com bots publicados à rede e não substitui permissões de dados, ferramentas ou cofres.
+
+O repo é `https://github.com/EnzoTironi/tryzoen`. Confirme o estado atual do checkout e preserve alterações de outros agentes. A produção previamente qualificada estava em `29086d3022c57eb0cd1ccc158b28f07ecf1f7ab5`. Atualize a referência antes de começar. Leia o `AGENTS.md` e use Node 24. As implementações devem seguir Effect 4, as APIs instaladas de Eve e os donos de código mapeados no plano.
+
+Primeiro corrija a origem de contas duplicadas: um mensageiro desconhecido ainda pode provisionar usuário independente antes do Google. O onboarding normal deve criar uma identidade canônica via Google e vincular mensageiros por desafio confirmado. Não usar uma tela de mescla como solução normal e não zerar produção como substituto da correção.
+
+Execute P01 e P02 antes de ampliar permissões. Depois entregue a criação/publicação/descoberta/uso/revogação de skills e ferramentas no Executor em contexto pessoal, de grupo e profissional. Em seguida complete Matrix/A2A com dois usuários e dois bots, Vaultwarden com delegação criptográfica e TOTP em site de teste, e a modalidade de ponte WhatsApp de usuário, conforme [o contrato de experiência inspirado no Pally](beeper-pally.md). O registry Eve tem uma referência `channel/chat-sdk-beeper`; avalie o contrato real antes de construir outro adaptador. Ela não comprova por si só integração Desktop ou hospedagem própria.
+
+Mantenha a interface aprovada: céu integrado, assets existentes, pouco texto, PT-BR/EN/ES, navegação React sem reload e sheets em torno de 80% apenas com fechamento. Redes e conexões devem aparecer no espaço certo. Ações e dados pessoais não ficam disponíveis automaticamente à empresa.
+
+Não há implementação ou teste novo de Vaultwarden/Beeper nesta entrega de planejamento. Todas as linhas da matriz começam como `planned`. Não transforme a CI ou os 15 resultados antigos em prova desses fluxos. Colete evidência sanitizada para cada caso e separe teste determinístico, integração real e jornada real de provedor. Faça exclusão completa com prova de não ressurgimento após restauração e qualifique a capacidade dentro do envelope proposto.
+
+Trabalhe em PRs por comportamento, com validação do mesmo SHA que será publicado por Alchemy. Registre impedimentos externos concretos e mantenha a funcionalidade indisponível quando sua prova estiver faltando. Não alegue suporte de todas as redes a partir de uma ponte. Não coloque segredos em ferramentas que retornam ao modelo, replays, logs, imagens, Git ou Mem0.
+
+As gravações foram dispensadas; iMessage, cobrança e Operon estão fora do escopo. Siga as instruções do projeto e as autorizações da tarefa de implementação. Para provas que dependam de uma conta nova real ou de um pareamento no aparelho, prepare primeiro todo o fluxo e identifique precisamente o único passo externo que ainda faltar.
+
+Ao finalizar, entregue a matriz preenchida com provas, os links das PRs e da implantação, limitações por provedor e as capacidades efetivamente disponíveis aos pilotos. Reporte falhas como falhas; não substitua testes de efeito e autorização por uma declaração do modelo de que funcionou.
