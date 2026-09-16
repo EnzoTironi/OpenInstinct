@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { childRoleContract } from "../../agent/lib/child-role";
 
-export const sentinelVerdictSchema = Schema.Union([
+const sentinelVerdictSchema = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("allow"),
   }),
@@ -36,7 +36,6 @@ const admissionSchema = Schema.Struct({
   streamingUnreviewed: Schema.Boolean,
   workerSelfAuthorizes: Schema.Boolean,
 });
-export type SentinelAdmission = typeof admissionSchema.Type;
 
 /**
  * Host/Executor intercept for audience crossing. This is not an Eve tool.

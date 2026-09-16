@@ -2,12 +2,11 @@ import { Schema } from "effect";
 
 const requiredId = Schema.String.check(Schema.isMinLength(1));
 
-export const browserSubmissionSchema = Schema.Struct({
+const browserSubmissionSchema = Schema.Struct({
   operationId: requiredId,
   origin: requiredId,
   target: requiredId,
 });
-export type BrowserSubmission = typeof browserSubmissionSchema.Type;
 
 const parseOptions = { onExcessProperty: "error" } as const;
 
