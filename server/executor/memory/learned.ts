@@ -15,7 +15,6 @@ import {
   workspaceActorFromPrincipal,
 } from "../../workspaces/access";
 import { admitPersonalMemoryFromSession } from "../../personal-memory/group-memory-policy";
-import { env } from "@shared/environment/env";
 import { toolInputSchema } from "../../../agent/lib/tool-input-schema";
 
 const memoryAttributes = Schema.Struct({
@@ -25,7 +24,6 @@ const memoryAttributes = Schema.Struct({
 });
 
 const memoryScope = (context: MemoryScopeContext) => {
-  if (!env.ZOEN_MEM0_URL || !env.ZOEN_MEM0_API_KEY) return null;
   const principal = context.session.auth.current;
   if (
     principal?.principalType !== "user" ||
@@ -70,14 +68,9 @@ const recall = (
         context.memory.scope.value
       );
       const memory = yield* LearnedMemory;
-      const query =
-        context.turn === null ? "" : JSON.stringify(context.turn.input);
       const stored = yield* memory
-        .recall(actor, context.memory.scope.key, context.operationId, query)
+        .recall(actor, context.memory.scope.key, context.operationId, "")
         .pipe(
-          // Replace the recalled slot even during an outage. Stale or forgotten
-          // notes must not survive merely because the memory service is down.
-          Effect.catchTag("Mem0Error", () => Effect.succeed(null)),
           Effect.catchTag("LearnedMemoryError", (error) =>
             error.reason === "invalid_input"
               ? Effect.fail(error)

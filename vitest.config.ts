@@ -20,6 +20,12 @@ export default defineConfig({
           new URL("shared/environment/env.ts", import.meta.url)
         ),
       },
+      {
+        find: /^@zoen\/operon$/u,
+        replacement: fileURLToPath(
+          new URL("packages/operon/src/index.ts", import.meta.url)
+        ),
+      },
       ...["agent", "app", "db", "evals", "shared", "tests", "tools", "web"].map(
         (owner) => ({
           find: new RegExp(`^@${owner}/(.*)$`, "u"),

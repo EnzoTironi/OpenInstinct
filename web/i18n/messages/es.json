@@ -705,6 +705,8 @@
   "The conversation is still loading.": "La conversación todavía está cargando.",
   "The session request failed.": "La solicitud de la sesión falló.",
   "The model is temporarily unavailable. Please try again.": "El modelo no está disponible en este momento. Inténtalo de nuevo.",
+  "The model provider has no remaining credits. Check billing and try again.": "El proveedor del modelo no tiene créditos restantes. Revisa la facturación e inténtalo de nuevo.",
+  "The model provider rejected this request. Check the configured model connection.": "El proveedor del modelo rechazó esta solicitud. Revisa la conexión del modelo configurada.",
   "The session stream did not report a valid tail index.": "La transmisión de la sesión no informó un índice final válido.",
   "Idioma": "Idioma",
   "Não foi possível salvar o idioma. Tente novamente.": "No se pudo guardar el idioma. Inténtalo de nuevo.",

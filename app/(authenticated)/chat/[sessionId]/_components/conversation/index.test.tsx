@@ -202,6 +202,43 @@ describe("chat conversation", () => {
     expect(markup).not.toContain("Internal runtime failure");
   });
 
+  it("shows a classified model-credit failure in the default conversation without the provider payload", () => {
+    const agent = {
+      data: { messages: [message("turn-1:user", "Try this")] },
+      error: undefined,
+      events: [
+        {
+          data: {
+            code: "MODEL_CALL_FAILED",
+            message:
+              "OpenRouter 402 insufficient credits for the selected model",
+            sequence: 1,
+            turnId: "turn-1",
+          },
+          meta: { at: "2026-09-15T18:00:00.000Z", id: "failed" },
+          type: "turn.failed",
+        },
+      ] satisfies MessageStreamEvent[],
+      respond: async () => undefined,
+      status: "ready",
+    } satisfies Pick<
+      ChatAgent,
+      "data" | "error" | "events" | "respond" | "status"
+    >;
+
+    const markup = renderToStaticMarkup(
+      <ChatConversation agent={agent} traceView="imessage" />
+    );
+
+    expect(markup).toContain("Try this");
+    expect(markup).toContain(
+      "O provedor do modelo está sem créditos. Verifique a cobrança e tente novamente."
+    );
+    expect(markup).not.toContain("OpenRouter");
+    expect(markup).not.toContain("402");
+    expect(markup).not.toContain("Não foi possível concluir o pedido.");
+  });
+
   it.each([
     ["complete", "A finished answer", true],
     ["streaming", "Still composing", false],

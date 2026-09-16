@@ -1,3 +1,7 @@
+packages:
+  - "."
+  - "packages/operon"
+
 minimumReleaseAgeStrict: true
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:

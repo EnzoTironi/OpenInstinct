@@ -362,8 +362,10 @@ const makeTransport = Effect.gen(function* () {
           return yield* new PayloadConflict({ id: existing[0].id });
         return yield* Effect.forEach(payloads, (payload, index) =>
           messaging.enqueue({
+            effectKind: "channel_send",
             identityId: value.identityId,
             deliveryKey: `${value.deliveryKey}:${String(index)}`,
+            operationId: value.deliveryKey,
             payload,
           })
         );
@@ -402,8 +404,10 @@ const makeTransport = Effect.gen(function* () {
             MessagePayloadSchema
           )(row.payload).pipe(Effect.mapError(invalidInput));
           return yield* messaging.enqueue({
+            effectKind: "channel_send",
             identityId: value.identityId,
             deliveryKey: row.key,
+            operationId: value.deliveryKey,
             payload,
           });
         })

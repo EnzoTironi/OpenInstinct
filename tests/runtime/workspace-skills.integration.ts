@@ -5,7 +5,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { expect, test } from "vitest";
 import { executeCodeMode } from "../../server/executor/dispatch";
 import { LearnedMemory } from "../../server/memory/learned";
-import { Mem0 } from "../../server/memory/mem0";
 import { WorkspaceAccessDenied } from "../../server/workspaces/access";
 import { WorkspaceRepository } from "../../server/workspaces/repository";
 import {
@@ -18,7 +17,6 @@ import { linkedIdentity } from "./identity-fixture";
 import { workspaceFixture, workspaceExecutionFor } from "./workspace-fixture";
 
 const services = LearnedMemory.layer.pipe(
-  Layer.provideMerge(Mem0.layer),
   Layer.provideMerge(WorkspaceRepository.layer),
   Layer.provideMerge(runtimeDatabase)
 );

@@ -1,8 +1,9 @@
 import { ResolvedInstallationSecrets } from "@db/services/installation-secrets";
 import { PgClient } from "@effect/sql-pg";
+import { objectTypeIdSchema } from "@zoen/operon";
 import { WorkspaceRepository } from "./workspaces/repository";
 import { LearnedMemory } from "./memory/learned";
-import { Mem0 } from "./memory/mem0";
+import { learnedNoteTypeId } from "./memory/learned-type";
 import { Config, Layer, ManagedRuntime } from "effect";
 import { ChannelAccounts } from "./accounts";
 import { NativeDeviceAuth } from "./accounts/device";
@@ -29,10 +30,7 @@ const infrastructure = Layer.mergeAll(
   Messaging.layer,
   MemoryDocuments.layer,
   WorkspaceRepository.layer,
-  LearnedMemory.layer.pipe(
-    Layer.provide(Mem0.layer),
-    Layer.provide(WorkspaceRepository.layer)
-  ),
+  LearnedMemory.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
   PersonalMemory.layer,
   Telegram.layer,
   Kapso.layer,
@@ -45,5 +43,9 @@ const services = Layer.mergeAll(
   ChannelTransport.layer,
   ChannelAuthPrompts.layer
 ).pipe(Layer.provideMerge(infrastructure));
+
+if (objectTypeIdSchema.make("LearnedNote") !== learnedNoteTypeId) {
+  throw new Error("Operon learned note type drifted.");
+}
 
 export const serverRuntime = ManagedRuntime.make(services);

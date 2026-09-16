@@ -497,7 +497,9 @@ test("outbox deduplicates intent, fences sends, and keeps lanes independent", ()
     Effect.gen(function* () {
       const intent = {
         identityId,
+        effectKind: "channel_send" as const,
         deliveryKey: "reply-1",
+        operationId: "reply-1",
         payload: { text: "reply" },
       };
       const receipts = yield* Effect.all(
@@ -565,12 +567,16 @@ test("expired outbox is uncertain, cannot resend, and blocks later output", () =
     Effect.gen(function* () {
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "first",
+        operationId: "first",
         payload: { text: "one" },
       });
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "second",
+        operationId: "second",
         payload: { text: "two" },
       });
       const claim = yield* messaging.claimOutbox({
@@ -590,6 +596,11 @@ test("expired outbox is uncertain, cannot resend, and blocks later output", () =
         status: "uncertain",
       });
       expect(state.counts).toContainEqual({ status: "queued", count: 1 });
+      expect(yield* messaging.aggregateOperation(identityId, "first")).toEqual({
+        disposition: "uncertain",
+        operationId: "first",
+        statuses: ["uncertain"],
+      });
     })
   ));
 
@@ -604,7 +615,9 @@ test("revocation blocks acceptance, dispatch, and completion and cancels queued 
       });
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "first",
+        operationId: "first",
         payload: { text: "reply" },
       });
       const claim = yield* messaging.claimInbox({
@@ -627,7 +640,9 @@ test("revocation blocks acceptance, dispatch, and completion and cancels queued 
         yield* messaging
           .enqueue({
             identityId,
+            effectKind: "channel_send",
             deliveryKey: "new",
+            operationId: "new",
             payload: { text: "blocked" },
           })
           .pipe(Effect.flip)
@@ -653,6 +668,11 @@ test("revocation blocks acceptance, dispatch, and completion and cancels queued 
       expect(
         (yield* messaging.inspectOutbox(identityId)).counts
       ).toContainEqual({ status: "cancelled", count: 1 });
+      expect(yield* messaging.aggregateOperation(identityId, "first")).toEqual({
+        disposition: "cancelled",
+        operationId: "first",
+        statuses: ["cancelled"],
+      });
     })
   ));
 
@@ -661,7 +681,9 @@ test("explicit uncertainty stores only categorical errors and remains visible", 
     Effect.gen(function* () {
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "first",
+        operationId: "first",
         payload: { text: "reply" },
       });
       const claim = yield* messaging.claimOutbox({
@@ -1035,7 +1057,9 @@ test("a conflicting transcript intent rolls back both preparation and earlier in
       });
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: `transcript:${input.id}:1:0`,
+        operationId: `transcript:${input.id}:1:0`,
         payload: { text: "conflicting existing intent" },
       });
       const claim = yield* messaging.claimInbox({
@@ -1073,7 +1097,9 @@ test("uncertain outbox resolve marks delivered, cancels, or authorizes duplicate
       ) {
         yield* messaging.enqueue({
           identityId,
+          effectKind: "channel_send",
           deliveryKey,
+          operationId: deliveryKey,
           payload: { text },
         });
         const claim = yield* messaging.claimOutbox({
@@ -1227,7 +1253,9 @@ test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery 
       const actor = "better-auth:operator-proof";
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "queued-only",
+        operationId: "queued-only",
         payload: { text: "still queued" },
       });
       const queued = yield* sql<{ id: string }>`
@@ -1252,7 +1280,9 @@ test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery 
 
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "stuck",
+        operationId: "stuck",
         payload: { text: "stuck" },
       });
       const claim = yield* messaging.claimOutbox({
@@ -1303,5 +1333,97 @@ test("uncertain outbox resolve refuses non-uncertain rows and inactive delivery 
         decision: { kind: "cancel", reason: "operator_cancelled" },
       });
       expect(cancelled.status).toBe("cancelled");
+    })
+  ));
+
+test("mixed outbox statuses keep the operation uncertain and isolate another identity", () =>
+  run((messaging, sql, identityId) =>
+    Effect.gen(function* () {
+      const otherIdentity = randomUUID();
+      yield* sql`INSERT INTO channel_identity (id, channel, installation_id, sender_id, user_id)
+        SELECT ${otherIdentity}, channel, installation_id, ${otherIdentity}, user_id
+        FROM channel_identity WHERE id = ${identityId}`;
+      yield* messaging.enqueue({
+        identityId,
+        effectKind: "channel_send",
+        deliveryKey: "briefing:0",
+        operationId: "briefing",
+        payload: { text: "first chunk" },
+      });
+      yield* messaging.enqueue({
+        identityId,
+        effectKind: "channel_send",
+        deliveryKey: "briefing:1",
+        operationId: "briefing",
+        payload: { text: "second chunk" },
+      });
+      yield* messaging.enqueue({
+        identityId: otherIdentity,
+        effectKind: "channel_send",
+        deliveryKey: "briefing:0",
+        operationId: "briefing",
+        payload: { text: "foreign chunk" },
+      });
+      const claim = yield* messaging.claimOutbox({
+        identityId,
+        leaseSeconds: 30,
+      });
+      if (!claim) throw new Error("Expected first chunk lease");
+      yield* messaging.markOutboxUncertain({
+        lease: {
+          identityId,
+          id: claim.id,
+          leaseToken: claim.leaseToken,
+        },
+        reason: "handoff_unknown",
+      });
+      yield* sql`UPDATE channel_outbox SET status = 'sent',
+        provider_message_id = 'tg:ok', sent_at = clock_timestamp()
+        WHERE identity_id = ${identityId} AND delivery_key = 'briefing:1'`;
+      const mixed = yield* messaging.aggregateOperation(identityId, "briefing");
+      expect(mixed.disposition).toBe("uncertain");
+      expect(mixed.statuses).toEqual(["uncertain", "sent"]);
+      expect(
+        yield* messaging.aggregateOperation(otherIdentity, "briefing")
+      ).toEqual({
+        disposition: "pending",
+        operationId: "briefing",
+        statuses: ["queued"],
+      });
+    })
+  ));
+
+test("lost wakeup rediscovers queued work and only one worker holds the lease", () =>
+  run((messaging, _sql, identityId) =>
+    Effect.gen(function* () {
+      yield* messaging.enqueue({
+        identityId,
+        effectKind: "channel_send",
+        deliveryKey: "scan",
+        operationId: "scan",
+        payload: { text: "committed without a task ping" },
+      });
+      expect(yield* messaging.aggregateOperation(identityId, "scan")).toEqual({
+        disposition: "pending",
+        operationId: "scan",
+        statuses: ["queued"],
+      });
+      const claims = yield* Effect.all(
+        [
+          messaging.claimOutbox({ identityId, leaseSeconds: 30 }),
+          messaging.claimOutbox({ identityId, leaseSeconds: 30 }),
+        ],
+        { concurrency: 2 }
+      );
+      const held = claims.filter((claim) => claim !== null);
+      expect(held).toHaveLength(1);
+      const lease = held[0];
+      if (!lease) throw new Error("Expected one active attempt owner");
+      expect(lease.status).toBe("dispatching");
+      expect(yield* messaging.aggregateOperation(identityId, "scan")).toEqual({
+        disposition: "uncertain",
+        operationId: "scan",
+        statuses: ["dispatching"],
+      });
     })
   ));

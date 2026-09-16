@@ -3,11 +3,12 @@ import { Effect, Schema } from "effect";
 import { channelProviderSchema } from "../../shared/identity/channel-auth";
 
 export const IdentityId = Schema.String.check(Schema.isUUID());
-const reference = Schema.String.check(
+export const messageReferenceSchema = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(256),
   Schema.isTrimmed()
 );
+const reference = messageReferenceSchema;
 
 export const InputDeliveryReferenceSchema = Schema.Struct({
   sessionId: reference,
@@ -74,12 +75,67 @@ export const AcceptInputSchema = Schema.Struct({
   payload: MessagePayloadSchema,
 });
 export type AcceptInput = typeof AcceptInputSchema.Type;
+const EffectKindSchema = Schema.Literals([
+  "browser_submit",
+  "channel_send",
+  "mail",
+  "whatsapp",
+]);
+export type EffectKind = typeof EffectKindSchema.Type;
+
 export const EnqueueInputSchema = Schema.Struct({
+  effectKind: EffectKindSchema,
   identityId: IdentityId,
   deliveryKey: reference,
+  operationId: reference,
   payload: MessagePayloadSchema,
 });
 export type EnqueueInput = typeof EnqueueInputSchema.Type;
+
+export const outboxStatusSchema = Schema.Literals([
+  "cancelled",
+  "dispatching",
+  "failed",
+  "queued",
+  "sent",
+  "uncertain",
+]);
+export type OutboxStatus = typeof outboxStatusSchema.Type;
+
+export type OperationDisposition =
+  | "cancelled"
+  | "failed"
+  | "pending"
+  | "succeeded"
+  | "uncertain";
+
+export function operationDisposition(
+  statuses: readonly OutboxStatus[]
+): OperationDisposition {
+  if (statuses.length === 0) {
+    return "pending";
+  }
+  const kinds = new Set(statuses);
+  if (kinds.has("uncertain") || kinds.has("dispatching")) {
+    return "uncertain";
+  }
+  if (kinds.has("queued")) {
+    return "pending";
+  }
+  if (kinds.has("failed")) {
+    return "failed";
+  }
+  if (kinds.has("sent") && kinds.has("cancelled")) {
+    return "failed";
+  }
+  if (kinds.size === 1 && kinds.has("cancelled")) {
+    return "cancelled";
+  }
+  if (kinds.size === 1 && kinds.has("sent")) {
+    return "succeeded";
+  }
+  return "uncertain";
+}
 
 export const ClaimInputSchema = Schema.Struct({
   identityId: IdentityId,

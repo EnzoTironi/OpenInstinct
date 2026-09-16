@@ -10,11 +10,14 @@ import {
   MessageClaimSchema,
   OutboxResolutionRejected,
   PayloadConflict,
+  outboxStatusSchema,
   type DeliveryFailure,
+  type EffectKind,
   type Lease,
   type MessagePayload,
   type OutboxResolutionDecision,
   type ResolveOutboxUncertainInput,
+  operationDisposition,
 } from "./model";
 
 const queues = {
@@ -39,7 +42,25 @@ const queues = {
 } as const;
 export type Lane = keyof typeof queues;
 
-export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
+interface InboxInsert {
+  identityId: string;
+  key: string;
+  payload: MessagePayload;
+  sourceMessageId: string | null;
+}
+
+interface OutboxInsert extends InboxInsert {
+  effectKind: EffectKind;
+  operationId: string;
+}
+
+function hasOutboxLinkage(
+  input: InboxInsert | OutboxInsert
+): input is OutboxInsert {
+  return "effectKind" in input && "operationId" in input;
+}
+
+export const makeQueue = <L extends Lane>(sql: PgClient.PgClient, lane: L) => {
   const queue = queues[lane];
   const table = sql(queue.table);
   const sourceMessageId =
@@ -61,12 +82,9 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
     return undefined;
   });
 
-  const insert = Effect.fn("Messaging.insert")(function* (input: {
-    identityId: string;
-    key: string;
-    sourceMessageId: string | null;
-    payload: MessagePayload;
-  }) {
+  const insert = Effect.fn("Messaging.insert")(function* (
+    input: L extends "outbox" ? OutboxInsert : InboxInsert
+  ) {
     yield* lockActive(input.identityId);
     const canonical = canonicalPayload(input.payload);
     const hash =
@@ -97,10 +115,23 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
     const sourceColumn = lane === "inbox" ? sql`, source_message_id` : sql``;
     const sourceValue =
       lane === "inbox" ? sql`, ${input.sourceMessageId}` : sql``;
+    const outboxRow =
+      lane === "outbox" && hasOutboxLinkage(input) ? input : undefined;
+    if (lane === "outbox" && !outboxRow) {
+      return yield* new MessagingStorageError({
+        message: "Outbox insert requires operation linkage.",
+      });
+    }
+    const operationColumn = outboxRow
+      ? sql`, operation_id, effect_kind`
+      : sql``;
+    const operationValue = outboxRow
+      ? sql`, ${outboxRow.operationId}, ${outboxRow.effectKind}`
+      : sql``;
     const rows = yield* sql`INSERT INTO ${table}
-      (id, identity_id, ${sql(queue.key)}, ${sql(queue.hash)}, payload, status${sourceColumn})
+      (id, identity_id, ${sql(queue.key)}, ${sql(queue.hash)}, payload, status${sourceColumn}${operationColumn})
       VALUES (${randomUUID()}, ${input.identityId}, ${input.key}, ${hash},
-        ${sql.json(canonical.payload)}, 'queued'${sourceValue}) RETURNING ${columns}`;
+        ${sql.json(canonical.payload)}, 'queued'${sourceValue}${operationValue}) RETURNING ${columns}`;
     return yield* decodeReceipt(rows[0]);
   }, sql.withTransaction);
 
@@ -376,6 +407,32 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
     };
   });
 
+  const aggregateOperation = Effect.fn("Messaging.aggregateOperation")(
+    function* (identityId: string, operationId: string) {
+      if (lane !== "outbox") {
+        return {
+          disposition: "pending" as const,
+          operationId,
+          statuses: [] as const,
+        };
+      }
+      const rows = yield* sql<{
+        status: string;
+      }>`SELECT status FROM ${table}
+        WHERE identity_id = ${identityId} AND operation_id = ${operationId}
+        ORDER BY ${sql(queue.order)}, id`;
+      const statuses = yield* Schema.decodeUnknownEffect(
+        Schema.Array(Schema.Struct({ status: outboxStatusSchema }))
+      )(rows);
+      const listed = statuses.map((row) => row.status);
+      return {
+        disposition: operationDisposition(listed),
+        operationId,
+        statuses: listed,
+      };
+    }
+  );
+
   return {
     insert,
     claim,
@@ -384,6 +441,7 @@ export const makeQueue = (sql: PgClient.PgClient, lane: Lane) => {
     resolveUncertain,
     scheduleRetry,
     inspect,
+    aggregateOperation,
     checkLease: (lease: Lease) => sql.withTransaction(requireLease(lease)),
   };
 };

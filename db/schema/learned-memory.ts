@@ -1,5 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
+  index,
   jsonb,
   pgTable,
   primaryKey,
@@ -47,4 +50,38 @@ export const workspaceMemoryRecalls = pgTable(
       .defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.namespaceId, table.operationId] })]
+);
+
+export const workspaceLearnedItems = pgTable(
+  "workspace_learned_item",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    namespaceId: uuid("namespace_id")
+      .notNull()
+      .references(() => workspaceMemoryNamespaces.namespaceId, {
+        onDelete: "cascade",
+      }),
+    typeId: text("type_id").notNull(),
+    memory: text("memory").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("workspace_learned_item_namespace_idx").on(
+      table.namespaceId,
+      table.typeId
+    ),
+    check(
+      "workspace_learned_item_memory_check",
+      sql`length(${table.memory}) > 0 AND length(${table.memory}) <= 8000`
+    ),
+    check(
+      "workspace_learned_item_type_check",
+      sql`length(trim(${table.typeId})) > 0 AND length(${table.typeId}) <= 128`
+    ),
+  ]
 );

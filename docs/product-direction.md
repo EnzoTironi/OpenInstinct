@@ -13,7 +13,10 @@ an outcome, contribute a missing detail when necessary, authorize what needs the
 decision, and receive a useful result. The product remembers enough to make the
 next interaction easier. It stays quiet when it has nothing useful to add.
 
-WhatsApp and Telegram are the front door. The same assistant works through both.
+WhatsApp and Telegram remain product doors and share the channel contract. The
+G0 live proof door is authenticated `/chat` on the same application PostgreSQL;
+those messengers do not block the first slice. See
+[G0 baseline](decisions/g0-baseline.md).
 Effect, Eve, Kernel and MCP are implementation choices supporting that promise.
 They should not become the onboarding curriculum. Operational ontology (Worlds)
 lives in [Operon](https://github.com/EnzoTironi/operon), not Companion.

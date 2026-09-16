@@ -52,6 +52,22 @@ describe("auth proxy matcher", () => {
     ).toBe(true);
   });
 
+  it("keeps authenticated /chat behind a browser session", async () => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        nextConfig: {},
+        url: "/chat",
+      })
+    ).toBe(true);
+    const response = await proxy(new NextRequest("https://example.com/chat"));
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://example.com/sign-in?callbackUrl=%2Fchat"
+    );
+    expect(getAuthSession).toHaveBeenCalledOnce();
+  });
+
   it("leaves scheduled-run authorization to the Eve channel", async () => {
     const response = await proxy(
       new NextRequest("https://example.com/internal/scheduled-run/start")

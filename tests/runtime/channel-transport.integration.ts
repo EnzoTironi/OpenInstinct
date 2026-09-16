@@ -184,7 +184,9 @@ test.each(["inbox", "outbox"] as const)(
               })
             : messaging.enqueue({
                 identityId,
+                effectKind: "channel_send",
                 deliveryKey: key,
+                operationId: key,
                 payload: { text: "fixture" },
               });
         yield* Effect.forEach(identities, (id) => put(id, "first"));
@@ -348,7 +350,9 @@ test("enqueues stable chunks idempotently and rolls back partial writes on confl
       ).toBeInstanceOf(PayloadConflict);
       yield* messaging.enqueue({
         identityId: id,
+        effectKind: "channel_send",
         deliveryKey: "atomic:1",
+        operationId: "atomic:1",
         payload: { text: "existing" },
       });
       expect(
@@ -373,7 +377,9 @@ test("unsupported stored media fails before any provider configuration or send",
       if (!id) throw new Error("Missing fixture");
       const receipt = yield* messaging.enqueue({
         identityId: id,
+        effectKind: "channel_send",
         deliveryKey: "media",
+        operationId: "media",
         payload: { attachments: [{ id: "opaque", mediaType: "image/png" }] },
       });
       expect(yield* transport.drainOutbox(id).pipe(Effect.flip)).toMatchObject({
@@ -412,7 +418,9 @@ test.each([
       if (!id) throw new Error("Missing fixture");
       const receipt = yield* messaging.enqueue({
         identityId: id,
+        effectKind: "channel_send",
         deliveryKey: "preflight",
+        operationId: "preflight",
         payload: { text: "must not leave database" },
       });
       const failure = yield* transport
@@ -494,12 +502,16 @@ test("rejects a stored chunk key hole even when its count matches the requested 
       if (!identityId) throw new Error("Missing fixture");
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "hole:0",
+        operationId: "hole:0",
         payload: { text: "a".repeat(4000) },
       });
       yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "hole:2",
+        operationId: "hole:2",
         payload: { text: "unexpected extra chunk" },
       });
       expect(
@@ -625,7 +637,9 @@ test("the dispatcher recovers native inputs before and after preparation while b
       );
       yield* messaging.enqueue({
         identityId: outboundId,
+        effectKind: "channel_send",
         deliveryKey: "uncertain-send",
+        operationId: "uncertain-send",
         payload: { text: "reply" },
       });
       const outbound = yield* messaging.claimOutbox({
@@ -705,12 +719,16 @@ test("HTTP 429 schedules retry_after deferral instead of terminal failure", () =
         WHERE id = ${identityId}`;
       const receipt = yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "rate-limit-one",
+        operationId: "rate-limit-one",
         payload: { text: "temporary throttle" },
       });
       const follower = yield* messaging.enqueue({
         identityId,
+        effectKind: "channel_send",
         deliveryKey: "rate-limit-two",
+        operationId: "rate-limit-two",
         payload: { text: "must wait behind deferred head" },
       });
       expect(

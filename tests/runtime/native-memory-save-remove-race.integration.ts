@@ -1,22 +1,65 @@
 import assert from "node:assert/strict";
-import { randomInt, randomUUID } from "node:crypto";
-import { waitForBlocked } from "./pg-locks";
+import { randomUUID } from "node:crypto";
 import { Client } from "pg";
-import { PgClient } from "@effect/sql-pg";
-import { Config, Effect } from "effect";
+import { Config, Effect, Schema } from "effect";
 import { test } from "vitest";
 import type { MemoryTurnStartedContext } from "eve/memory";
-import { fileMemory } from "eve/memory/file";
 import type { ToolContext } from "eve/tools";
-import { createMemoryDocumentBackend } from "../../agent/lib/memory-document-backend";
-import { authorizePersonalMemoryContext } from "../../agent/lib/personal-memory-access";
-import { personalMemoryProvider } from "../../server/executor/memory/personal-memory-provider";
-import { PersonalMemoryError } from "../../server/personal-memory/access";
+import learnedMemory from "../../server/executor/memory/learned";
 import { accessScopeForUser } from "../../shared/identity/access-scope";
 import { runtimeDatabase } from "./database";
 
-const forgottenText = "My favorite color is orange.";
-const incomingText = "My favorite drink is tea.";
+const forgottenText = "Minha cor favorita é laranja.";
+const incomingText = "Minha bebida favorita é chá.";
+
+const learnedItemListSchema = Schema.Array(
+  Schema.Struct({
+    id: Schema.String.check(Schema.isUUID()),
+    memory: Schema.String,
+  })
+);
+
+function learnedRecallItems(content: string) {
+  const line = content.trim().split("\n").at(-1);
+  if (line?.[0] !== "[") return [];
+  return Schema.decodeUnknownSync(learnedItemListSchema)(JSON.parse(line));
+}
+
+function recallMessage(recall: {
+  messages: readonly { content: string; id?: string }[];
+}) {
+  const message = recall.messages[0];
+  assert.ok(message);
+  return message;
+}
+
+function nextTurn(context: MemoryTurnStartedContext): MemoryTurnStartedContext {
+  const operationId = randomUUID();
+  const sequence = context.turn.sequence + 1;
+  return {
+    ...context,
+    operationId,
+    session: {
+      ...context.session,
+      turn: { id: operationId, sequence },
+    },
+    turn: { id: operationId, sequence, input: context.turn.input },
+  };
+}
+
+async function listLearned(
+  sql: Client,
+  scope: { workspaceId: string; userId: string }
+) {
+  const result = await sql.query<{ id: string; memory: string }>(
+    `SELECT i.id, i.memory FROM workspace_learned_item i
+     JOIN workspace_memory_namespace n ON n.namespace_id = i.namespace_id
+     WHERE n.workspace_id = $1 AND n.user_id = $2
+     ORDER BY i.id`,
+    [scope.workspaceId, scope.userId]
+  );
+  return result.rows;
+}
 
 async function fixture() {
   await Effect.runPromise(Effect.void.pipe(Effect.provide(runtimeDatabase)));
@@ -27,10 +70,8 @@ async function fixture() {
   const userId = randomUUID();
   const sessionId = randomUUID();
   const scope = accessScopeForUser(`better-auth:${userId}`);
-  const key = `native-save-remove-race:${randomUUID()}`;
   const close = async () => {
-    await sql.query("SELECT pg_advisory_unlock_all()");
-    await sql.query("DELETE FROM memory_document WHERE key = $1", [key]);
+    await sql.query(`DELETE FROM public.session WHERE "userId" = $1`, [userId]);
     await sql.query("DELETE FROM workspaces WHERE id = $1", [
       scope.workspaceId,
     ]);
@@ -40,7 +81,7 @@ async function fixture() {
   try {
     await sql.query(
       'INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)',
-      [userId, "Native race proof", `${userId}@example.invalid`]
+      [userId, "Learned race proof", `${userId}@example.invalid`]
     );
     await sql.query("INSERT INTO workspaces (id) VALUES ($1)", [
       scope.workspaceId,
@@ -55,7 +96,7 @@ async function fixture() {
     );
     const principal = {
       principalId: scope.userId,
-      principalType: "user",
+      principalType: "user" as const,
       authenticator: "authjs",
       attributes: {
         workspaceId: scope.workspaceId,
@@ -66,11 +107,11 @@ async function fixture() {
     const context: MemoryTurnStartedContext = {
       memory: {
         scope: {
-          key,
-          namespace: "native-save-remove-race",
-          value: scope.workspaceId,
+          key: `learned-save-remove-race:${randomUUID()}`,
+          namespace: "zoen-learned-v1",
+          value: [scope.workspaceId, scope.userId],
         },
-        slot: "profile",
+        slot: "learned",
       },
       session: {
         id: sessionId,
@@ -82,46 +123,48 @@ async function fixture() {
       messages: [],
       abortSignal: new AbortController().signal,
       getSandbox() {
-        throw new Error("Native file memory must not use a sandbox.");
+        throw new Error("Learned memory must not use a sandbox.");
       },
       getSkill() {
-        throw new Error("Native file memory must not load skills.");
+        throw new Error("Learned memory must not load skills.");
       },
     };
     const execution: ToolContext = {
       ...context,
       callId: randomUUID(),
-      toolName: "profile__save_memory",
+      toolName: "learned__save_memory",
       getToken() {
-        throw new Error("Native file memory must not use tokens.");
+        throw new Error("Learned memory must not use tokens.");
       },
       requireAuth() {
         throw new Error(
-          "Native file memory must not request provider authorization."
+          "Learned memory must not request provider authorization."
         );
       },
     };
-    const tools = await personalMemoryProvider.tools?.({
+    const tools = await learnedMemory.provider.tools({
       ...context,
       channel: { kind: "eve" },
     });
-    assert.ok(tools?.save_memory && tools.remove_memory);
-    await tools.save_memory.execute(
-      // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
-      { text: forgottenText },
-      execution
+    await tools.save_memory.execute({ text: forgottenText }, execution);
+    const recall = await learnedMemory.provider.recall["turn.started"](context);
+    const original = learnedRecallItems(recallMessage(recall).content).find(
+      (item) => item.memory.includes("laranja")
     );
-    const recall = await personalMemoryProvider.recall["turn.started"](context);
-    const index = /(?:^|\n)(\d+):.*orange/mu.exec(
-      recall?.messages[0]?.content ?? ""
-    )?.[1];
-    assert.ok(index);
+    assert.ok(original);
+    const documents = await sql.query(
+      "SELECT 1 FROM memory_document WHERE key = $1",
+      [context.memory.scope.key]
+    );
+    assert.equal(documents.rowCount, 0);
     return {
       sql,
+      scope,
       context,
       execution,
+      save: tools.save_memory,
       remove: tools.remove_memory,
-      originalIndex: Number(index),
+      originalId: original.id,
       close,
     };
   } catch (error) {
@@ -130,132 +173,88 @@ async function fixture() {
   }
 }
 
-const readDocument = async (sql: Client, key: string) => {
-  const result = await sql.query<{ content: string; version: string }>(
-    "SELECT content, version FROM memory_document WHERE key = $1",
-    [key]
-  );
-  const document = result.rows[0];
-  assert.ok(document);
-  return document;
-};
-
-async function runRace(blockedOperation: 1 | 2, text: string) {
+test("forgotten learned note stays gone while a concurrent remember commits a different fact", async () => {
   const owner = await fixture();
-  const gateKey = randomInt(1, 2_147_483_647);
-  let operations = 0;
-  let pending: Promise<unknown> | undefined;
   try {
-    const before = await readDocument(
-      owner.sql,
-      owner.context.memory.scope.key
+    await Promise.all([
+      owner.remove.execute(
+        { id: owner.originalId },
+        {
+          ...owner.execution,
+          callId: randomUUID(),
+          toolName: "learned__remove_memory",
+        }
+      ),
+      owner.save.execute(
+        { text: incomingText },
+        {
+          ...owner.execution,
+          callId: randomUUID(),
+          toolName: "learned__save_memory",
+        }
+      ),
+    ]);
+    const after = await listLearned(owner.sql, owner.scope);
+    assert.equal(
+      after.some((row) => row.id === owner.originalId),
+      false
     );
-    await owner.sql.query("SELECT pg_advisory_lock($1::bigint)", [gateKey]);
-    const pid = (
-      await owner.sql.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")
-    ).rows[0]?.pid;
-    assert.ok(pid);
-    // The real guard and backend execute unchanged. Only this save's selected authorization
-    // transaction waits on an actual PG operation, before document I/O acquires its row lock.
-    const authorize = Effect.gen(function* () {
-      yield* authorizePersonalMemoryContext(owner.context);
-      operations += 1;
-      if (operations === blockedOperation) {
-        const sql = yield* PgClient.PgClient;
-        yield* sql`SELECT pg_advisory_xact_lock(${gateKey}::bigint)`.pipe(
-          Effect.mapError(
-            () => new PersonalMemoryError({ reason: "unavailable" })
-          )
-        );
-      }
-    });
-    const native = fileMemory({
-      backend: createMemoryDocumentBackend(authorize),
-    });
-    const tools = await native.tools?.({
-      ...owner.context,
-      channel: { kind: "eve" },
-    });
-    assert.ok(tools?.save_memory);
-    pending = Promise.resolve(
-      tools.save_memory.execute(
-        // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
-        { text },
-        { ...owner.execution, callId: randomUUID() }
-      )
+    assert.equal(
+      after.some((row) => row.memory.includes("chá")),
+      true
     );
-    const blockedPid = await waitForBlocked(
-      owner.sql,
-      pid,
-      "%pg_advisory_xact_lock%"
+    assert.equal(
+      after.some((row) => row.memory.includes("laranja")),
+      false
     );
-    assert.equal(operations, blockedOperation);
+    const recalled = await learnedMemory.provider.recall["turn.started"](
+      nextTurn(owner.context)
+    );
+    const content = recallMessage(recalled).content;
+    assert.doesNotMatch(content, /laranja/);
+    assert.match(content, /chá/);
+  } finally {
+    await owner.close();
+  }
+});
+
+test("remembering forgotten text after removal creates a new learned note id", async () => {
+  const owner = await fixture();
+  try {
     await owner.remove.execute(
-      // @ts-expect-error The public heterogeneous tool map erases the individual input schema.
-      { index: owner.originalIndex },
+      { id: owner.originalId },
       {
         ...owner.execution,
         callId: randomUUID(),
-        toolName: "profile__remove_memory",
+        toolName: "learned__remove_memory",
       }
     );
-    const removed = await readDocument(
-      owner.sql,
-      owner.context.memory.scope.key
+    await owner.save.execute(
+      { text: forgottenText },
+      {
+        ...owner.execution,
+        callId: randomUUID(),
+        toolName: "learned__save_memory",
+      }
     );
-    assert.notEqual(removed.version, before.version);
-    assert.doesNotMatch(removed.content, /orange|tea/);
-    // Removal committed while the old save is still visibly blocked inside PostgreSQL.
+    const after = await listLearned(owner.sql, owner.scope);
     assert.equal(
-      await waitForBlocked(owner.sql, pid, "%pg_advisory_xact_lock%"),
-      blockedPid
+      after.some((row) => row.id === owner.originalId),
+      false
     );
-    await owner.sql.query("SELECT pg_advisory_unlock($1::bigint)", [gateKey]);
-    await pending;
-    const after = await readDocument(owner.sql, owner.context.memory.scope.key);
-    const recalled = await personalMemoryProvider.recall["turn.started"](
-      owner.context
+    const remembered = after.find((row) => row.memory.includes("laranja"));
+    assert.ok(remembered);
+    assert.notEqual(remembered.id, owner.originalId);
+    const recalled = await learnedMemory.provider.recall["turn.started"](
+      nextTurn(owner.context)
     );
-    return {
-      before,
-      removed,
-      after,
-      operations,
-      originalIndex: owner.originalIndex,
-      recall: recalled?.messages[0]?.content ?? "",
-    };
+    const items = learnedRecallItems(recallMessage(recalled).content);
+    assert.equal(
+      items.some((item) => item.id === owner.originalId),
+      false
+    );
+    assert.ok(items.some((item) => item.memory.includes("laranja")));
   } finally {
-    await owner.sql.query("SELECT pg_advisory_unlock($1::bigint)", [gateKey]);
-    await Promise.allSettled([pending]);
     await owner.close();
   }
-}
-
-test("stale native snapshot retries after removal without restoring the forgotten entry", async () => {
-  const result = await runRace(2, incomingText);
-  assert.doesNotMatch(result.after.content, /orange/);
-  assert.match(result.after.content, /tea/);
-  assert.doesNotMatch(result.recall, /orange/);
-  assert.match(result.recall, /tea/);
-  assert.equal(
-    result.operations,
-    4,
-    "Initial read/write conflict followed by a fresh read/write"
-  );
-  assert.notEqual(result.after.version, result.removed.version);
-});
-
-test("a delayed native save of the same incoming text creates a new entry after removal", async () => {
-  const result = await runRace(1, forgottenText);
-  assert.match(result.after.content, /orange/);
-  assert.match(result.recall, /orange/);
-  const newIndex = /(?:^|\n)(\d+):.*orange/mu.exec(result.recall)?.[1];
-  assert.ok(newIndex);
-  assert.ok(Number(newIndex) > result.originalIndex);
-  assert.equal(
-    result.operations,
-    2,
-    "The delayed read sees the removal, then writes its explicit incoming text"
-  );
-  assert.notEqual(result.after.version, result.removed.version);
 });

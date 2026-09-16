@@ -1,9 +1,15 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { justbash } from "eve/sandbox/just-bash";
 import { Schema } from "effect";
 import { expect, test } from "vitest";
+import {
+  computerScopeKey,
+  embeddedRuntimeDecision,
+  guestEnvironment,
+} from "../../../server/operon-kernel";
 
 test("the real Eve virtual shell keeps files session-private and blocks network access", async ({
   onTestFinished,
@@ -22,9 +28,10 @@ test("the real Eve virtual shell keeps files session-private and blocks network 
     server.address()
   );
   const backend = justbash({ autoInstall: false });
+  const sessionKey = randomUUID();
   const first = await backend.create({
     templateKey: null,
-    sessionKey: randomUUID(),
+    sessionKey,
     runtimeContext: { appRoot: process.cwd() },
   });
   onTestFinished(() => first.delete());
@@ -50,4 +57,58 @@ test("the real Eve virtual shell keeps files session-private and blocks network 
   expect(blocked.exitCode).not.toBe(0);
   expect(blocked.stderr).toMatch(/not allowed|denied/i);
   expect(requests).toBe(0);
+  const leaked = await first.session.run({ command: "printenv" });
+  expect(`${leaked.stdout}\n${leaked.stderr}`).not.toMatch(
+    /DATABASE_URL|BETTER_AUTH_SECRET|SECRET_ENCRYPTION_KEY|KERNEL_API_KEY/
+  );
+  expect(
+    guestEnvironment({ DATABASE_URL: "postgresql://x", PATH: "/bin" })
+  ).toEqual({ PATH: "/bin" });
+  await first.delete();
+  const resumed = await backend.create({
+    templateKey: null,
+    sessionKey,
+    runtimeContext: { appRoot: process.cwd() },
+  });
+  onTestFinished(() => resumed.delete());
+  expect(
+    (await resumed.session.run({ command: "cat private.txt" })).exitCode
+  ).not.toBe(0);
 }, 15000);
+
+test("pins Eve just-bash and does not install a second agent loop", () => {
+  const sandbox = readFileSync("agent/sandbox.ts", "utf8");
+  const agent = readFileSync("agent/agent.ts", "utf8");
+  const dockerfile = readFileSync("Dockerfile", "utf8");
+  const manifest = readFileSync("package.json", "utf8");
+  expect(embeddedRuntimeDecision).toEqual({
+    agentOs: "no-go",
+    secondAgentLoop: false,
+    selected: "eve-just-bash",
+  });
+  expect(sandbox).toContain("justbash({ autoInstall: false })");
+  expect(sandbox).toContain("computerSessionKey");
+  expect(sandbox).not.toContain("defaultBackend");
+  expect(sandbox).not.toContain("agentos");
+  expect(agent.match(/defineAgent\(/g)?.length).toBe(1);
+  expect(agent).not.toContain("agentos");
+  expect(dockerfile).toContain("require.resolve('just-bash')");
+  expect(manifest).toContain('"just-bash"');
+  expect(manifest).not.toContain("@rivet-dev/agentos");
+  expect(readFileSync("agent/tools/bash.ts", "utf8")).toContain(
+    "disableTool()"
+  );
+  expect(
+    computerScopeKey({
+      kind: "private",
+      userId: "better-auth:alice",
+      workspaceId: "company:acme",
+    })
+  ).not.toBe(
+    computerScopeKey({
+      kind: "shared",
+      audienceId: "binding:acme",
+      workspaceId: "company:acme",
+    })
+  );
+});
